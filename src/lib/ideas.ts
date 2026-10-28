@@ -74,21 +74,38 @@ function enesimoDomingo(anio: number, mes: number, n: number): string {
   return sumarDias(primero, ((7 - d) % 7) + (n - 1) * 7);
 }
 
+/** Domingo de Pascua (algoritmo de Butcher). Semana Santa es la semana anterior. */
+export function pascua(anio: number): string {
+  const a = anio % 19, b = Math.floor(anio / 100), c = anio % 100, d = Math.floor(b / 4), e = b % 4;
+  const f = Math.floor((b + 8) / 25), g = Math.floor((b - f + 1) / 3), h = (19 * a + b - d - g + 15) % 30;
+  const i = Math.floor(c / 4), k = c % 4, l = (32 + 2 * e + 2 * i - h - k) % 7, m = Math.floor((a + 11 * h + 22 * l) / 451);
+  const mes = Math.floor((h + l - 7 * m + 114) / 31), dia = ((h + l - 7 * m + 114) % 31) + 1;
+  return `${anio}-${String(mes).padStart(2, "0")}-${String(dia).padStart(2, "0")}`;
+}
+
 /** Fechas de los próximos `dias` días, de la más cercana a la más lejana. */
 export function fechasComerciales(hoy: string, dias = 60): FechaComercial[] {
   const limite = sumarDias(hoy, dias);
   const lista: FechaComercial[] = [];
   const anio = Number(hoy.slice(0, 4));
   for (const a of [anio, anio + 1]) {
+    const domingoPascua = pascua(a);
     lista.push(
+      { fecha: `${a}-01-07`, titulo: "Regreso al trabajo", consejo: "Mucha gente vuelve a la oficina y quiere verse bien. Publica horarios temprano y un precio de arranque de año." },
+      { fecha: `${a}-01-20`, titulo: "Cuesta de enero", consejo: "Las semanas más flojas del año. Un paquete accesible entre semana mantiene las sillas ocupadas." },
       { fecha: `${a}-02-14`, titulo: "14 de febrero", consejo: "Promueve el arreglo completo para una cita o salida." },
-      { fecha: `${a}-04-30`, titulo: "Día del Niño", consejo: "Buen momento para el corte infantil." },
-      { fecha: enesimoDomingo(a, 6, 3), titulo: "Día del Padre", consejo: "Paquete corte y barba, o una tarjeta de regalo." },
+      { fecha: sumarDias(domingoPascua, -7), titulo: "Semana Santa", consejo: "Muchos salen de viaje. Abre más horarios los días antes y avisa qué días cierran." },
+      { fecha: `${a}-04-30`, titulo: "Día del Niño", consejo: "Buen momento para el corte infantil. Un detalle para los niños ayuda a que vuelvan." },
+      { fecha: `${a}-05-10`, titulo: "Día de las Madres", consejo: "Las familias se arreglan para la comida. Invita a reservar desde el fin de semana anterior." },
+      { fecha: enesimoDomingo(a, 6, 3), titulo: "Día del Padre", consejo: "Paquete corte y barba, o una tarjeta de regalo para que los hijos se la den." },
       { fecha: `${a}-07-01`, titulo: "Graduaciones", consejo: "Publica cortes formales durante junio y julio.", aproximada: true },
-      { fecha: `${a}-08-17`, titulo: "Regreso a clases", consejo: "Corte escolar para niños y jóvenes.", aproximada: true },
+      { fecha: `${a}-08-17`, titulo: "Regreso a clases", consejo: "Corte escolar para niños y jóvenes. Conviene abrir más temprano esa semana.", aproximada: true },
       { fecha: `${a}-09-15`, titulo: "Fiestas patrias", consejo: "Abre más horarios antes del puente." },
+      { fecha: `${a}-10-31`, titulo: "Día de Muertos", consejo: "Diseños con temática, figuras rasuradas o barba con estilo. Publica fotos de trabajos anteriores." },
       { fecha: `${a}-11-14`, titulo: "Buen Fin", consejo: "Prepara el contenido una semana antes. Confirma las fechas oficiales.", aproximada: true },
       { fecha: `${a}-12-16`, titulo: "Posadas y fiestas", consejo: "Conviene abrir más horarios en la tarde." },
+      { fecha: `${a}-12-20`, titulo: "Aguinaldo", consejo: "Llega el aguinaldo. Buen momento para tarjetas de regalo y paquetes completos.", aproximada: true },
+      { fecha: `${a}-12-24`, titulo: "Navidad y Año Nuevo", consejo: "Las semanas más llenas del año. Abre agenda extendida del 20 al 31 y pide reservar con tiempo." },
     );
     for (let m = 1; m <= 12; m++) {
       const mm = String(m).padStart(2, "0");

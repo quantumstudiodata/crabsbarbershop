@@ -287,7 +287,7 @@ export const pagosComision = pgTable("pagos_comision", {
   barberoId: uuid("barbero_id")
     .notNull()
     .references(() => usuarios.id),
-  // pago: el negocio le paga a la barbera. renta: la barbera le paga al negocio.
+  // pago: el negocio le paga al barbero. renta: el barbero le paga al negocio.
   tipo: tipoPagoComisionEnum("tipo").notNull(),
   monto: integer("monto").notNull(),
   semana: date("semana").notNull(),

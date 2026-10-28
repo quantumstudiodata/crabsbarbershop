@@ -1,24 +1,12 @@
-export function Encabezado({ etiqueta, titulo, sub, children }: { etiqueta: string; titulo: React.ReactNode; sub?: React.ReactNode; children?: React.ReactNode }) {
+export function Encabezado({ etiqueta, titulo, sub, children }: { etiqueta?: React.ReactNode; titulo: React.ReactNode; sub?: React.ReactNode; children?: React.ReactNode }) {
   return (
     <div className="entre" style={{ alignItems: "flex-end" }}>
       <div>
-        <span className="lab">{etiqueta}</span>
-        <h1 className="titulo">{titulo}</h1>
+        {etiqueta && <span className="lab">{etiqueta}</span>}
+        <h1 className="titulo" style={{ marginTop: etiqueta ? 8 : 0 }}>{titulo}</h1>
         {sub && <p className="sub">{sub}</p>}
       </div>
       {children && <div className="fila">{children}</div>}
-    </div>
-  );
-}
-
-export function Dato({ etiqueta, valor, contexto }: { etiqueta: string; valor: React.ReactNode; contexto?: React.ReactNode }) {
-  return (
-    <div className="glass panel">
-      <div>
-        <span className="lab">{etiqueta}</span>
-        <span className="fig">{valor}</span>
-        {contexto && <span className="ctx">{contexto}</span>}
-      </div>
     </div>
   );
 }
@@ -31,9 +19,16 @@ export function Aviso({ tipo, children }: { tipo?: "ok" | "error"; children: Rea
 export const AVISOS: Record<string, { tipo?: "ok" | "error"; texto: string }> = {
   "sin-permiso": { tipo: "error", texto: "No tienes permiso para entrar a esa sección." },
   contrasena: { tipo: "ok", texto: "Listo. Tu contraseña quedó guardada." },
-  cobrada: { tipo: "ok", texto: "Venta cobrada." },
-  "caja-abierta": { tipo: "ok", texto: "La caja quedó abierta." },
-  "caja-cerrada": { tipo: "ok", texto: "La caja quedó cerrada." },
   guardado: { tipo: "ok", texto: "Guardado." },
   cancelada: { tipo: "ok", texto: "La venta quedó cancelada. Sigue visible en el historial." },
 };
+
+export function AvisoUrl({ aviso, error }: { aviso?: string; error?: string }) {
+  const a = aviso ? AVISOS[aviso] : undefined;
+  return (
+    <>
+      {a && <Aviso tipo={a.tipo}>{a.texto}</Aviso>}
+      {error && <Aviso tipo="error">{error}</Aviso>}
+    </>
+  );
+}

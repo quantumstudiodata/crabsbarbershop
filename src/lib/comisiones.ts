@@ -1,4 +1,4 @@
-// Reglas de pago de cada barbera. La regla vigente se copia en cada servicio cobrado.
+// Reglas de pago de cada persona del equipo. La regla vigente se copia en cada servicio cobrado.
 
 export type TipoRegla = "porcentaje" | "fijo" | "renta" | "sueldo" | "mixto";
 
@@ -16,7 +16,7 @@ export type Regla = {
 
 export type ReglaCopia = Pick<Regla, "tipo" | "porcentaje" | "montoFijo" | "montoSemanal">;
 
-/** Elige la regla que aplica: primero la del servicio exacto, luego la general de la barbera. */
+/** Elige la regla que aplica: primero la del servicio exacto, luego la general de la persona. */
 export function elegirRegla(reglas: Regla[], barberoId: string, servicioId: string | null, cuando: Date): Regla | null {
   const vigentes = reglas.filter(
     (r) => r.barberoId === barberoId && r.vigenteDesde <= cuando && (!r.vigenteHasta || r.vigenteHasta > cuando),
@@ -29,7 +29,7 @@ export function elegirRegla(reglas: Regla[], barberoId: string, servicioId: stri
 
 /**
  * Comisión de un servicio. Se calcula sobre lo cobrado después del descuento.
- * Nunca incluye la propina. Con renta de silla, lo cobrado es de la barbera (ella paga renta aparte).
+ * Nunca incluye la propina. Con renta de silla, lo cobrado es de quien atendió (paga renta aparte).
  * El sueldo fijo no genera comisión por servicio.
  */
 export function comisionDeServicio(regla: ReglaCopia | null, precioCobrado: number): number {
@@ -61,7 +61,7 @@ export type ResumenSemana = {
   rentaPendiente: number;
 };
 
-/** Junta lo de una barbera en una semana. Las cifras de entrada ya excluyen ventas canceladas. */
+/** Junta lo de una persona en una semana. Las cifras de entrada ya excluyen ventas canceladas. */
 export function resumenSemana(input: {
   reglaGeneral: ReglaCopia | null;
   servicios: number;

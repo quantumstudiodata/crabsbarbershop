@@ -4,7 +4,7 @@ import { and, asc, desc, eq, gte, inArray, isNotNull, lte, sql } from "drizzle-o
 import { efectivoEsperado, type MovimientosTurno } from "./caja";
 import type { Regla, ReglaCopia } from "./comisiones";
 import { db, schema } from "./db";
-import { fechaLocal, horaLocal } from "./fechas";
+import { fechaLocal, horaLocal, ZONA } from "./fechas";
 
 const s = schema;
 
@@ -23,11 +23,12 @@ export async function movimientosDeTurno(barberiaId: string, turnoId: string, fo
     .from(s.pagos)
     .innerJoin(s.ventas, eq(s.ventas.id, s.pagos.ventaId))
     .where(and(eq(s.ventas.barberiaId, barberiaId), eq(s.ventas.turnoId, turnoId), eq(s.ventas.estado, "pagada"), eq(s.pagos.esEfectivo, true)));
-  const [otrosCobros] = await db
-    .select({ total: sql<number>`coalesce(sum(${s.pagos.monto}),0)::int`, ventas: sql<number>`count(distinct ${s.ventas.id})::int` })
+  const otrosPorMetodo = await db
+    .select({ metodo: s.pagos.nombreMetodo, total: sql<number>`coalesce(sum(${s.pagos.monto}),0)::int`, ventas: sql<number>`count(distinct ${s.ventas.id})::int` })
     .from(s.pagos)
     .innerJoin(s.ventas, eq(s.ventas.id, s.pagos.ventaId))
-    .where(and(eq(s.ventas.barberiaId, barberiaId), eq(s.ventas.turnoId, turnoId), eq(s.ventas.estado, "pagada"), eq(s.pagos.esEfectivo, false)));
+    .where(and(eq(s.ventas.barberiaId, barberiaId), eq(s.ventas.turnoId, turnoId), eq(s.ventas.estado, "pagada"), eq(s.pagos.esEfectivo, false)))
+    .groupBy(s.pagos.nombreMetodo);
   const [propinas] = await db
     .select({
       efectivo: sql<number>`coalesce(sum(case when ${s.propinas.esEfectivo} then ${s.propinas.monto} else 0 end),0)::int`,
@@ -69,7 +70,8 @@ export async function movimientosDeTurno(barberiaId: string, turnoId: string, fo
   return {
     m,
     esperado: efectivoEsperado(m),
-    otrosCobros: otrosCobros.total,
+    otrosCobros: otrosPorMetodo.reduce((a, x) => a + x.total, 0),
+    otrosPorMetodo,
     ventas: conteoVentas.n,
     propinasTotal: propinas.total,
     movimientos: movs,
@@ -83,25 +85,29 @@ export type VentaFila = {
   creadoEn: Date;
   estado: "pagada" | "cancelada";
   total: number;
+  /** Día real de la venta en la zona de la barbería (no el día en que se abrió la caja). */
+  fecha: string;
   fechaOperativa: string;
   turnoId: string;
   turnoEstado: "abierto" | "cerrado";
   motivoCancelacion: string | null;
   registradaPor: string;
+  registradaPorId: string;
 };
 
-/** Ventas por fecha operativa (el día del turno), de la más reciente a la más antigua. */
-export async function ventasEntre(barberiaId: string, desde: string, hasta: string, opciones: { barberoId?: string } = {}) {
+/** Ventas por su fecha y hora reales en la zona de la barbería, de la más reciente a la más antigua. */
+export async function ventasEntre(barberiaId: string, desde: string, hasta: string, opciones: { barberoId?: string; zona?: string } = {}) {
+  const dia = sql<string>`to_char(${s.ventas.creadoEn} at time zone ${opciones.zona ?? ZONA}, 'YYYY-MM-DD')`;
   const filas = await db
     .select({
       id: s.ventas.id, folio: s.ventas.folio, creadoEn: s.ventas.creadoEn, estado: s.ventas.estado, total: s.ventas.total,
       fechaOperativa: s.turnosCaja.fechaOperativa, turnoId: s.ventas.turnoId, turnoEstado: s.turnosCaja.estado,
-      motivoCancelacion: s.ventas.motivoCancelacion, registradaPor: s.usuarios.nombre,
+      motivoCancelacion: s.ventas.motivoCancelacion, registradaPor: s.usuarios.nombre, registradaPorId: s.ventas.registradaPor, fecha: dia,
     })
     .from(s.ventas)
     .innerJoin(s.turnosCaja, eq(s.turnosCaja.id, s.ventas.turnoId))
     .innerJoin(s.usuarios, eq(s.usuarios.id, s.ventas.registradaPor))
-    .where(and(eq(s.ventas.barberiaId, barberiaId), gte(s.turnosCaja.fechaOperativa, desde), lte(s.turnosCaja.fechaOperativa, hasta)))
+    .where(and(eq(s.ventas.barberiaId, barberiaId), sql`${dia} between ${desde} and ${hasta}`))
     .orderBy(desc(s.ventas.creadoEn));
   if (filas.length === 0) return { ventas: [] as (VentaFila & { conceptos: ConceptoFila[]; pagos: PagoFila[]; propinas: PropinaFila[] })[] };
   const ids = filas.map((f) => f.id);
@@ -141,8 +147,8 @@ type PagoFila = { ventaId: string; metodo: string; esEfectivo: boolean; monto: n
 type PropinaFila = { ventaId: string; barberoId: string; monto: number; esEfectivo: boolean };
 
 /** Resumen de un periodo. Ventas = lo cobrado por servicios ya con descuento; sin propinas ni ventas canceladas. */
-export async function resumenPeriodo(barberiaId: string, desde: string, hasta: string) {
-  const { ventas } = await ventasEntre(barberiaId, desde, hasta);
+export async function resumenPeriodo(barberiaId: string, desde: string, hasta: string, zona = ZONA) {
+  const { ventas } = await ventasEntre(barberiaId, desde, hasta, { zona });
   const pagadas = ventas.filter((v) => v.estado === "pagada");
   const brutas = pagadas.reduce((a, v) => a + v.conceptos.reduce((b, c) => b + c.precioLista, 0), 0);
   const descuentos = pagadas.reduce((a, v) => a + v.conceptos.reduce((b, c) => b + c.descuento, 0), 0);
@@ -156,8 +162,11 @@ export async function resumenPeriodo(barberiaId: string, desde: string, hasta: s
   const porMetodo = new Map<string, number>();
   const porServicio = new Map<string, { veces: number; monto: number }>();
   const porBarbero = new Map<string, { nombre: string; servicios: number; monto: number }>();
+  const porHora = new Map<number, number>();
   for (const v of pagadas) {
-    porDia.set(v.fechaOperativa, (porDia.get(v.fechaOperativa) ?? 0) + v.total);
+    porDia.set(v.fecha, (porDia.get(v.fecha) ?? 0) + v.total);
+    const h = horaLocal(v.creadoEn, zona);
+    porHora.set(h, (porHora.get(h) ?? 0) + v.total);
     for (const p of v.pagos) porMetodo.set(p.metodo, (porMetodo.get(p.metodo) ?? 0) + p.monto);
     for (const c of v.conceptos) {
       const x = porServicio.get(c.nombre) ?? { veces: 0, monto: 0 };
@@ -183,6 +192,7 @@ export async function resumenPeriodo(barberiaId: string, desde: string, hasta: s
     canceladas: canceladas.length,
     ticket: pagadas.length ? Math.round(netas / pagadas.length) : 0,
     porDia,
+    porHora,
     porMetodo: [...porMetodo.entries()].sort((a, b) => b[1] - a[1]),
     porServicio: [...porServicio.entries()].sort((a, b) => b[1].monto - a[1].monto),
     porBarbero: [...porBarbero.entries()].map(([id, v]) => ({ id, ...v })).sort((a, b) => b.monto - a.monto),
@@ -205,10 +215,10 @@ export async function metodosActivos(barberiaId: string) {
     .orderBy(asc(s.metodosPago.orden));
 }
 
-/** Personas que atienden clientes: barberas y encargada activas. La dueña vive fuera y no corta en el local. */
+/** Personas que atienden clientes: barberos y encargado activos. El propietario no corta en el local. */
 export async function equipoQueAtiende(barberiaId: string) {
   return db
-    .select({ id: s.usuarios.id, nombre: s.usuarios.nombre, rol: s.usuarios.rol })
+    .select({ id: s.usuarios.id, nombre: s.usuarios.nombre, rol: s.usuarios.rol, avatar: s.usuarios.avatar, metaSemanal: s.usuarios.metaSemanal })
     .from(s.usuarios)
     .where(and(eq(s.usuarios.barberiaId, barberiaId), eq(s.usuarios.activo, true), inArray(s.usuarios.rol, ["barbera", "encargada"])))
     .orderBy(asc(s.usuarios.nombre));
@@ -243,16 +253,18 @@ export async function serviciosParaIdeas(barberiaId: string, zona: string) {
   return res;
 }
 
-export async function turnosCerrados(barberiaId: string, limite = 30) {
+export async function turnosCerrados(barberiaId: string, limite = 30, rango?: { desde: string; hasta: string }) {
   return db
     .select({
       id: s.turnosCaja.id, fechaOperativa: s.turnosCaja.fechaOperativa, abiertoEn: s.turnosCaja.abiertoEn, cerradoEn: s.turnosCaja.cerradoEn,
       fondoInicial: s.turnosCaja.fondoInicial, efectivoEsperado: s.turnosCaja.efectivoEsperado, efectivoContado: s.turnosCaja.efectivoContado,
       diferencia: s.turnosCaja.diferencia, notasCierre: s.turnosCaja.notasCierre, cerradoPor: s.usuarios.nombre,
+      verificacion: s.turnosCaja.verificacion,
     })
     .from(s.turnosCaja)
     .leftJoin(s.usuarios, eq(s.usuarios.id, s.turnosCaja.cerradoPor))
-    .where(and(eq(s.turnosCaja.barberiaId, barberiaId), eq(s.turnosCaja.estado, "cerrado"), isNotNull(s.turnosCaja.cerradoEn)))
+    .where(and(eq(s.turnosCaja.barberiaId, barberiaId), eq(s.turnosCaja.estado, "cerrado"), isNotNull(s.turnosCaja.cerradoEn),
+      ...(rango ? [gte(s.turnosCaja.fechaOperativa, rango.desde), lte(s.turnosCaja.fechaOperativa, rango.hasta)] : [])))
     .orderBy(desc(s.turnosCaja.cerradoEn))
     .limit(limite);
 }

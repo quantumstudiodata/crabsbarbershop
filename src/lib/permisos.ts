@@ -1,15 +1,15 @@
-// Qué puede hacer cada rol. La dueña puede dar permisos extra a una persona.
+// Qué puede hacer cada rol. El propietario puede dar permisos extra a una persona.
 
 export const PERMISOS = {
   "ventas.registrar": "Registrar sus propias ventas",
-  "ventas.registrar_otros": "Registrar ventas de otras barberas",
+  "ventas.registrar_otros": "Cobrar servicios hechos por otra persona del equipo",
   "ventas.ver_todas": "Ver las ventas de todo el equipo",
   "ventas.descuento": "Dar descuentos mayores al límite",
   "ventas.cancelar": "Cancelar ventas",
   "caja.operar": "Abrir y cerrar caja, retiros y gastos de caja",
   "caja.corregir": "Corregir un cierre de caja",
-  "equipo.ver": "Ver lo que le toca a cada barbera",
-  "equipo.pagar": "Registrar pagos a barberas",
+  "equipo.ver": "Ver comisiones y pagos de todo el equipo",
+  "equipo.pagar": "Registrar pagos al equipo",
   "reportes.ver": "Ver reportes",
   "reportes.exportar": "Descargar reportes",
   "ideas.decidir": "Aprobar o descartar ideas",
@@ -29,15 +29,16 @@ export const PERMISOS_POR_ROL: Record<Rol, Permiso[]> = {
   encargada: [
     "ventas.registrar", "ventas.registrar_otros", "ventas.ver_todas", "ventas.descuento", "ventas.cancelar", "caja.operar",
   ],
-  barbera: ["ventas.registrar"],
+  // En el local hay una sola computadora: cualquiera puede cobrar lo que hizo otra persona.
+  barbera: ["ventas.registrar", "ventas.registrar_otros"],
   contador: ["ventas.ver_todas", "equipo.ver", "reportes.ver", "reportes.exportar", "historial.ver"],
 };
 
 export const NOMBRE_ROL: Record<Rol, string> = {
   admin: "Administración",
-  duena: "Dueña",
-  encargada: "Encargada",
-  barbera: "Barbera",
+  duena: "Propietario",
+  encargada: "Encargado",
+  barbera: "Barbero",
   contador: "Contador",
 };
 
@@ -53,3 +54,14 @@ export function rolesAsignables(rol: Rol): Rol[] {
   if (rol === "duena") return ["duena", "encargada", "barbera", "contador"];
   return [];
 }
+
+/** Orden de jerarquía para listas de personas. */
+export const ORDEN_ROL: Rol[] = ["duena", "admin", "contador", "encargada", "barbera"];
+
+export const DESCRIPCION_ROL: Record<Rol, string> = {
+  duena: "Ve y decide todo",
+  admin: "Igual que el propietario",
+  contador: "Consulta y descarga, no cobra",
+  encargada: "Cobra, abre y cierra caja",
+  barbera: "Cobra y ve sus ventas",
+};

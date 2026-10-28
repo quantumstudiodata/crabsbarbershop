@@ -1,6 +1,6 @@
 "use server";
 
-import { eq, sql } from "drizzle-orm";
+import { and, eq, sql } from "drizzle-orm";
 import { redirect } from "next/navigation";
 import { BLOQUEO_MS, INTENTOS_MAXIMOS, crearSesion, hashContrasena, verificarContrasena } from "@/lib/auth";
 import { db, schema } from "@/lib/db";
@@ -22,10 +22,10 @@ export async function entrar(_: EstadoEntrada, form: FormData): Promise<EstadoEn
     await verificarContrasena(contrasena, await relleno);
     return { error: "El usuario o la contraseña no coinciden." };
   }
-  if (!u.activo) return { error: "Este usuario está desactivado. Pide ayuda a la dueña." };
+  if (!u.activo) return { error: "Este usuario está desactivado. Pide ayuda al propietario." };
   if (u.bloqueadoHasta && u.bloqueadoHasta > new Date()) {
     const min = Math.ceil((u.bloqueadoHasta.getTime() - Date.now()) / 60000);
-    return { error: `Demasiados intentos. Vuelve a intentar en ${min} minutos o pide a la dueña que restablezca tu contraseña.` };
+    return { error: `Demasiados intentos. Vuelve a intentar en ${min} minutos o usa ¿Olvidaste tu contraseña?` };
   }
   if (!(await verificarContrasena(contrasena, u.hash))) {
     const intentos = u.intentosFallidos + 1;
@@ -46,4 +46,23 @@ export async function entrar(_: EstadoEntrada, form: FormData): Promise<EstadoEn
     .where(eq(schema.usuarios.id, u.id));
   await crearSesion(u.id);
   redirect(u.debeCambiar ? "/cambiar-contrasena" : "/");
+}
+
+/**
+ * Pide al propietario que restablezca la contraseña. Siempre responde igual,
+ * exista o no el usuario, para no revelar quién tiene cuenta.
+ */
+export async function solicitarRestablecer(usuarioTxt: string): Promise<{ ok: true }> {
+  const usuario = String(usuarioTxt ?? "").trim().toUpperCase().slice(0, 40);
+  if (!usuario) return { ok: true };
+  const [u] = await db.select().from(schema.usuarios).where(eq(schema.usuarios.usuario, usuario)).limit(1);
+  if (!u || !u.activo) return { ok: true };
+  const [pendiente] = await db.select({ id: schema.solicitudesClave.id }).from(schema.solicitudesClave)
+    .where(and(eq(schema.solicitudesClave.usuarioId, u.id), eq(schema.solicitudesClave.atendida, false))).limit(1);
+  if (pendiente) return { ok: true };
+  await db.transaction(async (tx) => {
+    await tx.insert(schema.solicitudesClave).values({ barberiaId: u.barberiaId, usuarioId: u.id });
+    await registrar(tx, { barberiaId: u.barberiaId, usuarioId: u.id, tipo: "usuario", accion: `${u.nombre} pidió restablecer su contraseña` });
+  });
+  return { ok: true };
 }

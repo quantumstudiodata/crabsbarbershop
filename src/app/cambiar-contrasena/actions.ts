@@ -21,7 +21,7 @@ export async function cambiarContrasena(_: EstadoCambio, form: FormData): Promis
   if (nueva === actual) return { error: "La nueva contraseña debe ser diferente a la actual." };
   const problema = problemaContrasena(nueva, u.usuario);
   if (problema) return { error: problema };
-  await db.update(schema.usuarios).set({ hash: await hashContrasena(nueva), debeCambiar: false }).where(eq(schema.usuarios.id, u.id));
+  await db.update(schema.usuarios).set({ hash: await hashContrasena(nueva), debeCambiar: false, claveTemporal: null, claveTemporalExpira: null }).where(eq(schema.usuarios.id, u.id));
   await registrar(db, { barberiaId: u.barberiaId, usuarioId: u.id, tipo: "acceso", accion: `${u.nombre} cambió su contraseña` });
   redirect("/?aviso=contrasena");
 }

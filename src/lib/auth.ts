@@ -18,7 +18,7 @@ export const hashContrasena = (texto: string) => bcrypt.hash(texto, 10);
 export const verificarContrasena = (texto: string, hash: string) => bcrypt.compare(texto, hash);
 
 export type Sesion = {
-  usuario: { id: string; nombre: string; usuario: string; rol: Rol; debeCambiar: boolean };
+  usuario: { id: string; nombre: string; usuario: string; rol: Rol; debeCambiar: boolean; avatar: string };
   barberia: typeof schema.barberias.$inferSelect;
   permisos: Set<Permiso>;
   puede: (p: Permiso) => boolean;
@@ -63,7 +63,7 @@ export const obtenerSesion = cache(async (): Promise<Sesion | null> => {
   if (!fila || !fila.u.activo) return null;
   const permisos = permisosDe(fila.u.rol, fila.u.permisosExtra);
   return {
-    usuario: { id: fila.u.id, nombre: fila.u.nombre, usuario: fila.u.usuario, rol: fila.u.rol, debeCambiar: fila.u.debeCambiar },
+    usuario: { id: fila.u.id, nombre: fila.u.nombre, usuario: fila.u.usuario, rol: fila.u.rol, debeCambiar: fila.u.debeCambiar, avatar: fila.u.avatar },
     barberia: fila.b,
     permisos,
     puede: (p) => permisos.has(p),

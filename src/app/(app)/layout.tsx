@@ -1,39 +1,44 @@
-import Link from "next/link";
+import { MenuUsuario } from "@/components/MenuUsuario";
 import { Nav, type ItemNav } from "@/components/Nav";
+import { PanelIdeas } from "@/components/PanelIdeas";
+import { VentanaVivo } from "@/components/VentanaVivo";
 import { requerirSesion } from "@/lib/auth";
 import { NOMBRE_ROL } from "@/lib/permisos";
-import { salir } from "../salir";
 
 export const dynamic = "force-dynamic";
 
 export default async function LayoutApp({ children }: { children: React.ReactNode }) {
   const s = await requerirSesion();
-  const items: ItemNav[] = [{ href: "/", texto: "Inicio" }];
-  if (s.puede("ventas.registrar") || s.puede("ventas.registrar_otros")) items.push({ href: "/cobrar", texto: "Cobrar" });
-  items.push({ href: "/ventas", texto: "Ventas" });
-  if (s.puede("caja.operar") || s.puede("reportes.ver")) items.push({ href: "/caja", texto: "Caja" });
-  items.push({ href: "/equipo", texto: s.puede("equipo.ver") ? "Equipo" : "Mi semana" });
-  if (s.puede("reportes.ver")) items.push({ href: "/reportes", texto: "Reportes" });
-  if (s.puede("ideas.decidir")) items.push({ href: "/ideas", texto: "Ideas" });
-  if (s.puede("ajustes.usuarios") || s.puede("ajustes.negocio") || s.puede("historial.ver")) items.push({ href: "/ajustes", texto: "Ajustes" });
+  const rol = s.usuario.rol;
+  const atiende = rol === "barbera" || rol === "encargada";
+  const cobra = s.puede("ventas.registrar") || s.puede("ventas.registrar_otros");
+  const analitica = s.puede("reportes.ver") || s.puede("ventas.ver_todas");
+
+  const items: ItemNav[] = [];
+  if (rol !== "contador") items.push({ href: "/", texto: "Inicio", icono: "inicio" });
+  if (cobra) items.push({ href: "/cobrar", texto: "Cobro", icono: "cobro" });
+  if (atiende) items.push({ href: "/mis-ventas", texto: "Mis ventas", icono: "lista" });
+  if (analitica) items.push({ href: "/analitica", texto: "Analítica", icono: "grafica" });
+  if (rol === "contador") items.push({ href: "/cierres", texto: "Cierres y descargas", icono: "archivo" });
 
   return (
     <>
       <header className="barra">
-        <Nav items={items} />
-      </header>
-      <div className="contenedor">
-        <div className="usuario-menu">
-          <span>
-            {s.usuario.nombre} <span className="chip gris" style={{ marginLeft: 6 }}>{NOMBRE_ROL[s.usuario.rol]}</span>
-          </span>
-          <Link href="/cambiar-contrasena" className="enlace">Contraseña</Link>
-          <form action={salir}>
-            <button className="enlace">Salir</button>
-          </form>
+        <div className="barra-in">
+          <MenuUsuario
+            nombre={s.usuario.nombre}
+            usuario={s.usuario.usuario}
+            rol={NOMBRE_ROL[rol]}
+            avatar={s.usuario.avatar}
+            ajustes={s.puede("ajustes.usuarios") || s.puede("ajustes.negocio")}
+            historial={s.puede("historial.ver")}
+          />
+          <Nav items={items} />
+          <div className="herramientas">{s.puede("ideas.decidir") && <PanelIdeas />}</div>
         </div>
-        {children}
-      </div>
+      </header>
+      <main className="contenedor">{children}</main>
+      {rol !== "contador" && <VentanaVivo verTodo={s.puede("historial.ver") ? "/historial" : "/mis-ventas"} />}
     </>
   );
 }
