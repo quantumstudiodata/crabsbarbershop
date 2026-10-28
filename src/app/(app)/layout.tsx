@@ -1,5 +1,7 @@
 import { MenuUsuario } from "@/components/MenuUsuario";
 import { Nav, type ItemNav } from "@/components/Nav";
+import { Campana } from "@/components/Campana";
+import { Icono } from "@/components/Icono";
 import { PanelIdeas } from "@/components/PanelIdeas";
 import { VentanaVivo } from "@/components/VentanaVivo";
 import { requerirSesion } from "@/lib/auth";
@@ -34,11 +36,14 @@ export default async function LayoutApp({ children }: { children: React.ReactNod
             historial={s.puede("historial.ver")}
           />
           <Nav items={items} />
-          <div className="herramientas">{s.puede("ideas.decidir") && <PanelIdeas />}</div>
+          <div className="herramientas">
+            {rol === "contador" ? <span className="est"><Icono n="candado" />Solo lectura</span> : <Campana verTodo={s.puede("historial.ver") ? "/historial" : "/mis-ventas"} />}
+            {s.puede("ideas.decidir") && <PanelIdeas />}
+          </div>
         </div>
       </header>
       <main className="contenedor">{children}</main>
-      {rol !== "contador" && <VentanaVivo verTodo={s.puede("historial.ver") ? "/historial" : "/mis-ventas"} />}
+      {rol !== "contador" && <VentanaVivo />}
     </>
   );
 }

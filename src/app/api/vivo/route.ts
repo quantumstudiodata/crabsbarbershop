@@ -22,35 +22,54 @@ export async function GET() {
   const desde = new Date(Date.now() - 24 * 3600 * 1000);
   let eventos: EventoVivo[] = [];
 
-  if (se.puede("historial.ver")) {
-    const filas = await db
-      .select({ id: s.historial.id, t: s.historial.creadoEn, accion: s.historial.accion, tipo: s.historial.tipo, nombre: s.usuarios.nombre, avatar: s.usuarios.avatar })
-      .from(s.historial)
-      .leftJoin(s.usuarios, eq(s.usuarios.id, s.historial.usuarioId))
-      .where(and(eq(s.historial.barberiaId, bId), gte(s.historial.creadoEn, desde)))
-      .orderBy(desc(s.historial.creadoEn))
-      .limit(20);
-    // Las solicitudes de contraseña ya salen arriba con su botón.
-    const verSolicitudes = se.puede("ajustes.usuarios");
-    eventos = filas.filter((f) => f.tipo !== "acceso" && !(verSolicitudes && f.accion.endsWith("pidió restablecer su contraseña"))).map((f) => ({
-      id: `h${f.id}`, t: f.t.toISOString(), titulo: f.accion, href: RUTA[f.tipo], nombre: f.nombre ?? "Sistema", avatar: f.avatar ?? "cangrejo",
-    }));
-  } else {
-    // Barberos: los servicios que se registraron a su nombre.
-    const filas = await db
-      .select({ id: s.conceptos.id, t: s.ventas.creadoEn, servicio: s.conceptos.nombreServicio, monto: s.conceptos.precioCobrado, estado: s.ventas.estado, nombre: s.usuarios.nombre, avatar: s.usuarios.avatar, folio: s.ventas.folio })
-      .from(s.conceptos)
-      .innerJoin(s.ventas, eq(s.ventas.id, s.conceptos.ventaId))
-      .innerJoin(s.usuarios, eq(s.usuarios.id, s.ventas.registradaPor))
-      .where(and(eq(s.conceptos.barberiaId, bId), eq(s.conceptos.barberoId, se.usuario.id), gte(s.ventas.creadoEn, desde)))
-      .orderBy(desc(s.ventas.creadoEn))
-      .limit(20);
-    eventos = filas.map((f) => ({
-      id: `c${f.id}${f.estado}`, t: f.t.toISOString(),
-      titulo: f.estado === "cancelada" ? `Se canceló ${f.servicio}` : `${f.servicio}, ${formatoDinero(f.monto)}`,
-      detalle: `Folio ${f.folio}. Lo registró ${f.nombre.split(" ")[0]}`, href: "/mis-ventas", nombre: f.nombre, avatar: f.avatar,
-    }));
+  // Cobros recientes, escritos como en una conversación: "Luz cobró un Fade, $170 con tarjeta".
+  const cobros = await db
+    .select({ id: s.ventas.id, t: s.ventas.creadoEn, folio: s.ventas.folio, estado: s.ventas.estado, total: s.ventas.total, nombre: s.usuarios.nombre, avatar: s.usuarios.avatar })
+    .from(s.ventas)
+    .innerJoin(s.usuarios, eq(s.usuarios.id, s.ventas.registradaPor))
+    .where(and(eq(s.ventas.barberiaId, bId), gte(s.ventas.creadoEn, desde)))
+    .orderBy(desc(s.ventas.creadoEn))
+    .limit(25);
+  const ids = cobros.map((c) => c.id);
+  const [cs, ps] = ids.length ? await Promise.all([
+    db.select({ ventaId: s.conceptos.ventaId, nombre: s.conceptos.nombreServicio, barberoId: s.conceptos.barberoId, barbero: s.usuarios.nombre, avatar: s.usuarios.avatar })
+      .from(s.conceptos).innerJoin(s.usuarios, eq(s.usuarios.id, s.conceptos.barberoId)).where(inArray(s.conceptos.ventaId, ids)),
+    db.select({ ventaId: s.pagos.ventaId, metodo: s.pagos.nombreMetodo }).from(s.pagos).where(inArray(s.pagos.ventaId, ids)),
+  ]) : [[], []];
+  const verTodas = se.puede("ventas.ver_todas");
+  for (const c of cobros) {
+    const conceptos = cs.filter((x) => x.ventaId === c.id);
+    if (!verTodas && !conceptos.some((x) => x.barberoId === se.usuario.id)) continue;
+    const quien = conceptos[0];
+    const servicios = conceptos.map((x) => x.nombre);
+    const lista = servicios.length > 2 ? `${servicios.slice(0, 2).join(", ")} y ${servicios.length - 2} más` : servicios.join(" y ");
+    const metodos = [...new Set(ps.filter((x) => x.ventaId === c.id).map((x) => x.metodo.toLowerCase()))].join(" y ");
+    eventos.push({
+      id: `v${c.id}${c.estado}`, t: c.t.toISOString(),
+      titulo: c.estado === "cancelada" ? `Se canceló ${lista}` : `${(quien?.barbero ?? c.nombre).split(" ")[0]} atendió ${lista}`,
+      detalle: `${formatoDinero(c.total)}${metodos ? ` con ${metodos}` : ""}`,
+      href: verTodas ? "/analitica/ventas" : "/mis-ventas", nombre: quien?.barbero ?? c.nombre, avatar: quien?.avatar ?? c.avatar,
+    });
   }
+
+  // Lo demás que pasó: caja para todos; personas, precios y ajustes para quien ve el historial.
+  const verHistorial = se.puede("historial.ver");
+  const filas = await db
+    .select({ id: s.historial.id, t: s.historial.creadoEn, accion: s.historial.accion, tipo: s.historial.tipo, nombre: s.usuarios.nombre, avatar: s.usuarios.avatar })
+    .from(s.historial)
+    .leftJoin(s.usuarios, eq(s.usuarios.id, s.historial.usuarioId))
+    .where(and(eq(s.historial.barberiaId, bId), gte(s.historial.creadoEn, desde), verHistorial ? inArray(s.historial.tipo, ["caja", "usuario", "precio", "ajuste", "equipo", "idea"]) : eq(s.historial.tipo, "caja")))
+    .orderBy(desc(s.historial.creadoEn))
+    .limit(20);
+  const verSolicitudes = se.puede("ajustes.usuarios");
+  for (const f of filas) {
+    if (verSolicitudes && f.accion.endsWith("pidió restablecer su contraseña")) continue;
+    // "Ana Martínez López abrió la caja" se lee mejor como "Ana abrió la caja".
+    const titulo = f.nombre && f.accion.startsWith(f.nombre) ? f.nombre.split(" ")[0] + f.accion.slice(f.nombre.length) : f.accion;
+    eventos.push({ id: `h${f.id}`, t: f.t.toISOString(), titulo, href: verHistorial ? RUTA[f.tipo] : undefined, nombre: f.nombre ?? "Sistema", avatar: f.avatar ?? "cangrejo" });
+  }
+  eventos.sort((a, b) => b.t.localeCompare(a.t));
+  eventos = eventos.slice(0, 20);
 
   let solicitudes: SolicitudVivo[] = [];
   if (se.puede("ajustes.usuarios")) {

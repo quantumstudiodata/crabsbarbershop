@@ -36,6 +36,9 @@ const P: Record<string, React.ReactNode> = {
   persona: <><circle cx="9" cy="8" r="3.5" /><path d="M2.5 20c0-3.6 2.9-6.5 6.5-6.5s6.5 2.9 6.5 6.5M16 4.5a3.5 3.5 0 0 1 0 7M18.5 13.8c1.8.9 3 2.7 3 4.9" /></>,
   tarjeta: <><rect x="3" y="5" width="18" height="14" rx="2.5" /><path d="M3 10h18M7 15h4" /></>,
   etiqueta: <><path d="M3 12V4h8l10 10-8 8z" /><circle cx="7.5" cy="8.5" r="1.3" /></>,
+  buscar: <><circle cx="11" cy="11" r="6.5" /><path d="M20 20l-4.2-4.2" /></>,
+  salida: <path d="M12 19V5M6 11l6-6 6 6" />,
+  entrada: <path d="M12 5v14M6 13l6 6 6-6" />,
 };
 
 export type NombreIcono = keyof typeof P;

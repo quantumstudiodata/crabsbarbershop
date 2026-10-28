@@ -3,8 +3,8 @@ import type { Periodo } from "@/lib/periodo";
 import { Calendario } from "./Calendario";
 
 /** Semana, mes o fechas a elegir. */
-export function SelectorPeriodo({ ruta, p, hoy, conDia, extra = "" }: { ruta: string; p: Periodo; hoy: string; conDia?: boolean; extra?: string }) {
-  const op: [string, string][] = [...(conDia ? ([["dia", "Hoy"]] as [string, string][]) : []), ["semana", "Semana"], ["mes", "Mes"]];
+export function SelectorPeriodo({ ruta, p, hoy, conDia, conAnio, extra = "" }: { ruta: string; p: Periodo; hoy: string; conDia?: boolean; conAnio?: boolean; extra?: string }) {
+  const op: [string, string][] = [...(conDia ? ([["dia", "Hoy"]] as [string, string][]) : []), ["semana", "Semana"], ["mes", "Mes"], ...(conAnio ? ([["anio", "Año"]] as [string, string][]) : [])];
   const fin = p.hasta > hoy ? hoy : p.hasta;
   return (
     <div className="fila">

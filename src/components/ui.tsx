@@ -35,7 +35,7 @@ export function Modal({ abierto, cerrar, etiqueta, titulo, ancho, children }: {
           </div>
           <button type="button" className="icb cerrar-x" onClick={cerrar} aria-label="Cerrar"><Icono n="cerrar" /></button>
         </div>
-        {children}
+        <div className="modal-c">{children}</div>
       </div>
     </div>,
     document.body,
@@ -56,55 +56,69 @@ export function Interruptor({ name, checked, defaultChecked, onChange, etiqueta,
 
 export type Opcion = { valor: string; texto: string; detalle?: string; icono?: React.ReactNode };
 
-/** Lista desplegable propia (no la del navegador). */
+/** Lista desplegable propia (no la del navegador). La lista flota para que ninguna ventana la corte. */
 export function Selector({ name, opciones, valor, inicial, onChange, etiqueta, className }: {
   name?: string; opciones: Opcion[]; valor?: string; inicial?: string; onChange?: (v: string) => void; etiqueta: string; className?: string;
 }) {
   const [interno, setInterno] = useState(inicial ?? opciones[0]?.valor ?? "");
   const actual = valor ?? interno;
-  const [abierto, setAbierto] = useState(false);
+  const [pos, setPos] = useState<{ x: number; y: number; w: number; arriba: boolean } | null>(null);
   const [activo, setActivo] = useState(0);
-  const caja = useRef<HTMLDivElement>(null);
+  const boton = useRef<HTMLButtonElement>(null);
+  const lista = useRef<HTMLDivElement>(null);
   const elegido = opciones.find((o) => o.valor === actual);
   const id = useId();
+  const abierto = pos !== null;
 
+  const abrir = () => {
+    const r = boton.current?.getBoundingClientRect();
+    if (!r) return;
+    const arriba = window.innerHeight - r.bottom < Math.min(300, opciones.length * 44 + 20) && r.top > window.innerHeight - r.bottom;
+    setPos({ x: r.left, y: arriba ? r.top - 6 : r.bottom + 6, w: r.width, arriba });
+    setActivo(Math.max(0, opciones.findIndex((o) => o.valor === actual)));
+  };
   useEffect(() => {
     if (!abierto) return;
-    const fuera = (e: MouseEvent) => { if (!caja.current?.contains(e.target as Node)) setAbierto(false); };
+    const fuera = (e: MouseEvent) => { if (!lista.current?.contains(e.target as Node) && !boton.current?.contains(e.target as Node)) setPos(null); };
+    const cerrar = () => setPos(null);
     document.addEventListener("mousedown", fuera);
-    return () => document.removeEventListener("mousedown", fuera);
+    window.addEventListener("resize", cerrar);
+    window.addEventListener("scroll", cerrar, true);
+    return () => { document.removeEventListener("mousedown", fuera); window.removeEventListener("resize", cerrar); window.removeEventListener("scroll", cerrar, true); };
   }, [abierto]);
 
-  const elegir = (v: string) => { setInterno(v); onChange?.(v); setAbierto(false); };
+  const elegir = (v: string) => { setInterno(v); onChange?.(v); setPos(null); boton.current?.focus(); };
   const tecla = (e: React.KeyboardEvent) => {
     if (e.key === "ArrowDown" || e.key === "ArrowUp") {
       e.preventDefault();
-      if (!abierto) { setAbierto(true); setActivo(Math.max(0, opciones.findIndex((o) => o.valor === actual))); return; }
+      if (!abierto) { abrir(); return; }
       setActivo((i) => (i + (e.key === "ArrowDown" ? 1 : -1) + opciones.length) % opciones.length);
     } else if ((e.key === "Enter" || e.key === " ") && abierto) {
-      e.preventDefault(); elegir(opciones[activo].valor);
+      e.preventDefault(); e.stopPropagation(); elegir(opciones[activo].valor);
     } else if (e.key === "Escape" && abierto) {
-      e.stopPropagation(); setAbierto(false);
+      e.stopPropagation(); setPos(null);
     }
   };
 
   return (
-    <div className={`selector ${className ?? ""}`} ref={caja}>
+    <div className={`selector ${className ?? ""}`}>
       {name && <input type="hidden" name={name} value={actual} />}
-      <button type="button" className="input" aria-haspopup="listbox" aria-expanded={abierto} aria-label={etiqueta} aria-controls={id}
-        onClick={() => { setAbierto((a) => !a); setActivo(Math.max(0, opciones.findIndex((o) => o.valor === actual))); }} onKeyDown={tecla}>
-        <span className="fila" style={{ gap: 10 }}>{elegido?.icono}{elegido?.texto ?? "Elegir"}</span>
+      <button ref={boton} type="button" className="input" aria-haspopup="listbox" aria-expanded={abierto} aria-label={etiqueta} aria-controls={id}
+        onClick={() => (abierto ? setPos(null) : abrir())} onKeyDown={tecla}>
+        <span className="fila" style={{ gap: 10, flexWrap: "nowrap", minWidth: 0 }}>{elegido?.icono}<span style={{ overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>{elegido?.texto ?? "Elegir"}</span></span>
         <Icono n="abajo" />
       </button>
-      {abierto && (
-        <div className="desplegable" role="listbox" id={id} aria-label={etiqueta}>
+      {pos && createPortal(
+        <div ref={lista} className="desplegable" role="listbox" id={id} aria-label={etiqueta}
+          style={{ left: pos.x, top: pos.y, width: Math.max(pos.w, 200), transform: pos.arriba ? "translateY(-100%)" : undefined }}>
           {opciones.map((o, i) => (
             <button type="button" key={o.valor} role="option" aria-selected={o.valor === actual} className={`op ${i === activo ? "activo" : ""}`}
               onMouseEnter={() => setActivo(i)} onClick={() => elegir(o.valor)}>
               <span className="fila" style={{ gap: 10 }}>{o.icono}<span><b style={{ fontWeight: 500 }}>{o.texto}</b>{o.detalle && <small style={{ display: "block" }}>{o.detalle}</small>}</span></span>
             </button>
           ))}
-        </div>
+        </div>,
+        document.body,
       )}
     </div>
   );

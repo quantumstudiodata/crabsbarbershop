@@ -41,7 +41,7 @@ export default async function CobroYCaja({ searchParams }: { searchParams: Promi
           <Pasos name="diferencia" inicial={Math.round(b.limiteDiferenciaCaja / 100)} paso={10} max={100000} prefijo="$" etiqueta="diferencia permitida" />
         </div>
         <div className="regla">
-          <div><b>Meta de ventas por día</b><p>Sirve de referencia en Inicio. Déjala en 0 para no usar meta.</p></div>
+          <div><b>Meta de ventas por día</b><p>Se muestra en Inicio con una barra de avance. Déjala en 0 para que se calcule sola con las ventas; al principio es de $4,000.</p></div>
           <Pasos name="meta" inicial={Math.round(b.metaDiaria / 100)} paso={100} max={1000000} prefijo="$" etiqueta="meta diaria" />
         </div>
         <div className="acciones"><button className="bt">Guardar reglas<Fl /></button></div>

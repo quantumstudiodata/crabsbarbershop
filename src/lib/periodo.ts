@@ -1,12 +1,16 @@
 import { diasEntre, esFechaValida, fechaCorta, finDeMes, inicioDeMes, lunesDe, sumarDias } from "./fechas";
 
-export type Periodo = { tipo: "dia" | "semana" | "mes" | "rango"; desde: string; hasta: string; nombre: string; etiqueta: string };
+export type Periodo = { tipo: "dia" | "semana" | "mes" | "anio" | "rango"; desde: string; hasta: string; nombre: string; etiqueta: string };
 
 /** Lee el periodo de la dirección: ?periodo=semana|mes, o ?desde=&hasta= elegidos en el calendario. */
-export function leerPeriodo(q: { periodo?: string; desde?: string; hasta?: string }, hoy: string, porDefecto: "dia" | "semana" = "semana"): Periodo {
+export function leerPeriodo(q: { periodo?: string; desde?: string; hasta?: string }, hoy: string, porDefecto: "dia" | "semana" | "mes" = "semana"): Periodo {
   if (esFechaValida(q.desde) && esFechaValida(q.hasta) && q.desde <= q.hasta && diasEntre(q.desde, q.hasta) <= 400) {
     const unDia = q.desde === q.hasta;
     return { tipo: unDia ? "dia" : "rango", desde: q.desde, hasta: q.hasta, nombre: unDia ? (q.desde === hoy ? "Hoy" : `El ${fechaCorta(q.desde)}`) : "En esas fechas", etiqueta: unDia ? fechaCorta(q.desde) : `Del ${fechaCorta(q.desde)} al ${fechaCorta(q.hasta)}` };
+  }
+  if (q.periodo === "anio") {
+    const y = hoy.slice(0, 4);
+    return { tipo: "anio", desde: `${y}-01-01`, hasta: `${y}-12-31`, nombre: "Este año", etiqueta: `Año ${y}` };
   }
   const tipo = q.periodo === "mes" ? "mes" : q.periodo === "semana" ? "semana" : q.periodo === "dia" ? "dia" : porDefecto;
   if (tipo === "mes") return { tipo, desde: inicioDeMes(hoy), hasta: finDeMes(hoy), nombre: "Este mes", etiqueta: `Del ${fechaCorta(inicioDeMes(hoy))} al ${fechaCorta(finDeMes(hoy))}` };

@@ -30,7 +30,8 @@ export const PERMISOS_POR_ROL: Record<Rol, Permiso[]> = {
     "ventas.registrar", "ventas.registrar_otros", "ventas.ver_todas", "ventas.descuento", "ventas.cancelar", "caja.operar",
   ],
   // En el local hay una sola computadora: cualquiera puede cobrar lo que hizo otra persona.
-  barbera: ["ventas.registrar", "ventas.registrar_otros"],
+  // Los barberos también abren y cierran la caja: son quienes cobran.
+  barbera: ["ventas.registrar", "ventas.registrar_otros", "caja.operar"],
   contador: ["ventas.ver_todas", "equipo.ver", "reportes.ver", "reportes.exportar", "historial.ver"],
 };
 
@@ -63,5 +64,5 @@ export const DESCRIPCION_ROL: Record<Rol, string> = {
   admin: "Igual que el propietario",
   contador: "Consulta y descarga, no cobra",
   encargada: "Cobra, abre y cierra caja",
-  barbera: "Cobra y ve sus ventas",
+  barbera: "Cobra, abre y cierra caja",
 };

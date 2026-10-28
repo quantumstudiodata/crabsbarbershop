@@ -1,3 +1,4 @@
+import ExcelJS from "exceljs";
 import { and, eq, gte, lte } from "drizzle-orm";
 import { obtenerSesion } from "@/lib/auth";
 import { describirRegla, elegirRegla } from "@/lib/comisiones";
@@ -48,6 +49,35 @@ async function cortes(bId: string, desde: string, hasta: string, zona: string): 
   return filas;
 }
 
+async function pagosEquipo(bId: string, desde: string, hasta: string): Promise<Filas> {
+  const filas = await db
+    .select({ p: schema.pagosComision, nombre: schema.usuarios.nombre })
+    .from(schema.pagosComision)
+    .innerJoin(schema.usuarios, eq(schema.usuarios.id, schema.pagosComision.barberoId))
+    .where(and(eq(schema.pagosComision.barberiaId, bId), gte(schema.pagosComision.semana, lunesDe(desde)), lte(schema.pagosComision.semana, hasta)));
+  return [["Semana", "Persona", "Tipo", "Monto", "Nota"], ...filas.map((f) => [f.p.semana, f.nombre, f.p.tipo === "renta" ? "Pagó renta" : "Pago del negocio", pesos(f.p.monto), f.p.nota])];
+}
+
+/** Libro de Excel con una hoja por tema. Los montos van como números para poder sumarlos. */
+async function libro(hojas: [string, Filas][]): Promise<ArrayBuffer> {
+  const wb = new ExcelJS.Workbook();
+  wb.creator = "Crabs";
+  for (const [nombre, filas] of hojas) {
+    const ws = wb.addWorksheet(nombre, { views: [{ state: "frozen", ySplit: 1 }] });
+    for (const f of filas) ws.addRow(f.map((v) => (typeof v === "string" && /^-?\d+\.\d{2}$/.test(v) ? Number(v) : v)));
+    const enc = ws.getRow(1);
+    enc.font = { bold: true, color: { argb: "FFFFFFFF" } };
+    enc.fill = { type: "pattern", pattern: "solid", fgColor: { argb: "FF13171C" } };
+    ws.columns.forEach((c, i) => {
+      const largo = Math.max(...filas.map((f) => String(f[i] ?? "").length), 8);
+      c.width = Math.min(largo + 2, 48);
+      const esDinero = filas.slice(1).some((f) => typeof f[i] === "string" && /^-?\d+\.\d{2}$/.test(f[i] as string));
+      if (esDinero) c.numFmt = '"$"#,##0.00';
+    });
+  }
+  return (await wb.xlsx.writeBuffer()) as ArrayBuffer;
+}
+
 async function equipo(bId: string, desde: string, hasta: string, zona: string): Promise<Filas> {
   const [gente, reglas, { ventas }, pagos] = await Promise.all([
     equipoQueAtiende(bId), reglasDe(bId), ventasEntre(bId, desde, hasta, { zona }),
@@ -80,22 +110,28 @@ export async function GET(req: Request) {
   if (desde > hasta || diasEntre(desde, hasta) > 400) return new Response("Rango de fechas no válido.", { status: 400 });
   const bId = s.barberia.id;
 
-  let filas: Filas;
-  if (tipo === "ventas") filas = await ventas(bId, desde, hasta, zona);
-  else if (tipo === "gastos") filas = await gastos(bId, desde, hasta);
-  else if (tipo === "cortes") filas = await cortes(bId, desde, hasta, zona);
-  else if (tipo === "equipo") filas = await equipo(bId, desde, hasta, zona);
-  else if (tipo === "todo") {
-    const partes: [string, Filas][] = [
-      ["VENTAS", await ventas(bId, desde, hasta, zona)], ["GASTOS", await gastos(bId, desde, hasta)],
-      ["CORTES DE CAJA", await cortes(bId, desde, hasta, zona)], ["EQUIPO", await equipo(bId, desde, hasta, zona)],
-    ];
-    filas = [[`Crabs Barbería, del ${desde} al ${hasta}`]];
-    for (const [t, f] of partes) filas.push([], [t], ...f);
-  } else return new Response("Tipo de reporte no válido.", { status: 400 });
+  const hojas: Record<string, () => Promise<[string, Filas]>> = {
+    ventas: async () => ["Ventas", await ventas(bId, desde, hasta, zona)],
+    gastos: async () => ["Gastos", await gastos(bId, desde, hasta)],
+    cortes: async () => ["Cortes de caja", await cortes(bId, desde, hasta, zona)],
+    equipo: async () => ["Equipo", await equipo(bId, desde, hasta, zona)],
+    pagos: async () => ["Pagos al equipo", await pagosEquipo(bId, desde, hasta)],
+  };
+  const elegidas = tipo === "todo" ? Object.keys(hojas) : tipo && tipo in hojas ? [tipo] : [];
+  if (elegidas.length === 0) return new Response("Tipo de reporte no válido.", { status: 400 });
+  const datos = await Promise.all(elegidas.map((k) => hojas[k]()));
+  const base = `${tipo === "todo" ? "cierre" : tipo}_${desde}_${hasta}`;
 
-  const nombre = `${tipo === "todo" ? "cierre" : tipo}_${desde}_${hasta}.csv`;
-  return new Response(csv(filas), {
-    headers: { "Content-Type": "text/csv; charset=utf-8", "Content-Disposition": `attachment; filename="${nombre}"`, "Cache-Control": "no-store" },
+  if (u.searchParams.get("formato") === "csv") {
+    const filas: Filas = datos.length === 1 ? datos[0][1] : datos.flatMap(([t, f]) => [[], [t.toUpperCase()], ...f]);
+    return new Response(csv(filas), {
+      headers: { "Content-Type": "text/csv; charset=utf-8", "Content-Disposition": `attachment; filename="${base}.csv"`, "Cache-Control": "no-store" },
+    });
+  }
+  return new Response(await libro(datos), {
+    headers: {
+      "Content-Type": "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
+      "Content-Disposition": `attachment; filename="${base}.xlsx"`, "Cache-Control": "no-store",
+    },
   });
 }

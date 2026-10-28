@@ -103,7 +103,8 @@ describe("permisos", () => {
     expect(permisosDe("barbera", ["ventas.cancelar"]).has("ventas.cancelar")).toBe(true);
     // En el local hay una sola computadora: un barbero puede cobrar lo que hizo otra persona.
     expect(permisosDe("barbera").has("ventas.registrar_otros")).toBe(true);
-    expect(permisosDe("barbera", ["no.existe"]).size).toBe(2);
+    expect(permisosDe("barbera").has("caja.operar")).toBe(true);
+    expect(permisosDe("barbera", ["no.existe"]).size).toBe(3);
     expect(permisosDe("contador").has("ventas.registrar")).toBe(false);
     expect(permisosDe("contador").has("reportes.exportar")).toBe(true);
     expect(rolesAsignables("duena")).not.toContain("admin");
@@ -162,5 +163,15 @@ describe("ideas", () => {
     expect(pascua(2026)).toBe("2026-04-05");
     expect(pascua(2027)).toBe("2027-03-28");
     expect(fechasComerciales("2027-03-01", 30).find((x) => x.titulo === "Semana Santa")?.fecha).toBe("2027-03-21");
+  });
+});
+
+describe("metas", () => {
+  it("usa la asignada, la inicial o la calculada", async () => {
+    const { calcularMeta, META_INICIAL } = await import("@/lib/metas");
+    expect(calcularMeta(500000, [100]).monto).toBe(500000);
+    expect(calcularMeta(0, [0, 300000]).monto).toBe(META_INICIAL);
+    // promedio 350,000 centavos ($3,500) más 10% = $3,850, redondeado a $3,900
+    expect(calcularMeta(0, [300000, 400000, 0])).toEqual({ monto: 390000, origen: "calculada" });
   });
 });

@@ -17,7 +17,7 @@ export async function registrarPago(form: FormData) {
   const monto = leerPesos(texto(form, "monto"));
   const nota = texto(form, "nota", 200);
   const semana = esFechaValida(semanaTxt) ? lunesDe(semanaTxt) : null;
-  const ruta = `/analitica/equipo?semana=${semana ?? ""}`;
+  const ruta = texto(form, "regreso", 200).startsWith("/analitica/ventas") ? texto(form, "regreso", 200) : "/analitica/ventas";
   if (!semana || !monto) volver(ruta, { error: "Escribe el monto." });
   const [u] = await db.select().from(schema.usuarios)
     .where(and(eq(schema.usuarios.id, barberoId), eq(schema.usuarios.barberiaId, s.barberia.id))).limit(1);
@@ -30,6 +30,6 @@ export async function registrarPago(form: FormData) {
       detalle: { semana, nota },
     });
   });
-  revalidatePath("/analitica/equipo");
+  revalidatePath("/analitica/ventas");
   volver(ruta, { aviso: "guardado" });
 }

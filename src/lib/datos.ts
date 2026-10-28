@@ -277,3 +277,13 @@ export async function ajustesDeTurnos(barberiaId: string, turnoIds: string[]) {
     .innerJoin(s.usuarios, eq(s.usuarios.id, s.ajustesCierre.usuarioId))
     .where(and(eq(s.ajustesCierre.barberiaId, barberiaId), inArray(s.ajustesCierre.turnoId, turnoIds)));
 }
+
+/** Cuántos días distintos tienen ventas (hasta 2 basta para saber si ya hay historia). */
+export async function diasConVentas(barberiaId: string, zona: string, barberoId?: string) {
+  const dia = sql<string>`to_char(${s.ventas.creadoEn} at time zone ${zona}, 'YYYY-MM-DD')`;
+  const q = db.selectDistinct({ d: dia }).from(s.ventas);
+  const filas = barberoId
+    ? await q.innerJoin(s.conceptos, eq(s.conceptos.ventaId, s.ventas.id)).where(and(eq(s.ventas.barberiaId, barberiaId), eq(s.ventas.estado, "pagada"), eq(s.conceptos.barberoId, barberoId))).limit(2)
+    : await q.where(and(eq(s.ventas.barberiaId, barberiaId), eq(s.ventas.estado, "pagada"))).limit(2);
+  return filas.length;
+}

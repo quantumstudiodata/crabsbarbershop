@@ -1,18 +1,22 @@
 "use client";
 
 import Link from "next/link";
-import { useEffect, useRef, useState, useTransition } from "react";
+import { useActionState, useEffect, useRef, useState, useTransition } from "react";
+import { cambiarContrasena, type EstadoCambio } from "@/app/cambiar-contrasena/actions";
 import { cambiarAvatar } from "@/app/(app)/acciones-usuario";
 import { salir } from "@/app/salir";
 import { AVATARES } from "@/lib/avatares";
 import { Avatar } from "./Avatar";
-import { Icono } from "./Icono";
+import { Fl, Icono } from "./Icono";
 import { Modal } from "./ui";
 
 export function MenuUsuario(p: { nombre: string; usuario: string; rol: string; avatar: string; ajustes: boolean; historial: boolean }) {
   const [abierto, setAbierto] = useState(false);
   const [elegir, setElegir] = useState(false);
+  const [clave, setClave] = useState(false);
   const [avatar, setAvatar] = useState(p.avatar);
+  const [propuesto, setPropuesto] = useState(p.avatar);
+  const [vez, setVez] = useState(0);
   const [pendiente, iniciar] = useTransition();
   const caja = useRef<HTMLDivElement>(null);
 
@@ -25,9 +29,9 @@ export function MenuUsuario(p: { nombre: string; usuario: string; rol: string; a
     return () => { document.removeEventListener("mousedown", fuera); document.removeEventListener("keydown", esc); };
   }, [abierto]);
 
-  const guardar = (a: string) => {
-    setAvatar(a);
-    iniciar(async () => { await cambiarAvatar(a); });
+  const guardar = () => {
+    setAvatar(propuesto);
+    iniciar(async () => { await cambiarAvatar(propuesto); setElegir(false); });
   };
   const nombreCorto = p.nombre.split(" ").slice(0, 2).join(" ");
 
@@ -44,10 +48,10 @@ export function MenuUsuario(p: { nombre: string; usuario: string; rol: string; a
             <div className="fila"><Avatar avatar={avatar} nombre={p.nombre} t={44} /><span><b>{p.nombre}</b><small className="muted" style={{ display: "block", fontFamily: "var(--f-mono)", fontSize: 11 }}>{p.usuario}</small></span></div>
             <span className="etiqueta" style={{ width: "max-content" }}>{p.rol}</span>
           </div>
-          <button type="button" role="menuitem" className="it" onClick={() => { setElegir(true); setAbierto(false); }}><Icono n="usuario" />Cambiar avatar</button>
+          <button type="button" role="menuitem" className="it" onClick={() => { setPropuesto(avatar); setElegir(true); setAbierto(false); }}><Icono n="usuario" />Cambiar avatar</button>
           {p.ajustes && <Link role="menuitem" className="it" href="/ajustes" onClick={() => setAbierto(false)}><Icono n="ajustes" />Ajustes</Link>}
           {p.historial && <Link role="menuitem" className="it" href="/historial" onClick={() => setAbierto(false)}><Icono n="historial" />Historial</Link>}
-          <Link role="menuitem" className="it" href="/cambiar-contrasena" onClick={() => setAbierto(false)}><Icono n="candado" />Cambiar contraseña</Link>
+          <button type="button" role="menuitem" className="it" onClick={() => { setVez((v) => v + 1); setClave(true); setAbierto(false); }}><Icono n="candado" />Cambiar contraseña</button>
           <div className="separador" style={{ margin: "4px 0" }} />
           <form action={salir}><button role="menuitem" className="it salir"><Icono n="salir" />Salir</button></form>
         </div>
@@ -55,14 +59,45 @@ export function MenuUsuario(p: { nombre: string; usuario: string; rol: string; a
       <Modal abierto={elegir} cerrar={() => setElegir(false)} etiqueta="Tu perfil" titulo="Elige tu avatar">
         <div className="avatares">
           {Object.keys(AVATARES).map((a) => (
-            <button key={a} type="button" aria-pressed={avatar === a} aria-label={a === "iniciales" ? "Tus iniciales" : a} onClick={() => guardar(a)}>
+            <button key={a} type="button" aria-pressed={propuesto === a} aria-label={a === "iniciales" ? "Tus iniciales" : a} onClick={() => setPropuesto(a)}>
               <Avatar avatar={a} nombre={p.nombre} t={56} />
             </button>
           ))}
         </div>
-        <p className="ayuda-txt">{pendiente ? "Guardando…" : "Se guarda al tocarlo. Es el que verá el equipo junto a tu nombre."}</p>
-        <div className="acciones"><button type="button" className="bt" onClick={() => setElegir(false)}>Listo<span className="fl" aria-hidden="true"><Icono n="palomita" /></span></button></div>
+        <p className="ayuda-txt">Es el que verá el equipo junto a tu nombre.</p>
+        <div className="acciones">
+          <button type="button" className="bt sec solo" onClick={() => setElegir(false)}>Regresar</button>
+          <button type="button" className="bt" disabled={pendiente} onClick={guardar}>{pendiente ? "Guardando…" : "Listo"}<span className="fl" aria-hidden="true"><Icono n="palomita" /></span></button>
+        </div>
       </Modal>
+      {clave && <VentanaClave key={vez} cerrar={() => setClave(false)} />}
     </div>
+  );
+}
+
+function VentanaClave({ cerrar }: { cerrar: () => void }) {
+  const [eClave, accClave, guardandoClave] = useActionState<EstadoCambio, FormData>(cambiarContrasena, {});
+  return (
+  <Modal abierto cerrar={cerrar} etiqueta="Tu cuenta" titulo={eClave.ok ? "Contraseña guardada" : "Cambiar contraseña"}>
+      {eClave.ok ? (
+        <>
+          <div className="cronometro"><span className="exito"><Icono n="palomita" /></span><p className="muted">Listo. La próxima vez entra con la nueva.</p></div>
+          <div className="acciones"><button type="button" className="bt" onClick={cerrar}>Entendido<span className="fl" aria-hidden="true"><Icono n="palomita" /></span></button></div>
+        </>
+      ) : (
+        <form action={accClave} className="pila">
+          <input type="hidden" name="modal" value="si" />
+          <label className="campo"><span>Contraseña actual</span><input className="input" name="actual" type="password" autoComplete="current-password" required /></label>
+          <label className="campo"><span>Nueva contraseña</span><input className="input" name="nueva" type="password" autoComplete="new-password" minLength={8} required /></label>
+          <label className="campo"><span>Repite la nueva</span><input className="input" name="repetir" type="password" autoComplete="new-password" minLength={8} required /></label>
+          <p className="ayuda-txt">Al menos 8 caracteres, con letras y números.</p>
+          {eClave.error && <p className="aviso error" role="alert">{eClave.error}</p>}
+          <div className="acciones">
+            <button type="button" className="bt sec solo" onClick={cerrar}>Regresar</button>
+            <button className="bt" disabled={guardandoClave}>{guardandoClave ? "Guardando…" : "Guardar"}<Fl /></button>
+          </div>
+        </form>
+      )}
+    </Modal>
   );
 }
