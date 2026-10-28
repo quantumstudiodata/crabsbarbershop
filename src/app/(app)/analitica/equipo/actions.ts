@@ -17,7 +17,7 @@ export async function registrarPago(form: FormData) {
   const monto = leerPesos(texto(form, "monto"));
   const nota = texto(form, "nota", 200);
   const semana = esFechaValida(semanaTxt) ? lunesDe(semanaTxt) : null;
-  const ruta = `/equipo?semana=${semana ?? ""}`;
+  const ruta = `/analitica/equipo?semana=${semana ?? ""}`;
   if (!semana || !monto) volver(ruta, { error: "Escribe el monto." });
   const [u] = await db.select().from(schema.usuarios)
     .where(and(eq(schema.usuarios.id, barberoId), eq(schema.usuarios.barberiaId, s.barberia.id))).limit(1);
@@ -26,10 +26,10 @@ export async function registrarPago(form: FormData) {
     await tx.insert(schema.pagosComision).values({ barberiaId: s.barberia.id, barberoId: u.id, tipo, monto, semana, nota, usuarioId: s.usuario.id });
     await registrar(tx, {
       barberiaId: s.barberia.id, usuarioId: s.usuario.id, tipo: "equipo",
-      accion: tipo === "pago" ? `${s.usuario.nombre} registró un pago de ${formatoDinero(monto)} a ${u.nombre}` : `${u.nombre} pagó ${formatoDinero(monto)} de renta de silla`,
+      accion: tipo === "pago" ? `${s.usuario.nombre} registró un pago de ${formatoDinero(monto)} a ${u.nombre}` : `Se registró que ${u.nombre} pagó ${formatoDinero(monto)} de renta de silla`,
       detalle: { semana, nota },
     });
   });
-  revalidatePath("/equipo");
+  revalidatePath("/analitica/equipo");
   volver(ruta, { aviso: "guardado" });
 }

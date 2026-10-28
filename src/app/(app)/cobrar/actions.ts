@@ -56,7 +56,7 @@ export async function registrarVenta(_: EstadoCobro, form: FormData): Promise<Es
   if (previa) return { ok: true, folio: previa.folio, total: previa.total };
 
   const turno = await turnoAbierto(bId);
-  if (!turno) return { error: "La caja está cerrada. Ábrela antes de cobrar." };
+  if (!turno) return { error: "La caja está cerrada. Hay que abrirla antes de cobrar." };
 
   // Precios siempre desde la base de datos, nunca desde el navegador.
   const ids = [...new Set(e.lineas.map((l) => l.servicioId))];
@@ -74,7 +74,7 @@ export async function registrarVenta(_: EstadoCobro, form: FormData): Promise<Es
   if (e.descuento > 0 && !e.motivoDescuento) return { error: "Escribe el motivo del descuento." };
   const limite = Math.floor((subtotal * s.barberia.limiteDescuentoPct) / 100);
   if (e.descuento > limite && !s.puede("ventas.descuento")) {
-    return { error: `Ese descuento pasa del ${s.barberia.limiteDescuentoPct}% permitido. Pide a la encargada o a la dueña que lo registre.` };
+    return { error: `Ese descuento pasa del ${s.barberia.limiteDescuentoPct}% permitido. Pide al encargado o al propietario que lo registre.` };
   }
   const total = subtotal - e.descuento;
 

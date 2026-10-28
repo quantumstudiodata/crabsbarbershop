@@ -32,3 +32,6 @@ export function compararConteo(esperado: number, contado: number, formato: (c: n
 export function requiereExplicacion(diferencia: number, limite: number): boolean {
   return Math.abs(diferencia) > limite;
 }
+
+/** Minutos que tiene alguien para anular su propio cobro si se equivocó. */
+export const MINUTOS_CORRECCION = 10;

@@ -9,16 +9,18 @@ export function Modal({ abierto, cerrar, etiqueta, titulo, ancho, children }: {
   abierto: boolean; cerrar: () => void; etiqueta?: string; titulo: React.ReactNode; ancho?: boolean; children: React.ReactNode;
 }) {
   const ref = useRef<HTMLDivElement>(null);
+  const alCerrar = useRef(cerrar);
+  alCerrar.current = cerrar;
   const id = useId();
   useEffect(() => {
     if (!abierto) return;
     const previo = document.activeElement as HTMLElement | null;
-    const tecla = (e: KeyboardEvent) => { if (e.key === "Escape") { e.stopPropagation(); cerrar(); } };
+    const tecla = (e: KeyboardEvent) => { if (e.key === "Escape") { e.stopPropagation(); alCerrar.current(); } };
     document.addEventListener("keydown", tecla);
     const foco = ref.current?.querySelector<HTMLElement>("[autofocus], input:not([type=hidden]), button:not(.cerrar-x)");
     foco?.focus();
     return () => { document.removeEventListener("keydown", tecla); previo?.focus?.(); };
-  }, [abierto, cerrar]);
+  }, [abierto]);
   if (!abierto || typeof document === "undefined") return null;
   return createPortal(
     <div className="capa" onMouseDown={(e) => { if (e.target === e.currentTarget) cerrar(); }}>
@@ -92,7 +94,7 @@ export function Selector({ name, opciones, valor, inicial, onChange, etiqueta, c
         <Icono n="abajo" />
       </button>
       {abierto && (
-        <div className="lista" role="listbox" id={id} aria-label={etiqueta}>
+        <div className="desplegable" role="listbox" id={id} aria-label={etiqueta}>
           {opciones.map((o, i) => (
             <button type="button" key={o.valor} role="option" aria-selected={o.valor === actual} className={`op ${i === activo ? "activo" : ""}`}
               onMouseEnter={() => setActivo(i)} onClick={() => elegir(o.valor)}>

@@ -6,21 +6,34 @@ import { requerirSesion } from "@/lib/auth";
 import { turnoAbierto } from "@/lib/datos";
 import { db, schema } from "@/lib/db";
 import { registrar } from "@/lib/historial";
+import { MINUTOS_CORRECCION } from "@/lib/caja";
 import { formatoDinero } from "@/lib/money";
 import { texto, volver } from "@/lib/volver";
 
-/** Cancela una venta sin borrarla. Si su caja ya cerró, el efectivo se devuelve desde la caja abierta. */
+
+
+/**
+ * Cancela una venta sin borrarla. Si su caja ya cerró, el efectivo se devuelve desde la caja abierta.
+ * Quien no tiene permiso de cancelar puede corregir su propio cobro durante los primeros 10 minutos, con la caja abierta.
+ */
 export async function cancelarVenta(form: FormData) {
-  const s = await requerirSesion("ventas.cancelar");
+  const s = await requerirSesion();
   const ventaId = texto(form, "ventaId", 40);
   const motivo = texto(form, "motivo", 300);
-  const regreso = texto(form, "regreso", 100).startsWith("/ventas") ? texto(form, "regreso", 100) : "/ventas";
+  const r = texto(form, "regreso", 200);
+  const regreso = r.startsWith("/analitica/ventas") || r.startsWith("/mis-ventas") ? r : "/analitica/ventas";
   if (!motivo) volver(regreso, { error: "Escribe el motivo de la cancelación." });
   const [v] = await db.select({ venta: schema.ventas, turno: schema.turnosCaja }).from(schema.ventas)
     .innerJoin(schema.turnosCaja, eq(schema.turnosCaja.id, schema.ventas.turnoId))
     .where(and(eq(schema.ventas.id, ventaId), eq(schema.ventas.barberiaId, s.barberia.id))).limit(1);
   if (!v) volver(regreso, { error: "No se encontró esa venta." });
   if (v.venta.estado === "cancelada") volver(regreso, { error: "Esa venta ya estaba cancelada." });
+  if (!s.puede("ventas.cancelar")) {
+    const reciente = Date.now() - v.venta.creadoEn.getTime() <= MINUTOS_CORRECCION * 60000;
+    if (v.venta.registradaPor !== s.usuario.id || !reciente || v.turno.estado !== "abierto") {
+      volver(regreso, { error: `Solo puedes corregir tus cobros de los últimos ${MINUTOS_CORRECCION} minutos. Pide al encargado que la cancele.` });
+    }
+  }
 
   let devolucion = 0;
   let turnoActualId: string | null = null;
