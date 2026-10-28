@@ -374,17 +374,17 @@ table.tabla { width: 100%; border-collapse: collapse; font-size: 14px; }
 .progreso i { position: absolute; inset: 0; width: 40%; background: linear-gradient(90deg, transparent, var(--accent), transparent); animation: barrido 1.8s ease-in-out infinite; }
 
 /* ---------- Entrada ---------- */
-.entrada { min-height: 100vh; display: grid; place-items: center; padding: 24px 16px; }
-.entrada-c { width: min(980px, 100%); min-height: 600px; display: grid; grid-template-columns: 1fr 1fr; border-radius: 28px; overflow: hidden; }
+.entrada { min-height: 100vh; display: grid; }
+.entrada-c { width: 100%; min-height: inherit; display: grid; grid-template-columns: 1fr 1fr; border-radius: 0; border: 0; overflow: hidden; box-shadow: none; }
 .marca { position: relative; overflow: hidden; background: radial-gradient(circle at 50% 42%, rgba(255,255,255,.75), transparent 55%), linear-gradient(160deg, #dfe6ec, #b4c2ce); display: grid; align-content: center; justify-items: center; gap: 26px; padding: 48px; }
 .marca::after { content: ""; position: absolute; inset: -20% -40%; background: linear-gradient(118deg, transparent 0 40%, rgba(255,255,255,.45) 42%, transparent 46%, transparent 49%, rgba(255,255,255,.3) 50%, transparent 52%); animation: destello 12s ease-in-out infinite alternate; pointer-events: none; }
-.marca .cangrejo { width: 190px; height: 142px; color: var(--ink); opacity: .92; filter: drop-shadow(0 14px 18px rgba(20,35,50,.18)); }
-.marca .palabra { font: 800 92px/.85 var(--f-display); letter-spacing: .08em; padding-left: .08em; position: relative; z-index: 1; }
-.form-entrada { padding: 56px 48px; display: grid; align-content: center; justify-content: center; grid-template-columns: minmax(0, 380px); gap: 22px; background: rgba(255,255,255,.55); }
+.marca .cangrejo { width: clamp(150px, 14vw, 240px); height: auto; aspect-ratio: 4 / 3; color: var(--ink); opacity: .92; filter: drop-shadow(0 14px 18px rgba(20,35,50,.18)); }
+.marca .palabra { font: 800 clamp(72px, 7.5vw, 128px)/.85 var(--f-display); letter-spacing: .08em; padding-left: .08em; position: relative; z-index: 1; }
+.form-entrada { padding: 56px max(48px, 6vw); display: grid; align-content: center; justify-content: center; grid-template-columns: minmax(0, 380px); gap: 22px; background: rgba(255,255,255,.55); }
 .form-entrada .titulo { font-size: 32px; }
 .form-entrada .input { min-height: 52px; font-size: 16px; }
 .mayus { display: inline-flex; align-items: center; gap: 6px; font-size: 12px; color: var(--muted); padding: 3px 10px; border-radius: 999px; background: rgba(255,255,255,.85); border: 1px solid #fff; width: max-content; animation: aparecer .25s ease both; }
-@media (max-width: 760px) { .entrada-c { grid-template-columns: 1fr; } .marca { padding: 26px; min-height: 180px; } .marca { gap: 12px; } .marca .cangrejo { width: 96px; height: 72px; } .marca .palabra { font-size: 54px; } .form-entrada { padding: 30px 24px; } }
+@media (max-width: 760px) { .entrada-c { grid-template-columns: 1fr; } .marca { padding: 32px 26px; min-height: 0; } .marca { gap: 12px; } .marca .cangrejo { width: 96px; height: 72px; } .marca .palabra { font-size: 54px; } .form-entrada { padding: 30px 24px 40px; align-content: start; } .entrada-c { grid-template-rows: auto 1fr; } }
 
 /* Pantallas grandes: todo crece en proporción para no verse pequeño. */
 @media (min-width: 1600px) { html { zoom: 1.15; } .entrada, body { min-height: calc(100vh / 1.15); } }
