@@ -15,6 +15,13 @@
       "when": 1793163409055,
       "tag": "0001_bitacora_inmutable",
       "breakpoints": true
+    },
+    {
+      "idx": 2,
+      "version": "7",
+      "when": 1793176062628,
+      "tag": "0002_rediseno",
+      "breakpoints": true
     }
   ]
 }

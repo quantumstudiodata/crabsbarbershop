@@ -1,0 +1,2207 @@
+{
+  "id": "0ae40a38-4c0d-461b-8e6a-8b697cb76ca0",
+  "prevId": "678819ee-08ad-40c8-90e3-be7090bf4385",
+  "version": "7",
+  "dialect": "postgresql",
+  "tables": {
+    "public.ajustes_cierre": {
+      "name": "ajustes_cierre",
+      "schema": "",
+      "columns": {
+        "id": {
+          "name": "id",
+          "type": "uuid",
+          "primaryKey": true,
+          "notNull": true,
+          "default": "gen_random_uuid()"
+        },
+        "barberia_id": {
+          "name": "barberia_id",
+          "type": "uuid",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "turno_id": {
+          "name": "turno_id",
+          "type": "uuid",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "monto": {
+          "name": "monto",
+          "type": "integer",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "motivo": {
+          "name": "motivo",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "usuario_id": {
+          "name": "usuario_id",
+          "type": "uuid",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "creado_en": {
+          "name": "creado_en",
+          "type": "timestamp with time zone",
+          "primaryKey": false,
+          "notNull": true,
+          "default": "now()"
+        }
+      },
+      "indexes": {},
+      "foreignKeys": {
+        "ajustes_cierre_barberia_id_barberias_id_fk": {
+          "name": "ajustes_cierre_barberia_id_barberias_id_fk",
+          "tableFrom": "ajustes_cierre",
+          "tableTo": "barberias",
+          "columnsFrom": [
+            "barberia_id"
+          ],
+          "columnsTo": [
+            "id"
+          ],
+          "onDelete": "no action",
+          "onUpdate": "no action"
+        },
+        "ajustes_cierre_turno_id_turnos_caja_id_fk": {
+          "name": "ajustes_cierre_turno_id_turnos_caja_id_fk",
+          "tableFrom": "ajustes_cierre",
+          "tableTo": "turnos_caja",
+          "columnsFrom": [
+            "turno_id"
+          ],
+          "columnsTo": [
+            "id"
+          ],
+          "onDelete": "no action",
+          "onUpdate": "no action"
+        },
+        "ajustes_cierre_usuario_id_usuarios_id_fk": {
+          "name": "ajustes_cierre_usuario_id_usuarios_id_fk",
+          "tableFrom": "ajustes_cierre",
+          "tableTo": "usuarios",
+          "columnsFrom": [
+            "usuario_id"
+          ],
+          "columnsTo": [
+            "id"
+          ],
+          "onDelete": "no action",
+          "onUpdate": "no action"
+        }
+      },
+      "compositePrimaryKeys": {},
+      "uniqueConstraints": {},
+      "policies": {},
+      "checkConstraints": {},
+      "isRLSEnabled": false
+    },
+    "public.barberias": {
+      "name": "barberias",
+      "schema": "",
+      "columns": {
+        "id": {
+          "name": "id",
+          "type": "uuid",
+          "primaryKey": true,
+          "notNull": true,
+          "default": "gen_random_uuid()"
+        },
+        "nombre": {
+          "name": "nombre",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "zona_horaria": {
+          "name": "zona_horaria",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": true,
+          "default": "'America/Monterrey'"
+        },
+        "folio_prefijo": {
+          "name": "folio_prefijo",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": true,
+          "default": "'CRB'"
+        },
+        "siguiente_folio": {
+          "name": "siguiente_folio",
+          "type": "integer",
+          "primaryKey": false,
+          "notNull": true,
+          "default": 1
+        },
+        "limite_descuento_pct": {
+          "name": "limite_descuento_pct",
+          "type": "integer",
+          "primaryKey": false,
+          "notNull": true,
+          "default": 15
+        },
+        "limite_diferencia_caja": {
+          "name": "limite_diferencia_caja",
+          "type": "integer",
+          "primaryKey": false,
+          "notNull": true,
+          "default": 5000
+        },
+        "meta_diaria": {
+          "name": "meta_diaria",
+          "type": "integer",
+          "primaryKey": false,
+          "notNull": true,
+          "default": 0
+        },
+        "creado_en": {
+          "name": "creado_en",
+          "type": "timestamp with time zone",
+          "primaryKey": false,
+          "notNull": true,
+          "default": "now()"
+        }
+      },
+      "indexes": {},
+      "foreignKeys": {},
+      "compositePrimaryKeys": {},
+      "uniqueConstraints": {},
+      "policies": {},
+      "checkConstraints": {},
+      "isRLSEnabled": false
+    },
+    "public.conceptos": {
+      "name": "conceptos",
+      "schema": "",
+      "columns": {
+        "id": {
+          "name": "id",
+          "type": "uuid",
+          "primaryKey": true,
+          "notNull": true,
+          "default": "gen_random_uuid()"
+        },
+        "barberia_id": {
+          "name": "barberia_id",
+          "type": "uuid",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "venta_id": {
+          "name": "venta_id",
+          "type": "uuid",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "servicio_id": {
+          "name": "servicio_id",
+          "type": "uuid",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "nombre_servicio": {
+          "name": "nombre_servicio",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "barbero_id": {
+          "name": "barbero_id",
+          "type": "uuid",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "precio_lista": {
+          "name": "precio_lista",
+          "type": "integer",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "descuento": {
+          "name": "descuento",
+          "type": "integer",
+          "primaryKey": false,
+          "notNull": true,
+          "default": 0
+        },
+        "motivo_descuento": {
+          "name": "motivo_descuento",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "autorizado_por": {
+          "name": "autorizado_por",
+          "type": "uuid",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "precio_cobrado": {
+          "name": "precio_cobrado",
+          "type": "integer",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "regla_comision": {
+          "name": "regla_comision",
+          "type": "jsonb",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "comision": {
+          "name": "comision",
+          "type": "integer",
+          "primaryKey": false,
+          "notNull": true,
+          "default": 0
+        }
+      },
+      "indexes": {
+        "conceptos_venta_idx": {
+          "name": "conceptos_venta_idx",
+          "columns": [
+            {
+              "expression": "venta_id",
+              "isExpression": false,
+              "asc": true,
+              "nulls": "last"
+            }
+          ],
+          "isUnique": false,
+          "concurrently": false,
+          "method": "btree",
+          "with": {}
+        },
+        "conceptos_barbero_idx": {
+          "name": "conceptos_barbero_idx",
+          "columns": [
+            {
+              "expression": "barbero_id",
+              "isExpression": false,
+              "asc": true,
+              "nulls": "last"
+            }
+          ],
+          "isUnique": false,
+          "concurrently": false,
+          "method": "btree",
+          "with": {}
+        }
+      },
+      "foreignKeys": {
+        "conceptos_barberia_id_barberias_id_fk": {
+          "name": "conceptos_barberia_id_barberias_id_fk",
+          "tableFrom": "conceptos",
+          "tableTo": "barberias",
+          "columnsFrom": [
+            "barberia_id"
+          ],
+          "columnsTo": [
+            "id"
+          ],
+          "onDelete": "no action",
+          "onUpdate": "no action"
+        },
+        "conceptos_venta_id_ventas_id_fk": {
+          "name": "conceptos_venta_id_ventas_id_fk",
+          "tableFrom": "conceptos",
+          "tableTo": "ventas",
+          "columnsFrom": [
+            "venta_id"
+          ],
+          "columnsTo": [
+            "id"
+          ],
+          "onDelete": "no action",
+          "onUpdate": "no action"
+        },
+        "conceptos_servicio_id_servicios_id_fk": {
+          "name": "conceptos_servicio_id_servicios_id_fk",
+          "tableFrom": "conceptos",
+          "tableTo": "servicios",
+          "columnsFrom": [
+            "servicio_id"
+          ],
+          "columnsTo": [
+            "id"
+          ],
+          "onDelete": "no action",
+          "onUpdate": "no action"
+        },
+        "conceptos_barbero_id_usuarios_id_fk": {
+          "name": "conceptos_barbero_id_usuarios_id_fk",
+          "tableFrom": "conceptos",
+          "tableTo": "usuarios",
+          "columnsFrom": [
+            "barbero_id"
+          ],
+          "columnsTo": [
+            "id"
+          ],
+          "onDelete": "no action",
+          "onUpdate": "no action"
+        },
+        "conceptos_autorizado_por_usuarios_id_fk": {
+          "name": "conceptos_autorizado_por_usuarios_id_fk",
+          "tableFrom": "conceptos",
+          "tableTo": "usuarios",
+          "columnsFrom": [
+            "autorizado_por"
+          ],
+          "columnsTo": [
+            "id"
+          ],
+          "onDelete": "no action",
+          "onUpdate": "no action"
+        }
+      },
+      "compositePrimaryKeys": {},
+      "uniqueConstraints": {},
+      "policies": {},
+      "checkConstraints": {},
+      "isRLSEnabled": false
+    },
+    "public.gastos": {
+      "name": "gastos",
+      "schema": "",
+      "columns": {
+        "id": {
+          "name": "id",
+          "type": "uuid",
+          "primaryKey": true,
+          "notNull": true,
+          "default": "gen_random_uuid()"
+        },
+        "barberia_id": {
+          "name": "barberia_id",
+          "type": "uuid",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "categoria": {
+          "name": "categoria",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "concepto": {
+          "name": "concepto",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "monto": {
+          "name": "monto",
+          "type": "integer",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "fecha": {
+          "name": "fecha",
+          "type": "date",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "turno_id": {
+          "name": "turno_id",
+          "type": "uuid",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "usuario_id": {
+          "name": "usuario_id",
+          "type": "uuid",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "creado_en": {
+          "name": "creado_en",
+          "type": "timestamp with time zone",
+          "primaryKey": false,
+          "notNull": true,
+          "default": "now()"
+        }
+      },
+      "indexes": {},
+      "foreignKeys": {
+        "gastos_barberia_id_barberias_id_fk": {
+          "name": "gastos_barberia_id_barberias_id_fk",
+          "tableFrom": "gastos",
+          "tableTo": "barberias",
+          "columnsFrom": [
+            "barberia_id"
+          ],
+          "columnsTo": [
+            "id"
+          ],
+          "onDelete": "no action",
+          "onUpdate": "no action"
+        },
+        "gastos_turno_id_turnos_caja_id_fk": {
+          "name": "gastos_turno_id_turnos_caja_id_fk",
+          "tableFrom": "gastos",
+          "tableTo": "turnos_caja",
+          "columnsFrom": [
+            "turno_id"
+          ],
+          "columnsTo": [
+            "id"
+          ],
+          "onDelete": "no action",
+          "onUpdate": "no action"
+        },
+        "gastos_usuario_id_usuarios_id_fk": {
+          "name": "gastos_usuario_id_usuarios_id_fk",
+          "tableFrom": "gastos",
+          "tableTo": "usuarios",
+          "columnsFrom": [
+            "usuario_id"
+          ],
+          "columnsTo": [
+            "id"
+          ],
+          "onDelete": "no action",
+          "onUpdate": "no action"
+        }
+      },
+      "compositePrimaryKeys": {},
+      "uniqueConstraints": {},
+      "policies": {},
+      "checkConstraints": {},
+      "isRLSEnabled": false
+    },
+    "public.historial": {
+      "name": "historial",
+      "schema": "",
+      "columns": {
+        "id": {
+          "name": "id",
+          "type": "bigserial",
+          "primaryKey": true,
+          "notNull": true
+        },
+        "barberia_id": {
+          "name": "barberia_id",
+          "type": "uuid",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "usuario_id": {
+          "name": "usuario_id",
+          "type": "uuid",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "accion": {
+          "name": "accion",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "tipo": {
+          "name": "tipo",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "detalle": {
+          "name": "detalle",
+          "type": "jsonb",
+          "primaryKey": false,
+          "notNull": true,
+          "default": "'{}'::jsonb"
+        },
+        "creado_en": {
+          "name": "creado_en",
+          "type": "timestamp with time zone",
+          "primaryKey": false,
+          "notNull": true,
+          "default": "now()"
+        }
+      },
+      "indexes": {
+        "historial_barberia_idx": {
+          "name": "historial_barberia_idx",
+          "columns": [
+            {
+              "expression": "barberia_id",
+              "isExpression": false,
+              "asc": true,
+              "nulls": "last"
+            },
+            {
+              "expression": "creado_en",
+              "isExpression": false,
+              "asc": true,
+              "nulls": "last"
+            }
+          ],
+          "isUnique": false,
+          "concurrently": false,
+          "method": "btree",
+          "with": {}
+        }
+      },
+      "foreignKeys": {
+        "historial_barberia_id_barberias_id_fk": {
+          "name": "historial_barberia_id_barberias_id_fk",
+          "tableFrom": "historial",
+          "tableTo": "barberias",
+          "columnsFrom": [
+            "barberia_id"
+          ],
+          "columnsTo": [
+            "id"
+          ],
+          "onDelete": "no action",
+          "onUpdate": "no action"
+        },
+        "historial_usuario_id_usuarios_id_fk": {
+          "name": "historial_usuario_id_usuarios_id_fk",
+          "tableFrom": "historial",
+          "tableTo": "usuarios",
+          "columnsFrom": [
+            "usuario_id"
+          ],
+          "columnsTo": [
+            "id"
+          ],
+          "onDelete": "no action",
+          "onUpdate": "no action"
+        }
+      },
+      "compositePrimaryKeys": {},
+      "uniqueConstraints": {},
+      "policies": {},
+      "checkConstraints": {},
+      "isRLSEnabled": false
+    },
+    "public.ideas": {
+      "name": "ideas",
+      "schema": "",
+      "columns": {
+        "id": {
+          "name": "id",
+          "type": "uuid",
+          "primaryKey": true,
+          "notNull": true,
+          "default": "gen_random_uuid()"
+        },
+        "barberia_id": {
+          "name": "barberia_id",
+          "type": "uuid",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "clave": {
+          "name": "clave",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "titulo": {
+          "name": "titulo",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "estado": {
+          "name": "estado",
+          "type": "estado_idea",
+          "typeSchema": "public",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "nota": {
+          "name": "nota",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": true,
+          "default": "''"
+        },
+        "usuario_id": {
+          "name": "usuario_id",
+          "type": "uuid",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "creado_en": {
+          "name": "creado_en",
+          "type": "timestamp with time zone",
+          "primaryKey": false,
+          "notNull": true,
+          "default": "now()"
+        }
+      },
+      "indexes": {
+        "ideas_clave_uq": {
+          "name": "ideas_clave_uq",
+          "columns": [
+            {
+              "expression": "barberia_id",
+              "isExpression": false,
+              "asc": true,
+              "nulls": "last"
+            },
+            {
+              "expression": "clave",
+              "isExpression": false,
+              "asc": true,
+              "nulls": "last"
+            }
+          ],
+          "isUnique": true,
+          "concurrently": false,
+          "method": "btree",
+          "with": {}
+        }
+      },
+      "foreignKeys": {
+        "ideas_barberia_id_barberias_id_fk": {
+          "name": "ideas_barberia_id_barberias_id_fk",
+          "tableFrom": "ideas",
+          "tableTo": "barberias",
+          "columnsFrom": [
+            "barberia_id"
+          ],
+          "columnsTo": [
+            "id"
+          ],
+          "onDelete": "no action",
+          "onUpdate": "no action"
+        },
+        "ideas_usuario_id_usuarios_id_fk": {
+          "name": "ideas_usuario_id_usuarios_id_fk",
+          "tableFrom": "ideas",
+          "tableTo": "usuarios",
+          "columnsFrom": [
+            "usuario_id"
+          ],
+          "columnsTo": [
+            "id"
+          ],
+          "onDelete": "no action",
+          "onUpdate": "no action"
+        }
+      },
+      "compositePrimaryKeys": {},
+      "uniqueConstraints": {},
+      "policies": {},
+      "checkConstraints": {},
+      "isRLSEnabled": false
+    },
+    "public.metodos_pago": {
+      "name": "metodos_pago",
+      "schema": "",
+      "columns": {
+        "id": {
+          "name": "id",
+          "type": "uuid",
+          "primaryKey": true,
+          "notNull": true,
+          "default": "gen_random_uuid()"
+        },
+        "barberia_id": {
+          "name": "barberia_id",
+          "type": "uuid",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "nombre": {
+          "name": "nombre",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "es_efectivo": {
+          "name": "es_efectivo",
+          "type": "boolean",
+          "primaryKey": false,
+          "notNull": true,
+          "default": false
+        },
+        "activo": {
+          "name": "activo",
+          "type": "boolean",
+          "primaryKey": false,
+          "notNull": true,
+          "default": true
+        },
+        "orden": {
+          "name": "orden",
+          "type": "integer",
+          "primaryKey": false,
+          "notNull": true,
+          "default": 0
+        }
+      },
+      "indexes": {},
+      "foreignKeys": {
+        "metodos_pago_barberia_id_barberias_id_fk": {
+          "name": "metodos_pago_barberia_id_barberias_id_fk",
+          "tableFrom": "metodos_pago",
+          "tableTo": "barberias",
+          "columnsFrom": [
+            "barberia_id"
+          ],
+          "columnsTo": [
+            "id"
+          ],
+          "onDelete": "no action",
+          "onUpdate": "no action"
+        }
+      },
+      "compositePrimaryKeys": {},
+      "uniqueConstraints": {},
+      "policies": {},
+      "checkConstraints": {},
+      "isRLSEnabled": false
+    },
+    "public.movimientos_caja": {
+      "name": "movimientos_caja",
+      "schema": "",
+      "columns": {
+        "id": {
+          "name": "id",
+          "type": "uuid",
+          "primaryKey": true,
+          "notNull": true,
+          "default": "gen_random_uuid()"
+        },
+        "barberia_id": {
+          "name": "barberia_id",
+          "type": "uuid",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "turno_id": {
+          "name": "turno_id",
+          "type": "uuid",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "tipo": {
+          "name": "tipo",
+          "type": "tipo_movimiento",
+          "typeSchema": "public",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "monto": {
+          "name": "monto",
+          "type": "integer",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "concepto": {
+          "name": "concepto",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "venta_id": {
+          "name": "venta_id",
+          "type": "uuid",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "usuario_id": {
+          "name": "usuario_id",
+          "type": "uuid",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "creado_en": {
+          "name": "creado_en",
+          "type": "timestamp with time zone",
+          "primaryKey": false,
+          "notNull": true,
+          "default": "now()"
+        }
+      },
+      "indexes": {},
+      "foreignKeys": {
+        "movimientos_caja_barberia_id_barberias_id_fk": {
+          "name": "movimientos_caja_barberia_id_barberias_id_fk",
+          "tableFrom": "movimientos_caja",
+          "tableTo": "barberias",
+          "columnsFrom": [
+            "barberia_id"
+          ],
+          "columnsTo": [
+            "id"
+          ],
+          "onDelete": "no action",
+          "onUpdate": "no action"
+        },
+        "movimientos_caja_turno_id_turnos_caja_id_fk": {
+          "name": "movimientos_caja_turno_id_turnos_caja_id_fk",
+          "tableFrom": "movimientos_caja",
+          "tableTo": "turnos_caja",
+          "columnsFrom": [
+            "turno_id"
+          ],
+          "columnsTo": [
+            "id"
+          ],
+          "onDelete": "no action",
+          "onUpdate": "no action"
+        },
+        "movimientos_caja_venta_id_ventas_id_fk": {
+          "name": "movimientos_caja_venta_id_ventas_id_fk",
+          "tableFrom": "movimientos_caja",
+          "tableTo": "ventas",
+          "columnsFrom": [
+            "venta_id"
+          ],
+          "columnsTo": [
+            "id"
+          ],
+          "onDelete": "no action",
+          "onUpdate": "no action"
+        },
+        "movimientos_caja_usuario_id_usuarios_id_fk": {
+          "name": "movimientos_caja_usuario_id_usuarios_id_fk",
+          "tableFrom": "movimientos_caja",
+          "tableTo": "usuarios",
+          "columnsFrom": [
+            "usuario_id"
+          ],
+          "columnsTo": [
+            "id"
+          ],
+          "onDelete": "no action",
+          "onUpdate": "no action"
+        }
+      },
+      "compositePrimaryKeys": {},
+      "uniqueConstraints": {},
+      "policies": {},
+      "checkConstraints": {},
+      "isRLSEnabled": false
+    },
+    "public.pagos": {
+      "name": "pagos",
+      "schema": "",
+      "columns": {
+        "id": {
+          "name": "id",
+          "type": "uuid",
+          "primaryKey": true,
+          "notNull": true,
+          "default": "gen_random_uuid()"
+        },
+        "barberia_id": {
+          "name": "barberia_id",
+          "type": "uuid",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "venta_id": {
+          "name": "venta_id",
+          "type": "uuid",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "metodo_pago_id": {
+          "name": "metodo_pago_id",
+          "type": "uuid",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "nombre_metodo": {
+          "name": "nombre_metodo",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "es_efectivo": {
+          "name": "es_efectivo",
+          "type": "boolean",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "monto": {
+          "name": "monto",
+          "type": "integer",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "referencia": {
+          "name": "referencia",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": false
+        }
+      },
+      "indexes": {
+        "pagos_venta_idx": {
+          "name": "pagos_venta_idx",
+          "columns": [
+            {
+              "expression": "venta_id",
+              "isExpression": false,
+              "asc": true,
+              "nulls": "last"
+            }
+          ],
+          "isUnique": false,
+          "concurrently": false,
+          "method": "btree",
+          "with": {}
+        }
+      },
+      "foreignKeys": {
+        "pagos_barberia_id_barberias_id_fk": {
+          "name": "pagos_barberia_id_barberias_id_fk",
+          "tableFrom": "pagos",
+          "tableTo": "barberias",
+          "columnsFrom": [
+            "barberia_id"
+          ],
+          "columnsTo": [
+            "id"
+          ],
+          "onDelete": "no action",
+          "onUpdate": "no action"
+        },
+        "pagos_venta_id_ventas_id_fk": {
+          "name": "pagos_venta_id_ventas_id_fk",
+          "tableFrom": "pagos",
+          "tableTo": "ventas",
+          "columnsFrom": [
+            "venta_id"
+          ],
+          "columnsTo": [
+            "id"
+          ],
+          "onDelete": "no action",
+          "onUpdate": "no action"
+        },
+        "pagos_metodo_pago_id_metodos_pago_id_fk": {
+          "name": "pagos_metodo_pago_id_metodos_pago_id_fk",
+          "tableFrom": "pagos",
+          "tableTo": "metodos_pago",
+          "columnsFrom": [
+            "metodo_pago_id"
+          ],
+          "columnsTo": [
+            "id"
+          ],
+          "onDelete": "no action",
+          "onUpdate": "no action"
+        }
+      },
+      "compositePrimaryKeys": {},
+      "uniqueConstraints": {},
+      "policies": {},
+      "checkConstraints": {},
+      "isRLSEnabled": false
+    },
+    "public.pagos_comision": {
+      "name": "pagos_comision",
+      "schema": "",
+      "columns": {
+        "id": {
+          "name": "id",
+          "type": "uuid",
+          "primaryKey": true,
+          "notNull": true,
+          "default": "gen_random_uuid()"
+        },
+        "barberia_id": {
+          "name": "barberia_id",
+          "type": "uuid",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "barbero_id": {
+          "name": "barbero_id",
+          "type": "uuid",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "tipo": {
+          "name": "tipo",
+          "type": "tipo_pago_comision",
+          "typeSchema": "public",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "monto": {
+          "name": "monto",
+          "type": "integer",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "semana": {
+          "name": "semana",
+          "type": "date",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "nota": {
+          "name": "nota",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": true,
+          "default": "''"
+        },
+        "usuario_id": {
+          "name": "usuario_id",
+          "type": "uuid",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "creado_en": {
+          "name": "creado_en",
+          "type": "timestamp with time zone",
+          "primaryKey": false,
+          "notNull": true,
+          "default": "now()"
+        }
+      },
+      "indexes": {},
+      "foreignKeys": {
+        "pagos_comision_barberia_id_barberias_id_fk": {
+          "name": "pagos_comision_barberia_id_barberias_id_fk",
+          "tableFrom": "pagos_comision",
+          "tableTo": "barberias",
+          "columnsFrom": [
+            "barberia_id"
+          ],
+          "columnsTo": [
+            "id"
+          ],
+          "onDelete": "no action",
+          "onUpdate": "no action"
+        },
+        "pagos_comision_barbero_id_usuarios_id_fk": {
+          "name": "pagos_comision_barbero_id_usuarios_id_fk",
+          "tableFrom": "pagos_comision",
+          "tableTo": "usuarios",
+          "columnsFrom": [
+            "barbero_id"
+          ],
+          "columnsTo": [
+            "id"
+          ],
+          "onDelete": "no action",
+          "onUpdate": "no action"
+        },
+        "pagos_comision_usuario_id_usuarios_id_fk": {
+          "name": "pagos_comision_usuario_id_usuarios_id_fk",
+          "tableFrom": "pagos_comision",
+          "tableTo": "usuarios",
+          "columnsFrom": [
+            "usuario_id"
+          ],
+          "columnsTo": [
+            "id"
+          ],
+          "onDelete": "no action",
+          "onUpdate": "no action"
+        }
+      },
+      "compositePrimaryKeys": {},
+      "uniqueConstraints": {},
+      "policies": {},
+      "checkConstraints": {},
+      "isRLSEnabled": false
+    },
+    "public.propinas": {
+      "name": "propinas",
+      "schema": "",
+      "columns": {
+        "id": {
+          "name": "id",
+          "type": "uuid",
+          "primaryKey": true,
+          "notNull": true,
+          "default": "gen_random_uuid()"
+        },
+        "barberia_id": {
+          "name": "barberia_id",
+          "type": "uuid",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "venta_id": {
+          "name": "venta_id",
+          "type": "uuid",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "barbero_id": {
+          "name": "barbero_id",
+          "type": "uuid",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "monto": {
+          "name": "monto",
+          "type": "integer",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "es_efectivo": {
+          "name": "es_efectivo",
+          "type": "boolean",
+          "primaryKey": false,
+          "notNull": true
+        }
+      },
+      "indexes": {},
+      "foreignKeys": {
+        "propinas_barberia_id_barberias_id_fk": {
+          "name": "propinas_barberia_id_barberias_id_fk",
+          "tableFrom": "propinas",
+          "tableTo": "barberias",
+          "columnsFrom": [
+            "barberia_id"
+          ],
+          "columnsTo": [
+            "id"
+          ],
+          "onDelete": "no action",
+          "onUpdate": "no action"
+        },
+        "propinas_venta_id_ventas_id_fk": {
+          "name": "propinas_venta_id_ventas_id_fk",
+          "tableFrom": "propinas",
+          "tableTo": "ventas",
+          "columnsFrom": [
+            "venta_id"
+          ],
+          "columnsTo": [
+            "id"
+          ],
+          "onDelete": "no action",
+          "onUpdate": "no action"
+        },
+        "propinas_barbero_id_usuarios_id_fk": {
+          "name": "propinas_barbero_id_usuarios_id_fk",
+          "tableFrom": "propinas",
+          "tableTo": "usuarios",
+          "columnsFrom": [
+            "barbero_id"
+          ],
+          "columnsTo": [
+            "id"
+          ],
+          "onDelete": "no action",
+          "onUpdate": "no action"
+        }
+      },
+      "compositePrimaryKeys": {},
+      "uniqueConstraints": {},
+      "policies": {},
+      "checkConstraints": {},
+      "isRLSEnabled": false
+    },
+    "public.reglas_comision": {
+      "name": "reglas_comision",
+      "schema": "",
+      "columns": {
+        "id": {
+          "name": "id",
+          "type": "uuid",
+          "primaryKey": true,
+          "notNull": true,
+          "default": "gen_random_uuid()"
+        },
+        "barberia_id": {
+          "name": "barberia_id",
+          "type": "uuid",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "barbero_id": {
+          "name": "barbero_id",
+          "type": "uuid",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "servicio_id": {
+          "name": "servicio_id",
+          "type": "uuid",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "tipo": {
+          "name": "tipo",
+          "type": "tipo_regla",
+          "typeSchema": "public",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "porcentaje": {
+          "name": "porcentaje",
+          "type": "integer",
+          "primaryKey": false,
+          "notNull": true,
+          "default": 0
+        },
+        "monto_fijo": {
+          "name": "monto_fijo",
+          "type": "integer",
+          "primaryKey": false,
+          "notNull": true,
+          "default": 0
+        },
+        "monto_semanal": {
+          "name": "monto_semanal",
+          "type": "integer",
+          "primaryKey": false,
+          "notNull": true,
+          "default": 0
+        },
+        "vigente_desde": {
+          "name": "vigente_desde",
+          "type": "timestamp with time zone",
+          "primaryKey": false,
+          "notNull": true,
+          "default": "now()"
+        },
+        "vigente_hasta": {
+          "name": "vigente_hasta",
+          "type": "timestamp with time zone",
+          "primaryKey": false,
+          "notNull": false
+        }
+      },
+      "indexes": {},
+      "foreignKeys": {
+        "reglas_comision_barberia_id_barberias_id_fk": {
+          "name": "reglas_comision_barberia_id_barberias_id_fk",
+          "tableFrom": "reglas_comision",
+          "tableTo": "barberias",
+          "columnsFrom": [
+            "barberia_id"
+          ],
+          "columnsTo": [
+            "id"
+          ],
+          "onDelete": "no action",
+          "onUpdate": "no action"
+        },
+        "reglas_comision_barbero_id_usuarios_id_fk": {
+          "name": "reglas_comision_barbero_id_usuarios_id_fk",
+          "tableFrom": "reglas_comision",
+          "tableTo": "usuarios",
+          "columnsFrom": [
+            "barbero_id"
+          ],
+          "columnsTo": [
+            "id"
+          ],
+          "onDelete": "no action",
+          "onUpdate": "no action"
+        },
+        "reglas_comision_servicio_id_servicios_id_fk": {
+          "name": "reglas_comision_servicio_id_servicios_id_fk",
+          "tableFrom": "reglas_comision",
+          "tableTo": "servicios",
+          "columnsFrom": [
+            "servicio_id"
+          ],
+          "columnsTo": [
+            "id"
+          ],
+          "onDelete": "no action",
+          "onUpdate": "no action"
+        }
+      },
+      "compositePrimaryKeys": {},
+      "uniqueConstraints": {},
+      "policies": {},
+      "checkConstraints": {},
+      "isRLSEnabled": false
+    },
+    "public.servicios": {
+      "name": "servicios",
+      "schema": "",
+      "columns": {
+        "id": {
+          "name": "id",
+          "type": "uuid",
+          "primaryKey": true,
+          "notNull": true,
+          "default": "gen_random_uuid()"
+        },
+        "barberia_id": {
+          "name": "barberia_id",
+          "type": "uuid",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "nombre": {
+          "name": "nombre",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "descripcion": {
+          "name": "descripcion",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": true,
+          "default": "''"
+        },
+        "duracion_min": {
+          "name": "duracion_min",
+          "type": "integer",
+          "primaryKey": false,
+          "notNull": true,
+          "default": 30
+        },
+        "categoria": {
+          "name": "categoria",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": true,
+          "default": "'Cortes'"
+        },
+        "precio": {
+          "name": "precio",
+          "type": "integer",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "activo": {
+          "name": "activo",
+          "type": "boolean",
+          "primaryKey": false,
+          "notNull": true,
+          "default": true
+        },
+        "orden": {
+          "name": "orden",
+          "type": "integer",
+          "primaryKey": false,
+          "notNull": true,
+          "default": 0
+        },
+        "creado_en": {
+          "name": "creado_en",
+          "type": "timestamp with time zone",
+          "primaryKey": false,
+          "notNull": true,
+          "default": "now()"
+        }
+      },
+      "indexes": {},
+      "foreignKeys": {
+        "servicios_barberia_id_barberias_id_fk": {
+          "name": "servicios_barberia_id_barberias_id_fk",
+          "tableFrom": "servicios",
+          "tableTo": "barberias",
+          "columnsFrom": [
+            "barberia_id"
+          ],
+          "columnsTo": [
+            "id"
+          ],
+          "onDelete": "no action",
+          "onUpdate": "no action"
+        }
+      },
+      "compositePrimaryKeys": {},
+      "uniqueConstraints": {},
+      "policies": {},
+      "checkConstraints": {},
+      "isRLSEnabled": false
+    },
+    "public.sesiones": {
+      "name": "sesiones",
+      "schema": "",
+      "columns": {
+        "id": {
+          "name": "id",
+          "type": "text",
+          "primaryKey": true,
+          "notNull": true
+        },
+        "usuario_id": {
+          "name": "usuario_id",
+          "type": "uuid",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "expira_en": {
+          "name": "expira_en",
+          "type": "timestamp with time zone",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "creado_en": {
+          "name": "creado_en",
+          "type": "timestamp with time zone",
+          "primaryKey": false,
+          "notNull": true,
+          "default": "now()"
+        }
+      },
+      "indexes": {},
+      "foreignKeys": {
+        "sesiones_usuario_id_usuarios_id_fk": {
+          "name": "sesiones_usuario_id_usuarios_id_fk",
+          "tableFrom": "sesiones",
+          "tableTo": "usuarios",
+          "columnsFrom": [
+            "usuario_id"
+          ],
+          "columnsTo": [
+            "id"
+          ],
+          "onDelete": "cascade",
+          "onUpdate": "no action"
+        }
+      },
+      "compositePrimaryKeys": {},
+      "uniqueConstraints": {},
+      "policies": {},
+      "checkConstraints": {},
+      "isRLSEnabled": false
+    },
+    "public.solicitudes_clave": {
+      "name": "solicitudes_clave",
+      "schema": "",
+      "columns": {
+        "id": {
+          "name": "id",
+          "type": "uuid",
+          "primaryKey": true,
+          "notNull": true,
+          "default": "gen_random_uuid()"
+        },
+        "barberia_id": {
+          "name": "barberia_id",
+          "type": "uuid",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "usuario_id": {
+          "name": "usuario_id",
+          "type": "uuid",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "atendida": {
+          "name": "atendida",
+          "type": "boolean",
+          "primaryKey": false,
+          "notNull": true,
+          "default": false
+        },
+        "creado_en": {
+          "name": "creado_en",
+          "type": "timestamp with time zone",
+          "primaryKey": false,
+          "notNull": true,
+          "default": "now()"
+        }
+      },
+      "indexes": {
+        "solicitudes_barberia_idx": {
+          "name": "solicitudes_barberia_idx",
+          "columns": [
+            {
+              "expression": "barberia_id",
+              "isExpression": false,
+              "asc": true,
+              "nulls": "last"
+            },
+            {
+              "expression": "atendida",
+              "isExpression": false,
+              "asc": true,
+              "nulls": "last"
+            }
+          ],
+          "isUnique": false,
+          "concurrently": false,
+          "method": "btree",
+          "with": {}
+        }
+      },
+      "foreignKeys": {
+        "solicitudes_clave_barberia_id_barberias_id_fk": {
+          "name": "solicitudes_clave_barberia_id_barberias_id_fk",
+          "tableFrom": "solicitudes_clave",
+          "tableTo": "barberias",
+          "columnsFrom": [
+            "barberia_id"
+          ],
+          "columnsTo": [
+            "id"
+          ],
+          "onDelete": "no action",
+          "onUpdate": "no action"
+        },
+        "solicitudes_clave_usuario_id_usuarios_id_fk": {
+          "name": "solicitudes_clave_usuario_id_usuarios_id_fk",
+          "tableFrom": "solicitudes_clave",
+          "tableTo": "usuarios",
+          "columnsFrom": [
+            "usuario_id"
+          ],
+          "columnsTo": [
+            "id"
+          ],
+          "onDelete": "no action",
+          "onUpdate": "no action"
+        }
+      },
+      "compositePrimaryKeys": {},
+      "uniqueConstraints": {},
+      "policies": {},
+      "checkConstraints": {},
+      "isRLSEnabled": false
+    },
+    "public.turnos_caja": {
+      "name": "turnos_caja",
+      "schema": "",
+      "columns": {
+        "id": {
+          "name": "id",
+          "type": "uuid",
+          "primaryKey": true,
+          "notNull": true,
+          "default": "gen_random_uuid()"
+        },
+        "barberia_id": {
+          "name": "barberia_id",
+          "type": "uuid",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "fecha_operativa": {
+          "name": "fecha_operativa",
+          "type": "date",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "estado": {
+          "name": "estado",
+          "type": "estado_turno",
+          "typeSchema": "public",
+          "primaryKey": false,
+          "notNull": true,
+          "default": "'abierto'"
+        },
+        "fondo_inicial": {
+          "name": "fondo_inicial",
+          "type": "integer",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "abierto_por": {
+          "name": "abierto_por",
+          "type": "uuid",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "abierto_en": {
+          "name": "abierto_en",
+          "type": "timestamp with time zone",
+          "primaryKey": false,
+          "notNull": true,
+          "default": "now()"
+        },
+        "cerrado_por": {
+          "name": "cerrado_por",
+          "type": "uuid",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "cerrado_en": {
+          "name": "cerrado_en",
+          "type": "timestamp with time zone",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "efectivo_esperado": {
+          "name": "efectivo_esperado",
+          "type": "integer",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "efectivo_contado": {
+          "name": "efectivo_contado",
+          "type": "integer",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "diferencia": {
+          "name": "diferencia",
+          "type": "integer",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "notas_cierre": {
+          "name": "notas_cierre",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "verificacion": {
+          "name": "verificacion",
+          "type": "jsonb",
+          "primaryKey": false,
+          "notNull": true,
+          "default": "'{}'::jsonb"
+        }
+      },
+      "indexes": {
+        "turnos_barberia_fecha_idx": {
+          "name": "turnos_barberia_fecha_idx",
+          "columns": [
+            {
+              "expression": "barberia_id",
+              "isExpression": false,
+              "asc": true,
+              "nulls": "last"
+            },
+            {
+              "expression": "fecha_operativa",
+              "isExpression": false,
+              "asc": true,
+              "nulls": "last"
+            }
+          ],
+          "isUnique": false,
+          "concurrently": false,
+          "method": "btree",
+          "with": {}
+        },
+        "turnos_un_abierto_uq": {
+          "name": "turnos_un_abierto_uq",
+          "columns": [
+            {
+              "expression": "barberia_id",
+              "isExpression": false,
+              "asc": true,
+              "nulls": "last"
+            }
+          ],
+          "isUnique": true,
+          "where": "estado = 'abierto'",
+          "concurrently": false,
+          "method": "btree",
+          "with": {}
+        }
+      },
+      "foreignKeys": {
+        "turnos_caja_barberia_id_barberias_id_fk": {
+          "name": "turnos_caja_barberia_id_barberias_id_fk",
+          "tableFrom": "turnos_caja",
+          "tableTo": "barberias",
+          "columnsFrom": [
+            "barberia_id"
+          ],
+          "columnsTo": [
+            "id"
+          ],
+          "onDelete": "no action",
+          "onUpdate": "no action"
+        },
+        "turnos_caja_abierto_por_usuarios_id_fk": {
+          "name": "turnos_caja_abierto_por_usuarios_id_fk",
+          "tableFrom": "turnos_caja",
+          "tableTo": "usuarios",
+          "columnsFrom": [
+            "abierto_por"
+          ],
+          "columnsTo": [
+            "id"
+          ],
+          "onDelete": "no action",
+          "onUpdate": "no action"
+        },
+        "turnos_caja_cerrado_por_usuarios_id_fk": {
+          "name": "turnos_caja_cerrado_por_usuarios_id_fk",
+          "tableFrom": "turnos_caja",
+          "tableTo": "usuarios",
+          "columnsFrom": [
+            "cerrado_por"
+          ],
+          "columnsTo": [
+            "id"
+          ],
+          "onDelete": "no action",
+          "onUpdate": "no action"
+        }
+      },
+      "compositePrimaryKeys": {},
+      "uniqueConstraints": {},
+      "policies": {},
+      "checkConstraints": {},
+      "isRLSEnabled": false
+    },
+    "public.usuarios": {
+      "name": "usuarios",
+      "schema": "",
+      "columns": {
+        "id": {
+          "name": "id",
+          "type": "uuid",
+          "primaryKey": true,
+          "notNull": true,
+          "default": "gen_random_uuid()"
+        },
+        "barberia_id": {
+          "name": "barberia_id",
+          "type": "uuid",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "nombre": {
+          "name": "nombre",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "usuario": {
+          "name": "usuario",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "hash": {
+          "name": "hash",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "rol": {
+          "name": "rol",
+          "type": "rol",
+          "typeSchema": "public",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "permisos_extra": {
+          "name": "permisos_extra",
+          "type": "text[]",
+          "primaryKey": false,
+          "notNull": true,
+          "default": "'{}'::text[]"
+        },
+        "activo": {
+          "name": "activo",
+          "type": "boolean",
+          "primaryKey": false,
+          "notNull": true,
+          "default": true
+        },
+        "debe_cambiar": {
+          "name": "debe_cambiar",
+          "type": "boolean",
+          "primaryKey": false,
+          "notNull": true,
+          "default": true
+        },
+        "intentos_fallidos": {
+          "name": "intentos_fallidos",
+          "type": "integer",
+          "primaryKey": false,
+          "notNull": true,
+          "default": 0
+        },
+        "avatar": {
+          "name": "avatar",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": true,
+          "default": "'tijera'"
+        },
+        "meta_semanal": {
+          "name": "meta_semanal",
+          "type": "integer",
+          "primaryKey": false,
+          "notNull": true,
+          "default": 0
+        },
+        "clave_temporal": {
+          "name": "clave_temporal",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "clave_temporal_expira": {
+          "name": "clave_temporal_expira",
+          "type": "timestamp with time zone",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "bloqueado_hasta": {
+          "name": "bloqueado_hasta",
+          "type": "timestamp with time zone",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "creado_en": {
+          "name": "creado_en",
+          "type": "timestamp with time zone",
+          "primaryKey": false,
+          "notNull": true,
+          "default": "now()"
+        }
+      },
+      "indexes": {
+        "usuarios_usuario_uq": {
+          "name": "usuarios_usuario_uq",
+          "columns": [
+            {
+              "expression": "usuario",
+              "isExpression": false,
+              "asc": true,
+              "nulls": "last"
+            }
+          ],
+          "isUnique": true,
+          "concurrently": false,
+          "method": "btree",
+          "with": {}
+        },
+        "usuarios_barberia_idx": {
+          "name": "usuarios_barberia_idx",
+          "columns": [
+            {
+              "expression": "barberia_id",
+              "isExpression": false,
+              "asc": true,
+              "nulls": "last"
+            }
+          ],
+          "isUnique": false,
+          "concurrently": false,
+          "method": "btree",
+          "with": {}
+        }
+      },
+      "foreignKeys": {
+        "usuarios_barberia_id_barberias_id_fk": {
+          "name": "usuarios_barberia_id_barberias_id_fk",
+          "tableFrom": "usuarios",
+          "tableTo": "barberias",
+          "columnsFrom": [
+            "barberia_id"
+          ],
+          "columnsTo": [
+            "id"
+          ],
+          "onDelete": "no action",
+          "onUpdate": "no action"
+        }
+      },
+      "compositePrimaryKeys": {},
+      "uniqueConstraints": {},
+      "policies": {},
+      "checkConstraints": {},
+      "isRLSEnabled": false
+    },
+    "public.ventas": {
+      "name": "ventas",
+      "schema": "",
+      "columns": {
+        "id": {
+          "name": "id",
+          "type": "uuid",
+          "primaryKey": true,
+          "notNull": true,
+          "default": "gen_random_uuid()"
+        },
+        "barberia_id": {
+          "name": "barberia_id",
+          "type": "uuid",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "folio": {
+          "name": "folio",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "turno_id": {
+          "name": "turno_id",
+          "type": "uuid",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "registrada_por": {
+          "name": "registrada_por",
+          "type": "uuid",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "estado": {
+          "name": "estado",
+          "type": "estado_venta",
+          "typeSchema": "public",
+          "primaryKey": false,
+          "notNull": true,
+          "default": "'pagada'"
+        },
+        "total": {
+          "name": "total",
+          "type": "integer",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "descuento_total": {
+          "name": "descuento_total",
+          "type": "integer",
+          "primaryKey": false,
+          "notNull": true,
+          "default": 0
+        },
+        "observaciones": {
+          "name": "observaciones",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": true,
+          "default": "''"
+        },
+        "motivo_cancelacion": {
+          "name": "motivo_cancelacion",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "cancelada_por": {
+          "name": "cancelada_por",
+          "type": "uuid",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "cancelada_en": {
+          "name": "cancelada_en",
+          "type": "timestamp with time zone",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "venta_origen_id": {
+          "name": "venta_origen_id",
+          "type": "uuid",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "clave_unica": {
+          "name": "clave_unica",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "creado_en": {
+          "name": "creado_en",
+          "type": "timestamp with time zone",
+          "primaryKey": false,
+          "notNull": true,
+          "default": "now()"
+        }
+      },
+      "indexes": {
+        "ventas_folio_uq": {
+          "name": "ventas_folio_uq",
+          "columns": [
+            {
+              "expression": "barberia_id",
+              "isExpression": false,
+              "asc": true,
+              "nulls": "last"
+            },
+            {
+              "expression": "folio",
+              "isExpression": false,
+              "asc": true,
+              "nulls": "last"
+            }
+          ],
+          "isUnique": true,
+          "concurrently": false,
+          "method": "btree",
+          "with": {}
+        },
+        "ventas_clave_uq": {
+          "name": "ventas_clave_uq",
+          "columns": [
+            {
+              "expression": "barberia_id",
+              "isExpression": false,
+              "asc": true,
+              "nulls": "last"
+            },
+            {
+              "expression": "clave_unica",
+              "isExpression": false,
+              "asc": true,
+              "nulls": "last"
+            }
+          ],
+          "isUnique": true,
+          "concurrently": false,
+          "method": "btree",
+          "with": {}
+        },
+        "ventas_turno_idx": {
+          "name": "ventas_turno_idx",
+          "columns": [
+            {
+              "expression": "turno_id",
+              "isExpression": false,
+              "asc": true,
+              "nulls": "last"
+            }
+          ],
+          "isUnique": false,
+          "concurrently": false,
+          "method": "btree",
+          "with": {}
+        }
+      },
+      "foreignKeys": {
+        "ventas_barberia_id_barberias_id_fk": {
+          "name": "ventas_barberia_id_barberias_id_fk",
+          "tableFrom": "ventas",
+          "tableTo": "barberias",
+          "columnsFrom": [
+            "barberia_id"
+          ],
+          "columnsTo": [
+            "id"
+          ],
+          "onDelete": "no action",
+          "onUpdate": "no action"
+        },
+        "ventas_turno_id_turnos_caja_id_fk": {
+          "name": "ventas_turno_id_turnos_caja_id_fk",
+          "tableFrom": "ventas",
+          "tableTo": "turnos_caja",
+          "columnsFrom": [
+            "turno_id"
+          ],
+          "columnsTo": [
+            "id"
+          ],
+          "onDelete": "no action",
+          "onUpdate": "no action"
+        },
+        "ventas_registrada_por_usuarios_id_fk": {
+          "name": "ventas_registrada_por_usuarios_id_fk",
+          "tableFrom": "ventas",
+          "tableTo": "usuarios",
+          "columnsFrom": [
+            "registrada_por"
+          ],
+          "columnsTo": [
+            "id"
+          ],
+          "onDelete": "no action",
+          "onUpdate": "no action"
+        },
+        "ventas_cancelada_por_usuarios_id_fk": {
+          "name": "ventas_cancelada_por_usuarios_id_fk",
+          "tableFrom": "ventas",
+          "tableTo": "usuarios",
+          "columnsFrom": [
+            "cancelada_por"
+          ],
+          "columnsTo": [
+            "id"
+          ],
+          "onDelete": "no action",
+          "onUpdate": "no action"
+        }
+      },
+      "compositePrimaryKeys": {},
+      "uniqueConstraints": {},
+      "policies": {},
+      "checkConstraints": {},
+      "isRLSEnabled": false
+    }
+  },
+  "enums": {
+    "public.estado_idea": {
+      "name": "estado_idea",
+      "schema": "public",
+      "values": [
+        "aprobada",
+        "descartada"
+      ]
+    },
+    "public.estado_turno": {
+      "name": "estado_turno",
+      "schema": "public",
+      "values": [
+        "abierto",
+        "cerrado"
+      ]
+    },
+    "public.estado_venta": {
+      "name": "estado_venta",
+      "schema": "public",
+      "values": [
+        "pagada",
+        "cancelada"
+      ]
+    },
+    "public.rol": {
+      "name": "rol",
+      "schema": "public",
+      "values": [
+        "admin",
+        "duena",
+        "encargada",
+        "barbera",
+        "contador"
+      ]
+    },
+    "public.tipo_movimiento": {
+      "name": "tipo_movimiento",
+      "schema": "public",
+      "values": [
+        "entrada",
+        "retiro",
+        "devolucion"
+      ]
+    },
+    "public.tipo_pago_comision": {
+      "name": "tipo_pago_comision",
+      "schema": "public",
+      "values": [
+        "pago",
+        "renta"
+      ]
+    },
+    "public.tipo_regla": {
+      "name": "tipo_regla",
+      "schema": "public",
+      "values": [
+        "porcentaje",
+        "fijo",
+        "renta",
+        "sueldo",
+        "mixto"
+      ]
+    }
+  },
+  "schemas": {},
+  "sequences": {},
+  "roles": {},
+  "policies": {},
+  "views": {},
+  "_meta": {
+    "columns": {},
+    "schemas": {},
+    "tables": {}
+  }
+}

@@ -58,6 +58,12 @@ export const usuarios = pgTable(
     activo: boolean("activo").notNull().default(true),
     debeCambiar: boolean("debe_cambiar").notNull().default(true),
     intentosFallidos: integer("intentos_fallidos").notNull().default(0),
+    avatar: text("avatar").notNull().default("tijera"),
+    // Meta personal de ventas por semana (centavos). 0 = sin meta.
+    metaSemanal: integer("meta_semanal").notNull().default(0),
+    // Contraseña temporal cifrada, consultable por 30 minutos después de restablecerla.
+    claveTemporal: text("clave_temporal"),
+    claveTemporalExpira: timestamp("clave_temporal_expira", { withTimezone: true }),
     bloqueadoHasta: timestamp("bloqueado_hasta", { withTimezone: true }),
     creadoEn: creadoEn(),
   },
@@ -80,6 +86,7 @@ export const servicios = pgTable("servicios", {
   nombre: text("nombre").notNull(),
   descripcion: text("descripcion").notNull().default(""),
   duracionMin: integer("duracion_min").notNull().default(30),
+  categoria: text("categoria").notNull().default("Cortes"),
   precio: integer("precio").notNull(),
   activo: boolean("activo").notNull().default(true),
   orden: integer("orden").notNull().default(0),
@@ -114,6 +121,8 @@ export const turnosCaja = pgTable(
     efectivoContado: integer("efectivo_contado"),
     diferencia: integer("diferencia"),
     notasCierre: text("notas_cierre"),
+    // Revisión de formas de pago que no son efectivo al cerrar: { "Transferencia": true, ... }
+    verificacion: jsonb("verificacion").notNull().default(sql`'{}'::jsonb`),
   },
   (t) => [
     index("turnos_barberia_fecha_idx").on(t.barberiaId, t.fechaOperativa),
@@ -319,4 +328,19 @@ export const historial = pgTable(
     creadoEn: creadoEn(),
   },
   (t) => [index("historial_barberia_idx").on(t.barberiaId, t.creadoEn)],
+);
+
+// Solicitudes de "olvidé mi contraseña" que llegan al propietario y a administración.
+export const solicitudesClave = pgTable(
+  "solicitudes_clave",
+  {
+    id: id(),
+    barberiaId: barberiaId(),
+    usuarioId: uuid("usuario_id")
+      .notNull()
+      .references(() => usuarios.id),
+    atendida: boolean("atendida").notNull().default(false),
+    creadoEn: creadoEn(),
+  },
+  (t) => [index("solicitudes_barberia_idx").on(t.barberiaId, t.atendida)],
 );
