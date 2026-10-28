@@ -12,16 +12,19 @@ export function Modal({ abierto, cerrar, etiqueta, titulo, ancho, children }: {
   const alCerrar = useRef(cerrar);
   alCerrar.current = cerrar;
   const id = useId();
+  // El portal solo existe en el navegador; esperar a montar evita diferencias con lo que manda el servidor.
+  const [montado, setMontado] = useState(false);
+  useEffect(() => setMontado(true), []);
   useEffect(() => {
-    if (!abierto) return;
+    if (!abierto || !montado) return;
     const previo = document.activeElement as HTMLElement | null;
     const tecla = (e: KeyboardEvent) => { if (e.key === "Escape") { e.stopPropagation(); alCerrar.current(); } };
     document.addEventListener("keydown", tecla);
     const foco = ref.current?.querySelector<HTMLElement>("[autofocus], input:not([type=hidden]), button:not(.cerrar-x)");
     foco?.focus();
     return () => { document.removeEventListener("keydown", tecla); previo?.focus?.(); };
-  }, [abierto]);
-  if (!abierto || typeof document === "undefined") return null;
+  }, [abierto, montado]);
+  if (!abierto || !montado) return null;
   return createPortal(
     <div className="capa" onMouseDown={(e) => { if (e.target === e.currentTarget) cerrar(); }}>
       <div ref={ref} className={`modal ${ancho ? "ancho" : ""}`} role="dialog" aria-modal="true" aria-labelledby={id}>

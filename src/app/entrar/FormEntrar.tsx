@@ -1,7 +1,7 @@
 "use client";
 
 import { useActionState, useState } from "react";
-import { Icono } from "@/components/Icono";
+import { Fl, Icono } from "@/components/Icono";
 import { Modal } from "@/components/ui";
 import { entrar, solicitarRestablecer, type EstadoEntrada } from "./actions";
 
@@ -50,7 +50,7 @@ export function FormEntrar() {
         {estado.error && <p className="aviso error" role="alert">{estado.error}</p>}
         <button className="bt grande" disabled={enviando}>
           {enviando ? "Entrando…" : "Entrar"}
-          <span className="fl" aria-hidden="true"><svg className="ic" viewBox="0 0 24 24"><path d="M5 12h14M13 6l6 6-6 6" /></svg></span>
+          <Fl />
         </button>
       </form>
       <button type="button" className="enlace" style={{ justifySelf: "center" }} onClick={abrir}>¿Olvidaste tu contraseña?</button>
@@ -97,14 +97,14 @@ export function FormEntrar() {
           <button type="button" className="bt sec solo" onClick={() => setPaso("intencion")}>Regresar</button>
           <button type="button" className="bt" disabled={!usuarioOlvido.trim() || paso === "enviando"} onClick={enviar}>
             {paso === "enviando" ? "Enviando…" : "Sí, restablecer"}
-            <span className="fl" aria-hidden="true"><svg className="ic" viewBox="0 0 24 24"><path d="M5 12h14M13 6l6 6-6 6" /></svg></span>
+            <Fl />
           </button>
         </div>
       </Modal>
 
       <Modal abierto={paso === "enviada"} cerrar={cerrar} etiqueta="Solicitud enviada" titulo="Listo, ya se avisó">
         <div className="cronometro">
-          <span className="avatar" style={{ width: 64, height: 64, background: "var(--ok-soft)", color: "var(--ok)" }}><Icono n="palomita" /></span>
+          <span className="exito"><Icono n="palomita" /></span>
           <p className="muted">
             Tu solicitud llegó al propietario y se aprobará pronto.
             <br />

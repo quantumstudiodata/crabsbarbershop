@@ -3,7 +3,7 @@ import { compararConteo, efectivoEsperado, requiereExplicacion } from "@/lib/caj
 import { comisionDeServicio, elegirRegla, resumenSemana, type Regla } from "@/lib/comisiones";
 import { contrasenaTemporal, problemaContrasena, sugerirUsuario } from "@/lib/cuentas";
 import { diaDeSemana, esFechaValida, fechaLocal, finDeMes, lunesDe, sumarDias } from "@/lib/fechas";
-import { detectarFranjas, fechasComerciales } from "@/lib/ideas";
+import { detectarFranjas, fechasComerciales, pascua } from "@/lib/ideas";
 import { cambio, formatoDinero, leerPesos } from "@/lib/money";
 import { permisosDe, rolesAsignables } from "@/lib/permisos";
 
@@ -101,7 +101,9 @@ describe("permisos", () => {
   it("cada rol ve solo lo suyo", () => {
     expect(permisosDe("barbera").has("ventas.cancelar")).toBe(false);
     expect(permisosDe("barbera", ["ventas.cancelar"]).has("ventas.cancelar")).toBe(true);
-    expect(permisosDe("barbera", ["no.existe"]).size).toBe(1);
+    // En el local hay una sola computadora: un barbero puede cobrar lo que hizo otra persona.
+    expect(permisosDe("barbera").has("ventas.registrar_otros")).toBe(true);
+    expect(permisosDe("barbera", ["no.existe"]).size).toBe(2);
     expect(permisosDe("contador").has("ventas.registrar")).toBe(false);
     expect(permisosDe("contador").has("reportes.exportar")).toBe(true);
     expect(rolesAsignables("duena")).not.toContain("admin");
@@ -153,7 +155,12 @@ describe("ideas", () => {
   });
   it("lista fechas comerciales próximas en orden", () => {
     const fs = fechasComerciales("2026-10-28", 30);
-    expect(fs[0]).toMatchObject({ fecha: "2026-10-31", titulo: "Quincena" });
+    expect(fs[0]).toMatchObject({ fecha: "2026-10-31", titulo: "Día de Muertos" });
     expect(fs.some((x) => x.titulo === "Buen Fin")).toBe(true);
+  });
+  it("calcula Semana Santa con la fecha de Pascua", () => {
+    expect(pascua(2026)).toBe("2026-04-05");
+    expect(pascua(2027)).toBe("2027-03-28");
+    expect(fechasComerciales("2027-03-01", 30).find((x) => x.titulo === "Semana Santa")?.fecha).toBe("2027-03-21");
   });
 });

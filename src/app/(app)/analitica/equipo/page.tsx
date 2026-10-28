@@ -93,10 +93,10 @@ export default async function Equipo({ searchParams }: { searchParams: Promise<{
                     <td>
                       {esRenta ? (
                         r.rentaPendiente > 0
-                          ? <span className="fila" style={{ gap: 8, fontSize: 13 }}><Anillo avance={r.renta ? r.rentaPagada / r.renta : 0} />Renta pendiente, {formatoDinero(r.rentaPendiente)}</span>
+                          ? <span className="fila" style={{ gap: 8, fontSize: 13, flexWrap: "nowrap", whiteSpace: "nowrap" }}><Anillo avance={r.renta ? r.rentaPagada / r.renta : 0} />Renta pendiente, {formatoDinero(r.rentaPendiente)}</span>
                           : <span className="cubierto"><i>✓</i>Renta cubierta</span>
                       ) : r.leToca === 0 ? <span className="muted" style={{ fontSize: 13 }}>Sin saldo</span> : r.pendiente > 0
-                        ? <span className="fila" style={{ gap: 8, fontSize: 13 }}><Anillo avance={r.pagado / r.leToca} />Por pagar, {formatoDinero(r.pendiente)}</span>
+                        ? <span className="fila" style={{ gap: 8, fontSize: 13, flexWrap: "nowrap", whiteSpace: "nowrap" }}><Anillo avance={r.pagado / r.leToca} />Por pagar, {formatoDinero(r.pendiente)}</span>
                         : <span className="cubierto"><i>✓</i>Pagado</span>}
                     </td>
                     <td className="der">{s.puede("equipo.pagar") && <Pagar id={p.id} nombre={p.nombre} semana={lunes} renta={esRenta} pendiente={formatoDinero(esRenta ? r.rentaPendiente : r.pendiente)} />}</td>

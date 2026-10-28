@@ -42,7 +42,7 @@ export default async function Resumen({ searchParams }: { searchParams: Promise<
       <section className="hero subir">
         <div>
           <SelectorPeriodo ruta="/analitica" p={p} hoy={hoy} />
-          <p className="muted" style={{ margin: "26px 0 6px" }}>Ventas, {p.etiqueta.charAt(0).toLowerCase() + p.etiqueta.slice(1)}</p>
+          <p className="muted" style={{ margin: "26px 0 6px" }}>{p.tipo === "rango" ? `Ventas ${p.etiqueta.toLowerCase()}` : p.tipo === "semana" ? "Ventas de esta semana" : p.tipo === "mes" ? "Ventas de este mes" : `Ventas, ${p.etiqueta}`}</p>
           <div className="big"><Cuenta valor={r.netas} /></div>
           <p className="muted" style={{ marginTop: 12 }}>
             {v === null ? `De ${r.clientes} ${r.clientes === 1 ? "cliente" : "clientes"}.` : (

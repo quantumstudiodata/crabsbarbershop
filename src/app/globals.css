@@ -104,8 +104,8 @@ body.foco .barra.ver, body.foco .barra:hover, body.foco .barra:focus-within { tr
 /* ---------- Botón Flecha ---------- */
 .bt { display: inline-flex; align-items: center; justify-content: center; gap: 12px; border: 0; cursor: pointer; font: 600 14px var(--f-body); white-space: nowrap; text-decoration: none; padding: 6px 6px 6px 18px; border-radius: 999px; background: var(--ink); color: #fff; transition: transform .2s, background .2s; }
 .bt .fl { width: 32px; height: 32px; border-radius: 50%; display: grid; place-items: center; background: #fff; color: var(--ink); transition: transform .3s cubic-bezier(.2,.8,.2,1); flex: none; }
-.bt:hover .fl { transform: translateX(4px) rotate(-45deg); }
-.bt.sin-giro:hover .fl { transform: translateX(3px); }
+.bt:hover .fl { transform: translateX(3px); }
+.bt:hover .fl.giro { transform: translateX(4px) rotate(-45deg); }
 .bt.sec { background: rgba(255,255,255,.8); color: var(--ink); box-shadow: inset 0 0 0 1px rgba(19,23,28,.14); }
 .bt.sec .fl { background: var(--ink); color: #fff; }
 .bt.solo { padding: 10px 18px; }
@@ -232,7 +232,9 @@ table.tabla { width: 100%; border-collapse: collapse; font-size: 14px; }
 
 /* Contraseña temporal */
 .cronometro { display: grid; justify-items: center; gap: 12px; text-align: center; }
-.cronometro svg { width: 124px; height: 124px; }
+.cronometro > svg { width: 124px; height: 124px; }
+.exito { width: 64px; height: 64px; border-radius: 50%; display: grid; place-items: center; background: var(--ok-soft); color: var(--ok); animation: subir .5s cubic-bezier(.2,.8,.2,1) both; }
+.exito .ic { width: 30px; height: 30px; stroke-width: 2.2; }
 .clave { font: 600 32px/1 var(--f-mono); letter-spacing: .14em; padding: 15px 18px; border-radius: 14px; background: var(--accent-soft); width: 100%; text-align: center; user-select: all; }
 
 /* Calendario propio */
@@ -276,7 +278,7 @@ table.tabla { width: 100%; border-collapse: collapse; font-size: 14px; }
 @property --a { syntax: "<angle>"; initial-value: 0deg; inherits: false; }
 
 /* ---------- Inicio ---------- */
-.hero { display: grid; grid-template-columns: minmax(0, 1fr) 270px; gap: 32px; align-items: end; }
+.hero { display: grid; grid-template-columns: minmax(0, 1fr) 270px; gap: 32px; align-items: center; }
 @media (max-width: 860px) { .hero { grid-template-columns: 1fr; } }
 .area { width: 100%; height: auto; overflow: visible; display: block; }
 .area .l { fill: none; stroke: var(--accent); stroke-width: 2.5; stroke-linecap: round; stroke-linejoin: round; stroke-dasharray: 2000; stroke-dashoffset: 2000; animation: dibuja 2.2s cubic-bezier(.3,.7,.2,1) .2s forwards; }
@@ -288,7 +290,7 @@ table.tabla { width: 100%; border-collapse: collapse; font-size: 14px; }
 .datos { display: grid; }
 .datos > div { display: flex; justify-content: space-between; align-items: baseline; gap: 12px; padding: 15px 0; border-top: 1px solid var(--line); }
 .datos > div:first-child { border-top: 0; }
-.datos b { font: 600 21px var(--f-body); font-variant-numeric: tabular-nums; }
+.datos b { font: 600 21px var(--f-body); font-variant-numeric: tabular-nums; white-space: nowrap; }
 .tira { display: flex; gap: 26px; align-items: center; flex-wrap: wrap; }
 .tira small { display: block; color: var(--muted); font-size: 12px; }
 .meta { height: 10px; border-radius: 5px; background: var(--accent-soft); overflow: hidden; }

@@ -27,6 +27,7 @@ export async function guardarRegla(form: FormData) {
   if (tipo === "fijo" && fijo <= 0) volver(R, { error: "Escribe cuánto gana por servicio." });
   if ((tipo === "renta" || tipo === "sueldo" || tipo === "mixto") && semanal <= 0) volver(R, { error: "Escribe el monto semanal." });
   if (servicioId && (tipo === "renta" || tipo === "sueldo" || tipo === "mixto")) volver(R, { error: "Para un servicio en particular solo aplica porcentaje o monto fijo." });
+  if (tipo === "mixto" && pct >= 100) volver(R, { error: "El porcentaje va de 1 a 99." });
 
   const [u] = await db.select().from(schema.usuarios).where(and(eq(schema.usuarios.id, barberoId), eq(schema.usuarios.barberiaId, s.barberia.id))).limit(1);
   if (!u) volver(R, { error: "No se encontró a esa persona." });

@@ -21,12 +21,12 @@ const ya = await db.select().from(schema.usuarios).where(eq(schema.usuarios.usua
 if (ya.length) { console.log("Los datos de demostración ya estaban cargados."); await sql.end(); process.exit(0); }
 
 const hash = await bcrypt.hash("demo1234", 10);
-const alta = async (nombre: string, usuario: string, rol: "encargada" | "barbera" | "contador") =>
-  (await db.insert(schema.usuarios).values({ barberiaId: b.id, nombre, usuario, rol, hash, debeCambiar: false }).returning())[0];
-const ana = await alta("Ana Martínez López", "AMARTINEZ", "encargada");
-const luz = await alta("Luz Hernández Gil", "LHERNANDEZ", "barbera");
-const karla = await alta("Karla Ruiz Pérez", "KRUIZ", "barbera");
-await alta("José López", "JLOPEZ", "contador");
+const alta = async (nombre: string, usuario: string, rol: "encargada" | "barbera" | "contador", avatar: string, metaSemanal = 0) =>
+  (await db.insert(schema.usuarios).values({ barberiaId: b.id, nombre, usuario, rol, hash, debeCambiar: false, avatar, metaSemanal }).returning())[0];
+const ana = await alta("Ana Martínez López", "AMARTINEZ", "encargada", "tijera", 600000);
+const luz = await alta("Luz Hernández Gil", "LHERNANDEZ", "barbera", "luna");
+const karla = await alta("Karla Ruiz Pérez", "KRUIZ", "barbera", "bigote", 450000);
+await alta("José López", "JLOPEZ", "contador", "iniciales");
 const inicioReglas = new Date("2026-01-01T00:00:00Z");
 const reglas = {
   [ana.id]: { tipo: "porcentaje" as const, porcentaje: 4000, montoFijo: 0, montoSemanal: 0 },
@@ -86,5 +86,5 @@ for (let f = sumarDias(hoy, -63); f <= hoy; f = sumarDias(f, 1)) {
   }
 }
 await db.update(schema.barberias).set({ siguienteFolio: folio, metaDiaria: 350000 }).where(eq(schema.barberias.id, b.id));
-console.log("Datos de demostración cargados. Usuarios de ejemplo con contraseña demo1234: AMARTINEZ (encargada), LHERNANDEZ y KRUIZ (barberas), JLOPEZ (contador).");
+console.log("Datos de demostración cargados. Usuarios de ejemplo con contraseña demo1234: AMARTINEZ (encargado), LHERNANDEZ y KRUIZ (barberos), JLOPEZ (contador).");
 await sql.end();

@@ -52,8 +52,8 @@ export default async function Inicio({ searchParams }: { searchParams: Promise<{
     porHoraPrevio.set(h, (porHoraPrevio.get(h) ?? 0) + v.total);
   }
   const ahora = horaLocal(new Date(), zona);
-  const horas = [...r.porHora.keys(), ...porHoraPrevio.keys(), ahora];
-  const desde = Math.min(9, ...horas), hasta = Math.max(21, ...horas);
+  const horas = [...r.porHora.keys(), ...porHoraPrevio.keys()];
+  const desde = Math.min(9, ...horas), hasta = Math.max(21, ahora, ...horas);
   const dia = nombreDia(new Date(`${hoy}T12:00:00Z`).getUTCDay());
 
   return (
@@ -123,9 +123,13 @@ function GraficaDia({ hoy, previo, desde, hasta, ahora }: { hoy: Map<number, num
   const max = Math.max(...sHoy.map((x) => x ?? 0), ...sPrevio.map((x) => x ?? 0), 1);
   const x = (i: number) => (i * w) / (n - 1);
   const y = (v: number) => h - 8 - (v / max) * (h - 24);
-  const linea = (serie: (number | null)[]) => serie.map((v, i) => (v === null ? "" : `${i === 0 ? "M" : "L"}${x(i).toFixed(1)} ${y(v).toFixed(1)}`)).join(" ");
+  const linea = (serie: (number | null)[]) => {
+    let d = "";
+    serie.forEach((v, i) => { if (v !== null) d += `${d ? " L" : "M"}${x(i).toFixed(1)} ${y(v).toFixed(1)}`; });
+    return d;
+  };
   const ultimo = sHoy.reduce<number>((u, v, i) => (v === null ? u : i), 0);
-  const dHoy = linea(sHoy);
+  const dHoy = linea(sHoy).trim();
   return (
     <>
       <svg className="area" viewBox={`0 0 ${w} ${h}`} role="img" aria-label="Ventas acumuladas de hoy por hora comparadas con la semana pasada">
@@ -133,8 +137,8 @@ function GraficaDia({ hoy, previo, desde, hasta, ahora }: { hoy: Map<number, num
           <linearGradient id="relleno" x1="0" x2="0" y1="0" y2="1"><stop offset="0" stopColor="#4b6274" stopOpacity=".22" /><stop offset="1" stopColor="#4b6274" stopOpacity="0" /></linearGradient>
         </defs>
         <path className="p" d={linea(sPrevio)} />
-        <path className="f" d={`${dHoy} L${x(ultimo)} ${h} L0 ${h} Z`} fill="url(#relleno)" />
-        <path className="l" d={dHoy} />
+        {dHoy && <path className="f" d={`${dHoy} L${x(ultimo)} ${h} L0 ${h} Z`} fill="url(#relleno)" />}
+        {dHoy && <path className="l" d={dHoy} />}
         <circle className="d2" cx={x(ultimo)} cy={y(sHoy[ultimo] ?? 0)} r={6} />
         <circle className="d" cx={x(ultimo)} cy={y(sHoy[ultimo] ?? 0)} r={6} />
       </svg>

@@ -30,7 +30,9 @@ export async function GET() {
       .where(and(eq(s.historial.barberiaId, bId), gte(s.historial.creadoEn, desde)))
       .orderBy(desc(s.historial.creadoEn))
       .limit(20);
-    eventos = filas.filter((f) => f.tipo !== "acceso").map((f) => ({
+    // Las solicitudes de contraseña ya salen arriba con su botón.
+    const verSolicitudes = se.puede("ajustes.usuarios");
+    eventos = filas.filter((f) => f.tipo !== "acceso" && !(verSolicitudes && f.accion.endsWith("pidió restablecer su contraseña"))).map((f) => ({
       id: `h${f.id}`, t: f.t.toISOString(), titulo: f.accion, href: RUTA[f.tipo], nombre: f.nombre ?? "Sistema", avatar: f.avatar ?? "cangrejo",
     }));
   } else {

@@ -1,6 +1,7 @@
 "use client";
 
 import { useEffect, useState } from "react";
+import { createPortal } from "react-dom";
 import { decidirIdea } from "@/app/(app)/acciones-ideas";
 import type { Propuesta } from "@/lib/propuestas";
 import { Ayuda } from "./Ayuda";
@@ -52,7 +53,7 @@ export function PanelIdeas() {
       <button type="button" className="orbe" aria-label="Ideas para vender más" title="Ideas" onClick={() => setAbierto(true)}>
         <Icono n="chispa" />
       </button>
-      {abierto && (
+      {abierto && createPortal(
         <div className="capa" style={{ background: "rgba(30,42,54,.18)", placeItems: "stretch", padding: 0 }} onMouseDown={(e) => { if (e.target === e.currentTarget) setAbierto(false); }}>
           <aside className="panel-ideas" role="dialog" aria-modal="true" aria-label="Ideas">
             <div className="aurora" aria-hidden="true" />
@@ -112,7 +113,8 @@ export function PanelIdeas() {
               </>
             )}
           </aside>
-        </div>
+        </div>,
+        document.body,
       )}
     </>
   );

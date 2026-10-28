@@ -1,11 +1,15 @@
 import { and, eq, isNull } from "drizzle-orm";
-import { Aviso, AVISOS, Encabezado } from "@/components/Encabezado";
+import { Avatar } from "@/components/Avatar";
+import { Ayuda } from "@/components/Ayuda";
+import { AvisoUrl } from "@/components/Encabezado";
+import { Icono } from "@/components/Icono";
 import { requerirSesion } from "@/lib/auth";
 import { describirRegla } from "@/lib/comisiones";
 import { equipoQueAtiende, serviciosActivos } from "@/lib/datos";
 import { db, schema } from "@/lib/db";
 import { formatoDinero } from "@/lib/money";
-import { guardarRegla, quitarRegla } from "./actions";
+import { quitarRegla } from "./actions";
+import { FormaPago } from "./FormaPago";
 
 export const metadata = { title: "Formas de pago del equipo" };
 
@@ -16,63 +20,40 @@ export default async function ReglasEquipo({ searchParams }: { searchParams: Pro
     equipoQueAtiende(s.barberia.id), serviciosActivos(s.barberia.id),
     db.select().from(schema.reglasComision).where(and(eq(schema.reglasComision.barberiaId, s.barberia.id), isNull(schema.reglasComision.vigenteHasta))),
   ]);
-  const a = q.aviso ? AVISOS[q.aviso] : undefined;
   return (
     <>
-      {a && <Aviso tipo={a.tipo}>{a.texto}</Aviso>}
-      {q.error && <Aviso tipo="error">{q.error}</Aviso>}
-      <Encabezado etiqueta="Ajustes" titulo="Formas de pago del equipo" sub="Cada barbera puede tener la suya. Si la cambias, lo ya cobrado conserva la regla con la que se cobró." />
-      <section className="tres">
+      <AvisoUrl aviso={q.aviso} error={q.error} />
+      <div>
+        <h1 className="titulo">Formas de pago del equipo
+          <Ayuda titulo="¿Qué es esto?">
+            Define cómo gana cada persona: un porcentaje o monto por servicio, renta de silla, sueldo fijo, o sueldo más porcentaje.
+            <br /><br />Con esto se calcula lo que le corresponde cada semana en Analítica, Equipo. Las propinas siempre son aparte.
+          </Ayuda>
+        </h1>
+        <p className="sub">Cada persona puede tener la suya.</p>
+      </div>
+      <div className="glass panel" style={{ padding: "6px 10px 12px" }}>
+        {equipo.length === 0 && <p className="muted" style={{ padding: 12 }}>Todavía no hay barberos dados de alta.</p>}
         {equipo.map((p) => {
           const general = reglas.find((r) => r.barberoId === p.id && !r.servicioId) ?? null;
           const especiales = reglas.filter((r) => r.barberoId === p.id && r.servicioId);
           return (
-            <article key={p.id} className="glass panel">
-              <div className="fila"><span className="av">{p.nombre[0]}</span><span><b>{p.nombre}</b><small className="muted" style={{ display: "block", fontSize: 12 }}>{describirRegla(general, formatoDinero)}</small></span></div>
-              <FormRegla barberoId={p.id} actual={general} />
-              {especiales.length > 0 && (
-                <div className="lista">
-                  {especiales.map((r) => (
-                    <div key={r.id}>
-                      <span>{servicios.find((x) => x.id === r.servicioId)?.nombre ?? "Servicio"}<small>{describirRegla(r, formatoDinero)}</small></span>
-                      <form action={quitarRegla}><input type="hidden" name="id" value={r.id} /><button className="enlace">Quitar</button></form>
-                    </div>
-                  ))}
+            <div key={p.id} style={{ borderTop: "1px solid var(--line)" }}>
+              <div className="fila-p" style={{ gridTemplateColumns: "46px minmax(0,1fr) auto" }}>
+                <Avatar avatar={p.avatar} nombre={p.nombre} t={42} />
+                <span><b>{p.nombre}</b><small>{describirRegla(general, formatoDinero)}</small></span>
+                <span className="acts"><FormaPago id={p.id} nombre={p.nombre} actual={general} /></span>
+              </div>
+              {especiales.map((r) => (
+                <div key={r.id} className="entre" style={{ padding: "4px 12px 10px 70px", fontSize: 13 }}>
+                  <span className="muted">{servicios.find((x) => x.id === r.servicioId)?.nombre ?? "Servicio"}: {describirRegla(r, formatoDinero)}</span>
+                  <form action={quitarRegla}><input type="hidden" name="id" value={r.id} /><button className="icb peligro" aria-label="Quitar regla" title="Quitar"><Icono n="basura" /></button></form>
                 </div>
-              )}
-              <details>
-                <summary className="enlace">Regla distinta para un servicio</summary>
-                <FormRegla barberoId={p.id} servicios={servicios.map((x) => ({ id: x.id, nombre: x.nombre }))} />
-              </details>
-            </article>
+              ))}
+            </div>
           );
         })}
-      </section>
-    </>
-  );
-}
-
-function FormRegla({ barberoId, actual, servicios }: { barberoId: string; actual?: typeof schema.reglasComision.$inferSelect | null; servicios?: { id: string; nombre: string }[] }) {
-  return (
-    <form action={guardarRegla} className="pila-chica" style={{ marginTop: 10 }}>
-      <input type="hidden" name="barberoId" value={barberoId} />
-      {servicios && (
-        <label className="campo"><span>Servicio</span><select className="input" name="servicioId" required>{servicios.map((x) => <option key={x.id} value={x.id}>{x.nombre}</option>)}</select></label>
-      )}
-      <label className="campo"><span>Forma de pago</span>
-        <select className="input" name="tipo" defaultValue={actual?.tipo ?? "porcentaje"}>
-          <option value="porcentaje">Porcentaje de cada servicio</option>
-          <option value="fijo">Monto fijo por servicio</option>
-          {!servicios && <><option value="renta">Renta de silla</option><option value="sueldo">Sueldo fijo</option><option value="mixto">Sueldo más porcentaje</option></>}
-        </select>
-      </label>
-      <div className="fila">
-        <label className="campo" style={{ flex: "1 1 80px" }}><span>%</span><input className="input" name="porcentaje" inputMode="decimal" defaultValue={actual?.porcentaje ? actual.porcentaje / 100 : ""} /></label>
-        <label className="campo" style={{ flex: "1 1 90px" }}><span>Por servicio</span><input className="input" name="montoFijo" inputMode="decimal" defaultValue={actual?.montoFijo ? actual.montoFijo / 100 : ""} /></label>
-        {!servicios && <label className="campo" style={{ flex: "1 1 90px" }}><span>Por semana</span><input className="input" name="montoSemanal" inputMode="decimal" defaultValue={actual?.montoSemanal ? actual.montoSemanal / 100 : ""} /></label>}
       </div>
-      <p className="ayuda">Llena solo lo que aplique. Renta y sueldo son por semana.</p>
-      <button className="btn chico pri">Guardar</button>
-    </form>
+    </>
   );
 }

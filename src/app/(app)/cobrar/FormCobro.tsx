@@ -46,13 +46,15 @@ export function FormCobro(p: {
     setConDescuento(false); setDescuento(""); setMotivo(""); setPropina(""); setNotas("");
   };
 
-  // Después de cobrar: limpiar todo y preparar una venta nueva.
+  // Después de cobrar: limpiar todo y preparar una venta nueva (una sola vez por folio).
+  const atendido = useRef<string | null>(null);
   useEffect(() => {
-    if (estado.ok && estado.folio && estado.folio !== ultima?.folio) {
+    if (estado.ok && estado.folio && estado.folio !== atendido.current) {
+      atendido.current = estado.folio;
       setUltima({ folio: estado.folio, total: estado.total ?? 0 });
       limpiar();
     }
-  }, [estado, ultima?.folio]);
+  }, [estado]);
 
   // Atajos: Esc limpia, D descuento, P propina.
   useEffect(() => {

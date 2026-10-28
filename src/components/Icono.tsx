@@ -52,7 +52,7 @@ export function Icono({ n, className = "ic", titulo }: { n: string; className?: 
 /** Flecha del botón principal. */
 export function Fl() {
   return (
-    <span className="fl" aria-hidden="true">
+    <span className="fl giro" aria-hidden="true">
       <svg className="ic" viewBox="0 0 24 24" style={{ width: 16, height: 16 }}><path d="M5 12h14M13 6l6 6-6 6" /></svg>
     </span>
   );

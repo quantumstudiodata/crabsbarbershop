@@ -1,4 +1,4 @@
-// Alta inicial: crea la barbería Crabs, la dueña, la administradora, servicios y formas de pago.
+// Alta inicial: crea la barbería Crabs, el propietario, administración, servicios y formas de pago.
 // Solo corre si todavía no existe ninguna barbería. Muestra las contraseñas temporales una sola vez.
 import "dotenv/config";
 import bcrypt from "bcryptjs";
@@ -34,12 +34,12 @@ for (const [nombre, rol] of [[duena, "duena"], [admin, "admin"]] as const) {
   cuentas.push({ nombre, rol, usuario, clave });
 }
 
-// Precios de ejemplo: la dueña debe confirmarlos en Ajustes, Servicios y precios.
+// Precios de ejemplo: el propietario debe confirmarlos en Ajustes, Servicios y precios.
 const servicios: [string, number, number][] = [
   ["Corte clásico", 30, 15000], ["Fade", 40, 17000], ["Corte y barba", 50, 22000],
   ["Barba", 20, 10000], ["Corte infantil", 25, 12000], ["Ceja o diseño", 10, 5000],
 ];
-await db.insert(schema.servicios).values(servicios.map(([nombre, duracionMin, precio], orden) => ({ barberiaId: b.id, nombre, duracionMin, precio, orden })));
+await db.insert(schema.servicios).values(servicios.map(([nombre, duracionMin, precio], orden) => ({ barberiaId: b.id, nombre, duracionMin, precio, orden, categoria: /barba/i.test(nombre) ? "Barba y paquetes" : /infantil|ceja/i.test(nombre) ? "Niños y extras" : "Cortes" })));
 await db.insert(schema.metodosPago).values([
   { barberiaId: b.id, nombre: "Efectivo", esEfectivo: true, orden: 0 },
   { barberiaId: b.id, nombre: "Transferencia", esEfectivo: false, orden: 1 },

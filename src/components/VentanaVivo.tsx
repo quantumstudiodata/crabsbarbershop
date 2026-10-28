@@ -1,6 +1,7 @@
 "use client";
 
 import Link from "next/link";
+import { usePathname } from "next/navigation";
 import { useCallback, useEffect, useRef, useState } from "react";
 import type { EventoVivo, SolicitudVivo } from "@/app/api/vivo/route";
 import { Avatar } from "./Avatar";
@@ -25,9 +26,13 @@ export function VentanaVivo({ verTodo }: { verTodo: string }) {
   const [vistos, setVistos] = useState<Set<string>>(new Set());
   const [nuevos, setNuevos] = useState<Set<string>>(new Set());
   const primera = useRef(true);
+  const ruta = usePathname();
+
+  // En Cobro la ventana se queda minimizada para no tapar la venta.
+  useEffect(() => { if (ruta.startsWith("/cobrar")) setMin(true); }, [ruta]);
 
   useEffect(() => {
-    setMin(leer("crabs-vivo-min") !== "no");
+    setMin(location.pathname.startsWith("/cobrar") || leer("crabs-vivo-min") !== "no");
     setVistos(new Set(JSON.parse(leer("crabs-vivo-vistos") ?? "[]")));
   }, []);
 
