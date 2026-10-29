@@ -22,6 +22,27 @@
       "when": 1793176062628,
       "tag": "0002_rediseno",
       "breakpoints": true
+    },
+    {
+      "idx": 3,
+      "version": "7",
+      "when": 1793262310059,
+      "tag": "0003_periodo_pago",
+      "breakpoints": true
+    },
+    {
+      "idx": 4,
+      "version": "7",
+      "when": 1793262502321,
+      "tag": "0004_fondo_caja",
+      "breakpoints": true
+    },
+    {
+      "idx": 5,
+      "version": "7",
+      "when": 1793262576921,
+      "tag": "0005_comision_servicio",
+      "breakpoints": true
     }
   ]
 }

@@ -1,51 +1,42 @@
-import { asc, eq } from "drizzle-orm";
-import { Ayuda } from "@/components/Ayuda";
+import { and, asc, eq } from "drizzle-orm";
 import { AvisoUrl } from "@/components/Encabezado";
-import { Fl, Icono } from "@/components/Icono";
-import { Pasos } from "@/components/ui";
+import { Icono } from "@/components/Icono";
 import { requerirSesion } from "@/lib/auth";
 import { db, schema } from "@/lib/db";
-import { agregarMetodo, guardarReglas } from "./actions";
+import { NOMBRE_ROL, permisosDe } from "@/lib/permisos";
+import { agregarMetodo } from "./actions";
 import { Metodos } from "./Metodos";
+import { CajaObjetivos, ReglasCobro } from "./Reglas";
 
 export const metadata = { title: "Cobro y caja" };
 
 export default async function CobroYCaja({ searchParams }: { searchParams: Promise<{ aviso?: string; error?: string }> }) {
   const s = await requerirSesion("ajustes.negocio");
   const q = await searchParams;
-  const metodos = await db.select().from(schema.metodosPago).where(eq(schema.metodosPago.barberiaId, s.barberia.id)).orderBy(asc(schema.metodosPago.orden));
   const b = s.barberia;
+  const [metodos, gente] = await Promise.all([
+    db.select().from(schema.metodosPago).where(eq(schema.metodosPago.barberiaId, b.id)).orderBy(asc(schema.metodosPago.orden)),
+    db.select({ rol: schema.usuarios.rol, extra: schema.usuarios.permisosExtra, nombre: schema.usuarios.nombre }).from(schema.usuarios).where(and(eq(schema.usuarios.barberiaId, b.id), eq(schema.usuarios.activo, true))),
+  ]);
+  // Quiénes pueden autorizar descuentos mayores al límite.
+  const autorizan = [...new Set(gente.filter((u) => permisosDe(u.rol, u.extra).has("ventas.descuento")).map((u) => (u.rol === "duena" || u.rol === "admin" ? NOMBRE_ROL[u.rol].toLowerCase() : u.nombre.split(" ")[0])))].join(", ") || "el propietario";
   return (
     <>
       <AvisoUrl aviso={q.aviso} error={q.error} />
       <div>
         <h1 className="titulo">Cobro y caja</h1>
-        <p className="sub">Cómo pueden pagar los clientes y las reglas al cobrar y cerrar.</p>
+        <p className="sub">Cómo pagan los clientes, las reglas al cobrar y el manejo del efectivo.</p>
       </div>
-      <section className="glass panel">
-        <span className="lab">Formas de pago<Ayuda titulo="Formas de pago">Las que estén encendidas aparecen en Cobro.<br /><br />Al cerrar la caja, el efectivo se cuenta y las demás se revisan contra el banco o la terminal.</Ayuda></span>
+      <section className="glass panel bloque-a">
+        <span className="lab">1. Formas de pago</span>
         <Metodos metodos={metodos.map(({ id, nombre, esEfectivo, activo }) => ({ id, nombre, esEfectivo, activo }))} />
-        <form action={agregarMetodo} className="fila" style={{ marginTop: 6 }}>
+        <form action={agregarMetodo} className="fila" style={{ marginTop: 4 }}>
           <input className="input" name="nombre" placeholder="Otra forma de pago, por ejemplo: Vales" style={{ flex: "1 1 220px" }} required aria-label="Nueva forma de pago" />
           <button className="bt sec solo"><Icono n="mas" />Agregar</button>
         </form>
       </section>
-      <form action={guardarReglas} className="glass panel">
-        <span className="lab">Reglas</span>
-        <div className="regla" style={{ borderTop: 0 }}>
-          <div><b>Descuento máximo sin autorización</b><p>Un barbero puede descontar hasta este porcentaje. Más que eso, solo el encargado o el propietario.</p></div>
-          <Pasos name="descuento" inicial={b.limiteDescuentoPct} max={100} sufijo="%" etiqueta="descuento máximo" />
-        </div>
-        <div className="regla">
-          <div><b>Diferencia permitida al cerrar la caja</b><p>Si al contar falta o sobra más que esto, se pide escribir qué pasó antes de cerrar.</p></div>
-          <Pasos name="diferencia" inicial={Math.round(b.limiteDiferenciaCaja / 100)} paso={10} max={100000} prefijo="$" etiqueta="diferencia permitida" />
-        </div>
-        <div className="regla">
-          <div><b>Meta de ventas por día</b><p>Se muestra en Inicio con una barra de avance. Déjala en 0 para que se calcule sola con las ventas; al principio es de $4,000.</p></div>
-          <Pasos name="meta" inicial={Math.round(b.metaDiaria / 100)} paso={100} max={1000000} prefijo="$" etiqueta="meta diaria" />
-        </div>
-        <div className="acciones"><button className="bt">Guardar reglas<Fl /></button></div>
-      </form>
+      <ReglasCobro descuento={b.limiteDescuentoPct} autorizan={autorizan} />
+      <CajaObjetivos fondo={Math.round(b.fondoPredeterminado / 100)} diferencia={Math.round(b.limiteDiferenciaCaja / 100)} meta={Math.round(b.metaDiaria / 100)} />
     </>
   );
 }

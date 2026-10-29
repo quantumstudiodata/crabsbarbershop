@@ -7,6 +7,9 @@ const DIBUJO: Record<string, React.ReactNode> = {
   navaja: <g fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinejoin="round" strokeLinecap="round"><path d="M3 15 15 5c2 0 3.5 1 4 3L8 18z" /><path d="M8 18l-3 3M15 5l2 2" /></g>,
   luna: <path fill="currentColor" d="M15.5 3.5a8.5 8.5 0 1 0 5 15.2A7 7 0 0 1 15.5 3.5z" />,
   ola: <g fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round"><path d="M2 9c2.5-2.5 5-2.5 7.5 0s5 2.5 7.5 0 3.5-2 5-1M2 15c2.5-2.5 5-2.5 7.5 0s5 2.5 7.5 0 3.5-2 5-1" /></g>,
+  mostrador: <g fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round"><path d="M3 11h18v9H3z" /><path d="M5 11V8h14v3M9 15h6M12 4v4" /></g>,
+  calculadora: <g fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round"><rect x="5" y="3" width="14" height="18" rx="2.5" /><path d="M8 7h8M8 12h.01M12 12h.01M16 12h.01M8 16h.01M12 16h.01M16 16h.01" /></g>,
+  estrella: <path fill="currentColor" d="M12 3.5l2.6 5.4 5.9.8-4.3 4.1 1 5.8L12 16.9l-5.2 2.7 1-5.8-4.3-4.1 5.9-.8z" />,
 };
 
 export const iniciales = (nombre: string) =>
@@ -14,9 +17,8 @@ export const iniciales = (nombre: string) =>
 
 export function Avatar({ avatar, nombre, t = 36 }: { avatar: string; nombre: string; t?: number }) {
   const clave = esAvatar(avatar) ? avatar : "iniciales";
-  const fondo = `radial-gradient(circle at 30% 25%, rgba(255,255,255,.28), transparent 60%), ${AVATARES[clave].fondo}`;
   return (
-    <span className="avatar" style={{ width: t, height: t, background: fondo, boxShadow: "inset 0 1px 0 rgba(255,255,255,.3), 0 4px 10px -4px rgba(20,35,50,.5)" }} title={nombre}>
+    <span className="avatar" style={{ width: t, height: t, background: AVATARES[clave].fondo }} title={nombre}>
       {clave === "iniciales" ? (
         <b style={{ fontSize: t * 0.36, fontWeight: 600, letterSpacing: ".02em" }}>{iniciales(nombre)}</b>
       ) : clave === "cangrejo" ? (

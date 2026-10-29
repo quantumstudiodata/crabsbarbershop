@@ -1,6 +1,16 @@
 // Reglas de pago de cada persona del equipo. La regla vigente se copia en cada servicio cobrado.
 
 export type TipoRegla = "porcentaje" | "fijo" | "renta" | "sueldo" | "mixto";
+export type Periodo = "semana" | "quincena" | "mes";
+
+export const NOMBRE_PERIODO: Record<Periodo, string> = { semana: "a la semana", quincena: "a la quincena", mes: "al mes" };
+
+/** Convierte un monto por quincena o por mes a su equivalente por semana, para las cuentas semanales. */
+export function porSemana(monto: number, periodo: string | undefined): number {
+  if (periodo === "quincena") return Math.round((monto * 7) / 15.2);
+  if (periodo === "mes") return Math.round((monto * 12) / 52);
+  return monto;
+}
 
 export type Regla = {
   id?: string;
@@ -10,11 +20,12 @@ export type Regla = {
   porcentaje: number; // puntos base: 40% = 4000
   montoFijo: number;
   montoSemanal: number;
+  periodo?: string;
   vigenteDesde: Date;
   vigenteHasta: Date | null;
 };
 
-export type ReglaCopia = Pick<Regla, "tipo" | "porcentaje" | "montoFijo" | "montoSemanal">;
+export type ReglaCopia = Pick<Regla, "tipo" | "porcentaje" | "montoFijo" | "montoSemanal"> & { periodo?: string };
 
 /** Elige la regla que aplica: primero la del servicio exacto, luego la general de la persona. */
 export function elegirRegla(reglas: Regla[], barberoId: string, servicioId: string | null, cuando: Date): Regla | null {
@@ -72,8 +83,8 @@ export function resumenSemana(input: {
   rentaPagada: number;
 }): ResumenSemana {
   const r = input.reglaGeneral;
-  const sueldo = r && (r.tipo === "sueldo" || r.tipo === "mixto") ? r.montoSemanal : 0;
-  const renta = r && r.tipo === "renta" ? r.montoSemanal : 0;
+  const sueldo = r && (r.tipo === "sueldo" || r.tipo === "mixto") ? porSemana(r.montoSemanal, r.periodo) : 0;
+  const renta = r && r.tipo === "renta" ? porSemana(r.montoSemanal, r.periodo) : 0;
   const leToca = input.comisiones + sueldo;
   return {
     servicios: input.servicios,
@@ -93,16 +104,17 @@ export function resumenSemana(input: {
 export function describirRegla(r: ReglaCopia | null, formato: (c: number) => string): string {
   if (!r) return "Sin forma de pago configurada";
   const pct = `${r.porcentaje / 100}%`;
+  const per = NOMBRE_PERIODO[(r.periodo as Periodo) ?? "semana"] ?? "a la semana";
   switch (r.tipo) {
     case "porcentaje":
-      return `${pct} de cada servicio`;
+      return `Comisión de ${pct} por servicio`;
     case "fijo":
       return `${formato(r.montoFijo)} por servicio`;
     case "renta":
-      return `Renta de silla, ${formato(r.montoSemanal)} a la semana`;
+      return `Renta de silla, ${formato(r.montoSemanal)} ${per}`;
     case "sueldo":
-      return `Sueldo de ${formato(r.montoSemanal)} a la semana`;
+      return `Sueldo de ${formato(r.montoSemanal)} ${per}`;
     case "mixto":
-      return `Sueldo de ${formato(r.montoSemanal)} a la semana más ${pct}`;
+      return `Sueldo de ${formato(r.montoSemanal)} ${per} más ${pct}`;
   }
 }

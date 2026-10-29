@@ -11,8 +11,10 @@ export function Metodos({ metodos }: { metodos: { id: string; nombre: string; es
     <div className="permisos">
       {lista.map((m) => (
         <div key={m.id}>
-          <span><b style={{ fontWeight: 600 }}>{m.nombre}</b><small>{m.esEfectivo ? "Siempre activo. Es lo que se cuenta al cerrar la caja." : m.activo ? "Aparece en Cobro. Se revisa contra el banco al cerrar." : "No aparece en Cobro."}</small></span>
-          <Interruptor etiqueta={`${m.nombre} activo`} checked={m.activo} disabled={m.esEfectivo} onChange={() => iniciar(async () => { cambiar(m.id); await alternarMetodo(m.id); })} />
+          <span><b style={{ fontWeight: 600 }}>{m.nombre}</b><small>{m.esEfectivo ? "Es lo que se cuenta al cerrar la caja." : m.activo ? "Aparece en Cobro." : "No aparece en Cobro. Sus ventas pasadas se conservan."}</small></span>
+          {m.esEfectivo
+            ? <span className="etiqueta">Obligatorio</span>
+            : <Interruptor etiqueta={`${m.nombre} activo`} checked={m.activo} onChange={() => iniciar(async () => { cambiar(m.id); await alternarMetodo(m.id); })} />}
         </div>
       ))}
     </div>

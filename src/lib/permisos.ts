@@ -1,21 +1,21 @@
 // Qué puede hacer cada rol. El propietario puede dar permisos extra a una persona.
 
 export const PERMISOS = {
-  "ventas.registrar": "Registrar sus propias ventas",
-  "ventas.registrar_otros": "Cobrar servicios hechos por otra persona del equipo",
-  "ventas.ver_todas": "Ver las ventas de todo el equipo",
-  "ventas.descuento": "Dar descuentos mayores al límite",
+  "ventas.registrar": "Registrar ventas",
+  "ventas.registrar_otros": "Cobrar servicios de otros",
+  "ventas.ver_todas": "Ver ventas del equipo",
+  "ventas.descuento": "Aplicar descuentos mayores al límite",
   "ventas.cancelar": "Cancelar ventas",
-  "caja.operar": "Abrir y cerrar caja, retiros y gastos de caja",
-  "caja.corregir": "Corregir un cierre de caja",
-  "equipo.ver": "Ver comisiones y pagos de todo el equipo",
+  "caja.operar": "Abrir y cerrar caja, registrar retiros y gastos",
+  "caja.corregir": "Corregir cortes",
+  "equipo.ver": "Ver comisiones",
   "equipo.pagar": "Registrar pagos al equipo",
   "reportes.ver": "Ver reportes",
   "reportes.exportar": "Descargar reportes",
-  "ideas.decidir": "Aprobar o descartar ideas",
+  "ideas.decidir": "Gestionar ideas",
   "ajustes.usuarios": "Dar de alta personas y permisos",
   "ajustes.negocio": "Cambiar servicios, precios y formas de pago",
-  "historial.ver": "Ver el historial",
+  "historial.ver": "Consultar historial",
 } as const;
 
 export type Permiso = keyof typeof PERMISOS;
@@ -36,9 +36,10 @@ export const PERMISOS_POR_ROL: Record<Rol, Permiso[]> = {
 };
 
 export const NOMBRE_ROL: Record<Rol, string> = {
-  admin: "Administración",
+  admin: "Administrador",
   duena: "Propietario",
-  encargada: "Encargado",
+  // El rol de encargado ya no existe; las cuentas que lo tenían se tratan como barbero.
+  encargada: "Barbero",
   barbera: "Barbero",
   contador: "Contador",
 };
@@ -51,8 +52,8 @@ export function permisosDe(rol: Rol, extra: string[] = []): Set<Permiso> {
 
 /** Quién puede asignar qué rol: nadie puede crear a alguien con más poder que el suyo. */
 export function rolesAsignables(rol: Rol): Rol[] {
-  if (rol === "admin") return ["duena", "encargada", "barbera", "contador", "admin"];
-  if (rol === "duena") return ["duena", "encargada", "barbera", "contador"];
+  if (rol === "admin") return ["duena", "admin", "barbera", "contador"];
+  if (rol === "duena") return ["duena", "admin", "barbera", "contador"];
   return [];
 }
 
@@ -60,9 +61,16 @@ export function rolesAsignables(rol: Rol): Rol[] {
 export const ORDEN_ROL: Rol[] = ["duena", "admin", "contador", "encargada", "barbera"];
 
 export const DESCRIPCION_ROL: Record<Rol, string> = {
-  duena: "Ve y decide todo",
-  admin: "Igual que el propietario",
-  contador: "Consulta y descarga, no cobra",
+  duena: "Control total del negocio",
+  admin: "Configura el sistema, usuarios y precios, y consulta reportes",
+  contador: "Consulta y descarga información financiera",
   encargada: "Cobra, abre y cierra caja",
-  barbera: "Cobra, abre y cierra caja",
+  barbera: "Registra cobros, propinas y servicios",
 };
+
+/** Permisos agrupados para la ventana de edición de usuario. */
+export const GRUPOS_PERMISOS: { titulo: string; permisos: Permiso[] }[] = [
+  { titulo: "Ventas y cobros", permisos: ["ventas.registrar", "ventas.registrar_otros", "ventas.descuento", "ventas.cancelar"] },
+  { titulo: "Caja y pagos", permisos: ["caja.operar", "caja.corregir", "equipo.pagar"] },
+  { titulo: "Reportes y administración", permisos: ["ventas.ver_todas", "equipo.ver", "reportes.ver", "reportes.exportar", "historial.ver", "ideas.decidir"] },
+];

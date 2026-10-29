@@ -8,6 +8,9 @@ export const AVATARES = {
   navaja: { fondo: "#2b3a47" },
   luna: { fondo: "#56506e" },
   ola: { fondo: "#3f6b78" },
+  mostrador: { fondo: "#5a6470" },
+  calculadora: { fondo: "#7a6248" },
+  estrella: { fondo: "#46566a" },
   iniciales: { fondo: "#8ea5b8" },
 } as const;
 

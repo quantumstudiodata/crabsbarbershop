@@ -63,7 +63,7 @@ export async function cancelarVenta(form: FormData) {
     await registrar(tx, {
       barberiaId: s.barberia.id, usuarioId: s.usuario.id, tipo: "venta",
       accion: `${s.usuario.nombre} canceló la venta ${v.venta.folio}`,
-      detalle: { motivo, total: v.venta.total, devolucionEfectivo: devolucion || undefined, total_texto: formatoDinero(v.venta.total) },
+      detalle: { folio: v.venta.folio, motivo, total: v.venta.total, devolucionEfectivo: devolucion || undefined, total_texto: formatoDinero(v.venta.total) },
     });
   });
   revalidatePath("/", "layout");

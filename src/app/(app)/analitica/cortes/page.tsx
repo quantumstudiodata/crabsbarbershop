@@ -1,14 +1,15 @@
 import { redirect } from "next/navigation";
-import { Ayuda } from "@/components/Ayuda";
 import { AvisoUrl } from "@/components/Encabezado";
 import { Icono } from "@/components/Icono";
 import { SelectorPeriodo } from "@/components/Periodo";
 import { requerirSesion } from "@/lib/auth";
-import { ajustesDeTurnos, foliosCorte, turnosCerrados } from "@/lib/datos";
+import { eq } from "drizzle-orm";
+import { ajustesDeTurnos, detalleCortes, foliosCorte, turnosCerrados } from "@/lib/datos";
+import { db, schema } from "@/lib/db";
+import { HistorialCortes, type Corte, type DiaCortes } from "./HistorialCortes";
 import { fechaLarga, fechaLocal, horaCorta } from "@/lib/fechas";
 import { formatoDinero } from "@/lib/money";
 import { leerPeriodo } from "@/lib/periodo";
-import { Corregir } from "./Corregir";
 
 export const metadata = { title: "Cortes de caja" };
 
@@ -20,68 +21,47 @@ export default async function Cortes({ searchParams }: { searchParams: Promise<{
   const hoy = fechaLocal(new Date(), zona);
   const p = leerPeriodo(q, hoy, "semana");
   const cortes = await turnosCerrados(s.barberia.id, 1000, { desde: p.desde, hasta: p.hasta });
-  const [ajustes, folios] = await Promise.all([ajustesDeTurnos(s.barberia.id, cortes.map((c) => c.id)), foliosCorte(s.barberia.id)]);
-  const dias = [...new Set(cortes.map((c) => c.fechaOperativa))].sort().reverse();
+  const ids = cortes.map((c) => c.id);
+  const [ajustes, folios, det, gente] = await Promise.all([
+    ajustesDeTurnos(s.barberia.id, ids), foliosCorte(s.barberia.id), detalleCortes(s.barberia.id, ids),
+    db.select({ id: schema.usuarios.id, nombre: schema.usuarios.nombre, avatar: schema.usuarios.avatar }).from(schema.usuarios).where(eq(schema.usuarios.barberiaId, s.barberia.id)),
+  ]);
+  const persona = (id: string | null) => gente.find((g) => g.id === id) ?? { nombre: "", avatar: "iniciales" };
+  const lista: Corte[] = cortes.map((c) => {
+    const cobros = det.cobros.filter((x) => x.turnoId === c.id);
+    const efectivo = cobros.filter((x) => x.esEfectivo).reduce((a, x) => a + x.total, 0);
+    const metodos = [{ metodo: "Efectivo", total: efectivo }, ...cobros.filter((x) => !x.esEfectivo).map((x) => ({ metodo: x.metodo, total: x.total }))];
+    const movs = det.movimientos.filter((x) => x.turnoId === c.id);
+    const gastos = det.gastos.filter((x) => x.turnoId === c.id);
+    const suma = (t: string) => movs.filter((x) => x.tipo === t).reduce((a, x) => a + x.monto, 0);
+    return {
+      id: c.id, folio: folios.get(c.id) ?? "", dia: fechaLarga(c.fechaOperativa).toLowerCase(),
+      horario: `${horaCorta(c.abiertoEn, zona)} a ${c.cerradoEn ? horaCorta(c.cerradoEn, zona) : ""}`,
+      abrio: persona(c.abiertoPor), cerro: persona(gente.find((g) => g.nombre === c.cerradoPor)?.id ?? null),
+      metodos, total: metodos.reduce((a, x) => a + x.total, 0), ventas: cobros.reduce((a, x) => Math.max(a, x.ventas), 0),
+      fondo: c.fondoInicial, ventasEfectivo: efectivo, propinasEfectivo: det.propinas.find((x) => x.turnoId === c.id)?.efectivo ?? 0,
+      entradas: suma("entrada"), retiros: suma("retiro") + suma("devolucion"), gastos: gastos.reduce((a, x) => a + x.monto, 0),
+      esperado: c.efectivoEsperado ?? 0, contado: c.efectivoContado ?? 0, diferencia: c.diferencia ?? 0, notas: c.notasCierre,
+      movimientos: [
+        ...movs.map((m) => ({ t: m.creadoEn.getTime(), hora: horaCorta(m.creadoEn, zona), titulo: m.tipo === "retiro" ? "Retiro" : m.tipo === "entrada" ? "Entrada" : "Devolución", detalle: `${m.concepto}, ${m.usuario.split(" ")[0]}`, monto: m.tipo === "entrada" ? m.monto : -m.monto })),
+        ...gastos.map((g) => ({ t: g.creadoEn.getTime(), hora: horaCorta(g.creadoEn, zona), titulo: "Gasto", detalle: `${g.concepto}, ${g.usuario.split(" ")[0]}`, monto: -g.monto })),
+      ].sort((a, b) => a.t - b.t),
+      ajustes: ajustes.filter((x) => x.turnoId === c.id).map((x) => `Ajuste de ${formatoDinero(x.monto)} por ${x.usuario.split(" ")[0]}: ${x.motivo}`),
+    };
+  });
+  const dias: DiaCortes[] = [...new Set(cortes.map((c) => c.fechaOperativa))].sort().reverse().map((f) => {
+    const del = lista.filter((x, i) => cortes[i].fechaOperativa === f).reverse();
+    return { fecha: f, titulo: fechaLarga(f), total: del.reduce((a, x) => a + x.total, 0), diferencia: del.reduce((a, x) => a + x.diferencia, 0), cortes: del };
+  });
 
   return (
     <>
       <AvisoUrl aviso={q.aviso} error={q.error} />
       <div className="entre">
         <SelectorPeriodo ruta="/analitica/cortes" p={p} hoy={hoy} conAnio />
-        {s.puede("reportes.exportar") && <a className="bt sec solo" href={`/api/exportar?tipo=cortes&desde=${p.desde}&hasta=${p.hasta}`}><Icono n="descargar" />Descargar</a>}
+        {s.puede("reportes.exportar") && <a className="bt sec solo chico" href={`/api/exportar?tipo=cortes&desde=${p.desde}&hasta=${p.hasta}`}><Icono n="descargar" />Descargar</a>}
       </div>
-      <div>
-        <span className="lab">{p.etiqueta}</span>
-        <h1 className="titulo" style={{ marginTop: 8 }}>Cortes de caja
-          <Ayuda titulo="¿Qué es un corte?">Cada vez que alguien cierra la caja queda un corte: el efectivo contado contra el esperado, y si las transferencias y la tarjeta coincidieron.<br /><br />En un mismo día puede haber varios, uno por cada vez que se abrió y cerró.</Ayuda>
-        </h1>
-      </div>
-      {dias.length === 0 ? <p className="muted">No hay cortes en estas fechas.</p> : dias.map((d) => {
-        const delDia = cortes.filter((c) => c.fechaOperativa === d).sort((a, b) => a.abiertoEn.getTime() - b.abiertoEn.getTime());
-        const difDia = delDia.reduce((a, c) => a + (c.diferencia ?? 0), 0);
-        return (
-          <section key={d} className="dia-cortes subir">
-            <div className="entre">
-              <span><b style={{ fontSize: 15 }}>{fechaLarga(d)}</b><small className="muted" style={{ display: "block" }}>{delDia.length} {delDia.length === 1 ? "corte" : "cortes"}</small></span>
-              {difDia === 0 ? <span className="cubierto"><i>✓</i>Todo cuadró</span> : <span className="pill warn">{difDia > 0 ? `Sobraron ${formatoDinero(difDia)}` : `Faltaron ${formatoDinero(-difDia)}`} en el día</span>}
-            </div>
-            <div className="cortes-g">
-              {delDia.map((c, i) => {
-                const dif = c.diferencia ?? 0;
-                const ver = Object.entries((c.verificacion ?? {}) as Record<string, { total: number; coincide?: boolean }>);
-                const aj = ajustes.filter((x) => x.turnoId === c.id);
-                return (
-                  <article key={c.id} className="glass corte-t">
-                    <div className="entre">
-                      <span className="lab">Folio {folios.get(c.id)}</span>
-                      <span className="muted" style={{ fontSize: 12 }}>{horaCorta(c.abiertoEn, zona)} a {c.cerradoEn ? horaCorta(c.cerradoEn, zona) : ""}</span>
-                    </div>
-                    <span style={{ fontSize: 13 }}>Cerró <b>{c.cerradoPor?.split(" ")[0] ?? ""}</b></span>
-                    <div className="corte-num">
-                      <span><small>Esperado</small><b>{formatoDinero(c.efectivoEsperado ?? 0)}</b></span>
-                      <span><small>Contado</small><b>{formatoDinero(c.efectivoContado ?? 0)}</b></span>
-                    </div>
-                    {dif === 0 ? <span className="cubierto"><i>✓</i>El efectivo coincidió</span> : <span className="est temp"><span className="d" style={{ background: "var(--warn)", boxShadow: "0 0 0 3px var(--warn-soft)" }} />{dif > 0 ? `Sobraron ${formatoDinero(dif)}` : `Faltaron ${formatoDinero(-dif)}`}</span>}
-                    {ver.length > 0 && (
-                      <div className="resumen-c chico">
-                        {ver.map(([m, v]) => <div key={m}><span>{m}{v.coincide === false ? ", no coincidió" : ""}</span><span className="num">{formatoDinero(v.total)}</span></div>)}
-                      </div>
-                    )}
-                    {c.notasCierre && <p className="nota-c">{c.notasCierre}</p>}
-                    {aj.map((x, k) => <p key={k} className="nota-c">Ajuste de {formatoDinero(x.monto)} por {x.usuario.split(" ")[0]}: {x.motivo}</p>)}
-                    {s.puede("caja.corregir") && (
-                      <span className="fila" style={{ gap: 4 }}>
-                        <Corregir id={c.id} dia={fechaLarga(c.fechaOperativa).toLowerCase()} />
-                        <Ayuda titulo="Ajuste posterior">Si después de cerrar aparece dinero que no se contó, o se descubre un faltante, se registra aquí. El corte original no se modifica.</Ayuda>
-                      </span>
-                    )}
-                  </article>
-                );
-              })}
-            </div>
-          </section>
-        );
-      })}
+      <HistorialCortes dias={dias} corregir={s.puede("caja.corregir")} />
     </>
   );
 }

@@ -230,7 +230,7 @@ export async function reglasDe(barberiaId: string): Promise<Regla[]> {
 }
 
 export function copiaRegla(r: Regla | null): ReglaCopia | null {
-  return r ? { tipo: r.tipo, porcentaje: r.porcentaje, montoFijo: r.montoFijo, montoSemanal: r.montoSemanal } : null;
+  return r ? { tipo: r.tipo, porcentaje: r.porcentaje, montoFijo: r.montoFijo, montoSemanal: r.montoSemanal, periodo: r.periodo } : null;
 }
 
 export async function pagosComisionSemana(barberiaId: string, semana: string) {
@@ -259,7 +259,7 @@ export async function turnosCerrados(barberiaId: string, limite = 30, rango?: { 
       id: s.turnosCaja.id, fechaOperativa: s.turnosCaja.fechaOperativa, abiertoEn: s.turnosCaja.abiertoEn, cerradoEn: s.turnosCaja.cerradoEn,
       fondoInicial: s.turnosCaja.fondoInicial, efectivoEsperado: s.turnosCaja.efectivoEsperado, efectivoContado: s.turnosCaja.efectivoContado,
       diferencia: s.turnosCaja.diferencia, notasCierre: s.turnosCaja.notasCierre, cerradoPor: s.usuarios.nombre,
-      verificacion: s.turnosCaja.verificacion,
+      verificacion: s.turnosCaja.verificacion, abiertoPor: s.turnosCaja.abiertoPor,
     })
     .from(s.turnosCaja)
     .leftJoin(s.usuarios, eq(s.usuarios.id, s.turnosCaja.cerradoPor))
@@ -301,4 +301,26 @@ export async function folioCorte(barberiaId: string, abiertoEn: Date) {
 export async function foliosCorte(barberiaId: string) {
   const filas = await db.select({ id: s.turnosCaja.id }).from(s.turnosCaja).where(eq(s.turnosCaja.barberiaId, barberiaId)).orderBy(asc(s.turnosCaja.abiertoEn));
   return new Map(filas.map((f, i) => [f.id, `C-${String(i + 1).padStart(6, "0")}`]));
+}
+
+/** Para el historial de cortes: cobros por método, propinas y movimientos de cada turno. */
+export async function detalleCortes(barberiaId: string, turnoIds: string[]) {
+  if (turnoIds.length === 0) return { cobros: [], propinas: [], movimientos: [], gastos: [] };
+  const [cobros, props, movimientos, gastos] = await Promise.all([
+    db.select({ turnoId: s.ventas.turnoId, metodo: s.pagos.nombreMetodo, esEfectivo: s.pagos.esEfectivo, total: sql<number>`coalesce(sum(${s.pagos.monto}),0)::int`, ventas: sql<number>`count(distinct ${s.ventas.id})::int` })
+      .from(s.pagos).innerJoin(s.ventas, eq(s.ventas.id, s.pagos.ventaId))
+      .where(and(eq(s.ventas.barberiaId, barberiaId), inArray(s.ventas.turnoId, turnoIds), eq(s.ventas.estado, "pagada")))
+      .groupBy(s.ventas.turnoId, s.pagos.nombreMetodo, s.pagos.esEfectivo),
+    db.select({ turnoId: s.ventas.turnoId, efectivo: sql<number>`coalesce(sum(case when ${s.propinas.esEfectivo} then ${s.propinas.monto} else 0 end),0)::int` })
+      .from(s.propinas).innerJoin(s.ventas, eq(s.ventas.id, s.propinas.ventaId))
+      .where(and(eq(s.ventas.barberiaId, barberiaId), inArray(s.ventas.turnoId, turnoIds), eq(s.ventas.estado, "pagada")))
+      .groupBy(s.ventas.turnoId),
+    db.select({ turnoId: s.movimientosCaja.turnoId, tipo: s.movimientosCaja.tipo, monto: s.movimientosCaja.monto, concepto: s.movimientosCaja.concepto, creadoEn: s.movimientosCaja.creadoEn, usuario: s.usuarios.nombre })
+      .from(s.movimientosCaja).innerJoin(s.usuarios, eq(s.usuarios.id, s.movimientosCaja.usuarioId))
+      .where(and(eq(s.movimientosCaja.barberiaId, barberiaId), inArray(s.movimientosCaja.turnoId, turnoIds))),
+    db.select({ turnoId: s.gastos.turnoId, monto: s.gastos.monto, concepto: s.gastos.concepto, creadoEn: s.gastos.creadoEn, usuario: s.usuarios.nombre })
+      .from(s.gastos).innerJoin(s.usuarios, eq(s.usuarios.id, s.gastos.usuarioId))
+      .where(and(eq(s.gastos.barberiaId, barberiaId), inArray(s.gastos.turnoId, turnoIds))),
+  ]);
+  return { cobros, propinas: props, movimientos, gastos };
 }

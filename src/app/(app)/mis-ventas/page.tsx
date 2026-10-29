@@ -10,7 +10,9 @@ import { equipoQueAtiende, turnoAbierto, ventasEntre } from "@/lib/datos";
 import { diasEntre, fechaLarga, fechaLocal, horaCorta, sumarDias } from "@/lib/fechas";
 import { cambio, formatoDinero, porcentaje } from "@/lib/money";
 import { leerPeriodo } from "@/lib/periodo";
-import { Historial, type DiaVentas } from "./Historial";
+import { serieHoy } from "@/lib/series";
+import { Icono } from "@/components/Icono";
+import { HistorialVentas, type DiaVentas } from "@/components/HistorialVentas";
 
 export const metadata = { title: "Mis ventas" };
 
@@ -27,8 +29,8 @@ export default async function MisVentas({ searchParams }: { searchParams: Promis
   const yo = s.usuario.id;
   const largo = diasEntre(p.desde, p.hasta) + 1;
   const anual = p.tipo === "anio" || largo > 62;
-  const prevDesde = p.tipo === "anio" ? `${Number(p.desde.slice(0, 4)) - 1}-01-01` : sumarDias(p.desde, -largo);
-  const prevHasta = p.tipo === "anio" ? `${Number(p.desde.slice(0, 4)) - 1}-12-31` : sumarDias(p.desde, -1);
+  const prevDesde = p.tipo === "dia" ? sumarDias(p.desde, -7) : p.tipo === "anio" ? `${Number(p.desde.slice(0, 4)) - 1}-01-01` : sumarDias(p.desde, -largo);
+  const prevHasta = p.tipo === "dia" ? sumarDias(p.desde, -7) : p.tipo === "anio" ? `${Number(p.desde.slice(0, 4)) - 1}-12-31` : sumarDias(p.desde, -1);
   const [{ ventas }, previo, equipo, turno] = await Promise.all([
     ventasEntre(s.barberia.id, p.desde, p.hasta, { zona }),
     ventasEntre(s.barberia.id, prevDesde, prevHasta, { zona, barberoId: yo }),
@@ -67,7 +69,10 @@ export default async function MisVentas({ searchParams }: { searchParams: Promis
   const dias = Array.from({ length: largo }, (_, i) => sumarDias(p.desde, i));
   const porDia = (lista: typeof ventas, f: string) => lista.filter((v) => v.estado === "pagada" && v.fecha === f).reduce((a, v) => a + montoMio(v), 0);
   const porMes = (lista: typeof ventas, anio: string, m: number) => lista.filter((v) => v.estado === "pagada" && v.fecha.startsWith(`${anio}-${String(m + 1).padStart(2, "0")}`)).reduce((a, v) => a + montoMio(v), 0);
-  const serie = anual
+  const porHoras = p.tipo === "dia";
+  const horas = porHoras ? serieHoy([...mias, ...previo.ventas].filter((v) => v.estado === "pagada").map((v) => ({ creadoEn: v.creadoEn, fecha: v.fecha, monto: montoMio(v) })), p.desde, zona, p.desde === hoy) : null;
+  // Para un día, la comparación es contra el mismo día de la semana anterior.
+  const serie = horas ? { actual: horas.actual, previo: horas.previo, etiquetas: horas.etiquetas, cada: horas.cada } : anual
     ? { actual: MES_CORTO.map((_, m) => (`${p.desde.slice(0, 4)}-${String(m + 1).padStart(2, "0")}-01` <= hoy ? porMes(mias, p.desde.slice(0, 4), m) : null)), previo: MES_CORTO.map((_, m) => porMes(previo.ventas, prevDesde.slice(0, 4), m)), etiquetas: MES_CORTO, cada: 1 }
     : {
       actual: dias.map((d) => (d <= hoy ? porDia(mias, d) : null)),
@@ -87,15 +92,18 @@ export default async function MisVentas({ searchParams }: { searchParams: Promis
         for (const c of mios) nombres.set(c.nombre, (nombres.get(c.nombre) ?? 0) + 1);
         const limite = v.creadoEn.getTime() + MINUTOS_CORRECCION * 60000;
         const anulable = v.estado === "pagada" && v.registradaPorId === yo && turno?.id === v.turnoId && ahora < limite;
+        const propina = v.propinas.filter((x) => x.barberoId === yo).reduce((a, x) => a + x.monto, 0);
         return {
-          id: v.id, folio: v.folio, hora: horaCorta(v.creadoEn, zona), monto: montoMio(v), total: v.total,
+          id: v.id, folio: v.folio, hora: horaCorta(v.creadoEn, zona), monto: montoMio(v), cancelada: v.estado === "cancelada",
           servicios: [...nombres.entries()].map(([n, k]) => (k > 1 ? `${n} x${k}` : n)).join(", "),
-          cancelada: v.estado === "cancelada", motivo: v.motivoCancelacion,
-          metodos: v.pagos.map((pg) => `${pg.metodo} ${formatoDinero(pg.monto)}`).join(" y "),
-          propina: v.propinas.filter((x) => x.barberoId === yo).reduce((a, x) => a + x.monto, 0),
-          registro: v.registradaPor.split(" ")[0],
-          otros: v.conceptos.filter((c) => c.barberoId !== yo).map((c) => `${c.nombre} con ${c.barbero.split(" ")[0]}`).join(", "),
-          anularHasta: anulable ? horaCorta(new Date(limite), zona) : null,
+          // Solo la parte de este barbero.
+          detalle: [
+            ["Pago", v.pagos.map((pg) => `${pg.metodo} ${formatoDinero(Math.round(pg.monto * (v.total ? montoMio(v) / v.total : 0)))}`).join(" y ") || "Sin pago"],
+            ...(propina ? [["Propina", formatoDinero(propina)] as [string, string]] : []),
+            ["Registró", v.registradaPor.split(" ")[0]],
+            ...(v.estado === "cancelada" ? [["Cancelada", v.motivoCancelacion ?? ""] as [string, string]] : []),
+          ] as [string, string][],
+          accion: anulable ? { tipo: "anular" as const, hasta: horaCorta(new Date(limite), zona) } : undefined,
         };
       }),
     };
@@ -114,14 +122,21 @@ export default async function MisVentas({ searchParams }: { searchParams: Promis
           <div className="fila" style={{ gap: 10 }}>
             {variacion === null
               ? <span className="pill gris">Sin ventas en el periodo anterior para comparar</span>
-              : <span className={`pill ${variacion >= 0 ? "ok" : "warn"}`}>{variacion >= 0 ? "↗" : "↘"} {Math.abs(variacion)}% {variacion >= 0 ? "más" : "menos"} que el periodo anterior</span>}
+              : <span className={`pill ${variacion >= 0 ? "ok" : "warn"}`}>{variacion >= 0 ? "↗" : "↘"} {Math.abs(variacion)}% {variacion >= 0 ? "más" : "menos"} que {porHoras ? "el mismo día de la semana pasada" : "el periodo anterior"}</span>}
           </div>
           <Grafica id="misventas" actual={serie.actual} previo={serie.previo} etiquetas={serie.etiquetas} cadaEtiqueta={serie.cada} alto={190}
+            puntos={!porHoras} enCurso={horas?.enCurso ?? (dias.indexOf(hoy) >= 0 && !anual ? dias.indexOf(hoy) : undefined)}
             descripcion="Tus ventas del periodo comparadas con el periodo anterior" vacio="Sin servicios en estas fechas" />
-          <div className="cifras">
-            <div><span className="lab">Efectivo</span><b>{formatoDinero(efectivo)}</b></div>
-            {otros.length === 0 && <div><span className="lab">Tarjeta y transferencia</span><b>$0</b></div>}
-            {otros.map(([m, v]) => <div key={m}><span className="lab">{m}</span><b>{formatoDinero(v)}</b></div>)}
+          <div className="metodos-c">
+            {[["Efectivo", efectivo] as [string, number], ...(otros.length ? otros : [["Tarjeta y transferencia", 0] as [string, number]])].map(([m, v], i) => (
+              <div key={m} className="metodo-c" style={{ animationDelay: `${0.3 + i * 0.1}s` }}>
+                <span className="ic-m"><Icono n={m === "Efectivo" ? "efectivo" : /tarjeta/i.test(m) ? "tarjeta" : "cobro"} /></span>
+                <span className="lab">{m}</span>
+                <b>{formatoDinero(v)}</b>
+                <span className="pct-m"><i style={{ width: `${porcentaje(v, vendido)}%` }} /></span>
+                <small>{porcentaje(v, vendido)}% de tus ventas</small>
+              </div>
+            ))}
           </div>
         </div>
         <div className="pila">
@@ -150,7 +165,7 @@ export default async function MisVentas({ searchParams }: { searchParams: Promis
           </div>
         </div>
       </section>
-      <Historial dias={historial} />
+      <HistorialVentas dias={historial} regreso="/mis-ventas" />
     </>
   );
 }

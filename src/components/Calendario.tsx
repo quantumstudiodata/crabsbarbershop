@@ -37,6 +37,7 @@ export function Calendario({ desde, hasta, hoy }: { desde: string; hasta: string
     q.set("desde", a <= b ? a : b);
     q.set("hasta", a <= b ? b : a);
     q.delete("periodo");
+    q.delete("pagina");
     router.push(`${ruta}?${q.toString()}`);
     setAbierto(false);
     setInicio(null);

@@ -1,0 +1,1 @@
+ALTER TABLE "reglas_comision" ADD COLUMN "periodo" text DEFAULT 'semana' NOT NULL;

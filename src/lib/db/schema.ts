@@ -42,6 +42,8 @@ export const barberias = pgTable("barberias", {
   // Diferencia de caja (centavos) a partir de la cual se exige explicación.
   limiteDiferenciaCaja: integer("limite_diferencia_caja").notNull().default(5000),
   metaDiaria: integer("meta_diaria").notNull().default(0),
+  // Efectivo que se sugiere al abrir la caja (centavos).
+  fondoPredeterminado: integer("fondo_predeterminado").notNull().default(0),
   creadoEn: creadoEn(),
 });
 
@@ -87,6 +89,8 @@ export const servicios = pgTable("servicios", {
   descripcion: text("descripcion").notNull().default(""),
   duracionMin: integer("duracion_min").notNull().default(30),
   categoria: text("categoria").notNull().default("Cortes"),
+  // Comisión especial de este servicio en puntos base (40% = 4000). Vacío = la de cada barbero.
+  comision: integer("comision"),
   precio: integer("precio").notNull(),
   activo: boolean("activo").notNull().default(true),
   orden: integer("orden").notNull().default(0),
@@ -275,8 +279,9 @@ export const reglasComision = pgTable("reglas_comision", {
   // Porcentaje en puntos base: 40% = 4000.
   porcentaje: integer("porcentaje").notNull().default(0),
   montoFijo: integer("monto_fijo").notNull().default(0),
-  // Renta o sueldo por semana.
+  // Renta o sueldo por periodo (ver "periodo"). El nombre de la columna se conserva por compatibilidad.
   montoSemanal: integer("monto_semanal").notNull().default(0),
+  periodo: text("periodo").notNull().default("semana"),
   vigenteDesde: timestamp("vigente_desde", { withTimezone: true }).notNull().defaultNow(),
   vigenteHasta: timestamp("vigente_hasta", { withTimezone: true }),
 });

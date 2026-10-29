@@ -231,14 +231,19 @@ export function FormCobro(p: {
                   {v}% <small>{formatoDinero(Math.round((subtotal * v) / 100))}</small>
                 </button>
               ))}
-              <span className="otra"><span>Fijo</span><input inputMode="decimal" placeholder="$0" value={descuento?.tipo === "fijo" ? descuento.valor : ""} onChange={(e) => setDescuento(e.target.value ? { tipo: "fijo", valor: e.target.value } : null)} aria-label="Descuento fijo" /></span>
+              {descuento?.tipo === "fijo"
+                ? <span className="otra"><span>$</span><input inputMode="decimal" autoFocus value={descuento.valor} onChange={(e) => setDescuento({ tipo: "fijo", valor: e.target.value })} aria-label="Otro descuento" /></span>
+                : <button type="button" onClick={() => setDescuento({ tipo: "fijo", valor: "" })}>Otro</button>}
               {descuento && <button type="button" className="quitar" onClick={() => { setDescuento(null); setMotivo(""); }}>Quitar</button>}
             </div>
-            <div className="billetes">
-              {["Cliente frecuente", "Promoción", "Cortesía"].map((x) => <button type="button" key={x} className={motivo === x ? "on" : ""} onClick={() => setMotivo(x)}>{x}</button>)}
-              <span className="otra ancho"><input placeholder="Otro motivo" value={["Cliente frecuente", "Promoción", "Cortesía"].includes(motivo) ? "" : motivo} onChange={(e) => setMotivo(e.target.value)} aria-label="Motivo del descuento" /></span>
-            </div>
-            {pasaLimite && <small className="muted">Pasa del {p.limiteDescuento}% permitido. Solo el encargado o el propietario pueden registrarlo.</small>}
+            {desc > 0 && (
+              <div className="billetes motivo-r">
+                <span className="muted" style={{ fontSize: 12 }}>Motivo</span>
+                {["Cliente frecuente", "Promoción", "Cortesía"].map((x) => <button type="button" key={x} className={motivo === x ? "on" : ""} onClick={() => setMotivo(x)}>{x}</button>)}
+                <span className="otra"><input placeholder="Otro" value={["Cliente frecuente", "Promoción", "Cortesía"].includes(motivo) ? "" : motivo} onChange={(e) => setMotivo(e.target.value)} aria-label="Otro motivo" style={{ width: 90 }} /></span>
+              </div>
+            )}
+            {pasaLimite && <small className="muted">Pasa del {p.limiteDescuento}% permitido. Solo el propietario o el administrador pueden registrarlo.</small>}
           </div>
         )}
         {panel === "propina" && (
@@ -252,7 +257,6 @@ export function FormCobro(p: {
               <span className="otra"><span>Otra</span><input inputMode="decimal" placeholder="$0" value={propina?.tipo === "fijo" ? propina.valor : ""} onChange={(e) => setPropina(e.target.value ? { tipo: "fijo", valor: e.target.value } : null)} aria-label="Otra cantidad de propina" /></span>
               {propina && <button type="button" className="quitar" onClick={() => setPropina(null)}>Quitar</button>}
             </div>
-            <small className="muted">Es para {nombreDe(conServicio[0]?.barberoId ?? barbero) || "quien atendió"}. No suma a las ventas.</small>
           </div>
         )}
 
@@ -267,27 +271,23 @@ export function FormCobro(p: {
           ))}
         </div>
         {dividir && (
-          <div className="panel-rapido subir">
-            <div className="fila" style={{ gap: 10, flexWrap: "nowrap" }}>
-              <span className="otra ancho"><span>{metodoActual?.nombre}</span><input inputMode="decimal" placeholder="$0" value={monto1} onChange={(e) => setMonto1(e.target.value)} aria-label={`Monto con ${metodoActual?.nombre}`} autoFocus /></span>
-              <span className="muted" style={{ whiteSpace: "nowrap", fontSize: 13 }}>Faltan <b style={{ color: "var(--fg)" }}>{formatoDinero(total - m1)}</b></span>
+          <div className="panel-rapido subir division">
+            <div className="fila-div">
+              <Selector className="mini-sel" etiqueta="Primera forma de pago" valor={metodo} onChange={(v) => { setMetodo(v); if (v === metodo2) setMetodo2(p.metodos.find((x) => x.id !== v)?.id ?? ""); }} opciones={p.metodos.map((m) => ({ valor: m.id, texto: m.nombre }))} />
+              <span className="otra ancho"><span>$</span><input inputMode="decimal" placeholder="0" value={monto1} onChange={(e) => setMonto1(e.target.value)} aria-label="Primer importe" autoFocus /></span>
             </div>
-            <div className="billetes">
-              {p.metodos.filter((m) => m.id !== metodo).map((m) => <button type="button" key={m.id} className={metodo2 === m.id ? "on" : ""} onClick={() => setMetodo2(m.id)}>con {m.nombre.toLowerCase()}</button>)}
+            <div className="fila-div">
+              <Selector className="mini-sel" etiqueta="Segunda forma de pago" valor={metodo2} onChange={setMetodo2} opciones={p.metodos.filter((m) => m.id !== metodo).map((m) => ({ valor: m.id, texto: m.nombre }))} />
+              <span className="resto"><b>{formatoDinero(Math.max(total - m1, 0))}</b><small>el resto</small></span>
             </div>
+            <span className={`conteo-l ${m1 > 0 && m1 < total ? "ok" : "dif"}`}><Icono n={m1 > 0 && m1 < total ? "palomita" : "reloj"} />{m1 > 0 && m1 < total ? `${metodoActual?.nombre} ${formatoDinero(m1)} y ${p.metodos.find((x) => x.id === metodo2)?.nombre} ${formatoDinero(total - m1)}` : "Escribe cuánto se paga con la primera forma"}</span>
           </div>
         )}
         {efectivoSolo && total > 0 && (
-          <div className="pago-con">
-            <span className="otra ancho"><span>Paga con</span><input data-paso="" inputMode="decimal" value={recibido} onChange={(e) => setRecibido(e.target.value)} placeholder={formatoDinero(aCobrarEfectivo)} aria-label="Con cuánto paga" /></span>
-            <div className="cambio" aria-live="polite">
-              <span className="lab">Cambio</span>
-              <b className={cambioC !== null && cambioC < 0 ? "falta" : ""}>{cambioC === null ? "$0" : cambioC < 0 ? `Faltan ${formatoDinero(-cambioC)}` : formatoDinero(cambioC)}</b>
-            </div>
-            <div className="billetes">
-              {[20000, 50000, 100000].filter((b) => b >= aCobrarEfectivo).slice(0, 2).map((b) => <button type="button" key={b} onClick={() => setRecibido(String(b / 100))}>{formatoDinero(b)}</button>)}
-              <button type="button" onClick={() => setRecibido(String(aCobrarEfectivo / 100))}>Exacto</button>
-            </div>
+          <div className="paga-con">
+            <span className="otra"><span>Paga con</span><input data-paso="" inputMode="decimal" value={recibido} onChange={(e) => setRecibido(e.target.value)} placeholder={formatoDinero(aCobrarEfectivo)} aria-label="Con cuánto paga" /></span>
+            {[20000, 50000].filter((b) => b >= aCobrarEfectivo).slice(0, 2).map((b) => <button type="button" key={b} className="mini-b" onClick={() => setRecibido(String(b / 100))}>{formatoDinero(b)}</button>)}
+            <span className="cambio-c" aria-live="polite">Cambio <b className={cambioC !== null && cambioC < 0 ? "falta" : ""}>{cambioC === null ? "$0" : cambioC < 0 ? `faltan ${formatoDinero(-cambioC)}` : formatoDinero(cambioC)}</b></span>
           </div>
         )}
 

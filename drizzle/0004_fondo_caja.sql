@@ -1,0 +1,1 @@
+ALTER TABLE "barberias" ADD COLUMN "fondo_predeterminado" integer DEFAULT 0 NOT NULL;

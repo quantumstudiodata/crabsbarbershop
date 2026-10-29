@@ -107,7 +107,10 @@ describe("permisos", () => {
     expect(permisosDe("barbera", ["no.existe"]).size).toBe(3);
     expect(permisosDe("contador").has("ventas.registrar")).toBe(false);
     expect(permisosDe("contador").has("reportes.exportar")).toBe(true);
-    expect(rolesAsignables("duena")).not.toContain("admin");
+    // El propietario puede crear administradores; nadie puede crear el rol de encargado (ya no existe).
+    expect(rolesAsignables("duena")).toContain("admin");
+    expect(rolesAsignables("duena")).not.toContain("encargada");
+    expect(rolesAsignables("barbera")).toEqual([]);
     expect(rolesAsignables("encargada")).toEqual([]);
   });
 });

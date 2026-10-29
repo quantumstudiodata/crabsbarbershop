@@ -33,9 +33,9 @@ export function BarraCaja({ turno, folioVenta }: { turno: Turno; folioVenta: str
 }
 
 /** Con la caja cerrada no se muestra nada de Cobro: solo abrirla. */
-export function CajaCerrada({ opera }: { opera: boolean }) {
+export function CajaCerrada({ opera, sugerido }: { opera: boolean; sugerido: number }) {
   const [e, accion, abriendo] = useActionState<EstadoCaja, FormData>(abrirCaja, {});
-  const [fondo, setFondo] = useState("");
+  const [fondo, setFondo] = useState(sugerido ? String(sugerido / 100) : "");
   return (
     <section className="caja-puerta subir">
       <span className="icono-caja"><Icono n="caja" /></span>
@@ -74,9 +74,18 @@ function Resumen({ r, cerrar }: { r: ResumenCorte; cerrar: () => void }) {
         {r.metodos.map((m) => <div key={m.metodo}><span>{m.metodo}</span><span className="num">{formatoDinero(m.total)}</span></div>)}
         <div className="total-c"><span>Total vendido</span><b>{formatoDinero(r.total)}</b></div>
       </div>
-      <div className={`conteo ${r.diferencia === 0 ? "ok" : "dif"}`}>
-        <Icono n={r.diferencia === 0 ? "palomita" : "reloj"} />
-        <span>{r.diferencia === 0 ? "El efectivo coincide con el sistema" : r.diferencia > 0 ? `Sobraron ${formatoDinero(r.diferencia)} de efectivo` : `Faltaron ${formatoDinero(-r.diferencia)} de efectivo`}<small>Contado {formatoDinero(r.contado)}, esperado {formatoDinero(r.esperado)}</small></span>
+      <div className={`resultado-c ${r.diferencia === 0 ? "ok" : "dif"}`}>
+        <span className="sello" aria-hidden="true">
+          <svg viewBox="0 0 52 52">
+            <circle className="aro" cx="26" cy="26" r="23" pathLength={1} />
+            {r.diferencia === 0 ? <path className="trazo" d="M15 27l7 7 15-16" pathLength={1} /> : <path className="trazo" d="M26 14v15M26 37v1" pathLength={1} />}
+          </svg>
+          {r.diferencia === 0 && [0, 1, 2, 3, 4, 5].map((i) => <i key={i} style={{ rotate: `${i * 60}deg` }} />)}
+        </span>
+        <span>
+          <b>{r.diferencia === 0 ? "El efectivo coincide con el sistema" : r.diferencia > 0 ? `Sobraron ${formatoDinero(r.diferencia)}` : `Faltaron ${formatoDinero(-r.diferencia)}`}</b>
+          <span className="cifras-r"><span><small>Contado</small>{formatoDinero(r.contado)}</span><span><small>Esperado</small>{formatoDinero(r.esperado)}</span></span>
+        </span>
       </div>
       <div className="acciones"><button type="button" className="bt" onClick={cerrar}>Listo<span className="fl" aria-hidden="true"><Icono n="palomita" /></span></button></div>
     </Modal>

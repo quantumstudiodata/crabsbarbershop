@@ -56,21 +56,21 @@ export function MenuUsuario(p: { nombre: string; usuario: string; rol: string; a
           <form action={salir}><button role="menuitem" className="it salir"><Icono n="salir" />Salir</button></form>
         </div>
       )}
-      <Modal abierto={elegir} cerrar={() => setElegir(false)} etiqueta="Tu perfil" titulo="Elige tu avatar">
+      <Modal abierto={elegir} cerrar={() => setElegir(false)} etiqueta="Tu perfil" titulo="Elige tu avatar" ancho>
         <div className="carrusel-av">
-          <button type="button" className="icb flecha-c" aria-label="Anteriores" onClick={(e) => e.currentTarget.parentElement?.querySelector(".pista")?.scrollBy({ left: -200, behavior: "smooth" })}><Icono n="izquierda" /></button>
+          <button type="button" className="icb flecha-c" aria-label="Anteriores" onClick={(e) => e.currentTarget.parentElement?.querySelector(".pista")?.scrollBy({ left: -270, behavior: "smooth" })}><Icono n="izquierda" /></button>
           <div className="pista" role="radiogroup" aria-label="Avatares">
             {Object.keys(AVATARES).map((a) => (
               <button key={a} type="button" role="radio" aria-checked={propuesto === a} aria-label={a === "iniciales" ? "Tus iniciales" : a} onClick={() => setPropuesto(a)} className="op-av">
-                <Avatar avatar={a} nombre={p.nombre} t={84} />
+                <Avatar avatar={a} nombre={p.nombre} t={76} />
                 {propuesto === a && <span className="marca-av" aria-hidden="true"><Icono n="palomita" /></span>}
               </button>
             ))}
           </div>
-          <button type="button" className="icb flecha-c" aria-label="Siguientes" onClick={(e) => e.currentTarget.parentElement?.querySelector(".pista")?.scrollBy({ left: 200, behavior: "smooth" })}><Icono n="derecha" /></button>
+          <button type="button" className="icb flecha-c" aria-label="Siguientes" onClick={(e) => e.currentTarget.parentElement?.querySelector(".pista")?.scrollBy({ left: 270, behavior: "smooth" })}><Icono n="derecha" /></button>
         </div>
         <div className="acciones">
-          <button type="button" className="bt sec solo" onClick={() => setElegir(false)}>Regresar</button>
+          <button type="button" className="bt sec solo" onClick={() => setElegir(false)}>Cancelar</button>
           <button type="button" className="bt" disabled={pendiente} onClick={guardar}>{pendiente ? "Guardando…" : "Listo"}<span className="fl" aria-hidden="true"><Icono n="palomita" /></span></button>
         </div>
       </Modal>

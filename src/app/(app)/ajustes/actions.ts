@@ -21,7 +21,7 @@ async function personaDeMiBarberia(barberiaId: string, id: string) {
   return u ?? null;
 }
 
-type ReglaNueva = { tipo: "porcentaje" | "fijo" | "renta" | "sueldo" | "mixto"; porcentaje: number; montoFijo: number; montoSemanal: number };
+type ReglaNueva = { tipo: "porcentaje" | "fijo" | "renta" | "sueldo" | "mixto"; porcentaje: number; montoFijo: number; montoSemanal: number; periodo: string };
 
 /** Lee la forma de pago del formulario. null si no aplica; texto si hay un error. */
 function leerForma(form: FormData, rol: Rol): ReglaNueva | null | string {
@@ -33,17 +33,19 @@ function leerForma(form: FormData, rol: Rol): ReglaNueva | null | string {
   const semanal = leerPesos(texto(form, "pagoSemanal")) ?? 0;
   if ((tipo === "porcentaje" || tipo === "mixto") && (!(pct > 0) || pct >= 100)) return "Escribe el porcentaje, de 1 a 99.";
   if (tipo === "fijo" && fijo <= 0) return "Escribe cuánto gana por servicio.";
-  if ((tipo === "renta" || tipo === "sueldo" || tipo === "mixto") && semanal <= 0) return "Escribe el monto por semana.";
+  if ((tipo === "renta" || tipo === "sueldo" || tipo === "mixto") && semanal <= 0) return tipo === "renta" ? "Escribe el monto de la renta." : "Escribe el sueldo base.";
+  const periodo = ["semana", "quincena", "mes"].includes(texto(form, "pagoPeriodo")) ? texto(form, "pagoPeriodo") : "semana";
   return {
     tipo, porcentaje: tipo === "porcentaje" || tipo === "mixto" ? Math.round(pct * 100) : 0,
     montoFijo: tipo === "fijo" ? fijo : 0, montoSemanal: ["renta", "sueldo", "mixto"].includes(tipo) ? semanal : 0,
+    periodo: ["renta", "sueldo", "mixto"].includes(tipo) ? periodo : "semana",
   };
 }
 
 /** Guarda la forma de pago general. La anterior deja de aplicar desde ahora; lo ya cobrado conserva la suya. */
 async function guardarForma(tx: Tx, barberiaId: string, usuarioId: string, r: ReglaNueva) {
   const [actual] = await tx.select().from(schema.reglasComision).where(and(eq(schema.reglasComision.barberiaId, barberiaId), eq(schema.reglasComision.barberoId, usuarioId), isNull(schema.reglasComision.vigenteHasta), isNull(schema.reglasComision.servicioId))).limit(1);
-  if (actual && actual.tipo === r.tipo && actual.porcentaje === r.porcentaje && actual.montoFijo === r.montoFijo && actual.montoSemanal === r.montoSemanal) return false;
+  if (actual && actual.tipo === r.tipo && actual.porcentaje === r.porcentaje && actual.montoFijo === r.montoFijo && actual.montoSemanal === r.montoSemanal && actual.periodo === r.periodo) return false;
   const ahora = new Date();
   if (actual) await tx.update(schema.reglasComision).set({ vigenteHasta: ahora }).where(eq(schema.reglasComision.id, actual.id));
   await tx.insert(schema.reglasComision).values({ barberiaId, barberoId: usuarioId, servicioId: null, ...r, vigenteDesde: ahora });
@@ -81,7 +83,7 @@ export async function restablecer(id: string): Promise<EstadoPersona> {
   const u = await personaDeMiBarberia(s.barberia.id, String(id));
   if (!u) return { error: "No se encontró a esa persona." };
   if (u.id === s.usuario.id) return { error: "Tu propia contraseña se cambia desde tu menú." };
-  if (!rolesAsignables(s.usuario.rol).includes(u.rol)) return { error: "No puedes restablecer la contraseña de esa persona." };
+  if (!rolesAsignables(s.usuario.rol).includes(u.rol === "encargada" ? "barbera" : u.rol)) return { error: "No puedes restablecer la contraseña de esa persona." };
   const clave = contrasenaTemporal(u.nombre);
   const expira = expiraClave();
   await db.update(schema.usuarios).set({ hash: await hashContrasena(clave), debeCambiar: true, intentosFallidos: 0, bloqueadoHasta: null, claveTemporal: cifrar(clave), claveTemporalExpira: expira }).where(eq(schema.usuarios.id, u.id));
@@ -96,7 +98,7 @@ export async function restablecer(id: string): Promise<EstadoPersona> {
 export async function verClave(id: string): Promise<EstadoPersona> {
   const s = await requerirSesion("ajustes.usuarios");
   const u = await personaDeMiBarberia(s.barberia.id, String(id));
-  if (!u || !rolesAsignables(s.usuario.rol).includes(u.rol)) return { error: "No se encontró a esa persona." };
+  if (!u || !rolesAsignables(s.usuario.rol).includes(u.rol === "encargada" ? "barbera" : u.rol)) return { error: "No se encontró a esa persona." };
   if (!u.claveTemporal || !u.claveTemporalExpira || u.claveTemporalExpira < new Date() || !u.debeCambiar) return { error: "Ya pasaron los 30 minutos. Restablécela otra vez para ver una nueva." };
   const clave = descifrar(u.claveTemporal);
   if (!clave) return { error: "No se pudo leer la contraseña. Restablécela otra vez." };
@@ -109,7 +111,7 @@ export async function actualizarPersona(_: EstadoPersona, form: FormData): Promi
   if (!u) return { error: "No se encontró a esa persona." };
   if (u.id === s.usuario.id) return { error: "No puedes cambiar tu propio rol." };
   const asignables = rolesAsignables(s.usuario.rol);
-  if (!asignables.includes(u.rol)) return { error: "No puedes cambiar a esa persona." };
+  if (!asignables.includes(u.rol === "encargada" ? "barbera" : u.rol)) return { error: "No puedes cambiar a esa persona." };
   const rol = texto(form, "rol") as Rol;
   if (!asignables.includes(rol)) return { error: "Elige un rol." };
   const nombre = texto(form, "nombre", 80).replace(/\s+/g, " ") || u.nombre;
@@ -126,7 +128,10 @@ export async function actualizarPersona(_: EstadoPersona, form: FormData): Promi
     if (forma && (await guardarForma(tx, s.barberia.id, u.id, forma))) cambios.push(`forma de pago a ${describirRegla(forma, formatoDinero)}`);
     if ([...extra].sort().join() !== [...u.permisosExtra].sort().join()) cambios.push("permisos");
     if (meta !== u.metaSemanal) cambios.push("meta semanal");
-    if (cambios.length) await registrar(tx, { barberiaId: s.barberia.id, usuarioId: s.usuario.id, tipo: "usuario", accion: `${s.usuario.nombre} cambió a ${u.nombre}: ${cambios.join(", ")}`, detalle: { permisosExtra: extra } });
+    if (cambios.length) await registrar(tx, {
+      barberiaId: s.barberia.id, usuarioId: s.usuario.id, tipo: "usuario", accion: `${s.usuario.nombre} cambió a ${u.nombre}: ${cambios.join(", ")}`,
+      detalle: { usuario: u.usuario, antes: [u.nombre, NOMBRE_ROL[u.rol], u.metaSemanal ? `meta ${formatoDinero(u.metaSemanal)}` : ""].filter(Boolean).join(", "), ahora: [nombre, NOMBRE_ROL[rol], meta ? `meta ${formatoDinero(meta)}` : ""].filter(Boolean).join(", "), permisosExtra: extra },
+    });
   });
   revalidatePath("/", "layout");
   return { ok: true, mensaje: "Cambios guardados.", n: Date.now() };
@@ -138,7 +143,7 @@ export async function darDeBaja(id: string): Promise<EstadoPersona> {
   const u = await personaDeMiBarberia(s.barberia.id, String(id));
   if (!u) return { error: "No se encontró a esa persona." };
   if (u.id === s.usuario.id) return { error: "No puedes darte de baja a ti mismo." };
-  if (!rolesAsignables(s.usuario.rol).includes(u.rol)) return { error: "No puedes dar de baja a esa persona." };
+  if (!rolesAsignables(s.usuario.rol).includes(u.rol === "encargada" ? "barbera" : u.rol)) return { error: "No puedes eliminar a esa persona." };
   let borrada = false;
   try {
     await db.transaction(async (tx) => {
@@ -148,10 +153,36 @@ export async function darDeBaja(id: string): Promise<EstadoPersona> {
     });
     borrada = true;
   } catch {
-    await db.update(schema.usuarios).set({ activo: false, claveTemporal: null, claveTemporalExpira: null }).where(eq(schema.usuarios.id, u.id));
-    await cerrarSesionesDe(u.id);
+    return { error: `${u.nombre} ya tiene ventas o movimientos, así que no se puede eliminar. Queda desactivado.` };
   }
   await registrar(db, { barberiaId: s.barberia.id, usuarioId: s.usuario.id, tipo: "usuario", accion: `${s.usuario.nombre} eliminó a ${u.nombre}` });
   revalidatePath("/", "layout");
-  return { ok: true, mensaje: borrada ? `${u.nombre} se eliminó.` : `${u.nombre} se eliminó. Sus ventas pasadas se conservan en los reportes.`, n: Date.now() };
+  return { ok: true, mensaje: `${u.nombre} se eliminó.`, n: Date.now() };
+}
+
+async function personaEditable(id: string) {
+  const s = await requerirSesion("ajustes.usuarios");
+  const u = await personaDeMiBarberia(s.barberia.id, String(id));
+  if (!u || u.id === s.usuario.id || !rolesAsignables(s.usuario.rol).includes(u.rol === "encargada" ? "barbera" : u.rol)) return { s, u: null };
+  return { s, u };
+}
+
+/** Desactivar impide entrar, pero conserva sus ventas y todo lo que hizo. */
+export async function desactivar(id: string): Promise<EstadoPersona> {
+  const { s, u } = await personaEditable(id);
+  if (!u) return { error: "No puedes desactivar a esa persona." };
+  await db.update(schema.usuarios).set({ activo: false, claveTemporal: null, claveTemporalExpira: null }).where(eq(schema.usuarios.id, u.id));
+  await cerrarSesionesDe(u.id);
+  await registrar(db, { barberiaId: s.barberia.id, usuarioId: s.usuario.id, tipo: "usuario", accion: `${s.usuario.nombre} desactivó a ${u.nombre}`, detalle: { usuario: u.usuario, antes: "Activo", ahora: "Desactivado" } });
+  revalidatePath("/", "layout");
+  return { ok: true, mensaje: `${u.nombre} ya no puede entrar. Su historial se conserva.`, n: Date.now() };
+}
+
+export async function reactivar(id: string): Promise<EstadoPersona> {
+  const { s, u } = await personaEditable(id);
+  if (!u) return { error: "No puedes reactivar a esa persona." };
+  await db.update(schema.usuarios).set({ activo: true }).where(eq(schema.usuarios.id, u.id));
+  await registrar(db, { barberiaId: s.barberia.id, usuarioId: s.usuario.id, tipo: "usuario", accion: `${s.usuario.nombre} reactivó a ${u.nombre}`, detalle: { usuario: u.usuario, antes: "Desactivado", ahora: "Activo" } });
+  revalidatePath("/", "layout");
+  return { ok: true, mensaje: `${u.nombre} puede volver a entrar.`, n: Date.now() };
 }

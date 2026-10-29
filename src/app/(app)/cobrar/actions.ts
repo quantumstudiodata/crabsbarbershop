@@ -97,7 +97,9 @@ export async function registrarVenta(_: EstadoCobro, form: FormData): Promise<Es
     const desc = i === lineas.length - 1 ? restante : Math.floor((e.descuento * l.s.precio) / Math.max(subtotal, 1));
     restante -= desc;
     const cobrado = l.s.precio - desc;
-    const regla = copiaRegla(elegirRegla(reglas, l.barberoId, l.servicioId, ahora));
+    const base = copiaRegla(elegirRegla(reglas, l.barberoId, l.servicioId, ahora));
+    // Si el servicio tiene comisión especial, sustituye al porcentaje de quien cobra comisión.
+    const regla = base && l.s.comision !== null && (base.tipo === "porcentaje" || base.tipo === "mixto") ? { ...base, porcentaje: l.s.comision } : base;
     return {
       barberiaId: bId, servicioId: l.servicioId, nombreServicio: l.s.nombre, barberoId: l.barberoId, precioLista: l.s.precio,
       descuento: desc, motivoDescuento: desc > 0 ? e.motivoDescuento : null, autorizadoPor: desc > 0 ? s.usuario.id : null,

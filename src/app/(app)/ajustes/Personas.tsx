@@ -1,13 +1,13 @@
 "use client";
 
-import { useActionState, useEffect, useState, useTransition } from "react";
+import { useActionState, useEffect, useRef, useState, useTransition } from "react";
 import { Avatar } from "@/components/Avatar";
 import { Ayuda } from "@/components/Ayuda";
 import { Fl, Icono } from "@/components/Icono";
-import { Interruptor, Modal } from "@/components/ui";
+import { Interruptor, Modal, Selector } from "@/components/ui";
 import type { Rol } from "@/lib/permisos";
 import { CamposFormaPago, type FormaActual } from "./CamposFormaPago";
-import { actualizarPersona, darDeAlta, darDeBaja, restablecer, verClave, type ClaveVisible, type EstadoPersona } from "./actions";
+import { actualizarPersona, darDeAlta, darDeBaja, desactivar, reactivar, restablecer, verClave, type ClaveVisible, type EstadoPersona } from "./actions";
 
 type Persona = {
   id: string; nombre: string; usuario: string; rol: Rol; avatar: string; activo: boolean; metaSemanal: number; permisosExtra: string[];
@@ -15,10 +15,12 @@ type Persona = {
 };
 type Props = {
   personas: Persona[]; roles: { valor: Rol; texto: string; detalle: string }[]; nombresRol: Record<Rol, string>;
-  permisos: { clave: string; texto: string }[]; permisosPorRol: Record<Rol, readonly string[]>; restablecerId: string | null;
+  grupos: { titulo: string; permisos: { clave: string; texto: string }[] }[]; permisosPorRol: Record<Rol, readonly string[]>; restablecerId: string | null;
 };
 
-const GRUPO: Record<Rol, string> = { duena: "Propietario", admin: "Administración", contador: "Contador", encargada: "Encargado", barbera: "Barberos" };
+const ROLES_VISIBLES: Rol[] = ["duena", "admin", "barbera", "contador"];
+const rolDe = (r: Rol): Rol => (r === "encargada" ? "barbera" : r);
+const esBarbero = (r: Rol) => r === "barbera" || r === "encargada";
 
 /** Minutos que faltan, actualizado cada segundo. */
 function useRestante(hasta: number | null) {
@@ -29,13 +31,6 @@ function useRestante(hasta: number | null) {
     return () => clearInterval(t);
   }, [hasta]);
   return hasta ? Math.max(0, hasta - ahora) : 0;
-}
-
-function EstadoPersona({ p }: { p: Persona }) {
-  const ms = useRestante(p.claveHasta);
-  if (p.claveHasta && ms > 0) return <span className="est temp"><span className="d" style={{ background: "var(--warn)", boxShadow: "0 0 0 3px var(--warn-soft)" }} />Clave temporal, {Math.ceil(ms / 60000)} min</span>;
-  if (p.debeCambiar) return <span className="est temp"><span className="d" style={{ background: "var(--warn)", boxShadow: "0 0 0 3px var(--warn-soft)" }} />Falta elegir contraseña</span>;
-  return <span className="est"><span className="d" />Activa</span>;
 }
 
 function VentanaClave({ c, cerrar }: { c: ClaveVisible | null; cerrar: () => void }) {
@@ -76,54 +71,137 @@ function VentanaClave({ c, cerrar }: { c: ClaveVisible | null; cerrar: () => voi
   );
 }
 
+function Estado({ p, acceso }: { p: Persona; acceso: () => void }) {
+  const ms = useRestante(p.claveHasta);
+  if (!p.activo) return <span className="est off"><span className="d" />Desactivado</span>;
+  if (p.debeCambiar) return (
+    <button type="button" className="est temp enlace-est" onClick={acceso} title="Ver cómo darle acceso">
+      <span className="d" style={{ background: "var(--warn)", boxShadow: "0 0 0 3px var(--warn-soft)" }} />Acceso pendiente{p.claveHasta && ms > 0 ? `, ${Math.ceil(ms / 60000)} min` : ""}
+    </button>
+  );
+  return <span className="est"><span className="d" />Activo</span>;
+}
+
+function MenuAcciones({ p, acciones }: { p: Persona; acciones: { editar: () => void; clave: () => void; desactivar: () => void; reactivar: () => void; eliminar: () => void } }) {
+  const [abierto, setAbierto] = useState(false);
+  const caja = useRef<HTMLDivElement>(null);
+  useEffect(() => {
+    if (!abierto) return;
+    const fuera = (e: MouseEvent) => { if (!caja.current?.contains(e.target as Node)) setAbierto(false); };
+    document.addEventListener("mousedown", fuera);
+    return () => document.removeEventListener("mousedown", fuera);
+  }, [abierto]);
+  const ir = (f: () => void) => () => { setAbierto(false); f(); };
+  return (
+    <div ref={caja} style={{ position: "relative" }}>
+      <button type="button" className="icb" aria-label={`Acciones para ${p.nombre}`} aria-haspopup="menu" aria-expanded={abierto} onClick={() => setAbierto((a) => !a)}>⋯</button>
+      {abierto && (
+        <div className="menu acciones-m" role="menu">
+          {p.activo ? (
+            <>
+              <button type="button" role="menuitem" className="it" onClick={ir(acciones.editar)}><Icono n="editar" />Editar usuario</button>
+              <button type="button" role="menuitem" className="it" onClick={ir(acciones.clave)}><Icono n="llave" />Restablecer contraseña</button>
+              <button type="button" role="menuitem" className="it salir" onClick={ir(acciones.desactivar)}><Icono n="candado" />Desactivar usuario</button>
+            </>
+          ) : (
+            <>
+              <button type="button" role="menuitem" className="it" onClick={ir(acciones.reactivar)}><Icono n="palomita" />Reactivar usuario</button>
+              <button type="button" role="menuitem" className="it salir" onClick={ir(acciones.eliminar)}><Icono n="basura" />Eliminar definitivamente</button>
+            </>
+          )}
+        </div>
+      )}
+    </div>
+  );
+}
+
+function RolTarjetas({ roles, valor, cambiar }: { roles: Props["roles"]; valor: Rol; cambiar: (r: Rol) => void }) {
+  return (
+    <div className="opciones-t chicas" role="radiogroup" aria-label="Rol">
+      {roles.filter((r) => ROLES_VISIBLES.includes(r.valor)).map((r) => (
+        <label key={r.valor} className="opcion-t"><input type="radio" name="rol" value={r.valor} checked={valor === r.valor} onChange={() => cambiar(r.valor)} /><b>{r.texto}</b><small>{r.detalle}</small></label>
+      ))}
+    </div>
+  );
+}
+
 function EditarPersona({ p, props, cerrar }: { p: Persona; props: Props; cerrar: () => void }) {
   const [e, accion, guardando] = useActionState<EstadoPersona, FormData>(actualizarPersona, {});
-  const [rol, setRol] = useState<Rol>(p.rol);
+  const [rol, setRol] = useState<Rol>(rolDe(p.rol));
   useEffect(() => { if (e.ok) cerrar(); }, [e.ok, e.n, cerrar]);
   const base = new Set(props.permisosPorRol[rol]);
-  const atiende = rol === "barbera" || rol === "encargada";
   return (
     <Modal abierto cerrar={cerrar} etiqueta="Editar usuario" titulo={p.nombre} ancho>
       <form action={accion} className="pila">
         <input type="hidden" name="id" value={p.id} />
+        <span className="paso-t">Datos del usuario</span>
         <label className="campo"><span>Nombre completo</span><input className="input" name="nombre" defaultValue={p.nombre} /></label>
-        <div className="campo">
-          <span>Rol</span>
-          <div className="opciones-t" role="radiogroup">
-            {props.roles.map((r) => (
-              <label key={r.valor} className="opcion-t"><input type="radio" name="rol" value={r.valor} checked={rol === r.valor} onChange={() => setRol(r.valor)} /><b>{r.texto}</b><small>{r.detalle}</small></label>
-            ))}
-          </div>
+        <div className="campo"><span>Rol</span><RolTarjetas roles={props.roles} valor={rol} cambiar={setRol} /></div>
+        <span className="paso-t">Permisos</span>
+        <div className="grupos-p">
+          {props.grupos.map((g) => {
+            const incluidos = g.permisos.filter((x) => base.has(x.clave));
+            const extra = g.permisos.filter((x) => !base.has(x.clave));
+            return (
+              <details key={`${rol}-${g.titulo}`} className="grupo-p">
+                <summary><b>{g.titulo}</b><span className="muted">{incluidos.length} de {g.permisos.length} incluidos</span></summary>
+                <div className="grupo-p-c">
+                  {incluidos.length > 0 && <div className="incluidos">{incluidos.map((x) => <span key={x.clave} className="tag-i"><Icono n="palomita" />{x.texto}</span>)}</div>}
+                  {extra.map((x) => (
+                    <label key={x.clave} className="entre perm-l">
+                      <span>{x.texto}</span>
+                      <Interruptor name="permisos" value={x.clave} etiqueta={x.texto} defaultChecked={p.permisosExtra.includes(x.clave)} />
+                    </label>
+                  ))}
+                  {extra.length === 0 && <small className="muted">Su rol ya incluye todo este grupo.</small>}
+                </div>
+              </details>
+            );
+          })}
         </div>
-        <div className="campo">
-          <span>Permisos<Ayuda titulo="Permisos">Los que ya trae el rol aparecen encendidos y no se pueden quitar. Los demás se pueden dar como permiso extra.</Ayuda></span>
-          <div className="permisos">
-            {props.permisos.map((x) => (
-              <div key={`${rol}-${x.clave}`}>
-                <span>{x.texto}{base.has(x.clave) && <small>Incluido en su rol</small>}</span>
-                {base.has(x.clave)
-                  ? <Interruptor etiqueta={x.texto} checked disabled />
-                  : <Interruptor name="permisos" value={x.clave} etiqueta={x.texto} defaultChecked={p.permisosExtra.includes(x.clave)} />}
-              </div>
-            ))}
-          </div>
-        </div>
-        {atiende && (
-          <div className="campo">
-            <span>Forma de pago<Ayuda titulo="Forma de pago">Cómo gana esta persona. Con esto se calcula lo que le corresponde. Si la cambias, lo ya cobrado conserva la forma con la que se cobró.</Ayuda></span>
-            <CamposFormaPago actual={p.forma} nombre={p.nombre} />
-          </div>
-        )}
-        {atiende && (
-          <label className="campo">
-            <span>Meta de ventas por semana<Ayuda titulo="Meta semanal">Se le muestra en su Inicio con una barra de avance. Si la dejas vacía, se calcula sola con sus ventas; al principio es de $4,000.</Ayuda></span>
-            <input className="input" name="meta" inputMode="decimal" defaultValue={p.metaSemanal ? String(p.metaSemanal / 100) : ""} placeholder="Ejemplo: 5000" />
-          </label>
+        {esBarbero(rol) && (
+          <>
+            <span className="paso-t">Forma de pago</span>
+            <CamposFormaPago actual={p.forma} />
+            <span className="paso-t">Meta individual</span>
+            <label className="campo">
+              <span>Meta de ventas por semana (opcional)</span>
+              <input className="input" name="meta" inputMode="decimal" defaultValue={p.metaSemanal ? String(p.metaSemanal / 100) : ""} placeholder="Si la dejas vacía, se calcula sola" />
+            </label>
+          </>
         )}
         {e.error && <p className="aviso error">{e.error}</p>}
         <div className="acciones">
-          <button type="button" className="bt sec solo" onClick={cerrar}>Regresar</button>
+          <button type="button" className="bt sec solo" onClick={cerrar}>Cancelar</button>
           <button className="bt" disabled={guardando}>{guardando ? "Guardando…" : "Guardar cambios"}<Fl /></button>
+        </div>
+      </form>
+    </Modal>
+  );
+}
+
+function AltaUsuario({ props, cerrar, alGuardar }: { props: Props; cerrar: () => void; alGuardar: (c: ClaveVisible) => void }) {
+  const [e, accion, guardando] = useActionState<EstadoPersona, FormData>(darDeAlta, {});
+  const [paso, setPaso] = useState(1);
+  const [rol, setRol] = useState<Rol>("barbera");
+  const [nombre, setNombre] = useState("");
+  useEffect(() => { if (e.ok && e.clave) alGuardar(e.clave); }, [e.ok, e.n, e.clave, alGuardar]);
+  const dosPasos = esBarbero(rol);
+  return (
+    <Modal abierto cerrar={cerrar} etiqueta={dosPasos ? `Paso ${paso} de 2` : "Nuevo usuario"} titulo={paso === 1 ? "Agregar usuario" : "Cómo se le paga"} ancho>
+      <form action={accion} className="pila">
+        <div className="pila" style={{ display: paso === 1 ? undefined : "none" }}>
+          <label className="campo"><span>Nombre completo</span><input className="input" name="nombre" value={nombre} onChange={(x) => setNombre(x.target.value)} placeholder="Ejemplo: Ana Martínez López" required /></label>
+          <div className="campo"><span>Rol</span><RolTarjetas roles={props.roles} valor={rol} cambiar={setRol} /></div>
+          <p className="ayuda-txt">El usuario se arma con las iniciales y el primer apellido. La contraseña temporal se verá 30 minutos.</p>
+        </div>
+        {dosPasos && <div style={{ display: paso === 2 ? undefined : "none" }}><CamposFormaPago actual={null} /><p className="ayuda-txt" style={{ marginTop: 8 }}>Se puede cambiar después.</p></div>}
+        {e.error && <p className="aviso error">{e.error}</p>}
+        <div className="acciones">
+          {paso === 2 ? <button type="button" className="bt sec solo" onClick={() => setPaso(1)}>Regresar</button> : <button type="button" className="bt sec solo" onClick={cerrar}>Cancelar</button>}
+          {dosPasos && paso === 1
+            ? <button key="sig" type="button" className="bt" disabled={nombre.trim().split(/\s+/).length < 2} onClick={() => setPaso(2)}>Siguiente<Fl /></button>
+            : <button key="alta" className="bt" disabled={guardando}>{guardando ? "Guardando…" : "Dar de alta"}<Fl /></button>}
         </div>
       </form>
     </Modal>
@@ -133,17 +211,15 @@ function EditarPersona({ p, props, cerrar }: { p: Persona; props: Props; cerrar:
 export function Personas(props: Props) {
   const [clave, setClave] = useState<ClaveVisible | null>(null);
   const [editar, setEditar] = useState<Persona | null>(null);
-  const [confirmar, setConfirmar] = useState<{ tipo: "restablecer" | "baja"; p: Persona } | null>(
+  const [confirmar, setConfirmar] = useState<{ tipo: "restablecer" | "desactivar" | "eliminar"; p: Persona } | null>(
     () => (props.restablecerId ? { tipo: "restablecer", p: props.personas.find((x) => x.id === props.restablecerId)! } : null),
   );
-  const [alta, setAlta] = useState(false);
-  const [rolAlta, setRolAlta] = useState<Rol>("barbera");
-  const [nombreAlta, setNombreAlta] = useState("");
+  const [alta, setAlta] = useState(0);
   const [aviso, setAviso] = useState<EstadoPersona>({});
+  const [buscar, setBuscar] = useState("");
+  const [filtroRol, setFiltroRol] = useState("");
+  const [verInactivos, setVerInactivos] = useState(false);
   const [pendiente, iniciar] = useTransition();
-  const [eAlta, accAlta, guardandoAlta] = useActionState<EstadoPersona, FormData>(darDeAlta, {});
-
-  useEffect(() => { if (eAlta.ok && eAlta.clave) { setAlta(false); setClave(eAlta.clave); } }, [eAlta.n, eAlta.ok, eAlta.clave]);
 
   const ejecutar = (f: () => Promise<EstadoPersona>) => iniciar(async () => {
     const r = await f();
@@ -151,97 +227,82 @@ export function Personas(props: Props) {
     if (r.clave) setClave(r.clave);
     setAviso(r);
   });
+  const acceso = (p: Persona) => (p.claveHasta && p.claveHasta > Date.now() ? ejecutar(() => verClave(p.id)) : setConfirmar({ tipo: "restablecer", p }));
 
-  const grupos = (["duena", "admin", "contador", "encargada", "barbera"] as Rol[]).map((r) => ({ r, gente: props.personas.filter((p) => p.rol === r) })).filter((g) => g.gente.length);
+  const q = buscar.trim().toLowerCase();
+  const lista = props.personas.filter((p) => (verInactivos ? !p.activo : p.activo) && (!filtroRol || rolDe(p.rol) === filtroRol) && (!q || `${p.nombre} ${p.usuario}`.toLowerCase().includes(q)));
   const piden = props.personas.filter((p) => p.pide && p.editable);
+  const inactivos = props.personas.filter((p) => !p.activo).length;
 
   return (
     <>
       <div className="entre">
-        <div>
-          <h1 className="titulo">Usuarios</h1>
-          <p className="sub">Cada quien entra con su usuario y ve solo lo que le toca.</p>
-        </div>
-        <button type="button" className="bt" onClick={() => { setNombreAlta(""); setRolAlta("barbera"); setAlta(true); }}>Agregar usuario<span className="fl" aria-hidden="true"><Icono n="mas" /></span></button>
+        <h1 className="titulo">Usuarios</h1>
+        <button type="button" className="bt" onClick={() => setAlta((n) => n + 1)}>Agregar usuario<span className="fl" aria-hidden="true"><Icono n="mas" /></span></button>
       </div>
       {aviso.error && <p className="aviso error">{aviso.error}</p>}
       {aviso.mensaje && <p className="aviso ok">{aviso.mensaje}</p>}
       {piden.map((p) => (
-        <div key={p.id} className="glass panel" style={{ boxShadow: "var(--sh1), inset 0 0 0 2px var(--accent)" }}>
+        <div key={p.id} className="glass panel" style={{ boxShadow: "var(--sh1), inset 0 0 0 2px var(--accent)", padding: "12px 16px" }}>
           <div className="entre">
-            <span className="persona"><Avatar avatar={p.avatar} nombre={p.nombre} t={40} /><span><b>{p.nombre} pidió restablecer su contraseña</b><small className="muted" style={{ display: "block" }}>Lo pidió desde la pantalla de entrada.</small></span></span>
-            <button type="button" className="bt solo" onClick={() => setConfirmar({ tipo: "restablecer", p })}><Icono n="llave" />Restablecer</button>
+            <span className="persona"><Avatar avatar={p.avatar} nombre={p.nombre} t={34} /><b>{p.nombre} pidió restablecer su contraseña</b></span>
+            <button type="button" className="bt solo chico" onClick={() => setConfirmar({ tipo: "restablecer", p })}><Icono n="llave" />Restablecer</button>
           </div>
         </div>
       ))}
 
-      <div className="glass panel" style={{ padding: "6px 10px 12px" }}>
-        {grupos.map(({ r, gente }) => (
-          <div key={r}>
-            <div className="grupo">{GRUPO[r]}</div>
-            {gente.map((p) => (
-              <div key={p.id} className="fila-p" >
-                <Avatar avatar={p.avatar} nombre={p.nombre} t={42} />
-                <span style={{ minWidth: 0 }}><b>{p.nombre}</b>{p.yo && <span className="etiqueta" style={{ marginLeft: 8, padding: "2px 8px" }}>Tú</span>}<small><span style={{ fontFamily: "var(--f-mono)" }}>{p.usuario}</span>{p.formaTexto ? `, ${p.formaTexto.charAt(0).toLowerCase()}${p.formaTexto.slice(1)}` : ""}</small></span>
-                <span className="est-col"><EstadoPersona p={p} /></span>
-                <span className="acts">
-                  {p.editable && (
-                    <>
-                      <button type="button" className="icb" onClick={() => setEditar(p)} aria-label={`Editar a ${p.nombre}`} title="Editar"><Icono n="editar" /></button>
-                      {p.claveHasta && p.claveHasta > Date.now()
-                        ? <button type="button" className="icb" onClick={() => ejecutar(() => verClave(p.id))} aria-label={`Ver la contraseña temporal de ${p.nombre}`} title="Ver contraseña temporal"><Icono n="ojo" /></button>
-                        : <button type="button" className="icb" onClick={() => setConfirmar({ tipo: "restablecer", p })} aria-label={`Restablecer la contraseña de ${p.nombre}`} title="Restablecer contraseña"><Icono n="llave" /></button>}
-                      <button type="button" className="icb peligro" onClick={() => setConfirmar({ tipo: "baja", p })} aria-label={`Eliminar a ${p.nombre}`} title="Eliminar"><Icono n="basura" /></button>
-                    </>
-                  )}
-                </span>
-              </div>
-            ))}
+      <div className="herr-usuarios">
+        <label className="con-icono" style={{ flex: "1 1 220px" }}><Icono n="buscar" /><input className="input" value={buscar} onChange={(e) => setBuscar(e.target.value)} placeholder="Buscar por nombre o usuario" aria-label="Buscar usuario" /></label>
+        <div style={{ width: 200 }}>
+          <Selector etiqueta="Filtrar por rol" valor={filtroRol} onChange={setFiltroRol} opciones={[{ valor: "", texto: "Todos los roles" }, ...ROLES_VISIBLES.map((r) => ({ valor: r, texto: props.nombresRol[r] }))]} />
+        </div>
+        {inactivos > 0 && <button type="button" className={`chipf ${verInactivos ? "on" : ""}`} onClick={() => setVerInactivos((v) => !v)}>Desactivados ({inactivos})</button>}
+      </div>
+
+      <div className="glass lista-u">
+        {lista.length === 0 && <p className="muted" style={{ padding: 16 }}>No hay usuarios con ese filtro.</p>}
+        {lista.map((p) => (
+          <div key={p.id} className={`fila-u ${p.activo ? "" : "inactivo"}`}>
+            <Avatar avatar={p.avatar} nombre={p.nombre} t={34} />
+            <span className="nom"><b>{p.nombre}</b>{p.yo && <span className="etiqueta" style={{ padding: "1px 7px", marginLeft: 6 }}>Tú</span>}<small>{p.usuario}{p.formaTexto ? ` - ${p.formaTexto}` : ""}</small></span>
+            <span className={`rol-tag r-${rolDe(p.rol)}`}>{props.nombresRol[rolDe(p.rol)]}</span>
+            <span className="est-col"><Estado p={p} acceso={() => p.editable && acceso(p)} /></span>
+            <span className="acts">
+              {p.editable && <button type="button" className="icb" onClick={() => setEditar(p)} aria-label={`Editar a ${p.nombre}`} title="Editar"><Icono n="editar" /></button>}
+              {p.editable && <MenuAcciones p={p} acciones={{
+                editar: () => setEditar(p), clave: () => setConfirmar({ tipo: "restablecer", p }), desactivar: () => setConfirmar({ tipo: "desactivar", p }),
+                reactivar: () => ejecutar(() => reactivar(p.id)), eliminar: () => setConfirmar({ tipo: "eliminar", p }),
+              }} />}
+            </span>
           </div>
         ))}
       </div>
 
-      <Modal abierto={alta} cerrar={() => setAlta(false)} etiqueta="Nuevo usuario" titulo="Agregar usuario" ancho>
-        <form action={accAlta} className="pila">
-          <label className="campo"><span>Nombre completo</span><input className="input" name="nombre" value={nombreAlta} onChange={(e) => setNombreAlta(e.target.value)} placeholder="Ejemplo: Ana Martínez López" required /></label>
-          <div className="campo">
-            <span>Rol</span>
-            <div className="opciones-t" role="radiogroup">
-              {props.roles.map((r) => (
-                <label key={r.valor} className="opcion-t"><input type="radio" name="rol" value={r.valor} checked={rolAlta === r.valor} onChange={() => setRolAlta(r.valor)} /><b>{r.texto}</b><small>{r.detalle}</small></label>
-              ))}
-            </div>
-          </div>
-          {(rolAlta === "barbera" || rolAlta === "encargada") && (
-            <div className="campo">
-              <span>Forma de pago<Ayuda titulo="Forma de pago">Cómo gana esta persona: un porcentaje, un monto por servicio, renta de silla o sueldo. Se puede cambiar después.</Ayuda></span>
-              <CamposFormaPago actual={null} nombre={nombreAlta} />
-            </div>
-          )}
-          <p className="ayuda-txt">El usuario se arma con las iniciales y el primer apellido.<br />La contraseña temporal se podrá ver durante 30 minutos.</p>
-          {eAlta.error && <p className="aviso error">{eAlta.error}</p>}
-          <div className="acciones">
-            <button type="button" className="bt sec solo" onClick={() => setAlta(false)}>Regresar</button>
-            <button className="bt" disabled={guardandoAlta}>{guardandoAlta ? "Guardando…" : "Dar de alta"}<Fl /></button>
-          </div>
-        </form>
-      </Modal>
-
+      {alta > 0 && <AltaUsuario key={alta} props={props} cerrar={() => setAlta(0)} alGuardar={(c) => { setAlta(0); setClave(c); }} />}
       {confirmar?.tipo === "restablecer" && (
-        <Modal abierto cerrar={() => setConfirmar(null)} etiqueta="Restablecer contraseña" titulo={`¿Restablecer la contraseña de ${confirmar.p.nombre.split(" ")[0]}?`}>
-          <p className="muted">Su contraseña actual dejará de servir y se cerrará su sesión.<br />Verás una temporal durante 30 minutos para dársela.</p>
+        <Modal abierto cerrar={() => setConfirmar(null)} etiqueta="Acceso" titulo={`Darle acceso a ${confirmar.p.nombre.split(" ")[0]}`}>
+          <p className="muted">Se genera una contraseña temporal que verás 30 minutos para dársela.<br />Su contraseña anterior deja de servir y al entrar elegirá una propia.</p>
           <div className="acciones">
             <button type="button" className="bt sec solo" onClick={() => setConfirmar(null)}>Regresar</button>
-            <button type="button" className="bt" disabled={pendiente} onClick={() => ejecutar(() => restablecer(confirmar.p.id))}>{pendiente ? "Generando…" : "Sí, restablecer"}<Fl /></button>
+            <button type="button" className="bt" disabled={pendiente} onClick={() => ejecutar(() => restablecer(confirmar.p.id))}>{pendiente ? "Generando…" : "Generar contraseña"}<Fl /></button>
           </div>
         </Modal>
       )}
-      {confirmar?.tipo === "baja" && (
-        <Modal abierto cerrar={() => setConfirmar(null)} etiqueta="Eliminar usuario" titulo={`¿Eliminar a ${confirmar.p.nombre.split(" ")[0]}?`}>
-          <p className="muted">Ya no podrá entrar y desaparece de la lista.<br />Sus ventas pasadas se conservan en los reportes.</p>
+      {confirmar?.tipo === "desactivar" && (
+        <Modal abierto cerrar={() => setConfirmar(null)} etiqueta="Desactivar usuario" titulo={`¿Desactivar a ${confirmar.p.nombre.split(" ")[0]}?`}>
+          <p className="muted">Ya no podrá entrar.<br />Sus ventas y todo lo que hizo se conservan. Se puede reactivar cuando quieras.</p>
           <div className="acciones">
             <button type="button" className="bt sec solo" onClick={() => setConfirmar(null)}>Regresar</button>
-            <button type="button" className="bt peligro" disabled={pendiente} onClick={() => ejecutar(() => darDeBaja(confirmar.p.id))}>{pendiente ? "Eliminando…" : "Sí, eliminar"}<Fl /></button>
+            <button type="button" className="bt peligro" disabled={pendiente} onClick={() => ejecutar(() => desactivar(confirmar.p.id))}>Sí, desactivar<Fl /></button>
+          </div>
+        </Modal>
+      )}
+      {confirmar?.tipo === "eliminar" && (
+        <Modal abierto cerrar={() => setConfirmar(null)} etiqueta="Eliminar usuario" titulo={`¿Eliminar a ${confirmar.p.nombre.split(" ")[0]} definitivamente?`}>
+          <p className="muted">Solo se puede si nunca registró ventas ni movimientos. Si ya tiene, se queda desactivado.</p>
+          <div className="acciones">
+            <button type="button" className="bt sec solo" onClick={() => setConfirmar(null)}>Regresar</button>
+            <button type="button" className="bt peligro" disabled={pendiente} onClick={() => ejecutar(() => darDeBaja(confirmar.p.id))}>Sí, eliminar<Fl /></button>
           </div>
         </Modal>
       )}
