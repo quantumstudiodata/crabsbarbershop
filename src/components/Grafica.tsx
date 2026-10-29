@@ -63,7 +63,12 @@ export function Grafica({ id, actual, previo, etiquetas, alto = 170, ancho = 640
       </svg>
       {ultimo && resaltar && <span className="marca-valor" style={{ left: `${(ultimo[0] / ancho) * 100}%`, top: `${(ultimo[1] / alto) * 100}%` }}>{resaltar}</span>}
       {sinDatos && vacio && <span className="grafica-vacia">{vacio}</span>}
-      <div className="ejes">{etiquetas.map((e, i) => <span key={i} style={{ visibility: i % cadaEtiqueta === 0 || i === etiquetas.length - 1 ? "visible" : "hidden" }}>{e}</span>)}</div>
+      {/* Etiquetas posicionadas: no ensanchan la tarjeta aunque sean muchas. */}
+      <div className="ejes">
+        {etiquetas.map((e, i) => ((i % cadaEtiqueta === 0 && etiquetas.length - 1 - i >= Math.max(cadaEtiqueta, 2) / 2 + 0.5) || i === etiquetas.length - 1 || i === 0) && (
+          <span key={i} style={{ left: `${(i / Math.max(etiquetas.length - 1, 1)) * 100}%`, transform: i === 0 ? "none" : i === etiquetas.length - 1 ? "translateX(-100%)" : "translateX(-50%)" }}>{e}</span>
+        ))}
+      </div>
     </div>
   );
 }

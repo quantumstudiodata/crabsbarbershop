@@ -8,7 +8,7 @@ import { guardarVistos, hace, leerVistos, useVivo } from "./useVivo";
 
 /** Campana con los avisos recientes y cuántos no se han visto. */
 export function Campana({ verTodo }: { verTodo: string }) {
-  const { eventos, solicitudes } = useVivo();
+  const { eventos, solicitudes, alertas } = useVivo();
   const [abierta, setAbierta] = useState(false);
   const [vistos, setVistos] = useState<Set<string>>(new Set());
   const caja = useRef<HTMLDivElement>(null);
@@ -22,7 +22,7 @@ export function Campana({ verTodo }: { verTodo: string }) {
     return () => { document.removeEventListener("mousedown", fuera); document.removeEventListener("keydown", esc); };
   }, [abierta]);
 
-  const sinVer = eventos.filter((e) => !vistos.has(e.id)).length + solicitudes.length;
+  const sinVer = eventos.filter((e) => !vistos.has(e.id)).length + solicitudes.length + alertas.length;
   const abrir = () => {
     setAbierta((a) => !a);
     const todos = new Set([...vistos, ...eventos.map((e) => e.id)]);
@@ -38,6 +38,12 @@ export function Campana({ verTodo }: { verTodo: string }) {
       {abierta && (
         <div className="menu avisos" role="dialog" aria-label="Avisos">
           <div className="entre" style={{ padding: "6px 8px 8px" }}><b>Avisos</b><Link href={verTodo} className="enlace" onClick={() => setAbierta(false)}>Ver todo</Link></div>
+          {alertas.map((a) => (
+            <Link key={a.id} href={a.href} className="aviso-n nuevo" onClick={() => setAbierta(false)}>
+              <span className="icono-alerta"><Icono n="reloj" /></span>
+              <span><b>{a.titulo}</b><small>{a.detalle}</small></span>
+            </Link>
+          ))}
           {solicitudes.map((s) => (
             <Link key={s.id} href={`/ajustes?restablecer=${s.usuarioId}`} className="aviso-n nuevo" onClick={() => setAbierta(false)}>
               <Avatar avatar={s.avatar} nombre={s.nombre} t={30} />

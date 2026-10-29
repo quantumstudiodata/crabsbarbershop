@@ -1,9 +1,9 @@
 import { eq } from "drizzle-orm";
 import { requerirSesion } from "@/lib/auth";
-import { equipoQueAtiende, metodosActivos, movimientosDeTurno, serviciosActivos, turnoAbierto } from "@/lib/datos";
+import { equipoQueAtiende, folioCorte, metodosActivos, movimientosDeTurno, serviciosActivos, turnoAbierto } from "@/lib/datos";
 import { db, schema } from "@/lib/db";
-import { fechaLocal, horaCorta } from "@/lib/fechas";
-import { BarraCaja, CajaModal, type Turno } from "./CajaModal";
+import { fechaLarga, fechaLocal, horaCorta } from "@/lib/fechas";
+import { BarraCaja, CajaCerrada, CajaModal, CajaPendiente, type Turno } from "./CajaModal";
 import { FormCobro } from "./FormCobro";
 import { ModoFoco } from "./ModoFoco";
 
@@ -17,38 +17,43 @@ export default async function Cobrar({ searchParams }: { searchParams: Promise<{
   const [t, servicios, equipo, metodos] = await Promise.all([
     turnoAbierto(s.barberia.id), serviciosActivos(s.barberia.id), equipoQueAtiende(s.barberia.id), metodosActivos(s.barberia.id),
   ]);
-  const datos = t ? await movimientosDeTurno(s.barberia.id, t.id, t.fondoInicial) : null;
-  const [abrio] = t ? await db.select({ nombre: schema.usuarios.nombre }).from(schema.usuarios).where(eq(schema.usuarios.id, t.abiertoPor)) : [];
   const opera = s.puede("caja.operar");
-  const turno: Turno | null = t && datos ? {
-    desde: horaCorta(t.abiertoEn, zona), abrio: abrio?.nombre.split(" ")[0] ?? "", deOtroDia: t.fechaOperativa < fechaLocal(new Date(), zona),
-    m: datos.m, esperado: datos.esperado, ventas: datos.ventas,
-    otros: datos.otrosPorMetodo.map((x) => ({ metodo: x.metodo, total: x.total, ventas: x.ventas })),
-    movimientos: [
-      ...datos.movimientos.map((m) => ({ id: m.id, t: m.creadoEn.getTime(), hora: horaCorta(m.creadoEn, zona), titulo: m.tipo === "retiro" ? "Retiro" : m.tipo === "entrada" ? "Entrada" : "Devolución", detalle: `${m.concepto}. ${m.usuario.split(" ")[0]}`, monto: m.tipo === "entrada" ? m.monto : -m.monto })),
-      ...datos.gastos.map((g) => ({ id: g.id, t: g.creadoEn.getTime(), hora: horaCorta(g.creadoEn, zona), titulo: "Gasto", detalle: `${g.concepto}. ${g.usuario.split(" ")[0]}`, monto: -g.monto })),
-    ].sort((a, b) => b.t - a.t),
-  } : null;
-  const inicial = q.caja === "cerrar" ? "corte" : q.caja ? (turno ? "detalle" : "abrir") : null;
+  let turno: Turno | null = null;
+  if (t) {
+    const [datos, [abrio], folio] = await Promise.all([
+      movimientosDeTurno(s.barberia.id, t.id, t.fondoInicial),
+      db.select({ nombre: schema.usuarios.nombre }).from(schema.usuarios).where(eq(schema.usuarios.id, t.abiertoPor)),
+      folioCorte(s.barberia.id, t.abiertoEn),
+    ]);
+    turno = {
+      desde: horaCorta(t.abiertoEn, zona), abrio: abrio?.nombre.split(" ")[0] ?? "", dia: fechaLarga(t.fechaOperativa).toLowerCase(),
+      deOtroDia: t.fechaOperativa < fechaLocal(new Date(), zona), folioCorte: folio, m: datos.m, esperado: datos.esperado,
+      ventas: datos.ventas, propinas: datos.propinasTotal, otros: datos.otrosPorMetodo.map((x) => ({ metodo: x.metodo, total: x.total, ventas: x.ventas })),
+    };
+  }
+  const folioVenta = `${s.barberia.folioPrefijo}-${String(s.barberia.siguienteFolio).padStart(6, "0")}`;
 
   return (
     <>
       <ModoFoco />
-      <BarraCaja turno={turno} opera={opera} folio={`${s.barberia.folioPrefijo}-${String(s.barberia.siguienteFolio).padStart(6, "0")}`} />
-      {servicios.length === 0 || metodos.length === 0 ? (
-        <p className="aviso">Faltan servicios o formas de pago. Se agregan en Ajustes.</p>
-      ) : (
-        <FormCobro
-          servicios={servicios.map(({ id, nombre, duracionMin, precio, categoria }) => ({ id, nombre, duracionMin, precio, categoria }))}
-          equipo={equipo.map(({ id, nombre, avatar }) => ({ id, nombre, avatar }))}
-          metodos={metodos.map(({ id, nombre, esEfectivo }) => ({ id, nombre, esEfectivo }))}
-          yo={s.usuario.id}
-          puedeOtros={s.puede("ventas.registrar_otros")}
-          limiteDescuento={s.barberia.limiteDescuentoPct}
-          cajaAbierta={!!turno}
-        />
-      )}
-      {opera && <CajaModal inicial={inicial} turno={turno} limiteDiferencia={s.barberia.limiteDiferenciaCaja} />}
+      {!turno ? <CajaCerrada opera={opera} />
+        : turno.deOtroDia ? <CajaPendiente dia={turno.dia} opera={opera} />
+        : (
+          <>
+            <BarraCaja turno={turno} folioVenta={folioVenta} />
+            {servicios.length === 0 || metodos.length === 0 ? <p className="aviso">Faltan servicios o formas de pago. Se agregan en Ajustes.</p> : (
+              <FormCobro
+                servicios={servicios.map(({ id, nombre, duracionMin, precio, categoria }) => ({ id, nombre, duracionMin, precio, categoria }))}
+                equipo={equipo.map(({ id, nombre, avatar }) => ({ id, nombre, avatar }))}
+                metodos={metodos.map(({ id, nombre, esEfectivo }) => ({ id, nombre, esEfectivo }))}
+                yo={s.usuario.id}
+                puedeOtros={s.puede("ventas.registrar_otros")}
+                limiteDescuento={s.barberia.limiteDescuentoPct}
+              />
+            )}
+          </>
+        )}
+      {opera && <CajaModal inicial={q.caja === "cerrar" ? "corte" : null} turno={turno} limiteDiferencia={s.barberia.limiteDiferenciaCaja} />}
     </>
   );
 }

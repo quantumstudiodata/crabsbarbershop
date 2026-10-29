@@ -1,11 +1,11 @@
 "use client";
 
 import { useEffect, useState } from "react";
-import type { EventoVivo, SolicitudVivo } from "@/app/api/vivo/route";
+import type { AlertaVivo, EventoVivo, SolicitudVivo } from "@/app/api/vivo/route";
 
 // Una sola consulta cada 15 segundos, compartida por la ventana En vivo y la campana.
-type Datos = { eventos: EventoVivo[]; solicitudes: SolicitudVivo[]; nuevos: Set<string> };
-let datos: Datos = { eventos: [], solicitudes: [], nuevos: new Set() };
+type Datos = { eventos: EventoVivo[]; solicitudes: SolicitudVivo[]; alertas: AlertaVivo[]; nuevos: Set<string> };
+let datos: Datos = { eventos: [], solicitudes: [], alertas: [], nuevos: new Set() };
 let cargado = false;
 const oyentes = new Set<(d: Datos) => void>();
 let reloj: ReturnType<typeof setInterval> | null = null;
@@ -14,11 +14,11 @@ async function cargar() {
   try {
     const r = await fetch("/api/vivo", { cache: "no-store" });
     if (!r.ok) return;
-    const d = (await r.json()) as { eventos: EventoVivo[]; solicitudes: SolicitudVivo[] };
+    const d = (await r.json()) as { eventos: EventoVivo[]; solicitudes: SolicitudVivo[]; alertas?: AlertaVivo[] };
     const antes = new Set(datos.eventos.map((e) => e.id));
     const nuevos = cargado ? new Set(d.eventos.filter((e) => !antes.has(e.id)).map((e) => e.id)) : new Set<string>();
     cargado = true;
-    datos = { ...d, nuevos };
+    datos = { eventos: d.eventos, solicitudes: d.solicitudes, alertas: d.alertas ?? [], nuevos };
     oyentes.forEach((f) => f(datos));
   } catch {}
 }

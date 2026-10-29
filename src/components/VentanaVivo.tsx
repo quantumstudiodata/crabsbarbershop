@@ -14,7 +14,7 @@ const SEGUNDOS = 9;
  * para no tapar la pantalla. Tocando "En vivo" se deja fija la lista.
  */
 export function VentanaVivo() {
-  const { eventos, solicitudes, nuevos } = useVivo();
+  const { eventos, solicitudes, alertas, nuevos } = useVivo();
   const ruta = usePathname();
   const [fijo, setFijo] = useState(false);
   const [mostrar, setMostrar] = useState(false);
@@ -44,7 +44,7 @@ export function VentanaVivo() {
     setMostrar(false);
     try { sessionStorage.setItem("crabs-vivo-fijo", v ? "si" : "no"); } catch {}
   };
-  const abierto = fijo || mostrar || solicitudes.length > 0;
+  const abierto = fijo || mostrar || solicitudes.length > 0 || alertas.length > 0;
   const visibles = eventos.slice(0, fijo ? 6 : 3);
 
   return (
@@ -56,6 +56,13 @@ export function VentanaVivo() {
       </button>
       {abierto && (
         <div className={`vivo-tarjetas ${!fijo && mostrar ? "se-va" : ""}`} style={{ animationDuration: `${SEGUNDOS}s` }}>
+          {alertas.map((a) => (
+            <Link key={a.id} href={a.href} className="vivo-t urgente alerta">
+              <span className="icono-alerta"><Icono n="reloj" /></span>
+              <span><b>{a.titulo}</b><small>{a.detalle}</small></span>
+              <span />
+            </Link>
+          ))}
           {solicitudes.map((s) => (
             <div key={s.id} className="vivo-t urgente">
               <Avatar avatar={s.avatar} nombre={s.nombre} t={32} />

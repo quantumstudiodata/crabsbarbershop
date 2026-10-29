@@ -287,3 +287,18 @@ export async function diasConVentas(barberiaId: string, zona: string, barberoId?
     : await q.where(and(eq(s.ventas.barberiaId, barberiaId), eq(s.ventas.estado, "pagada"))).limit(2);
   return filas.length;
 }
+
+/** Folio del corte: el número de turno de caja en orden de apertura (C-000012). Nunca se repite. */
+export async function folioCorte(barberiaId: string, abiertoEn: Date) {
+  const [{ n }] = await db
+    .select({ n: sql<number>`count(*)::int` })
+    .from(s.turnosCaja)
+    .where(and(eq(s.turnosCaja.barberiaId, barberiaId), lte(s.turnosCaja.abiertoEn, abiertoEn)));
+  return `C-${String(n).padStart(6, "0")}`;
+}
+
+/** Folios de corte para varios turnos a la vez. */
+export async function foliosCorte(barberiaId: string) {
+  const filas = await db.select({ id: s.turnosCaja.id }).from(s.turnosCaja).where(eq(s.turnosCaja.barberiaId, barberiaId)).orderBy(asc(s.turnosCaja.abiertoEn));
+  return new Map(filas.map((f, i) => [f.id, `C-${String(i + 1).padStart(6, "0")}`]));
+}

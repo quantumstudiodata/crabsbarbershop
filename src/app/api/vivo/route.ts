@@ -1,6 +1,7 @@
 import { and, desc, eq, gte, inArray } from "drizzle-orm";
 import { obtenerSesion } from "@/lib/auth";
 import { db, schema } from "@/lib/db";
+import { fechaLocal } from "@/lib/fechas";
 import { formatoDinero } from "@/lib/money";
 
 export const dynamic = "force-dynamic";
@@ -12,6 +13,7 @@ const RUTA: Record<string, string> = {
 };
 
 export type EventoVivo = { id: string; t: string; titulo: string; detalle?: string; href?: string; nombre: string; avatar: string };
+export type AlertaVivo = { id: string; titulo: string; detalle: string; href: string };
 export type SolicitudVivo = { id: string; usuarioId: string; nombre: string; avatar: string; t: string };
 
 /** Actividad reciente para la ventana "En vivo". */
@@ -82,5 +84,11 @@ export async function GET() {
       .limit(10);
     solicitudes = filas.filter((f) => f.usuarioId !== se.usuario.id).map((f) => ({ id: f.id, usuarioId: f.usuarioId, nombre: f.nombre, avatar: f.avatar, t: f.t.toISOString() }));
   }
-  return Response.json({ eventos, solicitudes }, { headers: { "Cache-Control": "no-store" } });
+  // Pasadas las 12 de la noche con la caja del día anterior abierta.
+  const alertas: AlertaVivo[] = [];
+  const [t] = await db.select().from(s.turnosCaja).where(and(eq(s.turnosCaja.barberiaId, bId), eq(s.turnosCaja.estado, "abierto"))).limit(1);
+  if (t && t.fechaOperativa < fechaLocal(new Date(), se.barberia.zonaHoraria)) {
+    alertas.push({ id: `caja-${t.id}`, titulo: "No se cerró la caja de ayer", detalle: "Haz el corte para seguir cobrando", href: "/cobrar?caja=cerrar" });
+  }
+  return Response.json({ eventos, solicitudes, alertas }, { headers: { "Cache-Control": "no-store" } });
 }

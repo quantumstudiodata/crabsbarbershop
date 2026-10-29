@@ -4,14 +4,18 @@ import { and, eq } from "drizzle-orm";
 import { revalidatePath } from "next/cache";
 import { requerirSesion } from "@/lib/auth";
 import { compararConteo, requiereExplicacion } from "@/lib/caja";
-import { movimientosDeTurno, turnoAbierto } from "@/lib/datos";
+import { folioCorte, movimientosDeTurno, turnoAbierto } from "@/lib/datos";
 import { db, schema } from "@/lib/db";
 import { fechaLocal } from "@/lib/fechas";
 import { registrar } from "@/lib/historial";
 import { formatoDinero, leerPesos } from "@/lib/money";
 import { texto, volver } from "@/lib/volver";
 
-export type EstadoCaja = { ok?: boolean; error?: string; mensaje?: string; n?: number };
+export type ResumenCorte = {
+  folio: string; desde: string; hasta: string; metodos: { metodo: string; total: number }[]; total: number; ventas: number;
+  propinas: number; esperado: number; contado: number; diferencia: number;
+};
+export type EstadoCaja = { ok?: boolean; error?: string; mensaje?: string; n?: number; resumen?: ResumenCorte };
 
 const listo = (mensaje: string): EstadoCaja => {
   revalidatePath("/", "layout");
@@ -76,7 +80,10 @@ export async function registrarGasto(_: EstadoCaja, form: FormData): Promise<Est
   return listo(`Gasto de ${formatoDinero(monto)} guardado.`);
 }
 
-/** Corte de caja: el efectivo se cuenta; transferencias y tarjeta se revisan contra el banco o la terminal. */
+/**
+ * Corte de caja, como en un punto de venta: se suman todos los cobros por método (esa es la venta total)
+ * y se concilia solo el efectivo físico contra lo que debería haber.
+ */
 export async function cerrarCaja(_: EstadoCaja, form: FormData): Promise<EstadoCaja> {
   const s = await requerirSesion();
   if (!s.puede("caja.operar")) return { error: "No tienes permiso para cerrar la caja." };
@@ -87,23 +94,32 @@ export async function cerrarCaja(_: EstadoCaja, form: FormData): Promise<EstadoC
   if (!turno) return { error: "La caja ya está cerrada." };
   const datos = await movimientosDeTurno(s.barberia.id, turno.id, turno.fondoInicial);
   const r = compararConteo(datos.esperado, contado, formatoDinero);
-  const verificacion: Record<string, { total: number; coincide: boolean }> = {};
-  for (const m of datos.otrosPorMetodo) verificacion[m.metodo] = { total: m.total, coincide: form.get(`ver:${m.metodo}`) === "si" };
-  const sinRevisar = Object.entries(verificacion).filter(([, v]) => !v.coincide).map(([k]) => k);
-  if (requiereExplicacion(r.diferencia, s.barberia.limiteDiferenciaCaja) && !notas) return { error: `${r.texto} Escribe qué pasó antes de cerrar.` };
-  if (sinRevisar.length && !notas) return { error: `${sinRevisar.join(" y ")} no coincide. Escribe qué pasó antes de cerrar.` };
+  if (requiereExplicacion(r.diferencia, s.barberia.limiteDiferenciaCaja) && !notas) return { error: `${r.texto} Escribe en observaciones qué pasó.` };
+  const metodos = [{ metodo: "Efectivo", total: datos.m.cobrosEfectivo }, ...datos.otrosPorMetodo.map((x) => ({ metodo: x.metodo, total: x.total }))];
+  const verificacion = Object.fromEntries(datos.otrosPorMetodo.map((x) => [x.metodo, { total: x.total }]));
+  const cerradoEn = new Date();
   await db.transaction(async (tx) => {
     const filas = await tx.update(schema.turnosCaja)
-      .set({ estado: "cerrado", cerradoPor: s.usuario.id, cerradoEn: new Date(), efectivoEsperado: datos.esperado, efectivoContado: contado, diferencia: r.diferencia, notasCierre: notas || null, verificacion })
+      .set({ estado: "cerrado", cerradoPor: s.usuario.id, cerradoEn, efectivoEsperado: datos.esperado, efectivoContado: contado, diferencia: r.diferencia, notasCierre: notas || null, verificacion })
       .where(and(eq(schema.turnosCaja.id, turno.id), eq(schema.turnosCaja.estado, "abierto")))
       .returning({ id: schema.turnosCaja.id });
     if (filas.length === 0) return;
     await registrar(tx, {
       barberiaId: s.barberia.id, usuarioId: s.usuario.id, tipo: "caja",
-      accion: `${s.usuario.nombre} cerró la caja. ${r.texto}`, detalle: { esperado: datos.esperado, contado, diferencia: r.diferencia, notas, verificacion },
+      accion: `${s.usuario.nombre} hizo el corte de caja. ${r.texto}`, detalle: { esperado: datos.esperado, contado, diferencia: r.diferencia, notas, verificacion },
     });
   });
-  return listo(`Caja cerrada. ${r.texto}`);
+  const zona = s.barberia.zonaHoraria;
+  const hora = (d: Date) => new Intl.DateTimeFormat("es-MX", { timeZone: zona, hour: "2-digit", minute: "2-digit", hour12: false }).format(d);
+  revalidatePath("/", "layout");
+  return {
+    ok: true, n: Date.now(), mensaje: r.texto,
+    resumen: {
+      folio: await folioCorte(s.barberia.id, turno.abiertoEn), desde: hora(turno.abiertoEn), hasta: hora(cerradoEn),
+      metodos, total: metodos.reduce((a, x) => a + x.total, 0), ventas: datos.ventas, propinas: datos.propinasTotal,
+      esperado: datos.esperado, contado, diferencia: r.diferencia,
+    },
+  };
 }
 
 /** Corrección de un cierre ya hecho: no se edita el cierre, se agrega un ajuste con motivo. */

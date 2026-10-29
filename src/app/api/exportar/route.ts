@@ -2,7 +2,7 @@ import ExcelJS from "exceljs";
 import { and, eq, gte, lte } from "drizzle-orm";
 import { obtenerSesion } from "@/lib/auth";
 import { describirRegla, elegirRegla } from "@/lib/comisiones";
-import { ajustesDeTurnos, copiaRegla, equipoQueAtiende, reglasDe, turnosCerrados, ventasEntre } from "@/lib/datos";
+import { ajustesDeTurnos, copiaRegla, equipoQueAtiende, foliosCorte, reglasDe, turnosCerrados, ventasEntre } from "@/lib/datos";
 import { db, schema } from "@/lib/db";
 import { diasEntre, esFechaValida, fechaLocal, horaCorta, lunesDe, sumarDias } from "@/lib/fechas";
 import { formatoDinero } from "@/lib/money";
@@ -38,11 +38,11 @@ async function gastos(bId: string, desde: string, hasta: string): Promise<Filas>
 
 async function cortes(bId: string, desde: string, hasta: string, zona: string): Promise<Filas> {
   const ts = await turnosCerrados(bId, 1000, { desde, hasta });
-  const aj = await ajustesDeTurnos(bId, ts.map((t) => t.id));
-  const filas: Filas = [["Día", "Abrió", "Cerró", "Cerró quien", "Fondo de apertura", "Efectivo esperado", "Efectivo contado", "Diferencia", "Otras formas de pago", "Notas", "Correcciones"]];
+  const [aj, folios] = await Promise.all([ajustesDeTurnos(bId, ts.map((t) => t.id)), foliosCorte(bId)]);
+  const filas: Filas = [["Folio", "Día", "Abrió", "Cerró", "Cerró quien", "Fondo de apertura", "Efectivo esperado", "Efectivo contado", "Diferencia", "Otras formas de pago", "Notas", "Correcciones"]];
   for (const t of ts) {
-    const ver = Object.entries((t.verificacion ?? {}) as Record<string, { total: number; coincide: boolean }>).map(([m, v]) => `${m} ${pesos(v.total)} ${v.coincide ? "coincide" : "no coincide"}`).join("; ");
-    filas.push([t.fechaOperativa, horaCorta(t.abiertoEn, zona), t.cerradoEn ? horaCorta(t.cerradoEn, zona) : "", t.cerradoPor ?? "", pesos(t.fondoInicial),
+    const ver = Object.entries((t.verificacion ?? {}) as Record<string, { total: number; coincide?: boolean }>).map(([m, v]) => `${m} ${pesos(v.total)}${v.coincide === false ? " no coincide" : ""}`).join("; ");
+    filas.push([folios.get(t.id) ?? "", t.fechaOperativa, horaCorta(t.abiertoEn, zona), t.cerradoEn ? horaCorta(t.cerradoEn, zona) : "", t.cerradoPor ?? "", pesos(t.fondoInicial),
       pesos(t.efectivoEsperado ?? 0), pesos(t.efectivoContado ?? 0), pesos(t.diferencia ?? 0), ver, t.notasCierre ?? "",
       aj.filter((a) => a.turnoId === t.id).map((a) => `${pesos(a.monto)} ${a.motivo}`).join("; ")]);
   }

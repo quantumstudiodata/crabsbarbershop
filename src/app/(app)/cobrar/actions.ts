@@ -7,6 +7,7 @@ import { comisionDeServicio, elegirRegla } from "@/lib/comisiones";
 import { copiaRegla, equipoQueAtiende, reglasDe, turnoAbierto } from "@/lib/datos";
 import { db, schema } from "@/lib/db";
 import { registrar } from "@/lib/historial";
+import { fechaLocal } from "@/lib/fechas";
 import { formatoDinero } from "@/lib/money";
 
 export type EstadoCobro = { ok?: boolean; error?: string; folio?: string; total?: number };
@@ -57,6 +58,8 @@ export async function registrarVenta(_: EstadoCobro, form: FormData): Promise<Es
 
   const turno = await turnoAbierto(bId);
   if (!turno) return { error: "La caja está cerrada. Hay que abrirla antes de cobrar." };
+  // Pasadas las 12 de la noche, la caja del día anterior tiene que cerrarse antes de seguir cobrando.
+  if (turno.fechaOperativa < fechaLocal(new Date(), s.barberia.zonaHoraria)) return { error: "La caja de ayer no se cerró. Haz el corte de caja antes de seguir cobrando." };
 
   // Precios siempre desde la base de datos, nunca desde el navegador.
   const ids = [...new Set(e.lineas.map((l) => l.servicioId))];

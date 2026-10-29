@@ -4,7 +4,7 @@ import { AvisoUrl } from "@/components/Encabezado";
 import { Icono } from "@/components/Icono";
 import { SelectorPeriodo } from "@/components/Periodo";
 import { requerirSesion } from "@/lib/auth";
-import { ajustesDeTurnos, turnosCerrados } from "@/lib/datos";
+import { ajustesDeTurnos, foliosCorte, turnosCerrados } from "@/lib/datos";
 import { fechaLarga, fechaLocal, horaCorta } from "@/lib/fechas";
 import { formatoDinero } from "@/lib/money";
 import { leerPeriodo } from "@/lib/periodo";
@@ -20,7 +20,7 @@ export default async function Cortes({ searchParams }: { searchParams: Promise<{
   const hoy = fechaLocal(new Date(), zona);
   const p = leerPeriodo(q, hoy, "semana");
   const cortes = await turnosCerrados(s.barberia.id, 1000, { desde: p.desde, hasta: p.hasta });
-  const ajustes = await ajustesDeTurnos(s.barberia.id, cortes.map((c) => c.id));
+  const [ajustes, folios] = await Promise.all([ajustesDeTurnos(s.barberia.id, cortes.map((c) => c.id)), foliosCorte(s.barberia.id)]);
   const dias = [...new Set(cortes.map((c) => c.fechaOperativa))].sort().reverse();
 
   return (
@@ -48,12 +48,12 @@ export default async function Cortes({ searchParams }: { searchParams: Promise<{
             <div className="cortes-g">
               {delDia.map((c, i) => {
                 const dif = c.diferencia ?? 0;
-                const ver = Object.entries((c.verificacion ?? {}) as Record<string, { total: number; coincide: boolean }>);
+                const ver = Object.entries((c.verificacion ?? {}) as Record<string, { total: number; coincide?: boolean }>);
                 const aj = ajustes.filter((x) => x.turnoId === c.id);
                 return (
                   <article key={c.id} className="glass corte-t">
                     <div className="entre">
-                      <span className="lab">Corte {i + 1}</span>
+                      <span className="lab">Folio {folios.get(c.id)}</span>
                       <span className="muted" style={{ fontSize: 12 }}>{horaCorta(c.abiertoEn, zona)} a {c.cerradoEn ? horaCorta(c.cerradoEn, zona) : ""}</span>
                     </div>
                     <span style={{ fontSize: 13 }}>Cerró <b>{c.cerradoPor?.split(" ")[0] ?? ""}</b></span>
@@ -61,10 +61,12 @@ export default async function Cortes({ searchParams }: { searchParams: Promise<{
                       <span><small>Esperado</small><b>{formatoDinero(c.efectivoEsperado ?? 0)}</b></span>
                       <span><small>Contado</small><b>{formatoDinero(c.efectivoContado ?? 0)}</b></span>
                     </div>
-                    {dif === 0 ? <span className="cubierto"><i>✓</i>El efectivo cuadró</span> : <span className="est temp"><span className="d" style={{ background: "var(--warn)", boxShadow: "0 0 0 3px var(--warn-soft)" }} />{dif > 0 ? `Sobraron ${formatoDinero(dif)}` : `Faltaron ${formatoDinero(-dif)}`}</span>}
-                    {ver.map(([m, v]) => (
-                      <span key={m} className={`est ${v.coincide ? "" : "temp"}`}><span className="d" style={v.coincide ? undefined : { background: "var(--warn)", boxShadow: "0 0 0 3px var(--warn-soft)" }} />{m} {formatoDinero(v.total)}{v.coincide ? ", coincide" : ", no coincidió"}</span>
-                    ))}
+                    {dif === 0 ? <span className="cubierto"><i>✓</i>El efectivo coincidió</span> : <span className="est temp"><span className="d" style={{ background: "var(--warn)", boxShadow: "0 0 0 3px var(--warn-soft)" }} />{dif > 0 ? `Sobraron ${formatoDinero(dif)}` : `Faltaron ${formatoDinero(-dif)}`}</span>}
+                    {ver.length > 0 && (
+                      <div className="resumen-c chico">
+                        {ver.map(([m, v]) => <div key={m}><span>{m}{v.coincide === false ? ", no coincidió" : ""}</span><span className="num">{formatoDinero(v.total)}</span></div>)}
+                      </div>
+                    )}
                     {c.notasCierre && <p className="nota-c">{c.notasCierre}</p>}
                     {aj.map((x, k) => <p key={k} className="nota-c">Ajuste de {formatoDinero(x.monto)} por {x.usuario.split(" ")[0]}: {x.motivo}</p>)}
                     {s.puede("caja.corregir") && (

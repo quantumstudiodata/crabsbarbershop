@@ -18,7 +18,7 @@ export function Calendario({ desde, hasta, hoy }: { desde: string; hasta: string
   const ruta = usePathname();
   const params = useSearchParams();
   const [abierto, setAbierto] = useState(false);
-  const [mes, setMes] = useState(() => ({ y: Number(hasta.slice(0, 4)), m: Number(hasta.slice(5, 7)) - 1 }));
+  const [mes, setMes] = useState(() => { const f = hasta > hoy ? hoy : hasta; return { y: Number(f.slice(0, 4)), m: Number(f.slice(5, 7)) - 1 }; });
   const [inicio, setInicio] = useState<string | null>(null);
   const [sobre, setSobre] = useState<string | null>(null);
   const caja = useRef<HTMLDivElement>(null);
@@ -89,7 +89,7 @@ export function Calendario({ desde, hasta, hoy }: { desde: string; hasta: string
               );
             })}
           </div>
-          <small className="muted">{inicio ? "Ahora toca el último día." : "Toca el primer día y luego el último. Para un solo día, tócalo dos veces."}</small>
+          {inicio && <small className="muted">Ahora el último día.</small>}
         </div>
       )}
     </div>

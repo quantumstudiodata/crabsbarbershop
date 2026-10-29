@@ -11,7 +11,7 @@ import { requerirSesion } from "@/lib/auth";
 import { diasConVentas, equipoQueAtiende, movimientosDeTurno, turnoAbierto, ventasEntre } from "@/lib/datos";
 import { db, schema } from "@/lib/db";
 import { fechaLarga, fechaLocal, horaCorta, lunesDe, nombreDia, sumarDias } from "@/lib/fechas";
-import { calcularMeta, explicarMeta } from "@/lib/metas";
+import { calcularMeta } from "@/lib/metas";
 import { cambio, formatoDinero, porcentaje } from "@/lib/money";
 import { serieHoy, serieSemana, type Movimiento } from "@/lib/series";
 
@@ -105,7 +105,7 @@ export default async function Inicio({ searchParams }: { searchParams: Promise<Q
             </div>
             <div><span>Promedio por cliente</span><b>{deHoy.length ? formatoDinero(Math.round(netas / deHoy.length)) : "Sin datos"}</b></div>
             <div style={{ display: "grid", gap: 8 }}>
-              <span className="entre"><span>Meta del día<Ayuda titulo="Meta del día">{explicarMeta(meta, "día")} Se cambia en Ajustes, Cobro y caja.</Ayuda></span><b>{formatoDinero(meta.monto)}</b></span>
+              <span className="entre"><span>Meta del día<Ayuda titulo="Meta del día">La meta de ventas de hoy para todo el negocio. Se cambia en Ajustes, Cobro y caja.</Ayuda></span><b>{formatoDinero(meta.monto)}</b></span>
               <div className="meta"><i style={{ width: `${Math.max(avance * 100, 2)}%` }} /></div>
               <small className="muted">{porcentaje(netas, meta.monto)}% alcanzado</small>
             </div>
@@ -160,28 +160,26 @@ async function InicioBarbero({ s, hoy, zona, q, avisos }: { s: Sesion; hoy: stri
   return (
     <>
       {avisos}
+      <div className="subir">
+        <span className="lab">{fechaLarga(hoy)}</span>
+        <h1 className="titulo brillo" style={{ fontSize: 30, marginTop: 8 }}>Hola, {s.usuario.nombre.split(" ")[0]}</h1>
+      </div>
       <section className="inicio-b">
-        <div className="pila" style={{ gap: 18 }}>
-          <div className="subir">
-            <span className="lab">{fechaLarga(hoy)}</span>
-            <h1 className="titulo brillo" style={{ fontSize: 30, marginTop: 8 }}>Hola, {s.usuario.nombre.split(" ")[0]}</h1>
+        <div className="glass panel subir d1" style={{ padding: 26, gap: 18 }}>
+          <div className="entre" style={{ alignItems: "flex-end" }}>
+            <div><span className="lab">Hoy llevas</span><div className="big" style={{ fontSize: "clamp(52px, 7vw, 76px)", marginTop: 6 }}><Cuenta valor={totalHoy} /></div></div>
+            <div style={{ textAlign: "right" }}><span className="lab">Servicios</span><span className="fig" style={{ fontSize: 30 }}><Cuenta valor={deHoy.length} formato="entero" /></span></div>
           </div>
-          <div className="glass panel subir d1" style={{ padding: 24, gap: 16 }}>
-            <div className="entre" style={{ alignItems: "flex-end" }}>
-              <div><span className="lab">Hoy llevas</span><div className="big" style={{ fontSize: "clamp(48px, 7vw, 68px)", marginTop: 6 }}><Cuenta valor={totalHoy} /></div></div>
-              <div style={{ textAlign: "right" }}><span className="lab">Servicios</span><span className="fig" style={{ fontSize: 28 }}><Cuenta valor={deHoy.length} formato="entero" /></span></div>
+          <div className="entre"><Comparacion hoy={totalHoy} previo={previo} dia={dia} /><SelectorGrafica modo={modo} /></div>
+          <Grafica id="barbero" actual={serie.actual} previo={serie.previo} etiquetas={serie.etiquetas} cadaEtiqueta={serie.cada} alto={210}
+            descripcion={modo === "hoy" ? "Tus ventas de hoy por hora" : "Tus ventas de la semana"} vacio="Tu gráfica se dibuja con tu primer servicio" />
+          <div className="pila-chica">
+            <div className="entre">
+              <span className="muted" style={{ fontSize: 13 }}>Meta de la semana: <b style={{ color: "var(--fg)" }}>{formatoDinero(meta.monto)}</b><Ayuda titulo="Meta de la semana">Refleja tu meta de ventas de esta semana y cuánto llevas de ella.</Ayuda></span>
+              <b className="num">{porcentaje(semana, meta.monto)}%</b>
             </div>
-            <div className="entre"><Comparacion hoy={totalHoy} previo={previo} dia={dia} /><SelectorGrafica modo={modo} /></div>
-            <Grafica id="barbero" actual={serie.actual} previo={serie.previo} etiquetas={serie.etiquetas} cadaEtiqueta={serie.cada} alto={130}
-              descripcion={modo === "hoy" ? "Tus ventas de hoy por hora" : "Tus ventas de la semana"} vacio="Tu gráfica se dibuja con tu primer servicio" />
-            <div className="pila-chica">
-              <div className="entre">
-                <span className="muted" style={{ fontSize: 13 }}>Meta de la semana: <b style={{ color: "var(--fg)" }}>{formatoDinero(meta.monto)}</b><Ayuda titulo="Meta de la semana">{explicarMeta(meta, "semana")}</Ayuda></span>
-                <b className="num">{porcentaje(semana, meta.monto)}%</b>
-              </div>
-              <div className="meta"><i style={{ width: `${Math.max(avance * 100, 2)}%` }} /></div>
-              <small className="muted">Llevas {formatoDinero(semana)} esta semana.</small>
-            </div>
+            <div className="meta grande"><i style={{ width: `${Math.max(avance * 100, 3)}%` }} /></div>
+            <small className="muted">Llevas {formatoDinero(semana)} esta semana.</small>
           </div>
         </div>
         <div className="glass panel subir d2">
