@@ -1,4 +1,4 @@
-import { and, asc, eq, isNull } from "drizzle-orm";
+import { and, asc, eq, isNull, notLike } from "drizzle-orm";
 import { redirect } from "next/navigation";
 import { requerirSesion } from "@/lib/auth";
 import { describirRegla } from "@/lib/comisiones";
@@ -14,7 +14,7 @@ export default async function PaginaPersonas({ searchParams }: { searchParams: P
   if (!s.puede("ajustes.usuarios")) redirect("/ajustes/servicios");
   const q = await searchParams;
   const [gente, solicitudes, reglas] = await Promise.all([
-    db.select().from(schema.usuarios).where(eq(schema.usuarios.barberiaId, s.barberia.id)).orderBy(asc(schema.usuarios.nombre)),
+    db.select().from(schema.usuarios).where(and(eq(schema.usuarios.barberiaId, s.barberia.id), notLike(schema.usuarios.usuario, "BORRADO-%"))).orderBy(asc(schema.usuarios.nombre)),
     db.select({ usuarioId: schema.solicitudesClave.usuarioId }).from(schema.solicitudesClave).where(and(eq(schema.solicitudesClave.barberiaId, s.barberia.id), eq(schema.solicitudesClave.atendida, false))),
     db.select().from(schema.reglasComision).where(and(eq(schema.reglasComision.barberiaId, s.barberia.id), isNull(schema.reglasComision.vigenteHasta), isNull(schema.reglasComision.servicioId))),
   ]);

@@ -1017,3 +1017,6 @@ button.paso-v:hover { background: rgba(255,255,255,.8); }
 .barra-filtros .selector-p { flex-wrap: wrap; }
 .feed > .tachada b, .feed > .tachada small { text-decoration: line-through; color: var(--faint); }
 .feed > div { align-items: center; }
+.aviso-borrar { display: flex; gap: 14px; align-items: flex-start; padding: 14px; border-radius: 16px; background: rgba(160,82,90,.08); border: 1px solid rgba(160,82,90,.18); }
+.aviso-borrar .icono-alerta { background: #a0525a; flex: none; }
+.aviso-borrar p { margin: 0; font-size: 13.5px; }

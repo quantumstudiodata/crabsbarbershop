@@ -81,10 +81,12 @@ export function Selector({ name, opciones, valor, inicial, onChange, etiqueta, c
     if (!abierto) return;
     const fuera = (e: MouseEvent) => { if (!lista.current?.contains(e.target as Node) && !boton.current?.contains(e.target as Node)) setPos(null); };
     const cerrar = () => setPos(null);
+    // Desplazarse dentro de la lista no la cierra; desplazar la página sí, porque la lista se quedaría flotando.
+    const alDesplazar = (e: Event) => { if (!lista.current?.contains(e.target as Node)) setPos(null); };
     document.addEventListener("mousedown", fuera);
     window.addEventListener("resize", cerrar);
-    window.addEventListener("scroll", cerrar, true);
-    return () => { document.removeEventListener("mousedown", fuera); window.removeEventListener("resize", cerrar); window.removeEventListener("scroll", cerrar, true); };
+    window.addEventListener("scroll", alDesplazar, true);
+    return () => { document.removeEventListener("mousedown", fuera); window.removeEventListener("resize", cerrar); window.removeEventListener("scroll", alDesplazar, true); };
   }, [abierto]);
 
   const elegir = (v: string) => { setInterno(v); onChange?.(v); setPos(null); boton.current?.focus(); };

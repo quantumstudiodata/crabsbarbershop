@@ -238,7 +238,7 @@ function AltaUsuario({ props, cerrar, alGuardar }: { props: Props; cerrar: () =>
 export function Personas(props: Props) {
   const [clave, setClave] = useState<ClaveVisible | null>(null);
   const [editar, setEditar] = useState<Persona | null>(null);
-  const [confirmar, setConfirmar] = useState<{ tipo: "restablecer" | "desactivar" | "eliminar"; p: Persona } | null>(
+  const [confirmar, setConfirmar] = useState<{ tipo: "restablecer" | "desactivar" | "eliminar" | "borrarDatos"; p: Persona } | null>(
     () => (props.restablecerId ? { tipo: "restablecer", p: props.personas.find((x) => x.id === props.restablecerId)! } : null),
   );
   const [alta, setAlta] = useState(0);
@@ -250,6 +250,7 @@ export function Personas(props: Props) {
 
   const ejecutar = (f: () => Promise<EstadoPersona>) => iniciar(async () => {
     const r = await f();
+    if (r.conMovimientos) { setConfirmar((c) => (c ? { tipo: "borrarDatos", p: c.p } : null)); return; }
     setConfirmar(null);
     if (r.clave) setClave(r.clave);
     setAviso(r);
@@ -331,7 +332,7 @@ export function Personas(props: Props) {
       )}
       {confirmar?.tipo === "eliminar" && (
         <Modal abierto cerrar={() => setConfirmar(null)} etiqueta="Eliminar usuario" titulo={`¿Eliminar a ${confirmar.p.nombre.split(" ")[0]} definitivamente?`}>
-          <p className="muted">Solo se puede si nunca registró ventas ni movimientos. Si ya tiene, se queda desactivado.</p>
+          <p className="muted">Se borra su cuenta. Si ya tiene ventas o movimientos, te preguntaremos antes de borrar sus datos.</p>
           <div className="acciones">
             <button type="button" className="bt sec solo" onClick={() => setConfirmar(null)}>Regresar</button>
             <button type="button" className="bt peligro" disabled={pendiente} onClick={() => ejecutar(() => darDeBaja(confirmar.p.id))}>Sí, eliminar<Fl /></button>
@@ -339,6 +340,20 @@ export function Personas(props: Props) {
         </Modal>
       )}
       {ficha && <Ficha p={ficha} props={props} cerrar={() => setFicha(null)} editar={ficha.editable ? () => { setEditar(ficha); setFicha(null); } : undefined} />}
+      {confirmar?.tipo === "borrarDatos" && (
+        <Modal abierto cerrar={() => setConfirmar(null)} etiqueta="Eliminar usuario" titulo={`¿Borrar los datos de ${confirmar.p.nombre.split(" ")[0]} de verdad?`}>
+          <div className="aviso-borrar">
+            <span className="icono-alerta grande"><Icono n="basura" /></span>
+            <p><b>{confirmar.p.nombre} ya tiene ventas o movimientos registrados.</b><br />
+              Si continúas, se borran para siempre su nombre, usuario, contraseña, avatar, forma de pago y permisos. Ya no podrá entrar.</p>
+          </div>
+          <p className="muted" style={{ fontSize: 13 }}>Sus ventas, cortes y pagos se quedan en las cuentas a nombre de &quot;Persona eliminada&quot;, para que los reportes y la caja sigan cuadrando. Esto no se puede deshacer.</p>
+          <div className="acciones">
+            <button type="button" className="bt sec solo" onClick={() => setConfirmar(null)}>Mejor no</button>
+            <button type="button" className="bt peligro" disabled={pendiente} onClick={() => ejecutar(() => darDeBaja(confirmar.p.id, true))}>{pendiente ? "Borrando…" : "Sí, borrar sus datos"}<Fl /></button>
+          </div>
+        </Modal>
+      )}
       {editar && <EditarPersona p={editar} props={props} cerrar={() => setEditar(null)} />}
       <VentanaClave c={clave} cerrar={() => setClave(null)} />
     </>

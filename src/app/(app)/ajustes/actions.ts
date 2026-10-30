@@ -1,5 +1,6 @@
 "use server";
 
+import { randomUUID } from "node:crypto";
 import { and, eq, isNull } from "drizzle-orm";
 import { describirRegla } from "@/lib/comisiones";
 import type { Tx } from "@/lib/db";
@@ -14,7 +15,7 @@ import { NOMBRE_ROL, PERMISOS, PERMISOS_POR_ROL, rolesAsignables, type Rol } fro
 import { texto } from "@/lib/volver";
 
 export type ClaveVisible = { nombre: string; usuario: string; clave: string; expira: number };
-export type EstadoPersona = { ok?: boolean; error?: string; mensaje?: string; clave?: ClaveVisible; n?: number };
+export type EstadoPersona = { ok?: boolean; error?: string; mensaje?: string; clave?: ClaveVisible; n?: number; conMovimientos?: boolean };
 
 async function personaDeMiBarberia(barberiaId: string, id: string) {
   const [u] = await db.select().from(schema.usuarios).where(and(eq(schema.usuarios.id, id), eq(schema.usuarios.barberiaId, barberiaId))).limit(1);
@@ -147,22 +148,39 @@ export async function actualizarPersona(_: EstadoPersona, form: FormData): Promi
 }
 
 /** Elimina al usuario de la lista. Si nunca registró nada, se borra; si tiene movimientos, se desactiva y su historial se conserva. */
-export async function darDeBaja(id: string): Promise<EstadoPersona> {
+/**
+ * Eliminar definitivamente. Sin ventas ni movimientos, se borra por completo.
+ * Con movimientos, primero se pide confirmar; al confirmar se borran sus datos personales (nombre, usuario,
+ * contraseña, avatar, permisos) y sus ventas quedan a nombre de "Persona eliminada" para que las cuentas sigan cuadrando.
+ */
+export async function darDeBaja(id: string, borrarDatos = false): Promise<EstadoPersona> {
   const s = await requerirSesion("ajustes.usuarios");
   const u = await personaDeMiBarberia(s.barberia.id, String(id));
   if (!u) return { error: "No se encontró a esa persona." };
   if (u.id === s.usuario.id) return { error: "No puedes darte de baja a ti mismo." };
   if (!rolesAsignables(s.usuario.rol).includes(u.rol === "encargada" ? "barbera" : u.rol)) return { error: "No puedes eliminar a esa persona." };
-  let borrada = false;
   try {
     await db.transaction(async (tx) => {
       await tx.delete(schema.solicitudesClave).where(eq(schema.solicitudesClave.usuarioId, u.id));
+      await tx.delete(schema.sesiones).where(eq(schema.sesiones.usuarioId, u.id));
       await tx.delete(schema.reglasComision).where(eq(schema.reglasComision.barberoId, u.id));
       await tx.delete(schema.usuarios).where(eq(schema.usuarios.id, u.id));
     });
-    borrada = true;
   } catch {
-    return { error: `${u.nombre} ya tiene ventas o movimientos, así que no se puede eliminar. Queda desactivado.` };
+    if (!borrarDatos) return { conMovimientos: true, n: Date.now() };
+    const ahora = new Date();
+    await db.transaction(async (tx) => {
+      await tx.update(schema.usuarios).set({
+        nombre: "Persona eliminada", usuario: `BORRADO-${u.id.slice(0, 8).toUpperCase()}`, hash: await hashContrasena(randomUUID()),
+        activo: false, avatar: "iniciales", permisosExtra: [], metaSemanal: 0, claveTemporal: null, claveTemporalExpira: null, debeCambiar: false,
+      }).where(and(eq(schema.usuarios.id, u.id), eq(schema.usuarios.barberiaId, s.barberia.id)));
+      await tx.delete(schema.sesiones).where(eq(schema.sesiones.usuarioId, u.id));
+      await tx.delete(schema.solicitudesClave).where(eq(schema.solicitudesClave.usuarioId, u.id));
+      await tx.update(schema.reglasComision).set({ vigenteHasta: ahora }).where(and(eq(schema.reglasComision.barberoId, u.id), isNull(schema.reglasComision.vigenteHasta)));
+      await registrar(tx, { barberiaId: s.barberia.id, usuarioId: s.usuario.id, tipo: "usuario", accion: `${s.usuario.nombre} eliminó a ${u.nombre}`, detalle: { usuario: u.usuario, datosBorrados: true } });
+    });
+    revalidatePath("/", "layout");
+    return { ok: true, mensaje: `Se borraron los datos de ${u.nombre}. Sus ventas quedan como "Persona eliminada".`, n: Date.now() };
   }
   await registrar(db, { barberiaId: s.barberia.id, usuarioId: s.usuario.id, tipo: "usuario", accion: `${s.usuario.nombre} eliminó a ${u.nombre}` });
   revalidatePath("/", "layout");
