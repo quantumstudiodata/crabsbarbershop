@@ -982,3 +982,5 @@ button.paso-v:hover { background: rgba(255,255,255,.8); }
 .ficha-cab { display: flex; align-items: center; gap: 16px; padding: 16px; border-radius: 18px; background: radial-gradient(circle at 0% 0%, rgba(142,165,184,.3), transparent 60%), linear-gradient(160deg, rgba(255,255,255,.9), rgba(255,255,255,.55)); border: 1px solid #fff; box-shadow: 0 8px 20px -14px rgba(20,35,50,.45); animation: subir .35s ease both; }
 .ficha-cab b { font-size: 18px; font-weight: 600; }
 .ficha-u .perfil-datos { animation: subir .4s .06s ease both; }
+.bt.guardado, .bt.guardado:disabled { background: #2e6b47; color: #fff; opacity: 1; cursor: default; animation: listo-b .35s cubic-bezier(.2,.8,.2,1) both; }
+@keyframes listo-b { from { transform: scale(.94); } }

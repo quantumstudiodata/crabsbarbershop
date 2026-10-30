@@ -1,11 +1,11 @@
 "use client";
 
-import { useState } from "react";
-import { Fl } from "@/components/Icono";
+import { useActionState, useEffect, useState } from "react";
+import { Fl, Icono } from "@/components/Icono";
 import { type BarberoMeta, metaDelNegocio } from "@/lib/metas";
 import { formatoDinero } from "@/lib/money";
 import { Funciones, type Funcion } from "./Funciones";
-import { guardarReglas } from "./actions";
+import { type EstadoReglas, guardarReglas } from "./actions";
 
 /** Un ajuste con botones rápidos, control deslizante y una vista previa de lo que significa. */
 function Ajuste({ name, titulo, ayuda, inicial, opciones, max, paso, formato, vista }: {
@@ -30,22 +30,46 @@ function Ajuste({ name, titulo, ayuda, inicial, opciones, max, paso, formato, vi
   );
 }
 
-export function ReglasCobro({ descuento, autorizan, funciones }: { descuento: number; autorizan: string; funciones: Funcion[] }) {
+/** Formulario que guarda sin recargar. El botón dice "Guardado" hasta que se cambie algo. */
+function FormGuardar({ children, className, conBoton = true }: { children: React.ReactNode; className: string; conBoton?: boolean }) {
+  const [e, accion, guardando] = useActionState<EstadoReglas, FormData>(guardarReglas, {});
+  const [sucio, setSucio] = useState(false);
+  useEffect(() => { if (e.ok) setSucio(false); }, [e.ok, e.n]);
+  const guardado = !!e.ok && !sucio && !guardando;
+  const marcar = (x: React.SyntheticEvent) => { const t = x.target as HTMLElement; if (t.closest(".billetes button, input[type=range]")) setSucio(true); };
   return (
-    <form action={guardarReglas} className="glass panel bloque-a">
-      <span className="lab">2. Reglas de cobro</span>
-      <Funciones funciones={funciones} />
-      <Ajuste name="descuento" titulo="Autorización de descuentos" ayuda="Hasta cuánto puede descontar un barbero por su cuenta. Más que eso lo autoriza alguien con permiso."
-        inicial={descuento} opciones={[0, 10, 20, 50, 100]} max={100} paso={5} formato={(v) => `${v}%`}
-        vista={(v) => v === 0 ? <>Ningún barbero puede dar descuentos sin autorización.</> : v === 100 ? <>Un barbero puede dar cualquier descuento por su cuenta, hasta dejar el servicio gratis.</> : <>En un corte de $150, un barbero puede descontar hasta <b>{formatoDinero(Math.round(15000 * v / 100))}</b>. Más que eso lo autoriza: {autorizan}.</>} />
-      <div className="acciones"><button className="bt">Guardar<Fl /></button></div>
+    <form action={accion} className={className} onChange={marcar} onClick={marcar}>
+      {children}
+      {e.error && !sucio && <p className="aviso error">{e.error}</p>}
+      {conBoton && <div className="acciones">
+        <button className={`bt ${guardado ? "guardado" : ""}`} disabled={guardando || guardado}>
+          {guardando ? "Guardando…" : guardado ? "Guardado" : "Guardar"}
+          {guardado ? <span className="fl" aria-hidden="true"><Icono n="palomita" /></span> : <Fl />}
+        </button>
+      </div>}
     </form>
+  );
+}
+
+export function ReglasCobro({ descuento, autorizan, funciones }: { descuento: number; autorizan: string; funciones: Funcion[] }) {
+  const [conDescuentos, setConDescuentos] = useState(funciones.find((f) => f.clave === "descuentos")?.activa ?? true);
+  return (
+    <FormGuardar className="glass panel bloque-a" conBoton={conDescuentos}>
+      <span className="lab">2. Reglas de cobro</span>
+      <p className="ayuda-txt" style={{ marginTop: -4 }}>Qué botones aparecen en la pantalla de cobro.</p>
+      <Funciones funciones={funciones} alCambiar={(clave, activa) => { if (clave === "descuentos") setConDescuentos(activa); }} />
+      {conDescuentos && (
+        <Ajuste name="descuento" titulo="Autorización de descuentos" ayuda="Hasta cuánto puede descontar un barbero por su cuenta. Más que eso lo autoriza alguien con permiso."
+          inicial={descuento} opciones={[0, 10, 20, 50, 100]} max={100} paso={5} formato={(v) => `${v}%`}
+          vista={(v) => v === 0 ? <>Ningún barbero puede dar descuentos sin autorización.</> : v === 100 ? <>Un barbero puede dar cualquier descuento por su cuenta, hasta dejar el servicio gratis.</> : <>En un corte de $150, un barbero puede descontar hasta <b>{formatoDinero(Math.round(15000 * v / 100))}</b>. Más que eso lo autoriza: {autorizan}.</>} />
+      )}
+    </FormGuardar>
   );
 }
 
 export function CajaObjetivos({ fondo, diferencia, metaMensual, datosMeta }: { fondo: number; diferencia: number; metaMensual: number; datosMeta: { egresos: number; barberos: BarberoMeta[]; dias: number } }) {
   return (
-    <form action={guardarReglas} className="glass panel bloque-a">
+    <FormGuardar className="glass panel bloque-a">
       <span className="lab">3. Caja y objetivos</span>
       <Ajuste name="fondo" titulo="Fondo inicial sugerido" ayuda="El efectivo que aparece listo al abrir la caja."
         inicial={fondo} opciones={[0, 100, 200, 500]} max={2000} paso={50} formato={(v) => formatoDinero(v * 100)}
@@ -56,8 +80,7 @@ export function CajaObjetivos({ fondo, diferencia, metaMensual, datosMeta }: { f
       <Ajuste name="metaMensual" titulo="Meta mensual del negocio" ayuda="Lo que el negocio quiere que le quede al mes. Con esto se calcula cuánto debe cobrar cada barbero al día."
         inicial={metaMensual} opciones={[0, 10000, 20000, 40000]} max={150000} paso={1000} formato={(v) => (v ? formatoDinero(v * 100) : "Sin meta")}
         vista={(v) => <VistaMeta meta={v} datos={datosMeta} />} />
-      <div className="acciones"><button className="bt">Guardar<Fl /></button></div>
-    </form>
+    </FormGuardar>
   );
 }
 

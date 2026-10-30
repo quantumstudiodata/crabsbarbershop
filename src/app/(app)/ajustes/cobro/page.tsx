@@ -41,13 +41,13 @@ export default async function CobroYCaja({ searchParams }: { searchParams: Promi
       <ReglasCobro descuento={b.limiteDescuentoPct} autorizan={autorizan} funciones={[
         { clave: "descuentos", nombre: "Descuentos", activa: b.usaDescuentos, encendida: "Aparecen al cobrar.", apagada: "No aparecen al cobrar." },
         { clave: "propinas", nombre: "Propinas", activa: b.usaPropinas, encendida: "Aparecen al cobrar.", apagada: "No aparecen al cobrar." },
+        { clave: "dividir", nombre: "Dividir pago", activa: b.usaDividirPago, encendida: "Un cliente puede pagar con dos formas de pago.", apagada: "Cada venta se paga con una sola forma." },
       ]} />
       <CajaObjetivos fondo={Math.round(b.fondoPredeterminado / 100)} diferencia={Math.round(b.limiteDiferenciaCaja / 100)} metaMensual={Math.round(b.metaMensual / 100)}
         datosMeta={await datosParaMeta(b.id, b.zonaHoraria, fechaLocal(new Date(), b.zonaHoraria))} />
       <section className="glass panel bloque-a">
         <span className="lab">4. Funciones</span>
         <Funciones funciones={[
-          { clave: "dividir", nombre: "Dividir pago", activa: b.usaDividirPago, encendida: "Un cliente puede pagar con dos formas de pago.", apagada: "Cada venta se paga con una sola forma." },
           { clave: "metas", nombre: "Metas de ventas", activa: b.usaMetas, encendida: "Inicio muestra la meta y cuánto se lleva.", apagada: "No se muestran metas." },
           { clave: "renta", nombre: "Renta de silla", activa: b.usaRentaSilla, encendida: "Se puede elegir como forma de pago de un barbero.", apagada: "No aparece al dar de alta a un barbero." },
         ]} />
