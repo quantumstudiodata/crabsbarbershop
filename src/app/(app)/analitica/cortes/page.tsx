@@ -1,7 +1,7 @@
 import { redirect } from "next/navigation";
 import { AvisoUrl } from "@/components/Encabezado";
-import { Icono } from "@/components/Icono";
-import { SelectorPeriodo } from "@/components/Periodo";
+import { BarraFiltros } from "@/components/BarraFiltros";
+import { Paginacion } from "@/components/Paginacion";
 import { requerirSesion } from "@/lib/auth";
 import { eq } from "drizzle-orm";
 import { ajustesDeTurnos, detalleCortes, foliosCorte, metodosActivos, turnosCerrados } from "@/lib/datos";
@@ -9,24 +9,34 @@ import { db, schema } from "@/lib/db";
 import { HistorialCortes, type Corte, type DiaCortes } from "./HistorialCortes";
 import { fechaLarga, fechaLocal, horaCorta } from "@/lib/fechas";
 import { formatoDinero } from "@/lib/money";
-import { leerPeriodo } from "@/lib/periodo";
+import { type ConsultaFiltros, filtrarCortes, leerFiltros, rangoDePagina, urlDescarga } from "@/lib/filtros";
 
 export const metadata = { title: "Cortes de caja" };
 
-export default async function Cortes({ searchParams }: { searchParams: Promise<{ periodo?: string; desde?: string; hasta?: string; aviso?: string; error?: string }> }) {
+export default async function Cortes({ searchParams }: { searchParams: Promise<ConsultaFiltros & { aviso?: string; error?: string }> }) {
   const s = await requerirSesion();
   if (!s.puede("caja.operar") && !s.puede("reportes.ver")) redirect("/");
   const q = await searchParams;
   const zona = s.barberia.zonaHoraria;
   const hoy = fechaLocal(new Date(), zona);
-  const p = leerPeriodo(q, hoy, "mes");
-  const cortes = await turnosCerrados(s.barberia.id, 1000, { desde: p.desde, hasta: p.hasta });
-  const ids = cortes.map((c) => c.id);
-  const [ajustes, folios, det, gente, activos] = await Promise.all([
-    ajustesDeTurnos(s.barberia.id, ids), foliosCorte(s.barberia.id), detalleCortes(s.barberia.id, ids),
-    db.select({ id: schema.usuarios.id, nombre: schema.usuarios.nombre, avatar: schema.usuarios.avatar }).from(schema.usuarios).where(eq(schema.usuarios.barberiaId, s.barberia.id)),
+  const [gente, folios, todos, activos] = await Promise.all([
+    db.select({ id: schema.usuarios.id, nombre: schema.usuarios.nombre, avatar: schema.usuarios.avatar, activo: schema.usuarios.activo }).from(schema.usuarios).where(eq(schema.usuarios.barberiaId, s.barberia.id)),
+    foliosCorte(s.barberia.id),
+    turnosCerrados(s.barberia.id, 100000),
     metodosActivos(s.barberia.id),
   ]);
+  // Quien ha abierto o cerrado alguna caja puede usarse como filtro.
+  const conCortes = new Set(todos.flatMap((c) => [c.abiertoPor, c.cerradoPorId]));
+  const personas = gente.filter((g) => conCortes.has(g.id));
+  const f = leerFiltros(q, hoy, personas.map((x) => x.id));
+  const p = f.periodo;
+  const filtrados = filtrarCortes(todos.filter((c) => !p || (c.fechaOperativa >= p.desde && c.fechaOperativa <= p.hasta)), f, folios, new Map(gente.map((g) => [g.id, g.nombre])));
+  // Todo el historial, siete días por página.
+  const r = rangoDePagina([...new Set(filtrados.map((c) => c.fechaOperativa))].sort().reverse(), f.pagina);
+  const cortes = filtrados.filter((c) => r.dias.includes(c.fechaOperativa));
+  const ids = cortes.map((c) => c.id);
+  const [ajustes, det] = await Promise.all([ajustesDeTurnos(s.barberia.id, ids), detalleCortes(s.barberia.id, ids)]);
+  const diferenciaTotal = filtrados.reduce((a, c) => a + (c.diferencia ?? 0), 0);
   const persona = (id: string | null) => gente.find((g) => g.id === id) ?? { nombre: "", avatar: "iniciales" };
   const lista: Corte[] = cortes.map((c) => {
     const cobros = det.cobros.filter((x) => x.turnoId === c.id);
@@ -60,11 +70,15 @@ export default async function Cortes({ searchParams }: { searchParams: Promise<{
   return (
     <>
       <AvisoUrl aviso={q.aviso} error={q.error} />
-      <div className="entre">
-        <SelectorPeriodo ruta="/analitica/cortes" p={p} hoy={hoy} conAnio />
-        {s.puede("reportes.exportar") && <a className="bt sec solo chico" href={`/api/exportar?tipo=cortes&desde=${p.desde}&hasta=${p.hasta}`}><Icono n="descargar" />Descargar</a>}
+      <BarraFiltros p={p} hoy={hoy} personas={personas} persona={f.persona} buscar={f.buscar} sinPeriodo="Todo"
+        textoBuscar="Buscar por folio, observaciones o persona" descarga={s.puede("reportes.exportar") ? urlDescarga("cortes", f) : undefined} />
+      <div className="subir">
+        <span className="lab">{p ? p.etiqueta : "Todo el historial"}{f.buscar ? `, con "${f.buscar}"` : ""}</span>
+        <h1 className="titulo" style={{ marginTop: 8 }}>{filtrados.length} {filtrados.length === 1 ? "corte" : "cortes"}{diferenciaTotal ? `, ${diferenciaTotal < 0 ? "faltaron" : "sobraron"} ${formatoDinero(Math.abs(diferenciaTotal))}` : ", sin diferencias"}</h1>
       </div>
-      <HistorialCortes dias={dias} corregir={s.puede("caja.corregir")} />
+      {dias.length ? <HistorialCortes dias={dias} corregir={s.puede("caja.corregir")} /> : <p className="muted">No hay cortes con esos filtros.</p>}
+      <Paginacion ruta="/analitica/cortes" params={q as Record<string, string | undefined>} pagina={r.pagina} paginas={r.paginas}
+        texto={r.paginas > 1 ? `Página ${r.pagina} de ${r.paginas}` : ""} />
     </>
   );
 }

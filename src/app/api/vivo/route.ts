@@ -1,7 +1,9 @@
-import { and, desc, eq, gte, inArray } from "drizzle-orm";
+import { and, desc, eq, gte, inArray, sql } from "drizzle-orm";
+import { alias } from "drizzle-orm/pg-core";
 import { obtenerSesion } from "@/lib/auth";
 import { db, schema } from "@/lib/db";
 import { fechaLocal } from "@/lib/fechas";
+import { describirEvento } from "@/lib/eventos";
 import { formatoDinero } from "@/lib/money";
 
 export const dynamic = "force-dynamic";
@@ -15,6 +17,8 @@ const RUTA: Record<string, string> = {
 export type EventoVivo = { id: string; t: string; titulo: string; detalle?: string; href?: string; nombre: string; avatar: string };
 export type AlertaVivo = { id: string; titulo: string; detalle: string; href: string };
 export type SolicitudVivo = { id: string; usuarioId: string; nombre: string; avatar: string; t: string };
+/** Notificación personal: solo lo que a esa persona le toca saber. */
+export type AvisoVivo = { id: string; t: string; titulo: string; detalle?: string; href: string; nombre: string; avatar: string; icono?: string };
 
 /** Actividad reciente para la ventana "En vivo". */
 export async function GET() {
@@ -90,5 +94,74 @@ export async function GET() {
   if (t && t.fechaOperativa < fechaLocal(new Date(), se.barberia.zonaHoraria)) {
     alertas.push({ id: `caja-${t.id}`, titulo: "No se cerró la caja de ayer", detalle: "Haz el corte para seguir cobrando", href: "/cobrar?caja=cerrar" });
   }
-  return Response.json({ eventos, solicitudes, alertas }, { headers: { "Cache-Control": "no-store" } });
+  const avisos = await avisosPara(se);
+  return Response.json({ eventos, solicitudes, alertas, avisos }, { headers: { "Cache-Control": "no-store" } });
+}
+
+type Sesion = NonNullable<Awaited<ReturnType<typeof obtenerSesion>>>;
+const primer = (n: string | null | undefined) => (n ?? "").split(" ")[0];
+
+/**
+ * Notificaciones de los últimos 7 días, como en una red social.
+ * Barberos: cuando alguien cobra o cancela un servicio suyo, cuando reciben un pago y cuando cambian servicios o precios.
+ * Propietario y administración: diferencias en cortes, ventas canceladas y egresos registrados por otros.
+ */
+async function avisosPara(se: Sesion): Promise<AvisoVivo[]> {
+  const bId = se.barberia.id;
+  const yo = se.usuario.id;
+  const desde = new Date(Date.now() - 7 * 24 * 3600 * 1000);
+  const avisos: AvisoVivo[] = [];
+  const atiende = se.usuario.rol === "barbera" || se.usuario.rol === "encargada";
+  const registro = alias(s.usuarios, "registro");
+
+  if (atiende) {
+    const mios = await db
+      .select({ id: s.ventas.id, t: s.ventas.creadoEn, estado: s.ventas.estado, canceladaEn: s.ventas.canceladaEn, canceladaPor: s.ventas.canceladaPor, motivo: s.ventas.motivoCancelacion,
+        registradaPor: s.ventas.registradaPor, servicio: s.conceptos.nombreServicio, monto: s.conceptos.precioCobrado, quien: registro.nombre, avatar: registro.avatar })
+      .from(s.conceptos)
+      .innerJoin(s.ventas, eq(s.ventas.id, s.conceptos.ventaId))
+      .innerJoin(registro, eq(registro.id, s.ventas.registradaPor))
+      .where(and(eq(s.ventas.barberiaId, bId), eq(s.conceptos.barberoId, yo), gte(s.ventas.creadoEn, desde)))
+      .orderBy(desc(s.ventas.creadoEn)).limit(30);
+    for (const v of mios) {
+      if (v.registradaPor !== yo) avisos.push({ id: `c${v.id}${v.servicio}`, t: v.t.toISOString(), titulo: `${primer(v.quien)} cobró tu ${v.servicio}`, detalle: formatoDinero(v.monto), href: "/mis-ventas", nombre: v.quien, avatar: v.avatar });
+      if (v.estado === "cancelada" && v.canceladaPor !== yo && v.canceladaEn) avisos.push({ id: `x${v.id}${v.servicio}`, t: v.canceladaEn.toISOString(), titulo: `Se canceló tu ${v.servicio}`, detalle: v.motivo ?? undefined, href: "/mis-ventas", nombre: "Cancelación", avatar: "cangrejo", icono: "basura" });
+    }
+    const pagos = await db.select({ id: s.pagosComision.id, t: s.pagosComision.creadoEn, tipo: s.pagosComision.tipo, monto: s.pagosComision.monto, nombre: s.usuarios.nombre, avatar: s.usuarios.avatar })
+      .from(s.pagosComision).innerJoin(s.usuarios, eq(s.usuarios.id, s.pagosComision.usuarioId))
+      .where(and(eq(s.pagosComision.barberiaId, bId), eq(s.pagosComision.barberoId, yo), gte(s.pagosComision.creadoEn, desde)));
+    for (const p of pagos) avisos.push({
+      id: `p${p.id}`, t: p.t.toISOString(), titulo: p.tipo === "pago" ? `Recibiste un pago de ${formatoDinero(p.monto)}` : `Se registró tu renta de ${formatoDinero(p.monto)}`,
+      detalle: `Lo registró ${primer(p.nombre)}`, href: "/mis-ventas", nombre: p.nombre, avatar: p.avatar, icono: "efectivo",
+    });
+    const cambios = await db.select({ id: s.historial.id, t: s.historial.creadoEn, tipo: s.historial.tipo, accion: s.historial.accion, detalle: s.historial.detalle, nombre: s.usuarios.nombre, avatar: s.usuarios.avatar })
+      .from(s.historial).leftJoin(s.usuarios, eq(s.usuarios.id, s.historial.usuarioId))
+      .where(and(eq(s.historial.barberiaId, bId), gte(s.historial.creadoEn, desde), sql`(${s.historial.tipo} = 'precio' or (${s.historial.tipo} = 'ajuste' and ${s.historial.accion} ~ ' el servicio '))`))
+      .orderBy(desc(s.historial.creadoEn)).limit(10);
+    for (const c of cambios) {
+      const e = describirEvento(c.tipo, c.accion, (c.detalle ?? {}) as Record<string, unknown>, c.nombre);
+      avisos.push({ id: `h${c.id}`, t: c.t.toISOString(), titulo: `${e.titulo}${e.objeto ? `: ${e.objeto}` : ""}`, detalle: e.extra && e.extra !== "Ver cambios" ? e.extra : undefined, href: "/historial?tipo=precio", nombre: c.nombre ?? "Sistema", avatar: c.avatar ?? "cangrejo", icono: "etiqueta" });
+    }
+  }
+
+  if (se.puede("reportes.ver") || se.puede("ajustes.usuarios")) {
+    const [cortes, canceladas, egresos] = await Promise.all([
+      db.select({ id: s.turnosCaja.id, t: s.turnosCaja.cerradoEn, dif: s.turnosCaja.diferencia, nombre: s.usuarios.nombre, avatar: s.usuarios.avatar })
+        .from(s.turnosCaja).leftJoin(s.usuarios, eq(s.usuarios.id, s.turnosCaja.cerradoPor))
+        .where(and(eq(s.turnosCaja.barberiaId, bId), eq(s.turnosCaja.estado, "cerrado"), gte(s.turnosCaja.cerradoEn, desde), sql`${s.turnosCaja.diferencia} <> 0`)),
+      db.select({ id: s.ventas.id, t: s.ventas.canceladaEn, folio: s.ventas.folio, total: s.ventas.total, motivo: s.ventas.motivoCancelacion, por: s.ventas.canceladaPor, nombre: s.usuarios.nombre, avatar: s.usuarios.avatar })
+        .from(s.ventas).leftJoin(s.usuarios, eq(s.usuarios.id, s.ventas.canceladaPor))
+        .where(and(eq(s.ventas.barberiaId, bId), eq(s.ventas.estado, "cancelada"), gte(s.ventas.canceladaEn, desde))),
+      db.select({ id: s.gastos.id, t: s.gastos.creadoEn, monto: s.gastos.monto, concepto: s.gastos.concepto, por: s.gastos.usuarioId, nombre: s.usuarios.nombre, avatar: s.usuarios.avatar })
+        .from(s.gastos).innerJoin(s.usuarios, eq(s.usuarios.id, s.gastos.usuarioId))
+        .where(and(eq(s.gastos.barberiaId, bId), gte(s.gastos.creadoEn, desde))),
+    ]);
+    for (const c of cortes) if (c.t) avisos.push({
+      id: `k${c.id}`, t: c.t.toISOString(), titulo: `${(c.dif ?? 0) < 0 ? "Faltaron" : "Sobraron"} ${formatoDinero(Math.abs(c.dif ?? 0))} en un corte`,
+      detalle: `Lo cerró ${primer(c.nombre)}`, href: "/analitica/cortes", nombre: c.nombre ?? "", avatar: c.avatar ?? "cangrejo", icono: "caja",
+    });
+    for (const v of canceladas) if (v.t && v.por !== yo) avisos.push({ id: `x${v.id}`, t: v.t.toISOString(), titulo: `${primer(v.nombre)} canceló la venta ${v.folio}`, detalle: `${formatoDinero(v.total)}${v.motivo ? `, ${v.motivo}` : ""}`, href: `/analitica/ventas?q=${v.folio}`, nombre: v.nombre ?? "", avatar: v.avatar ?? "cangrejo" });
+    for (const g of egresos) if (g.por !== yo) avisos.push({ id: `g${g.id}`, t: g.t.toISOString(), titulo: `${primer(g.nombre)} registró un egreso de ${formatoDinero(g.monto)}`, detalle: g.concepto, href: "/analitica/gastos", nombre: g.nombre, avatar: g.avatar });
+  }
+  return avisos.sort((a, b) => b.t.localeCompare(a.t)).slice(0, 25);
 }

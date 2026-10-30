@@ -1,4 +1,4 @@
-import { eq } from "drizzle-orm";
+import { and, eq } from "drizzle-orm";
 import { requerirSesion } from "@/lib/auth";
 import { categoriasGasto, equipoQueAtiende, folioCorte, metodosActivos, movimientosDeTurno, serviciosActivos, turnoAbierto } from "@/lib/datos";
 import { db, schema } from "@/lib/db";
@@ -22,11 +22,11 @@ export default async function Cobrar({ searchParams }: { searchParams: Promise<{
   if (t) {
     const [datos, [abrio], folio] = await Promise.all([
       movimientosDeTurno(s.barberia.id, t.id, t.fondoInicial),
-      db.select({ nombre: schema.usuarios.nombre }).from(schema.usuarios).where(eq(schema.usuarios.id, t.abiertoPor)),
+      db.select({ nombre: schema.usuarios.nombre, avatar: schema.usuarios.avatar }).from(schema.usuarios).where(and(eq(schema.usuarios.id, t.abiertoPor), eq(schema.usuarios.barberiaId, s.barberia.id))),
       folioCorte(s.barberia.id, t.abiertoEn),
     ]);
     turno = {
-      desde: horaCorta(t.abiertoEn, zona), abrio: abrio?.nombre.split(" ")[0] ?? "", dia: fechaLarga(t.fechaOperativa).toLowerCase(),
+      desde: horaCorta(t.abiertoEn, zona), abrio: abrio?.nombre.split(" ")[0] ?? "", abrioAvatar: abrio?.avatar ?? "iniciales", abiertoEn: t.abiertoEn.toISOString(), dia: fechaLarga(t.fechaOperativa).toLowerCase(),
       deOtroDia: t.fechaOperativa < fechaLocal(new Date(), zona), folioCorte: folio, m: datos.m, esperado: datos.esperado,
       ventas: datos.ventas, propinas: datos.propinasTotal, otros: datos.otrosPorMetodo.map((x) => ({ metodo: x.metodo, total: x.total, ventas: x.ventas })),
     };

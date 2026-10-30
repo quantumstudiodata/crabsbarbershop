@@ -9,7 +9,7 @@ import { Icono } from "@/components/Icono";
 import { AvisoCajaEmergente } from "./AvisoCaja";
 import { Cuenta } from "@/components/ui";
 import { requerirSesion } from "@/lib/auth";
-import { diasConVentas, equipoQueAtiende, movimientosDeTurno, turnoAbierto, ventasEntre } from "@/lib/datos";
+import { diasConVentas, equipoQueAtiende, metasDelMes, movimientosDeTurno, turnoAbierto, ventasEntre } from "@/lib/datos";
 import { db, schema } from "@/lib/db";
 import { fechaLarga, fechaLocal, horaCorta, lunesDe, nombreDia, sumarDias } from "@/lib/fechas";
 import { calcularMeta } from "@/lib/metas";
@@ -48,7 +48,7 @@ export default async function Inicio({ searchParams }: { searchParams: Promise<Q
       {turno && turno.fechaOperativa < hoy && s.puede("reportes.ver") && (
         <div className="alerta-caja subir">
           <span className="icono-alerta grande"><Icono n="reloj" /></span>
-          <span><b>La caja del {fechaLarga(turno.fechaOperativa).toLowerCase()} sigue abierta</b><small>Pasaron las 12 de la noche y no se hizo el corte. Mientras tanto no se puede cobrar.</small></span>
+          <span><b>La caja del {fechaLarga(turno.fechaOperativa).toLowerCase()} sigue abierta</b><small>El día ha terminado y aún no se ha realizado el corte de caja. Realiza el cierre para iniciar una nueva jornada de cobros.</small></span>
           <Link className="bt chico solo" href="/cobrar?caja=cerrar"><Icono n="candado" />Cerrar caja</Link>
         </div>
       )}
@@ -72,9 +72,11 @@ export default async function Inicio({ searchParams }: { searchParams: Promise<Q
   const previoMismaHora = pagadas.filter((v) => v.fecha === sumarDias(hoy, -7) && v.creadoEn.getTime() <= limite).reduce((a, v) => a + v.total, 0);
   const serie = serieHoy(movs, hoy, zona);
   const dia = nombreDia(new Date(`${hoy}T12:00:00Z`).getUTCDay());
-  const meta = calcularMeta(s.barberia.metaDiaria, [7, 14, 21, 28].map((d) => pagadas.filter((v) => v.fecha === sumarDias(hoy, -d)).reduce((a, v) => a + v.total, 0)));
+  // Con meta mensual del negocio, la meta del día es la suma de lo que le toca a cada barbero.
+  const delMes = await metasDelMes(s.barberia.id, s.barberia.metaMensual, zona, hoy);
+  const meta = delMes ? { monto: Math.max(delMes.diaria, 1), origen: "asignada" as const } : calcularMeta(s.barberia.metaDiaria, [7, 14, 21, 28].map((d) => pagadas.filter((v) => v.fecha === sumarDias(hoy, -d)).reduce((a, v) => a + v.total, 0)));
   const avance = Math.min(netas / meta.monto, 1);
-  const recientes = ventas.filter((v) => v.fecha === hoy).slice(0, 10);
+  const recientes = ventas.slice(0, 10);
 
   return (
     <>
@@ -103,7 +105,7 @@ export default async function Inicio({ searchParams }: { searchParams: Promise<Q
             {s.barberia.usaMetas && <div style={{ display: "grid", gap: 8 }}>
               <span className="entre"><span>Meta diaria</span><b>{formatoDinero(meta.monto)}</b></span>
               <div className="meta grande"><i style={{ width: `${Math.max(avance * 100, 3)}%` }} /></div>
-              <small className="muted">{porcentaje(netas, meta.monto)}% alcanzado</small>
+              <small className="muted">{porcentaje(netas, meta.monto)}% alcanzado{delMes ? `, para llegar a ${formatoDinero(s.barberia.metaMensual)} al mes` : ""}</small>
             </div>}
           </div>
         </div>
@@ -126,16 +128,16 @@ export default async function Inicio({ searchParams }: { searchParams: Promise<Q
 
       <section className="glass panel subir d3">
         <div className="entre">
-          <span className="lab">Últimos servicios de hoy</span>
-          {s.puede("ventas.ver_todas") && <Link className="enlace" href="/analitica/ventas?periodo=dia">Ver todas las ventas</Link>}
+          <span className="lab">Últimos servicios</span>
+          {s.puede("ventas.ver_todas") && <Link className="enlace" href="/analitica/ventas">Ver todas las ventas</Link>}
         </div>
-        {recientes.length === 0 ? <p className="muted">Todavía no se cobra nada hoy.</p> : (
+        {recientes.length === 0 ? <p className="muted">Todavía no hay servicios cobrados.</p> : (
           <div className="recientes">
             {recientes.map((v) => {
               const quien = equipo.find((e) => e.id === v.conceptos[0]?.barberoId);
               return (
                 <div key={v.id} className={v.estado === "cancelada" ? "cancelada" : ""}>
-                  <span className="t">{horaCorta(v.creadoEn, zona)}</span>
+                  <span className="t">{v.fecha === hoy ? horaCorta(v.creadoEn, zona) : v.fecha === sumarDias(hoy, -1) ? "Ayer" : `${v.fecha.slice(8)}/${v.fecha.slice(5, 7)}`}</span>
                   {quien ? <Avatar avatar={quien.avatar} nombre={quien.nombre} t={26} /> : <span />}
                   <span className="srv">{v.conceptos.map((c) => c.nombre).join(", ")}<small>{v.conceptos[0]?.barbero.split(" ")[0]} - {v.pagos.map((pg) => pg.metodo).join(" y ")}</small></span>
                   <span className="folio">{v.folio}</span>
@@ -173,8 +175,13 @@ async function InicioBarbero({ s, hoy, zona, q, avisos }: { s: Sesion; hoy: stri
     const l = sumarDias(lunes, -7 * k);
     return mios.filter((c) => c.fecha >= l && c.fecha <= sumarDias(l, 6)).reduce((a, c) => a + c.precioCobrado, 0);
   });
-  const meta = calcularMeta(u?.meta ?? 0, semanas);
-  const avance = Math.min(semana / meta.monto, 1);
+  // Su meta diaria sale de la meta mensual del negocio; la semana son seis días de trabajo.
+  const delMes = u?.meta ? null : await metasDelMes(s.barberia.id, s.barberia.metaMensual, zona, hoy);
+  const mia = delMes?.porBarbero.find((x) => x.id === yo);
+  const meta = mia?.aplica ? { monto: Math.max(mia.diaria * 6, 1), origen: "asignada" as const } : calcularMeta(u?.meta ?? 0, semanas);
+  const metaHoy = mia?.aplica ? mia.diaria : Math.round(meta.monto / 6);
+  const enHoy = modo === "hoy";
+  const avance = Math.min((enHoy ? totalHoy : semana) / (enHoy ? Math.max(metaHoy, 1) : meta.monto), 1);
   const dia = nombreDia(new Date(`${hoy}T12:00:00Z`).getUTCDay());
 
   return (
@@ -195,11 +202,11 @@ async function InicioBarbero({ s, hoy, zona, q, avisos }: { s: Sesion; hoy: stri
             descripcion={modo === "hoy" ? "Tus ventas de hoy por hora" : "Tus ventas de la semana"} vacio="Tu gráfica se dibuja con tu primer servicio" />
           {s.barberia.usaMetas ? <div className="pila-chica">
             <div className="entre">
-              <span className="muted" style={{ fontSize: 13 }}>Meta de la semana: <b style={{ color: "var(--fg)" }}>{formatoDinero(meta.monto)}</b><Ayuda titulo="Meta de la semana">Refleja tu meta de ventas de esta semana y cuánto llevas de ella.</Ayuda></span>
-              <b className="num">{porcentaje(semana, meta.monto)}%</b>
+              <span className="muted" style={{ fontSize: 13 }}>{enHoy ? "Meta de hoy" : "Meta de la semana"}: <b style={{ color: "var(--fg)" }}>{formatoDinero(enHoy ? metaHoy : meta.monto)}</b><Ayuda titulo={enHoy ? "Meta de hoy" : "Meta de la semana"}>{mia?.aplica ? "Sale de la meta mensual del negocio y de tu forma de pago." : "Refleja tu meta de ventas y cuánto llevas de ella."}</Ayuda></span>
+              <b className="num">{porcentaje(enHoy ? totalHoy : semana, enHoy ? Math.max(metaHoy, 1) : meta.monto)}%</b>
             </div>
             <div className="meta grande"><i style={{ width: `${Math.max(avance * 100, 3)}%` }} /></div>
-            <small className="muted">Llevas {formatoDinero(semana)} esta semana.</small>
+            <small className="muted">Llevas {formatoDinero(enHoy ? totalHoy : semana)} {enHoy ? "hoy" : "esta semana"}.</small>
           </div> : <small className="muted">Llevas {formatoDinero(semana)} esta semana.</small>}
         </div>
         <div className="glass panel subir d2">

@@ -4,6 +4,7 @@ import { comisionDeServicio, elegirRegla, resumenSemana, type Regla } from "@/li
 import { contrasenaTemporal, problemaContrasena, sugerirUsuario } from "@/lib/cuentas";
 import { diaDeSemana, esFechaValida, fechaLocal, finDeMes, lunesDe, sumarDias } from "@/lib/fechas";
 import { detectarFranjas, fechasComerciales, pascua } from "@/lib/ideas";
+import { diasHabilesDelMes, metaDelNegocio } from "@/lib/metas";
 import { cambio, formatoDinero, leerPesos } from "@/lib/money";
 import { permisosDe, rolesAsignables } from "@/lib/permisos";
 
@@ -176,5 +177,29 @@ describe("metas", () => {
     expect(calcularMeta(0, [0, 300000]).monto).toBe(META_INICIAL);
     // promedio 350,000 centavos ($3,500) más 10% = $3,850, redondeado a $3,900
     expect(calcularMeta(0, [300000, 400000, 0])).toEqual({ monto: 390000, origen: "calculada" });
+  });
+});
+
+
+describe("meta mensual del negocio", () => {
+  it("reparte la meta según cómo se le paga a cada barbero", () => {
+    const r = metaDelNegocio(2000000, 1000000, [
+      { id: "a", nombre: "Ana", tipo: "porcentaje", porcentaje: 5000, montoFijo: 0, mensual: 0, peso: 1, ticket: 15000 },
+      { id: "b", nombre: "Beto", tipo: "sueldo", porcentaje: 0, montoFijo: 0, mensual: 600000, peso: 1, ticket: 15000 },
+      { id: "c", nombre: "Ceci", tipo: "renta", porcentaje: 0, montoFijo: 0, mensual: 300000, peso: 1, ticket: 15000 },
+    ], 26);
+    // Cubrir: 20,000 de meta + 10,000 de egresos + 6,000 de sueldo - 3,000 de renta = 33,000.
+    expect(r.cubrir).toBe(3300000);
+    const ana = r.porBarbero.find((x) => x.id === "a")!;
+    const beto = r.porBarbero.find((x) => x.id === "b")!;
+    // A Ana le toca la mitad (16,500) y el negocio se queda con el 50% de lo que cobra: debe cobrar 33,000.
+    expect(ana.mensual).toBe(3300000);
+    expect(beto.mensual).toBe(1650000);
+    expect(r.porBarbero.find((x) => x.id === "c")!.aplica).toBe(false);
+    expect(ana.diaria).toBe(Math.ceil(3300000 / 26 / 10000) * 10000);
+  });
+  it("cuenta lunes a sábado", () => {
+    expect(diasHabilesDelMes("2026-10")).toBe(27);
+    expect(diasHabilesDelMes("2026-02")).toBe(24);
   });
 });

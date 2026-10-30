@@ -50,6 +50,13 @@
       "when": 1793345040691,
       "tag": "0006_finanzas",
       "breakpoints": true
+    },
+    {
+      "idx": 7,
+      "version": "7",
+      "when": 1793347047010,
+      "tag": "0007_meta_mensual",
+      "breakpoints": true
     }
   ]
 }

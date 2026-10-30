@@ -1,12 +1,14 @@
 import { redirect } from "next/navigation";
 import { AvisoUrl } from "@/components/Encabezado";
-import { SelectorPeriodo } from "@/components/Periodo";
+import { BarraFiltros } from "@/components/BarraFiltros";
+import { Paginacion } from "@/components/Paginacion";
 import { requerirSesion } from "@/lib/auth";
 import { and, eq, gte, lte } from "drizzle-orm";
 import { Avatar } from "@/components/Avatar";
 import { Ayuda } from "@/components/Ayuda";
 import { describirRegla, elegirRegla, porSemana } from "@/lib/comisiones";
-import { copiaRegla, equipoQueAtiende, reglasDe, ventasEntre } from "@/lib/datos";
+import { copiaRegla, diasYTotalVentas, equipoConVentas, reglasDe, ventasEntre } from "@/lib/datos";
+import { condicionVentas, type ConsultaFiltros, leerFiltros, rangoDePagina, urlDescarga } from "@/lib/filtros";
 import { db, schema } from "@/lib/db";
 import { diasEntre, lunesDe } from "@/lib/fechas";
 import { fechaLarga, fechaLocal, horaCorta } from "@/lib/fechas";
@@ -14,11 +16,10 @@ import { formatoDinero } from "@/lib/money";
 import { leerPeriodo } from "@/lib/periodo";
 import { HistorialVentas, type DiaVentas } from "@/components/HistorialVentas";
 import { Pagar } from "./Pagar";
-import { FiltroPersona } from "./FiltroPersona";
 
 export const metadata = { title: "Ventas" };
 
-type Q = { periodo?: string; desde?: string; hasta?: string; persona?: string; aviso?: string; error?: string };
+type Q = ConsultaFiltros & { aviso?: string; error?: string };
 
 export default async function Ventas({ searchParams }: { searchParams: Promise<Q> }) {
   const s = await requerirSesion();
@@ -26,19 +27,22 @@ export default async function Ventas({ searchParams }: { searchParams: Promise<Q
   const q = await searchParams;
   const zona = s.barberia.zonaHoraria;
   const hoy = fechaLocal(new Date(), zona);
-  const p = leerPeriodo(q, hoy, "dia");
-  const equipo = await equipoQueAtiende(s.barberia.id);
-  const persona = equipo.some((e) => e.id === q.persona) ? q.persona! : "";
-  const { ventas } = await ventasEntre(s.barberia.id, p.desde, p.hasta, { zona, barberoId: persona || undefined });
-  const pagadas = ventas.filter((v) => v.estado === "pagada");
-  const total = pagadas.reduce((a, v) => a + v.conceptos.filter((c) => !persona || c.barberoId === persona).reduce((b, c) => b + c.precioCobrado, 0), 0);
-  const dias = [...new Set(ventas.map((v) => v.fecha))];
+  const equipo = await equipoConVentas(s.barberia.id);
+  const f = leerFiltros(q, hoy, equipo.map((e) => e.id));
+  const p = f.periodo;
+  const persona = f.persona;
+  const condiciones = condicionVentas(f);
+  // Sin filtros se ve todo el historial, siete días por página.
+  const resumen = await diasYTotalVentas(s.barberia.id, zona, { desde: p?.desde, hasta: p?.hasta, persona, condiciones });
+  const r = rangoDePagina(resumen.dias, f.pagina);
+  const { ventas } = r.dias.length ? await ventasEntre(s.barberia.id, r.desde, r.hasta, { zona, condiciones }) : { ventas: [] };
+  const dias = r.dias;
   const puedeCancelar = s.puede("ventas.cancelar");
   const historial: DiaVentas[] = dias.map((d) => {
     const delDia = ventas.filter((v) => v.fecha === d);
     const monto = (v: (typeof ventas)[number]) => (persona ? v.conceptos.filter((c) => c.barberoId === persona).reduce((a, c) => a + c.precioCobrado, 0) : v.total);
     return {
-      fecha: d, titulo: fechaLarga(d), total: delDia.filter((v) => v.estado === "pagada").reduce((a, v) => a + monto(v), 0),
+      fecha: d, titulo: d === hoy ? "Hoy" : fechaLarga(d), total: delDia.filter((v) => v.estado === "pagada").reduce((a, v) => a + monto(v), 0),
       filas: delDia.map((v) => ({
         id: v.id, folio: v.folio, hora: horaCorta(v.creadoEn, zona), monto: monto(v), cancelada: v.estado === "cancelada",
         servicios: v.conceptos.map((c) => c.nombre).join(", "),
@@ -55,28 +59,27 @@ export default async function Ventas({ searchParams }: { searchParams: Promise<Q
     };
   });
   const elegida = equipo.find((e) => e.id === persona);
-  const cuenta = elegida ? await cuentaDe(s.barberia.id, elegida.id, p.desde, p.hasta > hoy ? hoy : p.hasta, pagadas) : null;
-  const extra = persona ? `&persona=${persona}` : "";
+  // La cuenta de una persona se mide en el periodo elegido, o en el mes en curso si se ve todo.
+  const rango = p ?? leerPeriodo({ periodo: "mes" }, hoy);
+  const cuenta = elegida ? await cuentaDe(s.barberia.id, elegida.id, rango.desde, rango.hasta > hoy ? hoy : rango.hasta, (await ventasEntre(s.barberia.id, rango.desde, rango.hasta, { zona, barberoId: elegida.id })).ventas.filter((v) => v.estado === "pagada")) : null;
   const qs = new URLSearchParams(Object.entries(q).filter(([k, v]) => v && k !== "aviso" && k !== "error") as [string, string][]).toString();
   const regreso = `/analitica/ventas${qs ? `?${qs}` : ""}`;
 
   return (
     <>
       <AvisoUrl aviso={q.aviso} error={q.error} />
-      <div className="entre">
-        <SelectorPeriodo ruta="/analitica/ventas" p={p} hoy={hoy} conDia extra={extra} />
-        <FiltroPersona personas={equipo} actual={persona} />
-      </div>
+      <BarraFiltros p={p} hoy={hoy} personas={equipo} persona={persona} buscar={f.buscar} sinPeriodo="Todo"
+        descarga={s.puede("reportes.exportar") ? urlDescarga("ventas", f) : undefined} />
       <div className="subir">
-        <span className="lab">{p.etiqueta}</span>
-        <h1 className="titulo" style={{ marginTop: 8 }}>{pagadas.length} {pagadas.length === 1 ? "venta" : "ventas"}, {formatoDinero(total)}</h1>
+        <span className="lab">{p ? p.etiqueta : "Todo el historial"}{f.buscar ? `, con "${f.buscar}"` : ""}</span>
+        <h1 className="titulo" style={{ marginTop: 8 }}>{resumen.ventas} {resumen.ventas === 1 ? "venta" : "ventas"}, {formatoDinero(resumen.monto)}</h1>
       </div>
 
       {elegida && cuenta && (
         <section className="glass panel subir">
           <div className="entre">
             <span className="persona"><Avatar avatar={elegida.avatar} nombre={elegida.nombre} t={44} /><span><b>{elegida.nombre}</b><small className="muted" style={{ display: "block" }}>{cuenta.forma}</small></span></span>
-            {s.puede("equipo.pagar") && <Pagar id={elegida.id} nombre={elegida.nombre} semana={lunesDe(p.hasta > hoy ? hoy : p.hasta)} renta={cuenta.renta > 0} pendiente={formatoDinero(cuenta.renta > 0 ? cuenta.rentaPendiente : cuenta.saldo)} regreso={regreso} />}
+            {s.puede("equipo.pagar") && <Pagar id={elegida.id} nombre={elegida.nombre} semana={lunesDe(rango.hasta > hoy ? hoy : rango.hasta)} renta={cuenta.renta > 0} pendiente={formatoDinero(cuenta.renta > 0 ? cuenta.rentaPendiente : cuenta.saldo)} regreso={regreso} />}
           </div>
           <div className="cifras">
             <div><span className="lab">Ventas generadas</span><b>{formatoDinero(cuenta.vendido)}</b></div>
@@ -98,6 +101,8 @@ export default async function Ventas({ searchParams }: { searchParams: Promise<Q
       )}
 
       <HistorialVentas dias={historial} regreso={regreso} />
+      <Paginacion ruta="/analitica/ventas" params={q as Record<string, string | undefined>} pagina={r.pagina} paginas={r.paginas}
+        texto={resumen.dias.length ? `${resumen.dias.length} ${resumen.dias.length === 1 ? "día" : "días"} con ventas${r.paginas > 1 ? `, página ${r.pagina} de ${r.paginas}` : ""}` : ""} />
     </>
   );
 }

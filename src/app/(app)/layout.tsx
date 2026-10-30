@@ -5,6 +5,9 @@ import { Icono } from "@/components/Icono";
 import { PanelIdeas } from "@/components/PanelIdeas";
 import { VentanaVivo } from "@/components/VentanaVivo";
 import { requerirSesion } from "@/lib/auth";
+import { describirRegla, elegirRegla } from "@/lib/comisiones";
+import { copiaRegla, reglasDe } from "@/lib/datos";
+import { formatoDinero } from "@/lib/money";
 import { NOMBRE_ROL } from "@/lib/permisos";
 
 export const dynamic = "force-dynamic";
@@ -34,11 +37,12 @@ export default async function LayoutApp({ children }: { children: React.ReactNod
             rol={NOMBRE_ROL[rol]}
             avatar={s.usuario.avatar}
             ajustes={s.puede("ajustes.usuarios") || s.puede("ajustes.negocio")}
-            historial={s.puede("historial.ver")}
+            historial={s.puede("historial.ver") || atiende}
+            formaPago={atiende ? describirRegla(copiaRegla(elegirRegla(await reglasDe(s.barberia.id), s.usuario.id, null, new Date())), formatoDinero) : null}
           />
           <Nav items={items} />
           <div className="herramientas">
-            {rol === "contador" ? null : <Campana verTodo={s.puede("historial.ver") ? "/historial" : "/mis-ventas"} />}
+            {rol === "contador" ? null : <Campana />}
             {s.puede("ideas.decidir") && <PanelIdeas />}
           </div>
         </div>

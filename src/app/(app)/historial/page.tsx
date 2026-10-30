@@ -1,5 +1,6 @@
 import { type ConsultaPeriodo, leerPeriodo } from "@/lib/periodo";
-import { and, asc, count, desc, eq, gte, ilike, lte, or, sql, type SQL } from "drizzle-orm";
+import { and, asc, count, desc, eq, gte, ilike, inArray, lte, or, sql, type SQL } from "drizzle-orm";
+import { redirect } from "next/navigation";
 import Link from "next/link";
 import { requerirSesion } from "@/lib/auth";
 import { db, schema } from "@/lib/db";
@@ -17,13 +18,22 @@ const MES = ["ene", "feb", "mar", "abr", "may", "jun", "jul", "ago", "sep", "oct
 type Q = ConsultaPeriodo & { tipo?: string; usuario?: string; q?: string; pagina?: string };
 
 export default async function Historial({ searchParams }: { searchParams: Promise<Q> }) {
-  const s = await requerirSesion("historial.ver");
+  const s = await requerirSesion();
+  // Quien no ve el historial completo (los barberos) solo ve lo de la operación:
+  // ventas, caja y cambios de servicios y precios; de accesos, solo los suyos. Nada administrativo.
+  const completo = s.puede("historial.ver");
+  if (!completo && s.usuario.rol !== "barbera" && s.usuario.rol !== "encargada") redirect("/");
+  const categorias = completo ? CATEGORIAS : CATEGORIAS.filter(([k]) => ["", "venta", "caja", "precio"].includes(k));
   const q = await searchParams;
   const zona = s.barberia.zonaHoraria ?? ZONA;
   const hoy = fechaLocal(new Date(), zona);
   const h = schema.historial;
   const cond: SQL[] = [eq(h.barberiaId, s.barberia.id)];
-  if (q.tipo && CATEGORIAS.some(([k]) => k === q.tipo)) cond.push(eq(h.tipo, q.tipo));
+  if (!completo) cond.push(sql`(${h.tipo} in ('venta', 'caja', 'precio')
+    or (${h.tipo} = 'ajuste' and ${h.accion} ~ ' el servicio ')
+    or (${h.tipo} = 'gasto' and ${h.detalle}->>'deCaja' = 'true')
+    or (${h.tipo} = 'acceso' and ${h.usuarioId} = ${s.usuario.id}))`);
+  if (q.tipo && categorias.some(([k]) => k === q.tipo)) cond.push(q.tipo === "precio" && !completo ? or(eq(h.tipo, "precio"), eq(h.tipo, "ajuste"))! : eq(h.tipo, q.tipo));
   if (q.usuario && /^[0-9a-f-]{36}$/.test(q.usuario)) cond.push(eq(h.usuarioId, q.usuario));
   const conFecha = q.periodo || q.fecha || q.mes || q.anio || (esFechaValida(q.desde) && esFechaValida(q.hasta));
   const p = conFecha ? leerPeriodo(q, hoy, "dia") : null;
@@ -42,7 +52,8 @@ export default async function Historial({ searchParams }: { searchParams: Promis
     db.select({ id: h.id, tipo: h.tipo, accion: h.accion, detalle: h.detalle, creadoEn: h.creadoEn, nombre: schema.usuarios.nombre, usuario: schema.usuarios.usuario, avatar: schema.usuarios.avatar })
       .from(h).leftJoin(schema.usuarios, eq(schema.usuarios.id, h.usuarioId)).where(and(...cond))
       .orderBy(desc(h.creadoEn)).limit(POR_PAGINA).offset((pagina - 1) * POR_PAGINA),
-    db.select({ id: schema.usuarios.id, nombre: schema.usuarios.nombre, avatar: schema.usuarios.avatar }).from(schema.usuarios).where(eq(schema.usuarios.barberiaId, s.barberia.id)).orderBy(asc(schema.usuarios.nombre)),
+    db.select({ id: schema.usuarios.id, nombre: schema.usuarios.nombre, avatar: schema.usuarios.avatar }).from(schema.usuarios)
+      .where(and(eq(schema.usuarios.barberiaId, s.barberia.id), ...(completo ? [] : [inArray(schema.usuarios.rol, ["barbera", "encargada", "duena", "admin"])]))).orderBy(asc(schema.usuarios.nombre)),
   ]);
   const paginas = Math.max(1, Math.ceil(total / POR_PAGINA));
   const ayer = sumar(hoy, -1);
@@ -73,9 +84,9 @@ export default async function Historial({ searchParams }: { searchParams: Promis
     <>
       <div>
         <h1 className="titulo">Historial</h1>
-        <p className="sub">Registro permanente de lo que pasa en el sistema. Nada se borra.</p>
+        <p className="sub">{completo ? "Registro permanente de lo que pasa en el sistema. Nada se borra." : "Lo que pasa en el día a día: ventas, caja y cambios de servicios y precios."}</p>
       </div>
-      <Filtros categorias={CATEGORIAS} gente={gente} hoy={hoy} periodo={p} />
+      <Filtros categorias={categorias} gente={gente} hoy={hoy} periodo={p} />
       <Lista filas={lista} />
       <div className="entre">
         <span className="muted" style={{ fontSize: 13 }}>{total} {total === 1 ? "evento" : "eventos"}{total ? `, del ${(pagina - 1) * POR_PAGINA + 1} al ${Math.min(pagina * POR_PAGINA, total)}` : ""}</span>

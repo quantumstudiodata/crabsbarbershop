@@ -1,0 +1,1 @@
+ALTER TABLE "barberias" ADD COLUMN "meta_mensual" integer DEFAULT 0 NOT NULL;

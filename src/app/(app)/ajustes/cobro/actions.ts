@@ -36,20 +36,25 @@ export async function guardarReglas(form: FormData) {
   const cambios: Partial<typeof schema.barberias.$inferInsert> = {};
   if (form.has("descuento")) {
     const pct = num("descuento");
-    if (!Number.isInteger(pct) || pct < 0 || pct > 100) volver(R, { error: "El descuento va de 0 a 100%." });
+    if (!Number.isInteger(pct) || pct < 0 || pct > 100) volver(R, { error: "La autorización de descuentos va de 0 a 100%." });
     cambios.limiteDescuentoPct = pct;
   }
   if (form.has("diferencia")) cambios.limiteDiferenciaCaja = num("diferencia") * 100;
   if (form.has("meta")) cambios.metaDiaria = num("meta") * 100;
+  if (form.has("metaMensual")) {
+    const m = num("metaMensual");
+    if (!Number.isInteger(m) || m < 0 || m > 10_000_000) volver(R, { error: "Revisa la meta mensual." });
+    cambios.metaMensual = m * 100;
+  }
   if (form.has("fondo")) cambios.fondoPredeterminado = num("fondo") * 100;
   await db.update(schema.barberias).set(cambios).where(eq(schema.barberias.id, b.id));
   // Antes y después, para el historial.
-  const txt = (pct: number, dif: number, meta: number, fondo: number) => `descuento máximo ${pct}%, diferencia ${formatoDinero(dif)}, meta diaria ${formatoDinero(meta)}, fondo ${formatoDinero(fondo)}`;
+  const txt = (pct: number, dif: number, meta: number, fondo: number) => `descuento sin autorización hasta ${pct}%, diferencia ${formatoDinero(dif)}, meta mensual ${meta ? formatoDinero(meta) : "sin meta"}, fondo ${formatoDinero(fondo)}`;
   await registrar(db, {
     barberiaId: b.id, usuarioId: s.usuario.id, tipo: "ajuste", accion: `${s.usuario.nombre} cambió las reglas de cobro y caja`,
     detalle: {
-      antes: txt(b.limiteDescuentoPct, b.limiteDiferenciaCaja, b.metaDiaria, b.fondoPredeterminado),
-      ahora: txt(cambios.limiteDescuentoPct ?? b.limiteDescuentoPct, cambios.limiteDiferenciaCaja ?? b.limiteDiferenciaCaja, cambios.metaDiaria ?? b.metaDiaria, cambios.fondoPredeterminado ?? b.fondoPredeterminado),
+      antes: txt(b.limiteDescuentoPct, b.limiteDiferenciaCaja, b.metaMensual, b.fondoPredeterminado),
+      ahora: txt(cambios.limiteDescuentoPct ?? b.limiteDescuentoPct, cambios.limiteDiferenciaCaja ?? b.limiteDiferenciaCaja, cambios.metaMensual ?? b.metaMensual, cambios.fondoPredeterminado ?? b.fondoPredeterminado),
     },
   });
   revalidatePath("/", "layout");

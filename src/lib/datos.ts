@@ -1,10 +1,11 @@
 // Consultas de lectura. Todas reciben barberiaId desde la sesión: nunca desde la URL ni el formulario.
 
-import { and, asc, desc, eq, gte, inArray, isNotNull, isNull, lte, sql } from "drizzle-orm";
+import { and, asc, desc, eq, gte, inArray, isNotNull, isNull, lte, sql, type SQL } from "drizzle-orm";
 import { efectivoEsperado, type MovimientosTurno } from "./caja";
-import type { Regla, ReglaCopia } from "./comisiones";
+import { porSemana, type Regla, type ReglaCopia } from "./comisiones";
 import { db, schema } from "./db";
-import { fechaLocal, horaLocal, ZONA } from "./fechas";
+import { fechaLocal, horaLocal, sumarDias, ZONA } from "./fechas";
+import { type BarberoMeta, diasHabilesDelMes, metaDelNegocio } from "./metas";
 
 const s = schema;
 
@@ -100,7 +101,7 @@ export type VentaFila = {
 };
 
 /** Ventas por su fecha y hora reales en la zona de la barbería, de la más reciente a la más antigua. */
-export async function ventasEntre(barberiaId: string, desde: string, hasta: string, opciones: { barberoId?: string; zona?: string } = {}) {
+export async function ventasEntre(barberiaId: string, desde: string, hasta: string, opciones: { barberoId?: string; zona?: string; condiciones?: SQL[] } = {}) {
   const dia = sql<string>`to_char(${s.ventas.creadoEn} at time zone ${opciones.zona ?? ZONA}, 'YYYY-MM-DD')`;
   const filas = await db
     .select({
@@ -111,7 +112,7 @@ export async function ventasEntre(barberiaId: string, desde: string, hasta: stri
     .from(s.ventas)
     .innerJoin(s.turnosCaja, eq(s.turnosCaja.id, s.ventas.turnoId))
     .innerJoin(s.usuarios, eq(s.usuarios.id, s.ventas.registradaPor))
-    .where(and(eq(s.ventas.barberiaId, barberiaId), sql`${dia} between ${desde} and ${hasta}`))
+    .where(and(eq(s.ventas.barberiaId, barberiaId), sql`${dia} between ${desde} and ${hasta}`, ...(opciones.condiciones ?? [])))
     .orderBy(desc(s.ventas.creadoEn));
   if (filas.length === 0) return { ventas: [] as (VentaFila & { conceptos: ConceptoFila[]; pagos: PagoFila[]; propinas: PropinaFila[] })[] };
   const ids = filas.map((f) => f.id);
@@ -151,8 +152,17 @@ type PagoFila = { ventaId: string; metodo: string; esEfectivo: boolean; monto: n
 type PropinaFila = { ventaId: string; barberoId: string; monto: number; esEfectivo: boolean };
 
 /** Resumen de un periodo. Ventas = lo cobrado por servicios ya con descuento; sin propinas ni ventas canceladas. */
-export async function resumenPeriodo(barberiaId: string, desde: string, hasta: string, zona = ZONA) {
-  const { ventas } = await ventasEntre(barberiaId, desde, hasta, { zona });
+export async function resumenPeriodo(barberiaId: string, desde: string, hasta: string, zona = ZONA, barberoId?: string) {
+  let { ventas } = await ventasEntre(barberiaId, desde, hasta, { zona, barberoId });
+  if (barberoId) {
+    // Solo lo de esa persona: sus servicios, y los pagos en proporción a lo que le toca de cada venta.
+    ventas = ventas.map((v) => {
+      const suyos = v.conceptos.filter((c) => c.barberoId === barberoId);
+      const total = suyos.reduce((a, c) => a + c.precioCobrado, 0);
+      const parte = v.total ? total / v.total : 0;
+      return { ...v, conceptos: suyos, total, pagos: v.pagos.map((p) => ({ ...p, monto: Math.round(p.monto * parte) })), propinas: v.propinas.filter((p) => p.barberoId === barberoId) };
+    });
+  }
   const pagadas = ventas.filter((v) => v.estado === "pagada");
   const brutas = pagadas.reduce((a, v) => a + v.conceptos.reduce((b, c) => b + c.precioLista, 0), 0);
   const descuentos = pagadas.reduce((a, v) => a + v.conceptos.reduce((b, c) => b + c.descuento, 0), 0);
@@ -263,7 +273,7 @@ export async function turnosCerrados(barberiaId: string, limite = 30, rango?: { 
       id: s.turnosCaja.id, fechaOperativa: s.turnosCaja.fechaOperativa, abiertoEn: s.turnosCaja.abiertoEn, cerradoEn: s.turnosCaja.cerradoEn,
       fondoInicial: s.turnosCaja.fondoInicial, efectivoEsperado: s.turnosCaja.efectivoEsperado, efectivoContado: s.turnosCaja.efectivoContado,
       diferencia: s.turnosCaja.diferencia, notasCierre: s.turnosCaja.notasCierre, cerradoPor: s.usuarios.nombre,
-      verificacion: s.turnosCaja.verificacion, abiertoPor: s.turnosCaja.abiertoPor,
+      verificacion: s.turnosCaja.verificacion, abiertoPor: s.turnosCaja.abiertoPor, cerradoPorId: s.turnosCaja.cerradoPor,
     })
     .from(s.turnosCaja)
     .leftJoin(s.usuarios, eq(s.usuarios.id, s.turnosCaja.cerradoPor))
@@ -335,4 +345,70 @@ export async function categoriasGasto(barberiaId: string, soloActivas = true) {
     .from(s.categoriasGasto)
     .where(and(eq(s.categoriasGasto.barberiaId, barberiaId), ...(soloActivas ? [eq(s.categoriasGasto.activo, true)] : [])))
     .orderBy(asc(s.categoriasGasto.orden), asc(s.categoriasGasto.nombre));
+}
+
+/** Días con ventas (del más reciente al más viejo) y totales, con las mismas condiciones que la lista. */
+export async function diasYTotalVentas(barberiaId: string, zona: string, f: { desde?: string; hasta?: string; persona: string; condiciones: SQL[] }) {
+  const dia = sql<string>`to_char(${s.ventas.creadoEn} at time zone ${zona}, 'YYYY-MM-DD')`;
+  const cond = and(
+    eq(s.ventas.barberiaId, barberiaId),
+    ...(f.desde && f.hasta ? [sql`(${s.ventas.creadoEn} at time zone ${zona})::date between ${f.desde}::date and ${f.hasta}::date`] : []),
+    ...f.condiciones,
+  );
+  const monto = f.persona
+    ? sql<number>`coalesce(sum(case when ${s.ventas.estado} = 'pagada' then (select coalesce(sum(c.precio_cobrado),0) from ${s.conceptos} c where c.venta_id = ${s.ventas.id} and c.barbero_id = ${f.persona}) else 0 end),0)::int`
+    : sql<number>`coalesce(sum(case when ${s.ventas.estado} = 'pagada' then ${s.ventas.total} else 0 end),0)::int`;
+  const [dias, [t]] = await Promise.all([
+    db.select({ d: dia }).from(s.ventas).where(cond).groupBy(sql`1`).orderBy(sql`1 desc`),
+    db.select({ n: sql<number>`count(*) filter (where ${s.ventas.estado} = 'pagada')::int`, monto }).from(s.ventas).where(cond),
+  ]);
+  return { dias: dias.map((x) => x.d), ventas: t.n, monto: t.monto };
+}
+
+/** Para filtrar historiales: el equipo activo más quien ya no está pero tiene ventas registradas. */
+export async function equipoConVentas(barberiaId: string) {
+  return db
+    .select({ id: s.usuarios.id, nombre: s.usuarios.nombre, avatar: s.usuarios.avatar })
+    .from(s.usuarios)
+    .where(and(eq(s.usuarios.barberiaId, barberiaId), sql`(
+      (${s.usuarios.activo} and ${s.usuarios.rol} in ('barbera', 'encargada'))
+      or exists (select 1 from ${s.conceptos} c where c.barbero_id = ${s.usuarios.id}))`))
+    .orderBy(asc(s.usuarios.nombre));
+}
+
+/** La meta diaria de cada barbero y del negocio, a partir de la meta mensual. Null si no hay meta mensual. */
+export async function metasDelMes(barberiaId: string, metaMensual: number, zona: string, hoy: string) {
+  if (!metaMensual) return null;
+  const d = await datosParaMeta(barberiaId, zona, hoy);
+  return metaDelNegocio(metaMensual, d.egresos, d.barberos, d.dias);
+}
+
+/** Lo que se necesita para calcular la meta: egresos de un mes normal, cómo se le paga a cada quien y cuánto trabaja. */
+export async function datosParaMeta(barberiaId: string, zona: string, hoy: string) {
+  const desde60 = sumarDias(hoy, -60);
+  const inicioMes = `${hoy.slice(0, 7)}-01`;
+  const hace3 = `${sumarDias(inicioMes, -85).slice(0, 7)}-01`;
+  const [equipo, reglas, ventas, [g], hist] = await Promise.all([
+    equipoQueAtiende(barberiaId),
+    db.select().from(s.reglasComision).where(and(eq(s.reglasComision.barberiaId, barberiaId), isNull(s.reglasComision.vigenteHasta), isNull(s.reglasComision.servicioId))),
+    db.select({ id: s.conceptos.barberoId, monto: sql<number>`sum(${s.conceptos.precioCobrado})::int`, n: sql<number>`count(*)::int` })
+      .from(s.conceptos).innerJoin(s.ventas, eq(s.ventas.id, s.conceptos.ventaId))
+      .where(and(eq(s.ventas.barberiaId, barberiaId), eq(s.ventas.estado, "pagada"), sql`(${s.ventas.creadoEn} at time zone ${zona})::date >= ${desde60}::date`))
+      .groupBy(s.conceptos.barberoId),
+    db.select({ total: sql<number>`coalesce(sum(${s.gastos.monto}),0)::int`, meses: sql<number>`count(distinct to_char(${s.gastos.fecha}, 'YYYY-MM'))::int` })
+      .from(s.gastos).where(and(eq(s.gastos.barberiaId, barberiaId), gte(s.gastos.fecha, hace3), lte(s.gastos.fecha, sumarDias(inicioMes, -1)), isNull(s.gastos.canceladoEn))),
+    db.select({ egresos: s.historicoMensual.egresos }).from(s.historicoMensual).where(eq(s.historicoMensual.barberiaId, barberiaId)).orderBy(desc(s.historicoMensual.mes)).limit(3),
+  ]);
+  // Egresos de un mes normal: el promedio de los últimos meses registrados; si aún no hay, lo del Excel.
+  const egresos = g.meses > 0 ? Math.round(g.total / g.meses) : hist.length ? Math.round(hist.reduce((a, h) => a + h.egresos, 0) / hist.length) : 0;
+  const barberos: BarberoMeta[] = equipo.map((e) => {
+    const r = reglas.find((x) => x.barberoId === e.id);
+    const v = ventas.find((x) => x.id === e.id);
+    return {
+      id: e.id, nombre: e.nombre, tipo: r?.tipo ?? null, porcentaje: r?.porcentaje ?? 0, montoFijo: r?.montoFijo ?? 0,
+      mensual: r ? Math.round((porSemana(r.montoSemanal, r.periodo) * 52) / 12) : 0,
+      peso: v?.monto ?? 0, ticket: v && v.n ? Math.round(v.monto / v.n) : 0,
+    };
+  });
+  return { egresos, barberos, dias: diasHabilesDelMes(hoy.slice(0, 7)) };
 }

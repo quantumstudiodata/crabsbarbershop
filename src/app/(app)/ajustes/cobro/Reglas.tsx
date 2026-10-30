@@ -2,7 +2,9 @@
 
 import { useState } from "react";
 import { Fl } from "@/components/Icono";
+import { type BarberoMeta, metaDelNegocio } from "@/lib/metas";
 import { formatoDinero } from "@/lib/money";
+import { Funciones, type Funcion } from "./Funciones";
 import { guardarReglas } from "./actions";
 
 /** Un ajuste con botones rápidos, control deslizante y una vista previa de lo que significa. */
@@ -23,24 +25,25 @@ function Ajuste({ name, titulo, ayuda, inicial, opciones, max, paso, formato, vi
       <div className="billetes">
         {opciones.map((o) => <button type="button" key={o} className={v === o ? "on" : ""} onClick={() => setV(o)}>{formato(o)}</button>)}
       </div>
-      <p className="vista-a">{vista(v)}</p>
+      <div className="vista-a">{vista(v)}</div>
     </div>
   );
 }
 
-export function ReglasCobro({ descuento, autorizan }: { descuento: number; autorizan: string }) {
+export function ReglasCobro({ descuento, autorizan, funciones }: { descuento: number; autorizan: string; funciones: Funcion[] }) {
   return (
     <form action={guardarReglas} className="glass panel bloque-a">
       <span className="lab">2. Reglas de cobro</span>
-      <Ajuste name="descuento" titulo="Descuento sin autorización" ayuda="Hasta cuánto puede descontar un barbero por su cuenta."
-        inicial={descuento} opciones={[0, 10, 15, 20, 30]} max={50} paso={5} formato={(v) => `${v}%`}
-        vista={(v) => v === 0 ? <>Ningún barbero puede dar descuentos sin autorización.</> : <>En un corte de $150, un barbero puede descontar hasta <b>{formatoDinero(Math.round(15000 * v / 100))}</b>. Más que eso lo autoriza: {autorizan}.</>} />
+      <Funciones funciones={funciones} />
+      <Ajuste name="descuento" titulo="Autorización de descuentos" ayuda="Hasta cuánto puede descontar un barbero por su cuenta. Más que eso lo autoriza alguien con permiso."
+        inicial={descuento} opciones={[0, 10, 20, 50, 100]} max={100} paso={5} formato={(v) => `${v}%`}
+        vista={(v) => v === 0 ? <>Ningún barbero puede dar descuentos sin autorización.</> : v === 100 ? <>Un barbero puede dar cualquier descuento por su cuenta, hasta dejar el servicio gratis.</> : <>En un corte de $150, un barbero puede descontar hasta <b>{formatoDinero(Math.round(15000 * v / 100))}</b>. Más que eso lo autoriza: {autorizan}.</>} />
       <div className="acciones"><button className="bt">Guardar<Fl /></button></div>
     </form>
   );
 }
 
-export function CajaObjetivos({ fondo, diferencia, meta }: { fondo: number; diferencia: number; meta: number }) {
+export function CajaObjetivos({ fondo, diferencia, metaMensual, datosMeta }: { fondo: number; diferencia: number; metaMensual: number; datosMeta: { egresos: number; barberos: BarberoMeta[]; dias: number } }) {
   return (
     <form action={guardarReglas} className="glass panel bloque-a">
       <span className="lab">3. Caja y objetivos</span>
@@ -50,10 +53,31 @@ export function CajaObjetivos({ fondo, diferencia, meta }: { fondo: number; dife
       <Ajuste name="diferencia" titulo="Diferencia permitida al cerrar" ayuda="Si al contar falta o sobra más, se pide explicar qué pasó."
         inicial={diferencia} opciones={[0, 20, 50, 100]} max={500} paso={10} formato={(v) => formatoDinero(v * 100)}
         vista={(v) => v ? <>Faltar o sobrar hasta <b>{formatoDinero(v * 100)}</b> no pide explicación.</> : <>Cualquier diferencia pide explicación.</>} />
-      <Ajuste name="meta" titulo="Meta de ventas por día" ayuda="Se muestra en Inicio con su barra de avance."
-        inicial={meta} opciones={[0, 2000, 4000, 6000]} max={20000} paso={500} formato={(v) => (v ? formatoDinero(v * 100) : "Automática")}
-        vista={(v) => v ? <>La meta de cada día será <b>{formatoDinero(v * 100)}</b>.</> : <>Se calcula sola con las ventas; al principio es de $4,000.</>} />
+      <Ajuste name="metaMensual" titulo="Meta mensual del negocio" ayuda="Lo que el negocio quiere que le quede al mes. Con esto se calcula cuánto debe cobrar cada barbero al día."
+        inicial={metaMensual} opciones={[0, 10000, 20000, 40000]} max={150000} paso={1000} formato={(v) => (v ? formatoDinero(v * 100) : "Sin meta")}
+        vista={(v) => <VistaMeta meta={v} datos={datosMeta} />} />
       <div className="acciones"><button className="bt">Guardar<Fl /></button></div>
     </form>
+  );
+}
+
+/** Cómo queda la meta de cada barbero con la meta mensual elegida. */
+function VistaMeta({ meta, datos }: { meta: number; datos: { egresos: number; barberos: BarberoMeta[]; dias: number } }) {
+  if (!meta) return <>Sin meta mensual, la meta de cada día se calcula sola con lo que se ha vendido.</>;
+  const r = metaDelNegocio(meta * 100, datos.egresos, datos.barberos, datos.dias);
+  return (
+    <div className="vista-meta">
+      <span>Para que al negocio le queden <b>{formatoDinero(meta * 100)}</b> al mes hay que cubrir <b>{formatoDinero(r.cubrir)}</b>:
+        la meta{r.egresos ? <>, más {formatoDinero(r.egresos)} de egresos de un mes normal</> : null}{r.sueldos ? <>, más {formatoDinero(r.sueldos)} de sueldos</> : null}{r.rentas ? <>, menos {formatoDinero(r.rentas)} de rentas de silla</> : null}.</span>
+      <div className="metas-b">
+        {r.porBarbero.map((b) => (
+          <div key={b.id}>
+            <b>{b.nombre.split(" ")[0]}</b>
+            {b.aplica ? <><span className="num">{formatoDinero(b.diaria)} al día</span><small>Al negocio le queda el {b.parteNegocio}% de lo que cobra</small></> : <><span className="muted">Sin meta</span><small>Paga renta de silla</small></>}
+          </div>
+        ))}
+      </div>
+      <span>Meta del negocio por día: <b>{formatoDinero(r.diaria)}</b>, en {datos.dias} días de trabajo.</span>
+    </div>
   );
 }

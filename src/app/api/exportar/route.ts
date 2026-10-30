@@ -5,6 +5,7 @@ import { describirRegla, elegirRegla } from "@/lib/comisiones";
 import { ajustesDeTurnos, copiaRegla, equipoQueAtiende, foliosCorte, reglasDe, turnosCerrados, ventasEntre } from "@/lib/datos";
 import { db, schema } from "@/lib/db";
 import { diasEntre, esFechaValida, fechaLocal, horaCorta, lunesDe, sumarDias } from "@/lib/fechas";
+import { condicionVentas, filtrarCortes } from "@/lib/filtros";
 import { formatoDinero } from "@/lib/money";
 
 export const dynamic = "force-dynamic";
@@ -19,11 +20,11 @@ function celda(v: unknown): string {
 }
 const csv = (filas: Filas) => "﻿" + filas.map((f) => f.map(celda).join(",")).join("\r\n");
 
-async function ventas(bId: string, desde: string, hasta: string, zona: string): Promise<Filas> {
-  const { ventas } = await ventasEntre(bId, desde, hasta, { zona });
+async function ventas(bId: string, desde: string, hasta: string, zona: string, f: { persona: string; buscar: string }): Promise<Filas> {
+  const { ventas } = await ventasEntre(bId, desde, hasta, { zona, condiciones: condicionVentas(f) });
   const filas: Filas = [["Fecha", "Hora", "Folio", "Estado", "Servicio", "Atendió", "Precio de lista", "Descuento", "Cobrado", "Comisión", "Formas de pago", "Motivo de cancelación"]];
   for (const v of [...ventas].reverse()) {
-    for (const c of v.conceptos) {
+    for (const c of v.conceptos.filter((x) => !f.persona || x.barberoId === f.persona)) {
       filas.push([v.fecha, horaCorta(v.creadoEn, zona), v.folio, v.estado, c.nombre, c.barbero, pesos(c.precioLista), pesos(c.descuento), pesos(c.precioCobrado), pesos(c.comision),
         v.pagos.map((p) => `${p.metodo} ${pesos(p.monto)}`).join(" y "), v.motivoCancelacion ?? ""]);
     }
@@ -37,9 +38,13 @@ async function gastos(bId: string, desde: string, hasta: string): Promise<Filas>
     ...gs.map((g) => [g.fecha, g.categoria, g.concepto, g.descripcion, pesos(g.monto), g.metodo === "transferencia" ? "Transferencia" : "Efectivo", g.turnoId ? "Sí" : "No", g.canceladoEn ? "Cancelado" : "Vigente", g.motivoCancelacion ?? ""])];
 }
 
-async function cortes(bId: string, desde: string, hasta: string, zona: string): Promise<Filas> {
-  const ts = await turnosCerrados(bId, 1000, { desde, hasta });
-  const [aj, folios] = await Promise.all([ajustesDeTurnos(bId, ts.map((t) => t.id)), foliosCorte(bId)]);
+async function cortes(bId: string, desde: string, hasta: string, zona: string, f: { persona: string; buscar: string }): Promise<Filas> {
+  const [todos, folios, gente] = await Promise.all([
+    turnosCerrados(bId, 100000, { desde, hasta }), foliosCorte(bId),
+    db.select({ id: schema.usuarios.id, nombre: schema.usuarios.nombre }).from(schema.usuarios).where(eq(schema.usuarios.barberiaId, bId)),
+  ]);
+  const ts = filtrarCortes(todos, f, folios, new Map(gente.map((g) => [g.id, g.nombre])));
+  const aj = await ajustesDeTurnos(bId, ts.map((t) => t.id));
   const filas: Filas = [["Folio", "Día", "Abrió", "Cerró", "Cerró quien", "Fondo de apertura", "Efectivo esperado", "Efectivo contado", "Diferencia", "Otras formas de pago", "Notas", "Correcciones"]];
   for (const t of ts) {
     const ver = Object.entries((t.verificacion ?? {}) as Record<string, { total: number; coincide?: boolean }>).map(([m, v]) => `${m} ${pesos(v.total)}${v.coincide === false ? " no coincide" : ""}`).join("; ");
@@ -105,23 +110,26 @@ export async function GET(req: Request) {
   const tipo = u.searchParams.get("tipo");
   const zona = s.barberia.zonaHoraria;
   const hoy = fechaLocal(new Date(), zona);
+  // Sin fechas se descarga todo el historial.
   const d = u.searchParams.get("desde"), h = u.searchParams.get("hasta");
-  const desde = esFechaValida(d) ? d : sumarDias(hoy, -30);
-  const hasta = esFechaValida(h) ? h : hoy;
-  if (desde > hasta || diasEntre(desde, hasta) > 400) return new Response("Rango de fechas no válido.", { status: 400 });
+  const conFechas = esFechaValida(d) && esFechaValida(h);
+  const desde = conFechas ? d : "2000-01-01";
+  const hasta = conFechas ? h : hoy;
+  if (desde > hasta || diasEntre(desde, hasta) > 10000) return new Response("Rango de fechas no válido.", { status: 400 });
+  const f = { persona: /^[0-9a-f-]{36}$/.test(u.searchParams.get("persona") ?? "") ? u.searchParams.get("persona")! : "", buscar: (u.searchParams.get("q") ?? "").trim().slice(0, 60) };
   const bId = s.barberia.id;
 
   const hojas: Record<string, () => Promise<[string, Filas]>> = {
-    ventas: async () => ["Ventas", await ventas(bId, desde, hasta, zona)],
+    ventas: async () => ["Ventas", await ventas(bId, desde, hasta, zona, f)],
     gastos: async () => ["Gastos", await gastos(bId, desde, hasta)],
-    cortes: async () => ["Cortes de caja", await cortes(bId, desde, hasta, zona)],
+    cortes: async () => ["Cortes de caja", await cortes(bId, desde, hasta, zona, f)],
     equipo: async () => ["Equipo", await equipo(bId, desde, hasta, zona)],
     pagos: async () => ["Pagos al equipo", await pagosEquipo(bId, desde, hasta)],
   };
   const elegidas = tipo === "todo" ? Object.keys(hojas) : tipo && tipo in hojas ? [tipo] : [];
   if (elegidas.length === 0) return new Response("Tipo de reporte no válido.", { status: 400 });
   const datos = await Promise.all(elegidas.map((k) => hojas[k]()));
-  const base = `${tipo === "todo" ? "cierre" : tipo}_${desde}_${hasta}`;
+  const base = `${tipo === "todo" ? "cierre" : tipo}_${conFechas ? `${desde}_${hasta}` : "todo"}`;
 
   if (u.searchParams.get("formato") === "csv") {
     const filas: Filas = datos.length === 1 ? datos[0][1] : datos.flatMap(([t, f]) => [[], [t.toUpperCase()], ...f]);

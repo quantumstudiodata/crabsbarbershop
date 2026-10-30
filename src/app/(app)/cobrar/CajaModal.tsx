@@ -1,6 +1,7 @@
 "use client";
 
 import { useActionState, useEffect, useState } from "react";
+import { Avatar } from "@/components/Avatar";
 import { Fl, Icono } from "@/components/Icono";
 import { Modal } from "@/components/ui";
 import type { MovimientosTurno } from "@/lib/caja";
@@ -8,10 +9,16 @@ import { formatoDinero, leerPesos } from "@/lib/money";
 import { abrirCaja, cerrarCaja, registrarGasto, registrarMovimiento, type EstadoCaja, type ResumenCorte } from "../caja/actions";
 
 export type Turno = {
-  desde: string; abrio: string; dia: string; deOtroDia: boolean; folioCorte: string; m: MovimientosTurno; esperado: number; ventas: number;
+  desde: string; abrio: string; abrioAvatar: string; abiertoEn: string; dia: string; deOtroDia: boolean; folioCorte: string; m: MovimientosTurno; esperado: number; ventas: number;
   propinas: number; otros: { metodo: string; total: number; ventas: number }[];
 };
 type Vista = "retiro" | "gasto" | "corte";
+
+/** "2 h 15 min abierta" */
+const duracion = (iso: string) => {
+  const min = Math.max(0, Math.round((Date.now() - new Date(iso).getTime()) / 60000));
+  return min < 60 ? `${min} min abierta` : `${Math.floor(min / 60)} h ${min % 60} min abierta`;
+};
 
 const abrir = (v: Vista) => window.dispatchEvent(new CustomEvent("crabs:caja", { detail: v }));
 
@@ -57,8 +64,8 @@ export function CajaPendiente({ dia, opera }: { dia: string; opera: boolean }) {
   return (
     <section className="caja-puerta alerta subir">
       <span className="icono-caja"><Icono n="reloj" /></span>
-      <h1 className="titulo">La caja del {dia} no se cerró</h1>
-      <p className="muted">Ya pasaron las 12 de la noche.<br />Haz el corte de caja para seguir cobrando.</p>
+      <h1 className="titulo">La caja del {dia} sigue abierta</h1>
+      <p className="muted">El día ha terminado y aún no se ha realizado el corte de caja.<br />Realiza el cierre para iniciar una nueva jornada de cobros.</p>
       {opera ? <button type="button" className="bt grande" style={{ width: "min(360px, 100%)" }} onClick={() => abrir("corte")}>Hacer corte de caja<Fl /></button>
         : <p className="muted">Pide que hagan el corte.</p>}
     </section>
@@ -160,7 +167,11 @@ export function CajaModal({ inicial, turno, limiteDiferencia, categorias }: { in
   return (
     <Modal abierto cerrar={cerrar} etiqueta={`Folio ${turno.folioCorte}`} titulo="Corte de caja">
       <form action={accCerrar} className="pila">
-        <p className="muted" style={{ fontSize: 13, marginTop: -6 }}>{turno.desde} a ahora - Abrió {turno.abrio} - {turno.ventas} {turno.ventas === 1 ? "venta" : "ventas"}</p>
+        <div className="turno-c">
+          <span className="dato-t"><Icono n="reloj" /><span><small>Turno</small><b>{turno.desde} a ahora</b><em>{duracion(turno.abiertoEn)}</em></span></span>
+          <span className="dato-t"><Avatar avatar={turno.abrioAvatar} nombre={turno.abrio} t={30} /><span><small>Abrió</small><b>{turno.abrio}</b></span></span>
+          <span className="dato-t"><Icono n="lista" /><span><small>Ventas</small><b className="num">{turno.ventas}</b></span></span>
+        </div>
         <div className="resumen-c">
           <span className="lab">Resumen de cobros</span>
           {metodos.map((x) => <div key={x.metodo}><span>{x.metodo}</span><span className="num">{formatoDinero(x.total)}</span></div>)}
@@ -182,9 +193,8 @@ export function CajaModal({ inicial, turno, limiteDiferencia, categorias }: { in
             {m.propinasEfectivo > 0 && <div><span>Propinas en efectivo</span><span className="num">+{formatoDinero(m.propinasEfectivo)}</span></div>}
             {m.entradas > 0 && <div><span>Entradas</span><span className="num">+{formatoDinero(m.entradas)}</span></div>}
             <div><span>Retiros y gastos</span><span className="num">−{formatoDinero(m.retiros + m.gastosDeCaja + m.devolucionesEfectivo)}</span></div>
-            <div className="total-c"><span>Debe haber en caja</span><b>{formatoDinero(turno.esperado)}</b></div>
+            <div className="total-c"><span>Efectivo esperado</span><b>{formatoDinero(turno.esperado)}</b></div>
           </div>
-          <small className="muted">Tarjeta y transferencia cuentan en las ventas, pero no están en la caja física.</small>
         </details>
         <label className="campo">
           <span>Observaciones</span>

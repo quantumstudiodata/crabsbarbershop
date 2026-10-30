@@ -1,12 +1,12 @@
 import { redirect } from "next/navigation";
 import { Grafica } from "@/components/Grafica";
-import { Icono } from "@/components/Icono";
-import { SelectorPeriodo } from "@/components/Periodo";
+import { BarraFiltros } from "@/components/BarraFiltros";
 import { Cuenta } from "@/components/ui";
 import { requerirSesion } from "@/lib/auth";
-import { resumenPeriodo, ventasEntre } from "@/lib/datos";
+import { equipoConVentas, resumenPeriodo, ventasEntre } from "@/lib/datos";
 import { diasEntre, fechaCorta, fechaLocal, inicioDeMes, sumarDias } from "@/lib/fechas";
 import { cambio, formatoDinero, porcentaje } from "@/lib/money";
+import { type ConsultaFiltros, urlDescarga } from "@/lib/filtros";
 import { leerPeriodo } from "@/lib/periodo";
 import { serieHoy } from "@/lib/series";
 
@@ -16,12 +16,18 @@ const TONOS = ["#2b3a47", "#6d8597", "#a9b8c5", "#c58a3e", "#8ea5b8"];
 const DIA_CORTO = ["DOM", "LUN", "MAR", "MIÉ", "JUE", "VIE", "SÁB"];
 const MES_CORTO = ["ENE", "FEB", "MAR", "ABR", "MAY", "JUN", "JUL", "AGO", "SEP", "OCT", "NOV", "DIC"];
 
-export default async function Resumen({ searchParams }: { searchParams: Promise<{ periodo?: string; desde?: string; hasta?: string }> }) {
+export default async function Resumen({ searchParams }: { searchParams: Promise<ConsultaFiltros> }) {
   const s = await requerirSesion();
   if (!s.puede("reportes.ver")) redirect(s.puede("ventas.ver_todas") ? "/analitica/ventas" : "/");
   const zona = s.barberia.zonaHoraria;
   const hoy = fechaLocal(new Date(), zona);
-  const p = leerPeriodo(await searchParams, hoy, "mes");
+  const q = await searchParams;
+  const p = leerPeriodo(q, hoy, "mes");
+  const equipo = await equipoConVentas(s.barberia.id);
+  const persona = equipo.some((e) => e.id === q.persona) ? q.persona! : undefined;
+  // Con una persona elegida, cada venta cuenta solo lo que atendió esa persona.
+  const soloDe = <T extends { total: number; conceptos: { barberoId: string; precioCobrado: number }[] }>(vs: T[]) =>
+    persona ? vs.map((v) => ({ ...v, total: v.conceptos.filter((c) => c.barberoId === persona).reduce((a, c) => a + c.precioCobrado, 0) })) : vs;
   const largo = diasEntre(p.desde, p.hasta) + 1;
   const anual = p.tipo === "anio" || largo > 62;
   const dia = p.tipo === "dia";
@@ -35,15 +41,15 @@ export default async function Resumen({ searchParams }: { searchParams: Promise<
   const tramo = diasEntre(p.desde, p.hasta > hoy ? hoy : p.hasta) + 1;
   const prevJusto = dia ? prev : p.tipo === "anio" ? { desde: prev.desde, hasta: p.hasta > hoy ? `${anioAnt}${hoy.slice(4)}` : prev.hasta } : tramo >= largo ? prev : { desde: prev.desde, hasta: (sumarDias(prev.desde, tramo - 1) < prev.hasta ? sumarDias(prev.desde, tramo - 1) : prev.hasta) };
   const [r, completo, justo] = await Promise.all([
-    resumenPeriodo(s.barberia.id, p.desde, p.hasta, zona),
-    resumenPeriodo(s.barberia.id, prev.desde, prev.hasta, zona),
-    resumenPeriodo(s.barberia.id, prevJusto.desde, prevJusto.hasta, zona),
+    resumenPeriodo(s.barberia.id, p.desde, p.hasta, zona, persona),
+    resumenPeriodo(s.barberia.id, prev.desde, prev.hasta, zona, persona),
+    resumenPeriodo(s.barberia.id, prevJusto.desde, prevJusto.hasta, zona, persona),
   ]);
   let previoNetas = justo.netas;
   if (dia && p.desde === hoy) {
     // Hoy: contra lo vendido el mismo día de la semana pasada hasta esta misma hora.
-    const { ventas } = await ventasEntre(s.barberia.id, prev.desde, prev.desde, { zona });
-    previoNetas = ventas.filter((v) => v.estado === "pagada" && v.creadoEn.getTime() <= Date.now() - 7 * 86400000).reduce((a, v) => a + v.total, 0);
+    const { ventas } = await ventasEntre(s.barberia.id, prev.desde, prev.desde, { zona, barberoId: persona });
+    previoNetas = soloDe(ventas).filter((v) => v.estado === "pagada" && v.creadoEn.getTime() <= Date.now() - 7 * 86400000).reduce((a, v) => a + v.total, 0);
   }
   const v = cambio(r.netas, previoNetas);
   const comparacion = dia ? `que el ${DIA_CORTO[new Date(`${prev.desde}T12:00:00Z`).getUTCDay()].toLowerCase()} pasado${p.desde === hoy ? " a esta hora" : ""}` : p.tipo === "anio" ? "que el año pasado a estas alturas" : tramo < largo ? `que los primeros ${tramo} días del periodo anterior` : "que el periodo anterior";
@@ -52,8 +58,8 @@ export default async function Resumen({ searchParams }: { searchParams: Promise<
   const porMes = (mapa: Map<string, number>, anio: string) => Array.from({ length: 12 }, (_, i) => [...mapa.entries()].filter(([d]) => d.startsWith(`${anio}-${String(i + 1).padStart(2, "0")}`)).reduce((a, [, x]) => a + x, 0));
   let serie: { actual: (number | null)[]; previo: number[]; etiquetas: string[]; cada: number; enCurso?: number };
   if (dia) {
-    const { ventas } = await ventasEntre(s.barberia.id, prev.desde, p.desde, { zona });
-    const movs = ventas.filter((x) => x.estado === "pagada" && (x.fecha === p.desde || x.fecha === prev.desde)).map((x) => ({ creadoEn: x.creadoEn, fecha: x.fecha, monto: x.total }));
+    const { ventas } = await ventasEntre(s.barberia.id, prev.desde, p.desde, { zona, barberoId: persona });
+    const movs = soloDe(ventas).filter((x) => x.estado === "pagada" && (x.fecha === p.desde || x.fecha === prev.desde)).map((x) => ({ creadoEn: x.creadoEn, fecha: x.fecha, monto: x.total }));
     serie = serieHoy(movs, p.desde, zona, p.desde === hoy);
   } else if (anual) {
     const y = p.desde.slice(0, 4);
@@ -75,10 +81,8 @@ export default async function Resumen({ searchParams }: { searchParams: Promise<
 
   return (
     <>
-      <div className="entre">
-        <SelectorPeriodo ruta="/analitica" p={p} hoy={hoy} conDia conAnio />
-        {s.puede("reportes.exportar") && <a className="bt sec solo chico" href={`/api/exportar?tipo=ventas&desde=${p.desde}&hasta=${p.hasta}`}><Icono n="descargar" />Descargar</a>}
-      </div>
+      <BarraFiltros p={p} hoy={hoy} personas={equipo} persona={persona ?? ""} buscar="" conBuscar={false}
+        descarga={s.puede("reportes.exportar") ? urlDescarga("ventas", { periodo: p, persona: persona ?? "", buscar: "", pagina: 1 }) : undefined} />
 
       <section className="kpis subir">
         <div className="kpi principal">

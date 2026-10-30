@@ -42,6 +42,8 @@ export const barberias = pgTable("barberias", {
   // Diferencia de caja (centavos) a partir de la cual se exige explicación.
   limiteDiferenciaCaja: integer("limite_diferencia_caja").notNull().default(5000),
   metaDiaria: integer("meta_diaria").notNull().default(0),
+  // Lo que el negocio quiere que le quede al mes (centavos). De aquí sale la meta diaria de cada barbero.
+  metaMensual: integer("meta_mensual").notNull().default(0),
   // Efectivo que se sugiere al abrir la caja (centavos).
   fondoPredeterminado: integer("fondo_predeterminado").notNull().default(0),
   // Funciones opcionales: cada barbería decide cuáles usa.

@@ -10,9 +10,10 @@ import { Avatar } from "./Avatar";
 import { Fl, Icono } from "./Icono";
 import { Modal } from "./ui";
 
-export function MenuUsuario(p: { nombre: string; usuario: string; rol: string; avatar: string; ajustes: boolean; historial: boolean }) {
+export function MenuUsuario(p: { nombre: string; usuario: string; rol: string; avatar: string; ajustes: boolean; historial: boolean; formaPago: string | null }) {
   const [abierto, setAbierto] = useState(false);
   const [elegir, setElegir] = useState(false);
+  const [perfil, setPerfil] = useState(false);
   const [clave, setClave] = useState(false);
   const [avatar, setAvatar] = useState(p.avatar);
   const [propuesto, setPropuesto] = useState(p.avatar);
@@ -31,7 +32,7 @@ export function MenuUsuario(p: { nombre: string; usuario: string; rol: string; a
 
   const guardar = () => {
     setAvatar(propuesto);
-    iniciar(async () => { await cambiarAvatar(propuesto); setElegir(false); });
+    iniciar(async () => { await cambiarAvatar(propuesto); setElegir(false); setPerfil(true); });
   };
   const nombreCorto = p.nombre.split(" ").slice(0, 2).join(" ");
 
@@ -48,15 +49,35 @@ export function MenuUsuario(p: { nombre: string; usuario: string; rol: string; a
             <div className="fila"><Avatar avatar={avatar} nombre={p.nombre} t={44} /><span><b>{p.nombre}</b><small className="muted" style={{ display: "block", fontFamily: "var(--f-mono)", fontSize: 11 }}>{p.usuario}</small></span></div>
             <span className="etiqueta" style={{ width: "max-content" }}>{p.rol}</span>
           </div>
-          <button type="button" role="menuitem" className="it" onClick={() => { setPropuesto(avatar); setElegir(true); setAbierto(false); }}><Icono n="usuario" />Cambiar avatar</button>
+          <button type="button" role="menuitem" className="it" onClick={() => { setPerfil(true); setAbierto(false); }}><Icono n="usuario" />Mi perfil</button>
           {p.ajustes && <Link role="menuitem" className="it" href="/ajustes" onClick={() => setAbierto(false)}><Icono n="ajustes" />Ajustes</Link>}
           {p.historial && <Link role="menuitem" className="it" href="/historial" onClick={() => setAbierto(false)}><Icono n="historial" />Historial</Link>}
-          <button type="button" role="menuitem" className="it" onClick={() => { setVez((v) => v + 1); setClave(true); setAbierto(false); }}><Icono n="candado" />Cambiar contraseña</button>
           <div className="separador" style={{ margin: "4px 0" }} />
           <form action={salir}><button role="menuitem" className="it salir"><Icono n="salir" />Salir</button></form>
         </div>
       )}
-      <Modal abierto={elegir} cerrar={() => setElegir(false)} etiqueta="Tu perfil" titulo="Elige tu avatar" ancho>
+      <Modal abierto={perfil} cerrar={() => setPerfil(false)} etiqueta="Tu cuenta" titulo="Mi perfil">
+        <div className="perfil">
+          <button type="button" className="perfil-av" onClick={() => { setPropuesto(avatar); setPerfil(false); setElegir(true); }} aria-label="Cambiar avatar" title="Cambiar avatar">
+            <Avatar avatar={avatar} nombre={p.nombre} t={96} />
+            <span className="lapiz" aria-hidden="true"><Icono n="editar" /></span>
+          </button>
+          <b className="perfil-n">{p.nombre}</b>
+          <span className="etiqueta">{p.rol}</span>
+        </div>
+        <div className="perfil-datos">
+          <div><small>Nombre</small><span>{p.nombre}</span></div>
+          <div><small>Puesto</small><span>{p.rol}</span></div>
+          <div><small>Usuario</small><span className="mono">{p.usuario}</span></div>
+          {p.formaPago && <div><small>Tipo de pago</small><span>{p.formaPago}</span></div>}
+        </div>
+        <p className="ayuda-txt" style={{ textAlign: "center" }}>Para cambiar tus datos, pídeselo al propietario.</p>
+        <div className="acciones">
+          <button type="button" className="bt sec solo" onClick={() => { setPerfil(false); setVez((v) => v + 1); setClave(true); }}><Icono n="candado" />Cambiar contraseña</button>
+          <button type="button" className="bt" onClick={() => setPerfil(false)}>Listo<span className="fl" aria-hidden="true"><Icono n="palomita" /></span></button>
+        </div>
+      </Modal>
+      <Modal abierto={elegir} cerrar={() => { setElegir(false); setPerfil(true); }} etiqueta="Mi perfil" titulo="Elige tu avatar" ancho>
         <div className="carrusel-av">
           <button type="button" className="icb flecha-c" aria-label="Anteriores" onClick={(e) => e.currentTarget.parentElement?.querySelector(".pista")?.scrollBy({ left: -270, behavior: "smooth" })}><Icono n="izquierda" /></button>
           <div className="pista" role="radiogroup" aria-label="Avatares">
@@ -70,7 +91,7 @@ export function MenuUsuario(p: { nombre: string; usuario: string; rol: string; a
           <button type="button" className="icb flecha-c" aria-label="Siguientes" onClick={(e) => e.currentTarget.parentElement?.querySelector(".pista")?.scrollBy({ left: 270, behavior: "smooth" })}><Icono n="derecha" /></button>
         </div>
         <div className="acciones">
-          <button type="button" className="bt sec solo" onClick={() => setElegir(false)}>Cancelar</button>
+          <button type="button" className="bt sec solo" onClick={() => { setElegir(false); setPerfil(true); }}>Cancelar</button>
           <button type="button" className="bt" disabled={pendiente} onClick={guardar}>{pendiente ? "Guardando…" : "Listo"}<span className="fl" aria-hidden="true"><Icono n="palomita" /></span></button>
         </div>
       </Modal>
