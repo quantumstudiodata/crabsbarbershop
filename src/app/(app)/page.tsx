@@ -6,10 +6,11 @@ import { Ayuda } from "@/components/Ayuda";
 import { Aviso, AvisoUrl } from "@/components/Encabezado";
 import { Grafica } from "@/components/Grafica";
 import { Icono } from "@/components/Icono";
+import { ActividadBarbero } from "./ActividadBarbero";
 import { AvisoCajaEmergente } from "./AvisoCaja";
 import { Cuenta } from "@/components/ui";
 import { requerirSesion } from "@/lib/auth";
-import { diasConVentas, equipoQueAtiende, metasDelMes, movimientosDeTurno, turnoAbierto, ventasEntre } from "@/lib/datos";
+import { diasConVentas, equipoQueAtiende, foliosCorte, metasDelMes, turnosCerrados, movimientosDeTurno, turnoAbierto, ventasEntre } from "@/lib/datos";
 import { db, schema } from "@/lib/db";
 import { fechaLarga, fechaLocal, horaCorta, lunesDe, nombreDia, sumarDias } from "@/lib/fechas";
 import { calcularMeta } from "@/lib/metas";
@@ -170,6 +171,16 @@ async function InicioBarbero({ s, hoy, zona, q, avisos }: { s: Sesion; hoy: stri
   const movs: Movimiento[] = mios.map((c) => ({ creadoEn: c.creadoEn, fecha: c.fecha, monto: c.precioCobrado }));
   const deHoy = mios.filter((c) => c.fecha === hoy);
   const recientes = [...mios].sort((a, b) => b.creadoEn.getTime() - a.creadoEn.getTime()).slice(0, 10);
+  // También lo del equipo y los cortes de caja recientes, para que el barbero vea qué ha pasado.
+  const [{ ventas: todas }, cortes, folios, gente] = await Promise.all([
+    ventasEntre(s.barberia.id, sumarDias(hoy, -14), hoy, { zona }),
+    turnosCerrados(s.barberia.id, 8),
+    foliosCorte(s.barberia.id),
+    equipoQueAtiende(s.barberia.id),
+  ]);
+  const delEquipo = todas.slice(0, 10);
+  const avatarDe = (id?: string) => gente.find((g) => g.id === id)?.avatar ?? "iniciales";
+  const cuando = (fecha: string, d: Date) => (fecha === hoy ? horaCorta(d, zona) : fecha === sumarDias(hoy, -1) ? "Ayer" : `${fecha.slice(8)}/${fecha.slice(5, 7)}`);
   const totalHoy = deHoy.reduce((a, c) => a + c.precioCobrado, 0);
   const semana = mios.filter((c) => c.fecha >= lunes).reduce((a, c) => a + c.precioCobrado, 0);
   const limite = Date.now() - 7 * 86400000;
@@ -217,21 +228,14 @@ async function InicioBarbero({ s, hoy, zona, q, avisos }: { s: Sesion; hoy: stri
         </div>
         <div className="glass panel subir d2">
           <div className="entre">
-            <span className="lab">Tu actividad reciente</span>
+            <span className="lab">Actividad reciente</span>
             <Link className="bt solo chico" href="/cobrar"><Icono n="mas" />Registrar</Link>
           </div>
-          {recientes.length === 0 ? <p className="muted">Aquí aparecerán tus servicios en cuanto se cobren.</p> : (
-            <div className="feed">
-              {recientes.map((c, i) => (
-                <div key={i} className="subir" style={{ animationDelay: `${0.25 + i * 0.06}s` }}>
-                  <span className="t">{c.fecha === hoy ? horaCorta(c.creadoEn, zona) : c.fecha === sumarDias(hoy, -1) ? "Ayer" : c.fecha.slice(8) + "/" + c.fecha.slice(5, 7)}</span>
-                  <span><b style={{ fontWeight: 600 }}>{c.nombre}</b><small>{formatoDinero(c.precioCobrado)}, {[...new Set(c.metodos)].join(" y ")}</small></span>
-                  <span />
-                </div>
-              ))}
-            </div>
-          )}
-          {recientes.length > 0 && <Link href="/mis-ventas" className="enlace" style={{ display: "inline-block", paddingTop: 12 }}>Ver todo en Mis ventas</Link>}
+          <ActividadBarbero
+            mios={recientes.map((c, i) => ({ id: `m${i}`, t: cuando(c.fecha, c.creadoEn), titulo: c.nombre, detalle: `${formatoDinero(c.precioCobrado)}, ${[...new Set(c.metodos)].join(" y ")}` }))}
+            equipo={delEquipo.map((v) => ({ id: v.id, t: cuando(v.fecha, v.creadoEn), titulo: v.conceptos.map((c) => c.nombre).join(", "), detalle: `${v.conceptos[0]?.barbero.split(" ")[0] ?? ""}, ${formatoDinero(v.total)}`, nombre: v.conceptos[0]?.barbero, avatar: avatarDe(v.conceptos[0]?.barberoId), tachada: v.estado === "cancelada" }))}
+            cortes={cortes.map((c) => ({ id: c.id, t: cuando(c.fechaOperativa, c.cerradoEn ?? new Date()), titulo: `Corte ${folios.get(c.id) ?? ""}`, detalle: `Cerró ${(c.cerradoPor ?? "").split(" ")[0]}${c.diferencia ? `, ${c.diferencia < 0 ? "faltaron" : "sobraron"} ${formatoDinero(Math.abs(c.diferencia))}` : ", sin diferencias"}` }))}
+          />
         </div>
       </section>
     </>

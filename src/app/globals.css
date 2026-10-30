@@ -1015,3 +1015,5 @@ button.paso-v:hover { background: rgba(255,255,255,.8); }
 .lista-anios button.ext { background: var(--ink); color: #fff; }
 .sel-equipo { min-width: 200px; }
 .barra-filtros .selector-p { flex-wrap: wrap; }
+.feed > .tachada b, .feed > .tachada small { text-decoration: line-through; color: var(--faint); }
+.feed > div { align-items: center; }
