@@ -73,6 +73,9 @@ export async function registrarVenta(_: EstadoCobro, form: FormData): Promise<Es
 
   const lineas = e.lineas.map((l) => ({ ...l, s: svc.find((x) => x.id === l.servicioId)! }));
   const subtotal = lineas.reduce((a, l) => a + l.s.precio, 0);
+  if (e.descuento > 0 && !s.barberia.usaDescuentos) return { error: "Los descuentos están apagados en Ajustes." };
+  if (e.propina.monto > 0 && !s.barberia.usaPropinas) return { error: "Las propinas están apagadas en Ajustes." };
+  if (e.pagos.filter((x) => x.monto > 0).length > 1 && !s.barberia.usaDividirPago) return { error: "Dividir el pago está apagado en Ajustes." };
   if (e.descuento > subtotal) return { error: "El descuento no puede ser mayor que la venta." };
   if (e.descuento > 0 && !e.motivoDescuento) return { error: "Escribe el motivo del descuento." };
   const limite = Math.floor((subtotal * s.barberia.limiteDescuentoPct) / 100);

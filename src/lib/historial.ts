@@ -1,6 +1,6 @@
 import { db, schema, type Tx } from "./db";
 
-export type TipoHistorial = "venta" | "caja" | "precio" | "usuario" | "equipo" | "ajuste" | "idea" | "acceso";
+export type TipoHistorial = "venta" | "caja" | "gasto" | "precio" | "usuario" | "equipo" | "ajuste" | "idea" | "acceso";
 
 /** Agrega una línea a la bitácora. Nunca se edita ni se borra (lo impide la base de datos). */
 export async function registrar(

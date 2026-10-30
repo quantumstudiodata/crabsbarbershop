@@ -43,6 +43,13 @@
       "when": 1793262576921,
       "tag": "0005_comision_servicio",
       "breakpoints": true
+    },
+    {
+      "idx": 6,
+      "version": "7",
+      "when": 1793345040691,
+      "tag": "0006_finanzas",
+      "breakpoints": true
     }
   ]
 }

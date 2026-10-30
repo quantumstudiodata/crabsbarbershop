@@ -4,7 +4,7 @@ import { Icono } from "@/components/Icono";
 import { SelectorPeriodo } from "@/components/Periodo";
 import { requerirSesion } from "@/lib/auth";
 import { eq } from "drizzle-orm";
-import { ajustesDeTurnos, detalleCortes, foliosCorte, turnosCerrados } from "@/lib/datos";
+import { ajustesDeTurnos, detalleCortes, foliosCorte, metodosActivos, turnosCerrados } from "@/lib/datos";
 import { db, schema } from "@/lib/db";
 import { HistorialCortes, type Corte, type DiaCortes } from "./HistorialCortes";
 import { fechaLarga, fechaLocal, horaCorta } from "@/lib/fechas";
@@ -19,18 +19,21 @@ export default async function Cortes({ searchParams }: { searchParams: Promise<{
   const q = await searchParams;
   const zona = s.barberia.zonaHoraria;
   const hoy = fechaLocal(new Date(), zona);
-  const p = leerPeriodo(q, hoy, "semana");
+  const p = leerPeriodo(q, hoy, "mes");
   const cortes = await turnosCerrados(s.barberia.id, 1000, { desde: p.desde, hasta: p.hasta });
   const ids = cortes.map((c) => c.id);
-  const [ajustes, folios, det, gente] = await Promise.all([
+  const [ajustes, folios, det, gente, activos] = await Promise.all([
     ajustesDeTurnos(s.barberia.id, ids), foliosCorte(s.barberia.id), detalleCortes(s.barberia.id, ids),
     db.select({ id: schema.usuarios.id, nombre: schema.usuarios.nombre, avatar: schema.usuarios.avatar }).from(schema.usuarios).where(eq(schema.usuarios.barberiaId, s.barberia.id)),
+    metodosActivos(s.barberia.id),
   ]);
   const persona = (id: string | null) => gente.find((g) => g.id === id) ?? { nombre: "", avatar: "iniciales" };
   const lista: Corte[] = cortes.map((c) => {
     const cobros = det.cobros.filter((x) => x.turnoId === c.id);
     const efectivo = cobros.filter((x) => x.esEfectivo).reduce((a, x) => a + x.total, 0);
-    const metodos = [{ metodo: "Efectivo", total: efectivo }, ...cobros.filter((x) => !x.esEfectivo).map((x) => ({ metodo: x.metodo, total: x.total }))];
+    const otros = cobros.filter((x) => !x.esEfectivo).map((x) => ({ metodo: x.metodo, total: x.total }));
+    for (const m of activos) if (!m.esEfectivo && !otros.some((x) => x.metodo === m.nombre)) otros.push({ metodo: m.nombre, total: 0 });
+    const metodos = [{ metodo: "Efectivo", total: efectivo }, ...otros];
     const movs = det.movimientos.filter((x) => x.turnoId === c.id);
     const gastos = det.gastos.filter((x) => x.turnoId === c.id);
     const suma = (t: string) => movs.filter((x) => x.tipo === t).reduce((a, x) => a + x.monto, 0);

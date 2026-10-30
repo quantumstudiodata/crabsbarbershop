@@ -17,7 +17,7 @@ const PERIODOS: [string, string][] = [["semana", "Semanal"], ["quincena", "Quinc
 const EJEMPLO = 15000;
 
 /** Remuneración de un barbero, dentro del alta o la edición del usuario. */
-export function CamposFormaPago({ actual }: { actual: FormaActual }) {
+export function CamposFormaPago({ actual, conRenta = true }: { actual: FormaActual; conRenta?: boolean }) {
   const [tipo, setTipo] = useState<TipoPago>(actual?.tipo ?? "porcentaje");
   const [pct, setPct] = useState(actual?.porcentaje ? String(actual.porcentaje / 100) : "40");
   const [fijo, setFijo] = useState(actual?.montoFijo ? String(actual.montoFijo / 100) : "");
@@ -32,7 +32,7 @@ export function CamposFormaPago({ actual }: { actual: FormaActual }) {
       <input type="hidden" name="pagoTipo" value={tipo} />
       <input type="hidden" name="pagoPeriodo" value={periodo} />
       <div className="radios" role="radiogroup" aria-label="Cómo se le paga">
-        {TIPOS.map((x) => (
+        {TIPOS.filter((x) => conRenta || x.t !== "renta" || actual?.tipo === "renta").map((x) => (
           <label key={x.t} className="radio-f">
             <input type="radio" name="_pagoTipo" checked={tipo === x.t} onChange={() => setTipo(x.t)} />
             <span><b>{x.titulo}</b><small>{x.detalle}</small></span>

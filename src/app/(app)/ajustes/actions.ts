@@ -24,6 +24,9 @@ async function personaDeMiBarberia(barberiaId: string, id: string) {
 type ReglaNueva = { tipo: "porcentaje" | "fijo" | "renta" | "sueldo" | "mixto"; porcentaje: number; montoFijo: number; montoSemanal: number; periodo: string };
 
 /** Lee la forma de pago del formulario. null si no aplica; texto si hay un error. */
+/** Permisos extra en palabras, para el antes y después del historial. */
+const permisosTexto = (xs: string[]) => (xs.length ? `además puede: ${xs.map((x) => PERMISOS[x as keyof typeof PERMISOS] ?? x).join(", ").toLowerCase()}` : "solo los permisos de su rol");
+
 function leerForma(form: FormData, rol: Rol): ReglaNueva | null | string {
   if (rol !== "barbera" && rol !== "encargada") return null;
   const tipo = texto(form, "pagoTipo") as ReglaNueva["tipo"];
@@ -65,6 +68,7 @@ export async function darDeAlta(_: EstadoPersona, form: FormData): Promise<Estad
   if (!rolesAsignables(s.usuario.rol).includes(rol)) return { error: "Elige un rol." };
   const forma = leerForma(form, rol);
   if (typeof forma === "string") return { error: forma };
+  if (forma?.tipo === "renta" && !s.barberia.usaRentaSilla) return { error: "La renta de silla está apagada en Ajustes." };
   const existentes = (await db.select({ u: schema.usuarios.usuario }).from(schema.usuarios)).map((x) => x.u);
   const usuario = sugerirUsuario(nombre, existentes);
   const clave = contrasenaTemporal(nombre);
@@ -130,7 +134,12 @@ export async function actualizarPersona(_: EstadoPersona, form: FormData): Promi
     if (meta !== u.metaSemanal) cambios.push("meta semanal");
     if (cambios.length) await registrar(tx, {
       barberiaId: s.barberia.id, usuarioId: s.usuario.id, tipo: "usuario", accion: `${s.usuario.nombre} cambió a ${u.nombre}: ${cambios.join(", ")}`,
-      detalle: { usuario: u.usuario, antes: [u.nombre, NOMBRE_ROL[u.rol], u.metaSemanal ? `meta ${formatoDinero(u.metaSemanal)}` : ""].filter(Boolean).join(", "), ahora: [nombre, NOMBRE_ROL[rol], meta ? `meta ${formatoDinero(meta)}` : ""].filter(Boolean).join(", "), permisosExtra: extra },
+      detalle: {
+        usuario: u.usuario,
+        antes: [u.nombre, NOMBRE_ROL[u.rol], u.metaSemanal ? `meta ${formatoDinero(u.metaSemanal)}` : "", permisosTexto(u.permisosExtra)].filter(Boolean).join(", "),
+        ahora: [nombre, NOMBRE_ROL[rol], meta ? `meta ${formatoDinero(meta)}` : "", permisosTexto(extra)].filter(Boolean).join(", "),
+        permisosExtra: extra,
+      },
     });
   });
   revalidatePath("/", "layout");

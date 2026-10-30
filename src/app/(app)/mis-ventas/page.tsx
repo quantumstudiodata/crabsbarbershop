@@ -7,7 +7,7 @@ import { Cuenta } from "@/components/ui";
 import { requerirSesion } from "@/lib/auth";
 import { MINUTOS_CORRECCION } from "@/lib/caja";
 import { equipoQueAtiende, turnoAbierto, ventasEntre } from "@/lib/datos";
-import { diasEntre, fechaLarga, fechaLocal, horaCorta, sumarDias } from "@/lib/fechas";
+import { diasEntre, fechaLarga, fechaLocal, horaCorta, inicioDeMes, sumarDias } from "@/lib/fechas";
 import { cambio, formatoDinero, porcentaje } from "@/lib/money";
 import { leerPeriodo } from "@/lib/periodo";
 import { serieHoy } from "@/lib/series";
@@ -25,11 +25,11 @@ export default async function MisVentas({ searchParams }: { searchParams: Promis
   const q = await searchParams;
   const zona = s.barberia.zonaHoraria;
   const hoy = fechaLocal(new Date(), zona);
-  const p = leerPeriodo(q, hoy, "semana");
+  const p = leerPeriodo(q, hoy, "dia");
   const yo = s.usuario.id;
   const largo = diasEntre(p.desde, p.hasta) + 1;
   const anual = p.tipo === "anio" || largo > 62;
-  const prevDesde = p.tipo === "dia" ? sumarDias(p.desde, -7) : p.tipo === "anio" ? `${Number(p.desde.slice(0, 4)) - 1}-01-01` : sumarDias(p.desde, -largo);
+  const prevDesde = p.tipo === "dia" ? sumarDias(p.desde, -7) : p.tipo === "anio" ? `${Number(p.desde.slice(0, 4)) - 1}-01-01` : p.tipo === "mes" ? inicioDeMes(sumarDias(p.desde, -1)) : sumarDias(p.desde, -largo);
   const prevHasta = p.tipo === "dia" ? sumarDias(p.desde, -7) : p.tipo === "anio" ? `${Number(p.desde.slice(0, 4)) - 1}-12-31` : sumarDias(p.desde, -1);
   const [{ ventas }, previo, equipo, turno] = await Promise.all([
     ventasEntre(s.barberia.id, p.desde, p.hasta, { zona }),

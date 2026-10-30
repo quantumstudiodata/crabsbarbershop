@@ -5,7 +5,7 @@ import { SelectorPeriodo } from "@/components/Periodo";
 import { Cuenta } from "@/components/ui";
 import { requerirSesion } from "@/lib/auth";
 import { resumenPeriodo, ventasEntre } from "@/lib/datos";
-import { diasEntre, fechaCorta, fechaLocal, sumarDias } from "@/lib/fechas";
+import { diasEntre, fechaCorta, fechaLocal, inicioDeMes, sumarDias } from "@/lib/fechas";
 import { cambio, formatoDinero, porcentaje } from "@/lib/money";
 import { leerPeriodo } from "@/lib/periodo";
 import { serieHoy } from "@/lib/series";
@@ -21,7 +21,7 @@ export default async function Resumen({ searchParams }: { searchParams: Promise<
   if (!s.puede("reportes.ver")) redirect(s.puede("ventas.ver_todas") ? "/analitica/ventas" : "/");
   const zona = s.barberia.zonaHoraria;
   const hoy = fechaLocal(new Date(), zona);
-  const p = leerPeriodo(await searchParams, hoy);
+  const p = leerPeriodo(await searchParams, hoy, "mes");
   const largo = diasEntre(p.desde, p.hasta) + 1;
   const anual = p.tipo === "anio" || largo > 62;
   const dia = p.tipo === "dia";
@@ -29,10 +29,11 @@ export default async function Resumen({ searchParams }: { searchParams: Promise<
   const anioAnt = String(Number(p.desde.slice(0, 4)) - 1);
   const prev = dia ? { desde: sumarDias(p.desde, -7), hasta: sumarDias(p.desde, -7) }
     : p.tipo === "anio" ? { desde: `${anioAnt}-01-01`, hasta: `${anioAnt}-12-31` }
+    : p.tipo === "mes" ? { desde: inicioDeMes(sumarDias(p.desde, -1)), hasta: sumarDias(p.desde, -1) }
     : { desde: sumarDias(p.desde, -largo), hasta: sumarDias(p.desde, -1) };
   // El porcentaje compara el mismo tramo transcurrido, para que sea justo con un periodo que no ha terminado.
   const tramo = diasEntre(p.desde, p.hasta > hoy ? hoy : p.hasta) + 1;
-  const prevJusto = dia ? prev : p.tipo === "anio" ? { desde: prev.desde, hasta: `${anioAnt}${hoy.slice(4)}` } : { desde: prev.desde, hasta: sumarDias(prev.desde, tramo - 1) };
+  const prevJusto = dia ? prev : p.tipo === "anio" ? { desde: prev.desde, hasta: p.hasta > hoy ? `${anioAnt}${hoy.slice(4)}` : prev.hasta } : tramo >= largo ? prev : { desde: prev.desde, hasta: (sumarDias(prev.desde, tramo - 1) < prev.hasta ? sumarDias(prev.desde, tramo - 1) : prev.hasta) };
   const [r, completo, justo] = await Promise.all([
     resumenPeriodo(s.barberia.id, p.desde, p.hasta, zona),
     resumenPeriodo(s.barberia.id, prev.desde, prev.hasta, zona),

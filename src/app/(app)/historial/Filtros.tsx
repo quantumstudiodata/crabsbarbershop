@@ -3,11 +3,12 @@
 import { usePathname, useRouter, useSearchParams } from "next/navigation";
 import { useState } from "react";
 import { Avatar } from "@/components/Avatar";
-import { Calendario } from "@/components/Calendario";
+import { SelectorPeriodo } from "@/components/Periodo";
 import { Icono } from "@/components/Icono";
 import { Selector } from "@/components/ui";
+import type { Periodo } from "@/lib/periodo";
 
-export function Filtros({ categorias, gente, hoy, desde, hasta }: { categorias: [string, string][]; gente: { id: string; nombre: string; avatar: string }[]; hoy: string; desde?: string; hasta?: string }) {
+export function Filtros({ categorias, gente, hoy, periodo }: { categorias: [string, string][]; gente: { id: string; nombre: string; avatar: string }[]; hoy: string; periodo: Periodo | null }) {
   const router = useRouter();
   const ruta = usePathname();
   const params = useSearchParams();
@@ -31,8 +32,8 @@ export function Filtros({ categorias, gente, hoy, desde, hasta }: { categorias: 
         <Selector etiqueta="Empleado" valor={params.get("usuario") ?? ""} onChange={(v) => ir({ usuario: v })}
           opciones={[{ valor: "", texto: "Todo el equipo" }, ...gente.map((g) => ({ valor: g.id, texto: g.nombre.split(" ").slice(0, 2).join(" "), icono: <Avatar avatar={g.avatar} nombre={g.nombre} t={20} /> }))]} />
       </div>
-      {desde && hasta ? <Calendario desde={desde} hasta={hasta} hoy={hoy} /> : <Calendario desde={hoy} hasta={hoy} hoy={hoy} />}
-      {(params.get("q") || params.get("tipo") || params.get("usuario") || desde) && <button type="button" className="enlace" onClick={() => { setQ(""); router.push(ruta); }}>Quitar filtros</button>}
+      <SelectorPeriodo p={periodo} hoy={hoy} sinPeriodo="Todo" />
+      {(params.get("q") || params.get("tipo") || params.get("usuario") || periodo) && <button type="button" className="enlace" onClick={() => { setQ(""); router.push(ruta); }}>Quitar filtros</button>}
     </div>
   );
 }

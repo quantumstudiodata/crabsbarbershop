@@ -1,3 +1,4 @@
+import { type ConsultaPeriodo, leerPeriodo } from "@/lib/periodo";
 import { and, asc, count, desc, eq, gte, ilike, lte, or, sql, type SQL } from "drizzle-orm";
 import Link from "next/link";
 import { requerirSesion } from "@/lib/auth";
@@ -10,10 +11,10 @@ import { Lista, type FilaHistorial } from "./Lista";
 export const metadata = { title: "Historial" };
 
 const POR_PAGINA = 10;
-const CATEGORIAS: [string, string][] = [["", "Todas las categorías"], ["venta", "Ventas"], ["caja", "Caja"], ["precio", "Precios"], ["ajuste", "Configuración"], ["usuario", "Usuarios"], ["equipo", "Pagos al equipo"], ["idea", "Ideas"], ["acceso", "Accesos"]];
+const CATEGORIAS: [string, string][] = [["", "Todas las categorías"], ["venta", "Ventas"], ["caja", "Caja"], ["gasto", "Egresos"], ["precio", "Precios"], ["ajuste", "Configuración"], ["usuario", "Usuarios"], ["equipo", "Pagos al equipo"], ["idea", "Ideas"], ["acceso", "Accesos"]];
 const MES = ["ene", "feb", "mar", "abr", "may", "jun", "jul", "ago", "sep", "oct", "nov", "dic"];
 
-type Q = { tipo?: string; usuario?: string; q?: string; desde?: string; hasta?: string; pagina?: string };
+type Q = ConsultaPeriodo & { tipo?: string; usuario?: string; q?: string; pagina?: string };
 
 export default async function Historial({ searchParams }: { searchParams: Promise<Q> }) {
   const s = await requerirSesion("historial.ver");
@@ -24,10 +25,11 @@ export default async function Historial({ searchParams }: { searchParams: Promis
   const cond: SQL[] = [eq(h.barberiaId, s.barberia.id)];
   if (q.tipo && CATEGORIAS.some(([k]) => k === q.tipo)) cond.push(eq(h.tipo, q.tipo));
   if (q.usuario && /^[0-9a-f-]{36}$/.test(q.usuario)) cond.push(eq(h.usuarioId, q.usuario));
-  const rango = esFechaValida(q.desde) && esFechaValida(q.hasta);
-  if (rango) {
+  const conFecha = q.periodo || q.fecha || q.mes || q.anio || (esFechaValida(q.desde) && esFechaValida(q.hasta));
+  const p = conFecha ? leerPeriodo(q, hoy, "dia") : null;
+  if (p) {
     const dia = sql`(${h.creadoEn} at time zone ${zona})::date`;
-    cond.push(sql`${dia} between ${q.desde}::date and ${q.hasta}::date`);
+    cond.push(sql`${dia} between ${p.desde}::date and ${p.hasta}::date`);
   }
   const texto = (q.q ?? "").trim().slice(0, 60);
   if (texto) {
@@ -73,7 +75,7 @@ export default async function Historial({ searchParams }: { searchParams: Promis
         <h1 className="titulo">Historial</h1>
         <p className="sub">Registro permanente de lo que pasa en el sistema. Nada se borra.</p>
       </div>
-      <Filtros categorias={CATEGORIAS} gente={gente} hoy={hoy} desde={rango ? q.desde : undefined} hasta={rango ? q.hasta : undefined} />
+      <Filtros categorias={CATEGORIAS} gente={gente} hoy={hoy} periodo={p} />
       <Lista filas={lista} />
       <div className="entre">
         <span className="muted" style={{ fontSize: 13 }}>{total} {total === 1 ? "evento" : "eventos"}{total ? `, del ${(pagina - 1) * POR_PAGINA + 1} al ${Math.min(pagina * POR_PAGINA, total)}` : ""}</span>

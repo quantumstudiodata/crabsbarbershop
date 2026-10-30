@@ -8,6 +8,7 @@ export const PERMISOS = {
   "ventas.cancelar": "Cancelar ventas",
   "caja.operar": "Abrir y cerrar caja, registrar retiros y gastos",
   "caja.corregir": "Corregir cortes",
+  "gastos.registrar": "Registrar y cancelar egresos",
   "equipo.ver": "Ver comisiones",
   "equipo.pagar": "Registrar pagos al equipo",
   "reportes.ver": "Ver reportes",
@@ -32,7 +33,7 @@ export const PERMISOS_POR_ROL: Record<Rol, Permiso[]> = {
   // En el local hay una sola computadora: cualquiera puede cobrar lo que hizo otra persona.
   // Los barberos también abren y cierran la caja: son quienes cobran.
   barbera: ["ventas.registrar", "ventas.registrar_otros", "caja.operar"],
-  contador: ["ventas.ver_todas", "equipo.ver", "reportes.ver", "reportes.exportar", "historial.ver"],
+  contador: ["ventas.ver_todas", "equipo.ver", "reportes.ver", "reportes.exportar", "historial.ver", "gastos.registrar"],
 };
 
 export const NOMBRE_ROL: Record<Rol, string> = {
@@ -71,6 +72,6 @@ export const DESCRIPCION_ROL: Record<Rol, string> = {
 /** Permisos agrupados para la ventana de edición de usuario. */
 export const GRUPOS_PERMISOS: { titulo: string; permisos: Permiso[] }[] = [
   { titulo: "Ventas y cobros", permisos: ["ventas.registrar", "ventas.registrar_otros", "ventas.descuento", "ventas.cancelar"] },
-  { titulo: "Caja y pagos", permisos: ["caja.operar", "caja.corregir", "equipo.pagar"] },
+  { titulo: "Caja y pagos", permisos: ["caja.operar", "caja.corregir", "gastos.registrar", "equipo.pagar"] },
   { titulo: "Reportes y administración", permisos: ["ventas.ver_todas", "equipo.ver", "reportes.ver", "reportes.exportar", "historial.ver", "ideas.decidir"] },
 ];

@@ -37,7 +37,7 @@ function SelectorGrafica({ modo }: { modo: "hoy" | "semana" }) {
 
 export default async function Inicio({ searchParams }: { searchParams: Promise<Q> }) {
   const s = await requerirSesion();
-  if (s.usuario.rol === "contador") redirect("/analitica");
+  if (s.usuario.rol === "contador") redirect("/libreta");
   const q = await searchParams;
   const zona = s.barberia.zonaHoraria;
   const hoy = fechaLocal(new Date(), zona);
@@ -100,11 +100,11 @@ export default async function Inicio({ searchParams }: { searchParams: Promise<Q
             <div><span>Clientes atendidos</span><b><Cuenta valor={deHoy.length} formato="entero" /></b></div>
             <div><span>Servicios</span><b><Cuenta valor={servicios} formato="entero" /></b></div>
             <div><span>Promedio por cliente</span><b>{deHoy.length ? formatoDinero(Math.round(netas / deHoy.length)) : "Sin datos"}</b></div>
-            <div style={{ display: "grid", gap: 8 }}>
+            {s.barberia.usaMetas && <div style={{ display: "grid", gap: 8 }}>
               <span className="entre"><span>Meta diaria</span><b>{formatoDinero(meta.monto)}</b></span>
               <div className="meta grande"><i style={{ width: `${Math.max(avance * 100, 3)}%` }} /></div>
               <small className="muted">{porcentaje(netas, meta.monto)}% alcanzado</small>
-            </div>
+            </div>}
           </div>
         </div>
       </section>
@@ -193,14 +193,14 @@ async function InicioBarbero({ s, hoy, zona, q, avisos }: { s: Sesion; hoy: stri
           <div className="entre"><Comparacion hoy={totalHoy} previo={previo} dia={dia} /><SelectorGrafica modo={modo} /></div>
           <Grafica id="barbero" actual={serie.actual} previo={serie.previo} etiquetas={serie.etiquetas} cadaEtiqueta={serie.cada} alto={210}
             descripcion={modo === "hoy" ? "Tus ventas de hoy por hora" : "Tus ventas de la semana"} vacio="Tu gráfica se dibuja con tu primer servicio" />
-          <div className="pila-chica">
+          {s.barberia.usaMetas ? <div className="pila-chica">
             <div className="entre">
               <span className="muted" style={{ fontSize: 13 }}>Meta de la semana: <b style={{ color: "var(--fg)" }}>{formatoDinero(meta.monto)}</b><Ayuda titulo="Meta de la semana">Refleja tu meta de ventas de esta semana y cuánto llevas de ella.</Ayuda></span>
               <b className="num">{porcentaje(semana, meta.monto)}%</b>
             </div>
             <div className="meta grande"><i style={{ width: `${Math.max(avance * 100, 3)}%` }} /></div>
             <small className="muted">Llevas {formatoDinero(semana)} esta semana.</small>
-          </div>
+          </div> : <small className="muted">Llevas {formatoDinero(semana)} esta semana.</small>}
         </div>
         <div className="glass panel subir d2">
           <div className="entre">

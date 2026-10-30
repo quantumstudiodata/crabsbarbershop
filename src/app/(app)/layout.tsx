@@ -21,6 +21,7 @@ export default async function LayoutApp({ children }: { children: React.ReactNod
   if (cobra) items.push({ href: "/cobrar", texto: "Cobro", icono: "cobro" });
   if (atiende) items.push({ href: "/mis-ventas", texto: "Mis ventas", icono: "lista" });
   if (analitica) items.push({ href: "/analitica", texto: "Analítica", icono: "grafica" });
+  if (rol === "contador") items.push({ href: "/libreta", texto: "Libreta", icono: "lista" });
   if (rol === "contador") items.push({ href: "/cierres", texto: "Cierres y descargas", icono: "archivo" });
 
   return (
@@ -37,7 +38,7 @@ export default async function LayoutApp({ children }: { children: React.ReactNod
           />
           <Nav items={items} />
           <div className="herramientas">
-            {rol === "contador" ? <span className="est"><Icono n="candado" />Solo lectura</span> : <Campana verTodo={s.puede("historial.ver") ? "/historial" : "/mis-ventas"} />}
+            {rol === "contador" ? null : <Campana verTodo={s.puede("historial.ver") ? "/historial" : "/mis-ventas"} />}
             {s.puede("ideas.decidir") && <PanelIdeas />}
           </div>
         </div>

@@ -4,7 +4,7 @@ import { and, eq } from "drizzle-orm";
 import { revalidatePath } from "next/cache";
 import { requerirSesion } from "@/lib/auth";
 import { compararConteo, requiereExplicacion } from "@/lib/caja";
-import { folioCorte, movimientosDeTurno, turnoAbierto } from "@/lib/datos";
+import { categoriasGasto, folioCorte, movimientosDeTurno, turnoAbierto } from "@/lib/datos";
 import { db, schema } from "@/lib/db";
 import { fechaLocal } from "@/lib/fechas";
 import { registrar } from "@/lib/historial";
@@ -65,16 +65,18 @@ export async function registrarGasto(_: EstadoCaja, form: FormData): Promise<Est
   if (!s.puede("caja.operar")) return { error: "No tienes permiso para registrar gastos de caja." };
   const monto = leerPesos(texto(form, "monto"));
   const concepto = texto(form, "concepto");
-  const categoria = texto(form, "categoria", 60) || "Otros";
+  const elegida = texto(form, "categoria", 60);
+  const cats = await categoriasGasto(s.barberia.id);
+  const categoria = cats.find((c) => c.nombre === elegida)?.nombre ?? "Otros";
   if (!monto) return { error: "Escribe el monto del gasto." };
   if (!concepto) return { error: "Escribe en qué se gastó." };
   const turno = await turnoAbierto(s.barberia.id);
   if (!turno) return { error: "La caja está cerrada." };
   await db.transaction(async (tx) => {
-    await tx.insert(schema.gastos).values({ barberiaId: s.barberia.id, categoria, concepto, monto, turnoId: turno.id, usuarioId: s.usuario.id, fecha: fechaLocal(new Date(), s.barberia.zonaHoraria) });
+    await tx.insert(schema.gastos).values({ barberiaId: s.barberia.id, categoria, concepto, monto, metodo: "efectivo", turnoId: turno.id, usuarioId: s.usuario.id, fecha: fechaLocal(new Date(), s.barberia.zonaHoraria) });
     await registrar(tx, {
-      barberiaId: s.barberia.id, usuarioId: s.usuario.id, tipo: "caja",
-      accion: `${s.usuario.nombre} registró un gasto de ${formatoDinero(monto)} pagado con la caja`, detalle: { concepto, categoria },
+      barberiaId: s.barberia.id, usuarioId: s.usuario.id, tipo: "gasto",
+      accion: `${s.usuario.nombre} registró un gasto de ${formatoDinero(monto)} pagado con la caja`, detalle: { concepto, categoria, monto, metodo: "efectivo", deCaja: true },
     });
   });
   return listo(`Gasto de ${formatoDinero(monto)} guardado.`);

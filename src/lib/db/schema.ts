@@ -44,6 +44,15 @@ export const barberias = pgTable("barberias", {
   metaDiaria: integer("meta_diaria").notNull().default(0),
   // Efectivo que se sugiere al abrir la caja (centavos).
   fondoPredeterminado: integer("fondo_predeterminado").notNull().default(0),
+  // Funciones opcionales: cada barbería decide cuáles usa.
+  usaPropinas: boolean("usa_propinas").notNull().default(true),
+  usaDescuentos: boolean("usa_descuentos").notNull().default(true),
+  usaMetas: boolean("usa_metas").notNull().default(true),
+  usaDividirPago: boolean("usa_dividir_pago").notNull().default(true),
+  usaRentaSilla: boolean("usa_renta_silla").notNull().default(true),
+  // Preparado para suscripciones: el plan y su estado son de cada negocio.
+  plan: text("plan").notNull().default("inicial"),
+  estadoCuenta: text("estado_cuenta").notNull().default("activa"),
   creadoEn: creadoEn(),
 });
 
@@ -257,15 +266,52 @@ export const gastos = pgTable("gastos", {
   barberiaId: barberiaId(),
   categoria: text("categoria").notNull(),
   concepto: text("concepto").notNull(),
+  descripcion: text("descripcion").notNull().default(""),
   monto: integer("monto").notNull(),
   fecha: date("fecha").notNull(),
+  // efectivo o transferencia. Solo el efectivo pagado con la caja abierta afecta el corte.
+  metodo: text("metodo").notNull().default("efectivo"),
   // Si se pagó con el efectivo de la caja, aquí queda el turno.
   turnoId: uuid("turno_id").references(() => turnosCaja.id),
   usuarioId: uuid("usuario_id")
     .notNull()
     .references(() => usuarios.id),
+  // Un gasto no se borra: se cancela con motivo y deja de contar.
+  canceladoEn: timestamp("cancelado_en", { withTimezone: true }),
+  canceladoPor: uuid("cancelado_por").references(() => usuarios.id),
+  motivoCancelacion: text("motivo_cancelacion"),
   creadoEn: creadoEn(),
 });
+
+export const categoriasGasto = pgTable(
+  "categorias_gasto",
+  {
+    id: id(),
+    barberiaId: barberiaId(),
+    nombre: text("nombre").notNull(),
+    orden: integer("orden").notNull().default(0),
+    activo: boolean("activo").notNull().default(true),
+    creadoEn: creadoEn(),
+  },
+  (t) => [uniqueIndex("categorias_gasto_uq").on(t.barberiaId, t.nombre)],
+);
+
+// Meses que se llevaban en Excel antes del sistema. Solo se consultan; las cifras nuevas salen de las ventas.
+export const historicoMensual = pgTable(
+  "historico_mensual",
+  {
+    id: id(),
+    barberiaId: barberiaId(),
+    mes: text("mes").notNull(),
+    subtotal: integer("subtotal").notNull().default(0),
+    egresos: integer("egresos").notNull().default(0),
+    total: integer("total").notNull().default(0),
+    // Lo de cada columna de la libreta (A, B...) cuando se conoce.
+    porColumna: jsonb("por_columna").notNull().default(sql`'{}'::jsonb`),
+    creadoEn: creadoEn(),
+  },
+  (t) => [uniqueIndex("historico_mensual_uq").on(t.barberiaId, t.mes)],
+);
 
 export const reglasComision = pgTable("reglas_comision", {
   id: id(),

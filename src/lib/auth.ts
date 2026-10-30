@@ -60,7 +60,8 @@ export const obtenerSesion = cache(async (): Promise<Sesion | null> => {
     .innerJoin(schema.barberias, eq(schema.barberias.id, schema.usuarios.barberiaId))
     .where(and(eq(schema.sesiones.id, sha256(token)), gt(schema.sesiones.expiraEn, new Date())))
     .limit(1);
-  if (!fila || !fila.u.activo) return null;
+  // Un negocio suspendido (por ejemplo, sin suscripción) no puede entrar; sus datos se conservan.
+  if (!fila || !fila.u.activo || fila.b.estadoCuenta !== "activa") return null;
   const permisos = permisosDe(fila.u.rol, fila.u.permisosExtra);
   return {
     usuario: { id: fila.u.id, nombre: fila.u.nombre, usuario: fila.u.usuario, rol: fila.u.rol, debeCambiar: fila.u.debeCambiar, avatar: fila.u.avatar },

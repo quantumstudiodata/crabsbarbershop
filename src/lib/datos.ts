@@ -1,6 +1,6 @@
 // Consultas de lectura. Todas reciben barberiaId desde la sesión: nunca desde la URL ni el formulario.
 
-import { and, asc, desc, eq, gte, inArray, isNotNull, lte, sql } from "drizzle-orm";
+import { and, asc, desc, eq, gte, inArray, isNotNull, isNull, lte, sql } from "drizzle-orm";
 import { efectivoEsperado, type MovimientosTurno } from "./caja";
 import type { Regla, ReglaCopia } from "./comisiones";
 import { db, schema } from "./db";
@@ -29,6 +29,10 @@ export async function movimientosDeTurno(barberiaId: string, turnoId: string, fo
     .innerJoin(s.ventas, eq(s.ventas.id, s.pagos.ventaId))
     .where(and(eq(s.ventas.barberiaId, barberiaId), eq(s.ventas.turnoId, turnoId), eq(s.ventas.estado, "pagada"), eq(s.pagos.esEfectivo, false)))
     .groupBy(s.pagos.nombreMetodo);
+  // Las formas de pago activas aparecen siempre en el corte, aunque sea en $0.
+  for (const m of await metodosActivos(barberiaId)) {
+    if (!m.esEfectivo && !otrosPorMetodo.some((x) => x.metodo === m.nombre)) otrosPorMetodo.push({ metodo: m.nombre, total: 0, ventas: 0 });
+  }
   const [propinas] = await db
     .select({
       efectivo: sql<number>`coalesce(sum(case when ${s.propinas.esEfectivo} then ${s.propinas.monto} else 0 end),0)::int`,
@@ -54,7 +58,7 @@ export async function movimientosDeTurno(barberiaId: string, turnoId: string, fo
     .select({ id: s.gastos.id, monto: s.gastos.monto, concepto: s.gastos.concepto, categoria: s.gastos.categoria, creadoEn: s.gastos.creadoEn, usuario: s.usuarios.nombre })
     .from(s.gastos)
     .innerJoin(s.usuarios, eq(s.usuarios.id, s.gastos.usuarioId))
-    .where(and(eq(s.gastos.barberiaId, barberiaId), eq(s.gastos.turnoId, turnoId)))
+    .where(and(eq(s.gastos.barberiaId, barberiaId), eq(s.gastos.turnoId, turnoId), isNull(s.gastos.canceladoEn)))
     .orderBy(desc(s.gastos.creadoEn));
 
   const totalTipo = (t: string) => movs.filter((m) => m.tipo === t).reduce((a, m) => a + m.monto, 0);
@@ -178,7 +182,7 @@ export async function resumenPeriodo(barberiaId: string, desde: string, hasta: s
   const [g] = await db
     .select({ total: sql<number>`coalesce(sum(${s.gastos.monto}),0)::int` })
     .from(s.gastos)
-    .where(and(eq(s.gastos.barberiaId, barberiaId), gte(s.gastos.fecha, desde), lte(s.gastos.fecha, hasta)));
+    .where(and(eq(s.gastos.barberiaId, barberiaId), gte(s.gastos.fecha, desde), lte(s.gastos.fecha, hasta), isNull(s.gastos.canceladoEn)));
 
   return {
     clientes: pagadas.length,
@@ -320,7 +324,15 @@ export async function detalleCortes(barberiaId: string, turnoIds: string[]) {
       .where(and(eq(s.movimientosCaja.barberiaId, barberiaId), inArray(s.movimientosCaja.turnoId, turnoIds))),
     db.select({ turnoId: s.gastos.turnoId, monto: s.gastos.monto, concepto: s.gastos.concepto, creadoEn: s.gastos.creadoEn, usuario: s.usuarios.nombre })
       .from(s.gastos).innerJoin(s.usuarios, eq(s.usuarios.id, s.gastos.usuarioId))
-      .where(and(eq(s.gastos.barberiaId, barberiaId), inArray(s.gastos.turnoId, turnoIds))),
+      .where(and(eq(s.gastos.barberiaId, barberiaId), inArray(s.gastos.turnoId, turnoIds), isNull(s.gastos.canceladoEn))),
   ]);
   return { cobros, propinas: props, movimientos, gastos };
+}
+
+/** Categorías de egresos de la barbería, en su orden. */
+export async function categoriasGasto(barberiaId: string, soloActivas = true) {
+  return db.select({ id: s.categoriasGasto.id, nombre: s.categoriasGasto.nombre, activo: s.categoriasGasto.activo })
+    .from(s.categoriasGasto)
+    .where(and(eq(s.categoriasGasto.barberiaId, barberiaId), ...(soloActivas ? [eq(s.categoriasGasto.activo, true)] : [])))
+    .orderBy(asc(s.categoriasGasto.orden), asc(s.categoriasGasto.nombre));
 }

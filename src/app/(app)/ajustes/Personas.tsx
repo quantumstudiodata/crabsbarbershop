@@ -14,7 +14,7 @@ type Persona = {
   debeCambiar: boolean; pide: boolean; claveHasta: number | null; yo: boolean; editable: boolean; forma: FormaActual; formaTexto: string;
 };
 type Props = {
-  personas: Persona[]; roles: { valor: Rol; texto: string; detalle: string }[]; nombresRol: Record<Rol, string>;
+  personas: Persona[]; roles: { valor: Rol; texto: string; detalle: string }[]; nombresRol: Record<Rol, string>; conRenta: boolean;
   grupos: { titulo: string; permisos: { clave: string; texto: string }[] }[]; permisosPorRol: Record<Rol, readonly string[]>; restablecerId: string | null;
 };
 
@@ -162,7 +162,7 @@ function EditarPersona({ p, props, cerrar }: { p: Persona; props: Props; cerrar:
         {esBarbero(rol) && (
           <>
             <span className="paso-t">Forma de pago</span>
-            <CamposFormaPago actual={p.forma} />
+            <CamposFormaPago actual={p.forma} conRenta={props.conRenta} />
             <span className="paso-t">Meta individual</span>
             <label className="campo">
               <span>Meta de ventas por semana (opcional)</span>
@@ -195,7 +195,7 @@ function AltaUsuario({ props, cerrar, alGuardar }: { props: Props; cerrar: () =>
           <div className="campo"><span>Rol</span><RolTarjetas roles={props.roles} valor={rol} cambiar={setRol} /></div>
           <p className="ayuda-txt">El usuario se arma con las iniciales y el primer apellido. La contraseña temporal se verá 30 minutos.</p>
         </div>
-        {dosPasos && <div style={{ display: paso === 2 ? undefined : "none" }}><CamposFormaPago actual={null} /><p className="ayuda-txt" style={{ marginTop: 8 }}>Se puede cambiar después.</p></div>}
+        {dosPasos && <div style={{ display: paso === 2 ? undefined : "none" }}><CamposFormaPago actual={null} conRenta={props.conRenta} /><p className="ayuda-txt" style={{ marginTop: 8 }}>Se puede cambiar después.</p></div>}
         {e.error && <p className="aviso error">{e.error}</p>}
         <div className="acciones">
           {paso === 2 ? <button type="button" className="bt sec solo" onClick={() => setPaso(1)}>Regresar</button> : <button type="button" className="bt sec solo" onClick={cerrar}>Cancelar</button>}

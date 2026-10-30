@@ -19,6 +19,7 @@ const iconoMetodo = (m: Metodo) => (m.esEfectivo ? "efectivo" : /tarjeta/i.test(
 
 export function FormCobro(p: {
   servicios: Servicio[]; equipo: Persona[]; metodos: Metodo[]; yo: string; puedeOtros: boolean; limiteDescuento: number;
+  usa: { propinas: boolean; descuentos: boolean; dividir: boolean };
 }) {
   const [estado, accion, enviando] = useActionState<EstadoCobro, FormData>(registrarVenta, {});
   const [clave, setClave] = useState(nuevaClave);
@@ -98,8 +99,8 @@ export function FormCobro(p: {
       }
       if (escribiendo || e.ctrlKey || e.metaKey || e.altKey) return;
       const k = e.key.toLowerCase();
-      if (k === "d") { e.preventDefault(); setPanel((x) => (x === "descuento" ? null : "descuento")); }
-      if (k === "p") { e.preventDefault(); setPanel((x) => (x === "propina" ? null : "propina")); }
+      if (k === "d" && p.usa.descuentos) { e.preventDefault(); setPanel((x) => (x === "descuento" ? null : "descuento")); }
+      if (k === "p" && p.usa.propinas) { e.preventDefault(); setPanel((x) => (x === "propina" ? null : "propina")); }
     };
     window.addEventListener("keydown", tecla);
     return () => window.removeEventListener("keydown", tecla);
@@ -212,13 +213,13 @@ export function FormCobro(p: {
         )}
 
         <div className="extras">
-          <button type="button" className={`chipf ${panel === "descuento" || desc ? "on" : ""}`} aria-expanded={panel === "descuento"} onClick={() => setPanel((x) => (x === "descuento" ? null : "descuento"))}>
+          {p.usa.descuentos && <button type="button" className={`chipf ${panel === "descuento" || desc ? "on" : ""}`} aria-expanded={panel === "descuento"} onClick={() => setPanel((x) => (x === "descuento" ? null : "descuento"))}>
             <Icono n="etiqueta" />{desc ? `Descuento −${formatoDinero(desc)}` : "Descuento"}
-          </button>
-          <button type="button" className={`chipf ${panel === "propina" || prop ? "on" : ""}`} aria-expanded={panel === "propina"} onClick={() => setPanel((x) => (x === "propina" ? null : "propina"))}>
+          </button>}
+          {p.usa.propinas && <button type="button" className={`chipf ${panel === "propina" || prop ? "on" : ""}`} aria-expanded={panel === "propina"} onClick={() => setPanel((x) => (x === "propina" ? null : "propina"))}>
             <Icono n="mas" />{prop ? `Propina ${formatoDinero(prop)}` : "Propina"}
-          </button>
-          {p.metodos.length > 1 && (
+          </button>}
+          {p.usa.dividir && p.metodos.length > 1 && (
             <button type="button" className={`chipf ${dividir ? "on" : ""}`} aria-pressed={dividir} onClick={() => setDividir((d) => !d)}><Icono n="cobro" />Dividir pago</button>
           )}
         </div>

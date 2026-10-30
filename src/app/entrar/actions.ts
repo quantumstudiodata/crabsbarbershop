@@ -23,6 +23,8 @@ export async function entrar(_: EstadoEntrada, form: FormData): Promise<EstadoEn
     return { error: "El usuario o la contraseña no coinciden." };
   }
   if (!u.activo) return { error: "Este usuario está desactivado. Pide ayuda al propietario." };
+  const [negocio] = await db.select({ estado: schema.barberias.estadoCuenta }).from(schema.barberias).where(eq(schema.barberias.id, u.barberiaId)).limit(1);
+  if (negocio?.estado !== "activa") return { error: "La cuenta de este negocio está suspendida. Comunícate con soporte." };
   if (u.bloqueadoHasta && u.bloqueadoHasta > new Date()) {
     const min = Math.ceil((u.bloqueadoHasta.getTime() - Date.now()) / 60000);
     return { error: `Demasiados intentos. Vuelve a intentar en ${min} minutos o usa ¿Olvidaste tu contraseña?` };

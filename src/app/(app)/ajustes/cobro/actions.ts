@@ -55,3 +55,26 @@ export async function guardarReglas(form: FormData) {
   revalidatePath("/", "layout");
   volver(R, { aviso: "guardado" });
 }
+
+const FUNCIONES = {
+  propinas: ["usaPropinas", "Propinas"],
+  descuentos: ["usaDescuentos", "Descuentos"],
+  dividir: ["usaDividirPago", "Dividir pago"],
+  metas: ["usaMetas", "Metas de ventas"],
+  renta: ["usaRentaSilla", "Renta de silla"],
+} as const;
+
+export async function alternarFuncion(clave: string) {
+  const s = await requerirSesion("ajustes.negocio");
+  const f = FUNCIONES[clave as keyof typeof FUNCIONES];
+  if (!f) return;
+  const [campo, nombre] = f;
+  const antes = s.barberia[campo];
+  await db.update(schema.barberias).set({ [campo]: !antes }).where(eq(schema.barberias.id, s.barberia.id));
+  await registrar(db, {
+    barberiaId: s.barberia.id, usuarioId: s.usuario.id, tipo: "ajuste",
+    accion: `${s.usuario.nombre} ${antes ? "apagó" : "encendió"} la función ${nombre}`,
+    detalle: { antes: antes ? "Encendida" : "Apagada", ahora: antes ? "Apagada" : "Encendida" },
+  });
+  revalidatePath("/", "layout");
+}

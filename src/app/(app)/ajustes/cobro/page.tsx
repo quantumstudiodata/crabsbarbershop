@@ -5,6 +5,7 @@ import { requerirSesion } from "@/lib/auth";
 import { db, schema } from "@/lib/db";
 import { NOMBRE_ROL, permisosDe } from "@/lib/permisos";
 import { agregarMetodo } from "./actions";
+import { Funciones } from "./Funciones";
 import { Metodos } from "./Metodos";
 import { CajaObjetivos, ReglasCobro } from "./Reglas";
 
@@ -37,6 +38,17 @@ export default async function CobroYCaja({ searchParams }: { searchParams: Promi
       </section>
       <ReglasCobro descuento={b.limiteDescuentoPct} autorizan={autorizan} />
       <CajaObjetivos fondo={Math.round(b.fondoPredeterminado / 100)} diferencia={Math.round(b.limiteDiferenciaCaja / 100)} meta={Math.round(b.metaDiaria / 100)} />
+      <section className="glass panel bloque-a">
+        <span className="lab">4. Funciones</span>
+        <Funciones funciones={[
+          { clave: "propinas", nombre: "Propinas", activa: b.usaPropinas, encendida: "Se pueden agregar al cobrar.", apagada: "No aparecen al cobrar." },
+          { clave: "descuentos", nombre: "Descuentos", activa: b.usaDescuentos, encendida: "Se pueden dar al cobrar, con su motivo.", apagada: "No se pueden dar descuentos." },
+          { clave: "dividir", nombre: "Dividir pago", activa: b.usaDividirPago, encendida: "Un cliente puede pagar con dos formas de pago.", apagada: "Cada venta se paga con una sola forma." },
+          { clave: "metas", nombre: "Metas de ventas", activa: b.usaMetas, encendida: "Inicio muestra la meta y cuánto se lleva.", apagada: "No se muestran metas." },
+          { clave: "renta", nombre: "Renta de silla", activa: b.usaRentaSilla, encendida: "Se puede elegir como forma de pago de un barbero.", apagada: "No aparece al dar de alta a un barbero." },
+        ]} />
+        <p className="ayuda-txt">Apagar una función solo la esconde. Lo que ya se registró se conserva.</p>
+      </section>
     </>
   );
 }

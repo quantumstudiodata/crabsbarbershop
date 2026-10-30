@@ -13,7 +13,6 @@ export type Turno = {
 };
 type Vista = "retiro" | "gasto" | "corte";
 
-const CATEGORIAS = ["Insumos", "Limpieza", "Servicios del local", "Mantenimiento", "Otros"];
 const abrir = (v: Vista) => window.dispatchEvent(new CustomEvent("crabs:caja", { detail: v }));
 
 /** Línea discreta arriba de Cobro mientras la caja está abierta. */
@@ -92,14 +91,14 @@ function Resumen({ r, cerrar }: { r: ResumenCorte; cerrar: () => void }) {
   );
 }
 
-export function CajaModal({ inicial, turno, limiteDiferencia }: { inicial: Vista | null; turno: Turno | null; limiteDiferencia: number }) {
+export function CajaModal({ inicial, turno, limiteDiferencia, categorias }: { inicial: Vista | null; turno: Turno | null; limiteDiferencia: number; categorias: string[] }) {
   const [vista, setVista] = useState<Vista | null>(inicial);
   const [eMov, accMov, guardandoMov] = useActionState<EstadoCaja, FormData>(registrarMovimiento, {});
   const [eGasto, accGasto, guardandoGasto] = useActionState<EstadoCaja, FormData>(registrarGasto, {});
   const [eCerrar, accCerrar, cerrando] = useActionState<EstadoCaja, FormData>(cerrarCaja, {});
   const [tipoMov, setTipoMov] = useState<"retiro" | "entrada">("retiro");
   const [concepto, setConcepto] = useState("");
-  const [categoria, setCategoria] = useState(CATEGORIAS[0]);
+  const [categoria, setCategoria] = useState(categorias[0] ?? "Otros");
   const [contado, setContado] = useState("");
   const [resumen, setResumen] = useState<ResumenCorte | null>(null);
 
@@ -145,7 +144,7 @@ export function CajaModal({ inicial, turno, limiteDiferencia }: { inicial: Vista
           <input type="hidden" name="categoria" value={categoria} />
           <input className="input grande" name="monto" inputMode="decimal" placeholder="$0" required autoFocus aria-label="Monto" />
           <input className="input" name="concepto" placeholder="En qué se gastó" required aria-label="En qué se gastó" />
-          <div className="billetes">{CATEGORIAS.map((c) => <button type="button" key={c} className={categoria === c ? "on" : ""} onClick={() => setCategoria(c)}>{c}</button>)}</div>
+          <div className="billetes">{categorias.map((c) => <button type="button" key={c} className={categoria === c ? "on" : ""} onClick={() => setCategoria(c)}>{c}</button>)}</div>
           {eGasto.error && <p className="aviso error">{eGasto.error}</p>}
           <div className="acciones"><button type="button" className="bt sec solo" onClick={cerrar}>Regresar</button><button className="bt" disabled={guardandoGasto}>{guardandoGasto ? "Guardando…" : "Guardar"}<Fl /></button></div>
         </form>

@@ -33,7 +33,8 @@ async function ventas(bId: string, desde: string, hasta: string, zona: string): 
 
 async function gastos(bId: string, desde: string, hasta: string): Promise<Filas> {
   const gs = await db.select().from(schema.gastos).where(and(eq(schema.gastos.barberiaId, bId), gte(schema.gastos.fecha, desde), lte(schema.gastos.fecha, hasta)));
-  return [["Fecha", "Tipo", "Concepto", "Monto", "Pagado con la caja"], ...gs.map((g) => [g.fecha, g.categoria, g.concepto, pesos(g.monto), g.turnoId ? "Sí" : "No"])];
+  return [["Fecha", "Categoría", "Concepto", "Descripción", "Monto", "Método de pago", "Salió de la caja", "Estado", "Motivo de cancelación"],
+    ...gs.map((g) => [g.fecha, g.categoria, g.concepto, g.descripcion, pesos(g.monto), g.metodo === "transferencia" ? "Transferencia" : "Efectivo", g.turnoId ? "Sí" : "No", g.canceladoEn ? "Cancelado" : "Vigente", g.motivoCancelacion ?? ""])];
 }
 
 async function cortes(bId: string, desde: string, hasta: string, zona: string): Promise<Filas> {

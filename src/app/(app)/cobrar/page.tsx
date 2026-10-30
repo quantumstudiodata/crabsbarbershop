@@ -1,6 +1,6 @@
 import { eq } from "drizzle-orm";
 import { requerirSesion } from "@/lib/auth";
-import { equipoQueAtiende, folioCorte, metodosActivos, movimientosDeTurno, serviciosActivos, turnoAbierto } from "@/lib/datos";
+import { categoriasGasto, equipoQueAtiende, folioCorte, metodosActivos, movimientosDeTurno, serviciosActivos, turnoAbierto } from "@/lib/datos";
 import { db, schema } from "@/lib/db";
 import { fechaLarga, fechaLocal, horaCorta } from "@/lib/fechas";
 import { BarraCaja, CajaCerrada, CajaModal, CajaPendiente, type Turno } from "./CajaModal";
@@ -14,8 +14,8 @@ export default async function Cobrar({ searchParams }: { searchParams: Promise<{
   if (!s.puede("ventas.registrar") && !s.puede("ventas.registrar_otros")) return <p className="aviso error">No tienes permiso para cobrar.</p>;
   const q = await searchParams;
   const zona = s.barberia.zonaHoraria;
-  const [t, servicios, equipo, metodos] = await Promise.all([
-    turnoAbierto(s.barberia.id), serviciosActivos(s.barberia.id), equipoQueAtiende(s.barberia.id), metodosActivos(s.barberia.id),
+  const [t, servicios, equipo, metodos, cats] = await Promise.all([
+    turnoAbierto(s.barberia.id), serviciosActivos(s.barberia.id), equipoQueAtiende(s.barberia.id), metodosActivos(s.barberia.id), categoriasGasto(s.barberia.id),
   ]);
   const opera = s.puede("caja.operar");
   let turno: Turno | null = null;
@@ -49,11 +49,12 @@ export default async function Cobrar({ searchParams }: { searchParams: Promise<{
                 yo={s.usuario.id}
                 puedeOtros={s.puede("ventas.registrar_otros")}
                 limiteDescuento={s.barberia.limiteDescuentoPct}
+                usa={{ propinas: s.barberia.usaPropinas, descuentos: s.barberia.usaDescuentos, dividir: s.barberia.usaDividirPago }}
               />
             )}
           </>
         )}
-      {opera && <CajaModal inicial={q.caja === "cerrar" ? "corte" : null} turno={turno} limiteDiferencia={s.barberia.limiteDiferenciaCaja} />}
+      {opera && <CajaModal inicial={q.caja === "cerrar" ? "corte" : null} turno={turno} limiteDiferencia={s.barberia.limiteDiferenciaCaja} categorias={cats.map((c) => c.nombre)} />}
     </>
   );
 }

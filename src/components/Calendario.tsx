@@ -1,6 +1,5 @@
 "use client";
 
-import { usePathname, useRouter, useSearchParams } from "next/navigation";
 import { useEffect, useRef, useState } from "react";
 import { Icono } from "./Icono";
 
@@ -8,21 +7,14 @@ const MESES = ["enero", "febrero", "marzo", "abril", "mayo", "junio", "julio", "
 const D = ["L", "M", "M", "J", "V", "S", "D"];
 
 const aFecha = (y: number, m: number, d: number) => `${y}-${String(m + 1).padStart(2, "0")}-${String(d).padStart(2, "0")}`;
-const sumar = (f: string, n: number) => { const d = new Date(`${f}T12:00:00Z`); d.setUTCDate(d.getUTCDate() + n); return d.toISOString().slice(0, 10); };
-const corta = (f: string) => `${Number(f.slice(8))} de ${MESES[Number(f.slice(5, 7)) - 1]}`;
-const lunes = (f: string) => { const dia = new Date(`${f}T12:00:00Z`).getUTCDay(); return sumar(f, dia === 0 ? -6 : 1 - dia); };
+const aMes = (y: number, m: number) => `${y}-${String(m + 1).padStart(2, "0")}`;
+export const fechaTexto = (f: string) => `${Number(f.slice(8))} de ${MESES[Number(f.slice(5, 7)) - 1]}${f.slice(0, 4) === String(new Date().getFullYear()) ? "" : ` de ${f.slice(0, 4)}`}`;
+export const mesTexto = (ym: string) => `${MESES[Number(ym.slice(5, 7)) - 1]} ${ym.slice(0, 4)}`;
 
-/** Elige un rango de fechas y lo pone en la dirección (?desde=&hasta=). */
-export function Calendario({ desde, hasta, hoy }: { desde: string; hasta: string; hoy: string }) {
-  const router = useRouter();
-  const ruta = usePathname();
-  const params = useSearchParams();
+/** Cierra la ventana al hacer clic fuera o con Escape. */
+function useVentana() {
   const [abierto, setAbierto] = useState(false);
-  const [mes, setMes] = useState(() => { const f = hasta > hoy ? hoy : hasta; return { y: Number(f.slice(0, 4)), m: Number(f.slice(5, 7)) - 1 }; });
-  const [inicio, setInicio] = useState<string | null>(null);
-  const [sobre, setSobre] = useState<string | null>(null);
   const caja = useRef<HTMLDivElement>(null);
-
   useEffect(() => {
     if (!abierto) return;
     const fuera = (e: MouseEvent) => { if (!caja.current?.contains(e.target as Node)) setAbierto(false); };
@@ -31,68 +23,89 @@ export function Calendario({ desde, hasta, hoy }: { desde: string; hasta: string
     document.addEventListener("keydown", esc);
     return () => { document.removeEventListener("mousedown", fuera); document.removeEventListener("keydown", esc); };
   }, [abierto]);
+  return { abierto, setAbierto, caja };
+}
 
-  const aplicar = (a: string, b: string) => {
-    const q = new URLSearchParams(params.toString());
-    q.set("desde", a <= b ? a : b);
-    q.set("hasta", a <= b ? b : a);
-    q.delete("periodo");
-    q.delete("pagina");
-    router.push(`${ruta}?${q.toString()}`);
-    setAbierto(false);
-    setInicio(null);
-  };
-  const tocar = (f: string) => {
-    if (!inicio) setInicio(f);
-    else aplicar(inicio, f);
-  };
-
+/** Un solo día. */
+export function Calendario({ fecha, hoy, elegir, activo = true }: { fecha: string; hoy: string; elegir: (f: string) => void; activo?: boolean }) {
+  const { abierto, setAbierto, caja } = useVentana();
+  const [mes, setMes] = useState(() => ({ y: Number(fecha.slice(0, 4)), m: Number(fecha.slice(5, 7)) - 1 }));
   const primero = new Date(Date.UTC(mes.y, mes.m, 1)).getUTCDay();
   const vacios = (primero + 6) % 7;
   const diasMes = new Date(Date.UTC(mes.y, mes.m + 1, 0)).getUTCDate();
-  const a = inicio ?? desde;
-  const b = inicio ? sobre ?? inicio : hasta;
-  const [r1, r2] = a <= b ? [a, b] : [b, a];
   const mesAnt = mes.m === 0 ? { y: mes.y - 1, m: 11 } : { y: mes.y, m: mes.m - 1 };
   const mesSig = mes.m === 11 ? { y: mes.y + 1, m: 0 } : { y: mes.y, m: mes.m + 1 };
-  const finMesPasado = sumar(`${hoy.slice(0, 8)}01`, -1);
-
   return (
     <div style={{ position: "relative" }} ref={caja}>
-      <button type="button" className="chipf" aria-expanded={abierto} onClick={() => setAbierto((x) => !x)}>
-        <Icono n="calendario" />
-        {desde === hasta ? corta(desde) : `${corta(desde)} al ${corta(hasta)}`}
+      <button type="button" className={`chipf ${activo ? "on-suave" : ""}`} aria-expanded={abierto} onClick={() => setAbierto((x) => !x)}>
+        <Icono n="calendario" />{activo ? fechaTexto(fecha) : "Elegir día"}
       </button>
       {abierto && (
-        <div className="calendario" role="dialog" aria-label="Elegir fechas">
-          <div className="atajos">
-            <button type="button" onClick={() => aplicar(hoy, hoy)}>Hoy</button>
-            <button type="button" onClick={() => aplicar(lunes(hoy), hoy)}>Esta semana</button>
-            <button type="button" onClick={() => aplicar(`${hoy.slice(0, 8)}01`, hoy)}>Este mes</button>
-            <button type="button" onClick={() => aplicar(`${finMesPasado.slice(0, 8)}01`, finMesPasado)}>Mes pasado</button>
-          </div>
+        <div className="calendario" role="dialog" aria-label="Elegir día">
           <div className="entre">
             <button type="button" className="icb" onClick={() => setMes(mesAnt)} aria-label="Mes anterior"><Icono n="izquierda" /></button>
             <b style={{ textTransform: "capitalize" }}>{MESES[mes.m]} {mes.y}</b>
             <button type="button" className="icb" onClick={() => setMes(mesSig)} aria-label="Mes siguiente" disabled={aFecha(mesSig.y, mesSig.m, 1) > hoy}><Icono n="derecha" /></button>
           </div>
-          <div className="rejilla" onMouseLeave={() => setSobre(null)}>
+          <div className="rejilla">
             {D.map((d, i) => <span className="d" key={i}>{d}</span>)}
             {Array.from({ length: vacios }, (_, i) => <span key={`v${i}`} />)}
             {Array.from({ length: diasMes }, (_, i) => {
               const f = aFecha(mes.y, mes.m, i + 1);
-              const ext = f === r1 || f === r2;
-              const clase = [ext ? "ext" : f > r1 && f < r2 ? "rango" : "", f === hoy ? "hoy" : ""].join(" ");
               return (
-                <button type="button" key={f} className={clase} disabled={f > hoy} onClick={() => tocar(f)} onMouseEnter={() => setSobre(f)} aria-label={corta(f)}>
+                <button type="button" key={f} className={[activo && f === fecha ? "ext" : "", f === hoy ? "hoy" : ""].join(" ")} disabled={f > hoy} onClick={() => { elegir(f); setAbierto(false); }} aria-label={fechaTexto(f)}>
                   {i + 1}
                 </button>
               );
             })}
           </div>
-          {inicio && <small className="muted">Ahora el último día.</small>}
+          <button type="button" className="enlace" style={{ justifySelf: "start" }} onClick={() => { elegir(hoy); setAbierto(false); }}>Ir a hoy</button>
         </div>
       )}
+    </div>
+  );
+}
+
+/** Un mes: flechas para ir al anterior o siguiente y una cuadrícula para saltar a cualquiera. */
+export function ElegirMes({ mes, hoy, elegir }: { mes: string; hoy: string; elegir: (ym: string) => void }) {
+  const { abierto, setAbierto, caja } = useVentana();
+  const [anio, setAnio] = useState(Number(mes.slice(0, 4)));
+  const y = Number(mes.slice(0, 4)), m = Number(mes.slice(5, 7)) - 1;
+  const ant = m === 0 ? aMes(y - 1, 11) : aMes(y, m - 1);
+  const sig = m === 11 ? aMes(y + 1, 0) : aMes(y, m + 1);
+  const tope = hoy.slice(0, 7);
+  return (
+    <div className="paso-p" ref={caja}>
+      <button type="button" className="icb" onClick={() => elegir(ant)} aria-label="Mes anterior"><Icono n="izquierda" /></button>
+      <button type="button" className="paso-v" aria-expanded={abierto} onClick={() => { setAnio(y); setAbierto((x) => !x); }}>{mesTexto(mes)}</button>
+      <button type="button" className="icb" onClick={() => elegir(sig)} aria-label="Mes siguiente" disabled={sig > tope}><Icono n="derecha" /></button>
+      {abierto && (
+        <div className="calendario meses" role="dialog" aria-label="Elegir mes">
+          <div className="entre">
+            <button type="button" className="icb" onClick={() => setAnio(anio - 1)} aria-label="Año anterior"><Icono n="izquierda" /></button>
+            <b>{anio}</b>
+            <button type="button" className="icb" onClick={() => setAnio(anio + 1)} aria-label="Año siguiente" disabled={anio + 1 > Number(hoy.slice(0, 4))}><Icono n="derecha" /></button>
+          </div>
+          <div className="rejilla-m">
+            {MESES.map((t, i) => {
+              const k = aMes(anio, i);
+              return <button type="button" key={k} className={k === mes ? "ext" : k === tope ? "hoy" : ""} disabled={k > tope} onClick={() => { elegir(k); setAbierto(false); }}>{t.slice(0, 3)}</button>;
+            })}
+          </div>
+        </div>
+      )}
+    </div>
+  );
+}
+
+/** Un año, con flechas. */
+export function ElegirAnio({ anio, hoy, elegir }: { anio: string; hoy: string; elegir: (y: string) => void }) {
+  const y = Number(anio);
+  return (
+    <div className="paso-p">
+      <button type="button" className="icb" onClick={() => elegir(String(y - 1))} aria-label="Año anterior" disabled={y <= 2020}><Icono n="izquierda" /></button>
+      <span className="paso-v">{anio}</span>
+      <button type="button" className="icb" onClick={() => elegir(String(y + 1))} aria-label="Año siguiente" disabled={y + 1 > Number(hoy.slice(0, 4))}><Icono n="derecha" /></button>
     </div>
   );
 }

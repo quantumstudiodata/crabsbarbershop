@@ -19,7 +19,12 @@ export function describirEvento(tipo: string, accion: string, detalle: Record<st
     return { categoria: "caja", titulo: "Corte de caja realizado", extra: `${dif === 0 ? "Sin diferencias" : dif > 0 ? `Sobraron ${formatoDinero(dif)}` : `Faltaron ${formatoDinero(-dif)}`}${typeof d.contado === "number" ? `, ${formatoDinero(d.contado)} contados` : ""}` };
   }
   if ((r = m(/^registró (un retiro|una entrada) de (\S+)/))) return { categoria: "caja", titulo: r[1] === "un retiro" ? "Retiro de caja" : "Entrada de caja", objeto: r[2], extra: typeof d.concepto === "string" ? d.concepto : "" };
-  if ((r = m(/^registró un gasto de (\S+)/))) return { categoria: "caja", titulo: "Gasto de caja", objeto: r[1], extra: typeof d.concepto === "string" ? d.concepto : "" };
+  if ((r = m(/^registró un gasto de (\S+)/))) return { categoria: "gasto", titulo: "Gasto de caja", objeto: r[1], extra: typeof d.concepto === "string" ? d.concepto : "" };
+  if ((r = m(/^registró un egreso de (\S+?): (.+)/))) return { categoria: "gasto", titulo: "Egreso registrado", objeto: r[2], extra: `${r[1]}${d.metodo === "transferencia" ? " por transferencia" : " en efectivo"}` };
+  if ((r = m(/^canceló un egreso de (\S+?): (.+)/))) return { categoria: "gasto", titulo: "Egreso cancelado", objeto: r[2], extra: typeof d.motivo === "string" ? d.motivo : r[1] };
+  if ((r = m(/^(apagó|encendió) la función (.+)/))) return { categoria: "ajuste", titulo: r[1] === "apagó" ? "Función apagada" : "Función encendida", objeto: r[2] };
+  if ((r = m(/^agregó la categoría de egresos (.+)/))) return { categoria: "ajuste", titulo: "Categoría de egresos agregada", objeto: r[1] };
+  if ((r = m(/^(ocultó|volvió a mostrar) la categoría de egresos (.+)/))) return { categoria: "ajuste", titulo: r[1] === "ocultó" ? "Categoría de egresos ocultada" : "Categoría de egresos visible", objeto: r[2] };
   if ((r = m(/^corrigió el cierre del (\S+) en (.+)/))) return { categoria: "caja", titulo: "Ajuste a un corte", objeto: r[1], extra: r[2] };
   if ((r = m(/^cambió el precio de (.+)/))) return { categoria: "precio", titulo: "Precio modificado", objeto: r[1], extra: d.antes && d.ahora ? `${d.antes} a ${d.ahora}` : "" };
   if ((r = m(/^agregó el servicio (.+?) a (\S+)$/))) return { categoria: "precio", titulo: "Servicio agregado", objeto: r[1], extra: r[2] };

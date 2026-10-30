@@ -36,6 +36,7 @@ export default async function PaginaPersonas({ searchParams }: { searchParams: P
       personas={personas}
       roles={asignables.map((r) => ({ valor: r, texto: NOMBRE_ROL[r], detalle: DESCRIPCION_ROL[r] }))}
       nombresRol={NOMBRE_ROL}
+      conRenta={s.barberia.usaRentaSilla}
       grupos={GRUPOS_PERMISOS.map((g) => ({ titulo: g.titulo, permisos: g.permisos.map((k) => ({ clave: k, texto: PERMISOS[k] })) }))}
       permisosPorRol={PERMISOS_POR_ROL}
       restablecerId={q.restablecer && personas.some((p) => p.id === q.restablecer && p.editable) ? q.restablecer : null}
