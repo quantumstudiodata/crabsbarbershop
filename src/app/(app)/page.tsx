@@ -103,9 +103,14 @@ export default async function Inicio({ searchParams }: { searchParams: Promise<Q
             <div><span>Servicios</span><b><Cuenta valor={servicios} formato="entero" /></b></div>
             <div><span>Promedio por cliente</span><b>{deHoy.length ? formatoDinero(Math.round(netas / deHoy.length)) : "Sin datos"}</b></div>
             {s.barberia.usaMetas && <div style={{ display: "grid", gap: 8 }}>
-              <span className="entre"><span>Meta diaria</span><b>{formatoDinero(meta.monto)}</b></span>
+              <span className="entre"><span>{delMes ? "Meta del día, todo el equipo" : "Meta diaria"}</span><b>{formatoDinero(meta.monto)}</b></span>
               <div className="meta grande"><i style={{ width: `${Math.max(avance * 100, 3)}%` }} /></div>
               <small className="muted">{porcentaje(netas, meta.monto)}% alcanzado{delMes ? `, para llegar a ${formatoDinero(s.barberia.metaMensual)} al mes` : ""}</small>
+              {delMes && delMes.porBarbero.filter((b) => b.aplica).length > 0 && (
+                <div className="metas-eq">
+                  {delMes.porBarbero.filter((b) => b.aplica).map((b) => <span key={b.id}>{b.nombre.split(" ")[0]}<b>{formatoDinero(b.diaria)}</b></span>)}
+                </div>
+              )}
             </div>}
           </div>
         </div>
@@ -126,12 +131,12 @@ export default async function Inicio({ searchParams }: { searchParams: Promise<Q
         })}
       </section>
 
-      <section className="glass panel subir d3">
-        <div className="entre">
+      <section className="glass ultimos subir d3">
+        <div className="cab-u">
           <span className="lab">Últimos servicios</span>
-          {s.puede("ventas.ver_todas") && <Link className="enlace" href="/analitica/ventas">Ver todas las ventas</Link>}
+          {s.puede("ventas.ver_todas") && <Link className="bt-ver" href="/analitica/ventas">Ver todas las ventas<span><Icono n="derecha" /></span></Link>}
         </div>
-        {recientes.length === 0 ? <p className="muted">Todavía no hay servicios cobrados.</p> : (
+        {recientes.length === 0 ? <p className="muted" style={{ padding: 20 }}>Todavía no hay servicios cobrados.</p> : (
           <div className="recientes">
             {recientes.map((v) => {
               const quien = equipo.find((e) => e.id === v.conceptos[0]?.barberoId);
@@ -180,7 +185,8 @@ async function InicioBarbero({ s, hoy, zona, q, avisos }: { s: Sesion; hoy: stri
   const mia = delMes?.porBarbero.find((x) => x.id === yo);
   const meta = mia?.aplica ? { monto: Math.max(mia.diaria * 6, 1), origen: "asignada" as const } : calcularMeta(u?.meta ?? 0, semanas);
   const metaHoy = mia?.aplica ? mia.diaria : Math.round(meta.monto / 6);
-  const enHoy = modo === "hoy";
+  // En su cuenta, el barbero ve solo su meta del día.
+  const enHoy = true;
   const avance = Math.min((enHoy ? totalHoy : semana) / (enHoy ? Math.max(metaHoy, 1) : meta.monto), 1);
   const dia = nombreDia(new Date(`${hoy}T12:00:00Z`).getUTCDay());
 

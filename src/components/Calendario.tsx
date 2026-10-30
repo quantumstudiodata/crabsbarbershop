@@ -66,21 +66,27 @@ export function Calendario({ fecha, hoy, elegir, activo = true }: { fecha: strin
   );
 }
 
-/** Un mes: flechas para ir al anterior o siguiente y una cuadrícula para saltar a cualquiera. */
-export function ElegirMes({ mes, hoy, elegir }: { mes: string; hoy: string; elegir: (ym: string) => void }) {
+/** Botón pequeño con un menú que se abre por debajo. */
+function Desplegable({ texto, activo, children }: { texto: string; activo: boolean; children: (cerrar: () => void) => React.ReactNode }) {
   const { abierto, setAbierto, caja } = useVentana();
+  return (
+    <div style={{ position: "relative" }} ref={caja}>
+      <button type="button" className={`bp ${activo ? "on" : ""}`} aria-expanded={abierto} onClick={() => setAbierto((x) => !x)}>
+        {texto}<Icono n="abajo" className={`ic flecha-bp ${abierto ? "girada" : ""}`} />
+      </button>
+      {abierto && <div className="calendario menu-p" role="dialog">{children(() => setAbierto(false))}</div>}
+    </div>
+  );
+}
+
+/** Mes: se abre por debajo una cuadrícula con los meses y flechas para cambiar de año. */
+export function MenuMes({ mes, activo, hoy, elegir }: { mes: string; activo: boolean; hoy: string; elegir: (ym: string) => void }) {
   const [anio, setAnio] = useState(Number(mes.slice(0, 4)));
-  const y = Number(mes.slice(0, 4)), m = Number(mes.slice(5, 7)) - 1;
-  const ant = m === 0 ? aMes(y - 1, 11) : aMes(y, m - 1);
-  const sig = m === 11 ? aMes(y + 1, 0) : aMes(y, m + 1);
   const tope = hoy.slice(0, 7);
   return (
-    <div className="paso-p" ref={caja}>
-      <button type="button" className="icb" onClick={() => elegir(ant)} aria-label="Mes anterior"><Icono n="izquierda" /></button>
-      <button type="button" className="paso-v" aria-expanded={abierto} onClick={() => { setAnio(y); setAbierto((x) => !x); }}>{mesTexto(mes)}</button>
-      <button type="button" className="icb" onClick={() => elegir(sig)} aria-label="Mes siguiente" disabled={sig > tope}><Icono n="derecha" /></button>
-      {abierto && (
-        <div className="calendario meses" role="dialog" aria-label="Elegir mes">
+    <Desplegable texto={activo ? mesTexto(mes) : "Mes"} activo={activo}>
+      {(cerrar) => (
+        <>
           <div className="entre">
             <button type="button" className="icb" onClick={() => setAnio(anio - 1)} aria-label="Año anterior"><Icono n="izquierda" /></button>
             <b>{anio}</b>
@@ -89,23 +95,26 @@ export function ElegirMes({ mes, hoy, elegir }: { mes: string; hoy: string; eleg
           <div className="rejilla-m">
             {MESES.map((t, i) => {
               const k = aMes(anio, i);
-              return <button type="button" key={k} className={k === mes ? "ext" : k === tope ? "hoy" : ""} disabled={k > tope} onClick={() => { elegir(k); setAbierto(false); }}>{t.slice(0, 3)}</button>;
+              return <button type="button" key={k} className={activo && k === mes ? "ext" : k === tope ? "hoy" : ""} disabled={k > tope} onClick={() => { elegir(k); cerrar(); }}>{t.slice(0, 3)}</button>;
             })}
           </div>
-        </div>
+        </>
       )}
-    </div>
+    </Desplegable>
   );
 }
 
-/** Un año, con flechas. */
-export function ElegirAnio({ anio, hoy, elegir }: { anio: string; hoy: string; elegir: (y: string) => void }) {
-  const y = Number(anio);
+/** Año: se abre por debajo la lista de años. */
+export function MenuAnio({ anio, activo, hoy, elegir, desde = 2023 }: { anio: string; activo: boolean; hoy: string; elegir: (y: string) => void; desde?: number }) {
+  const ultimo = Number(hoy.slice(0, 4));
+  const anios = Array.from({ length: Math.max(1, ultimo - desde + 1) }, (_, i) => String(ultimo - i));
   return (
-    <div className="paso-p">
-      <button type="button" className="icb" onClick={() => elegir(String(y - 1))} aria-label="Año anterior" disabled={y <= 2020}><Icono n="izquierda" /></button>
-      <span className="paso-v">{anio}</span>
-      <button type="button" className="icb" onClick={() => elegir(String(y + 1))} aria-label="Año siguiente" disabled={y + 1 > Number(hoy.slice(0, 4))}><Icono n="derecha" /></button>
-    </div>
+    <Desplegable texto={activo ? anio : "Año"} activo={activo}>
+      {(cerrar) => (
+        <div className="lista-anios">
+          {anios.map((y) => <button type="button" key={y} className={activo && y === anio ? "ext" : ""} onClick={() => { elegir(y); cerrar(); }}>{y}</button>)}
+        </div>
+      )}
+    </Desplegable>
   );
 }

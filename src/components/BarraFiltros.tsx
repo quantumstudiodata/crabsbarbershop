@@ -25,9 +25,15 @@ export function BarraFiltros({ p, hoy, personas, persona, buscar, conBuscar = tr
     router.push(t ? `${ruta}?${t}` : ruta);
   };
   const hayFiltros = !!(p && sinPeriodo) || !!persona || !!buscar;
+  const equipo = (
+    <div className="sel-equipo">
+      <Selector etiqueta="Filtrar por barbero" valor={persona} onChange={(v) => ir({ persona: v })}
+        opciones={[{ valor: "", texto: "Todo el equipo" }, ...personas.map((x) => ({ valor: x.id, texto: x.nombre.split(" ").slice(0, 2).join(" "), icono: <Avatar avatar={x.avatar} nombre={x.nombre} t={22} /> }))]} />
+    </div>
+  );
   return (
     <div className="barra-filtros">
-      <SelectorPeriodo p={p} hoy={hoy} sinPeriodo={sinPeriodo} />
+      <SelectorPeriodo p={p} hoy={hoy} sinPeriodo={sinPeriodo} medio={equipo} />
       <div className="fila filtros-extra">
         {conBuscar && (
           <form className="con-icono buscar-f" onSubmit={(e) => { e.preventDefault(); ir({ q: q.trim() }); }}>
@@ -35,10 +41,6 @@ export function BarraFiltros({ p, hoy, personas, persona, buscar, conBuscar = tr
             <input className="input" value={q} onChange={(e) => setQ(e.target.value)} onBlur={() => { if (q.trim() !== buscar) ir({ q: q.trim() }); }} placeholder={textoBuscar} aria-label="Buscar" />
           </form>
         )}
-        <div style={{ minWidth: 200 }}>
-          <Selector etiqueta="Filtrar por barbero" valor={persona} onChange={(v) => ir({ persona: v })}
-            opciones={[{ valor: "", texto: "Todo el equipo" }, ...personas.map((x) => ({ valor: x.id, texto: x.nombre.split(" ").slice(0, 2).join(" "), icono: <Avatar avatar={x.avatar} nombre={x.nombre} t={22} /> }))]} />
-        </div>
         {hayFiltros && <button type="button" className="enlace" onClick={() => { setQ(""); router.push(ruta); }}>Quitar filtros</button>}
         {descarga && <a className="chipf" href={descarga}><Icono n="descargar" />Descargar</a>}
       </div>

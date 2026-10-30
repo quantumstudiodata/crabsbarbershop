@@ -721,7 +721,7 @@ input[type="range"]::-moz-range-thumb { width: 20px; height: 20px; border-radius
 .filtros-h { display: flex; gap: 10px; align-items: center; flex-wrap: wrap; padding: 12px; border-radius: 18px; background: rgba(43,58,71,.06); }
 .tabla-h { padding: 0; overflow: hidden; }
 .th-h, .fila-h { display: grid; grid-template-columns: 56px 120px 130px minmax(0, 1fr); gap: 12px; align-items: center; padding: 10px 16px; }
-.th-h { background: linear-gradient(90deg, #2b3a47, #13171c); color: rgba(255,255,255,.75); font: 500 10.5px var(--f-mono); letter-spacing: .12em; text-transform: uppercase; }
+.th-h { background: linear-gradient(90deg, #cdd6df, #bfc9d3); color: #3a4a58; border-bottom: 1px solid rgba(43,58,71,.12); font: 500 10.5px var(--f-mono); letter-spacing: .12em; text-transform: uppercase; }
 .fila-h { width: 100%; border: 0; background: rgba(255,255,255,.55); text-align: left; font: inherit; font-size: 13.5px; color: inherit; cursor: pointer; border-top: 1px solid var(--line); border-left: 3px solid transparent; transition: background .15s; }
 .fila-h:nth-child(odd) { background: rgba(232,237,242,.6); }
 .fila-h:hover { background: #fff; }
@@ -984,3 +984,34 @@ button.paso-v:hover { background: rgba(255,255,255,.8); }
 .ficha-u .perfil-datos { animation: subir .4s .06s ease both; }
 .bt.guardado, .bt.guardado:disabled { background: #2e6b47; color: #fff; opacity: 1; cursor: default; animation: listo-b .35s cubic-bezier(.2,.8,.2,1) both; }
 @keyframes listo-b { from { transform: scale(.94); } }
+
+/* Últimos servicios: encabezado gris tenue, filas con movimiento al pasar el cursor */
+.ultimos { padding: 0; overflow: hidden; }
+.ultimos .cab-u { display: flex; justify-content: space-between; align-items: center; padding: 14px 20px; background: linear-gradient(90deg, rgba(43,58,71,.13), rgba(43,58,71,.06)); border-bottom: 1px solid rgba(43,58,71,.1); }
+.ultimos .recientes { padding: 6px 12px 10px; }
+.recientes > div { border-radius: 12px; transition: background .2s, transform .25s cubic-bezier(.2,.8,.2,1), box-shadow .25s; }
+.recientes > div:hover { background: #fff; transform: translateX(4px); box-shadow: 0 6px 16px -10px rgba(20,35,50,.4); border-top-color: transparent; }
+.recientes > div:hover + div { border-top-color: transparent; }
+.bt-ver { display: inline-flex; align-items: center; gap: 8px; padding: 7px 8px 7px 14px; border-radius: 999px; background: #fff; color: var(--fg); font-weight: 600; font-size: 13px; text-decoration: none; box-shadow: 0 4px 12px -6px rgba(20,35,50,.35); transition: transform .2s, box-shadow .2s, background .2s; }
+.bt-ver span { display: grid; place-items: center; width: 24px; height: 24px; border-radius: 50%; background: var(--ink); color: #fff; transition: transform .25s cubic-bezier(.2,.8,.2,1); }
+.bt-ver span .ic { width: 13px; height: 13px; }
+.bt-ver:hover { transform: translateY(-1px); box-shadow: 0 10px 20px -10px rgba(20,35,50,.45); }
+.bt-ver:hover span { transform: translateX(3px); }
+.metas-eq { display: grid; gap: 4px; margin-top: 2px; }
+.metas-eq > span { display: flex; justify-content: space-between; font-size: 12px; color: var(--muted); }
+.metas-eq b { color: var(--fg); font-weight: 600; font-size: 13px !important; }
+
+/* Filtro de periodo: botones pequeños con menú por debajo */
+.botones-p { display: inline-flex; gap: 4px; padding: 3px; border-radius: 12px; background: rgba(255,255,255,.5); border: 1px solid rgba(255,255,255,.9); }
+.bp { display: inline-flex; align-items: center; gap: 4px; padding: 6px 11px; border: 0; border-radius: 9px; background: none; font: 500 12.5px var(--f-body); color: var(--muted); cursor: pointer; white-space: nowrap; text-transform: capitalize; transition: background .15s, color .15s; }
+.bp:hover { background: rgba(255,255,255,.85); color: var(--fg); }
+.bp.on { background: var(--ink); color: #fff; }
+.flecha-bp { width: 12px; height: 12px; transition: transform .2s; }
+.flecha-bp.girada { transform: rotate(180deg); }
+.calendario.menu-p { width: 260px; }
+.lista-anios { display: grid; gap: 4px; }
+.lista-anios button { border: 0; background: rgba(255,255,255,.7); padding: 9px 12px; border-radius: 10px; text-align: left; font: 500 13.5px var(--f-body); cursor: pointer; transition: background .15s; }
+.lista-anios button:hover { background: var(--accent-soft); }
+.lista-anios button.ext { background: var(--ink); color: #fff; }
+.sel-equipo { min-width: 200px; }
+.barra-filtros .selector-p { flex-wrap: wrap; }

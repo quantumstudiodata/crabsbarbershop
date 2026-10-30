@@ -26,9 +26,9 @@ export default async function Libreta({ searchParams }: { searchParams: Promise<
   return (
     <>
       <div>
-        <span className="lab">Contabilidad</span>
-        <h1 className="titulo" style={{ marginTop: 6 }}>Libreta</h1>
-        <p className="muted" style={{ marginTop: 4 }}>Lo mismo que el Excel de siempre, pero se llena solo con los cobros y egresos.</p>
+        <h1 className="titulo">Control financiero</h1>
+        <span className="pill ok" style={{ display: "inline-flex", marginTop: 8 }}>Registro automático</span>
+        <p className="muted" style={{ marginTop: 8, maxWidth: 620 }}>Lleva el control de los ingresos y egresos de tu barbería en un solo lugar. Los movimientos se registran automáticamente a partir de los cobros y gastos realizados en el sistema.</p>
       </div>
       <NavLibreta vista={vista} mes={mes} anio={anio} hoy={hoy} descarga={descarga} />
       {vista === "mes" ? <Mes barberiaId={s.barberia.id} mes={mes} zona={zona} puedeEgresos={s.puede("gastos.registrar")} />

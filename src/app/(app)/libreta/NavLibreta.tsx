@@ -1,7 +1,7 @@
 "use client";
 
 import { useRouter } from "next/navigation";
-import { ElegirAnio, ElegirMes } from "@/components/Calendario";
+import { MenuAnio, MenuMes } from "@/components/Calendario";
 import { Icono } from "@/components/Icono";
 
 /** Mes, Año o Por barbero, con su selector y el botón de descarga. */
@@ -16,9 +16,11 @@ export function NavLibreta({ vista, mes, anio, hoy, descarga }: { vista: "mes" |
           <button type="button" aria-current={vista === "anio" ? "page" : undefined} onClick={() => ir(`vista=anio&anio=${anio}`)}>Año</button>
           <button type="button" aria-current={vista === "barberos" ? "page" : undefined} onClick={() => ir(`vista=barberos&anio=${anio}`)}>Por barbero</button>
         </nav>
-        {vista === "mes"
-          ? <ElegirMes key={mes} mes={mes} hoy={hoy} elegir={(m) => ir(`vista=mes&mes=${m}`)} />
-          : <ElegirAnio anio={anio} hoy={hoy} elegir={(y) => ir(`vista=${vista}&anio=${y}`)} />}
+        <div className="botones-p">
+          {vista === "mes"
+            ? <MenuMes key={mes} mes={mes} activo hoy={hoy} elegir={(m) => ir(`vista=mes&mes=${m}`)} />
+            : <MenuAnio anio={anio} activo hoy={hoy} elegir={(y) => ir(`vista=${vista}&anio=${y}`)} />}
+        </div>
       </div>
       <a className="chipf" href={descarga}><Icono n="descargar" />Descargar Excel</a>
     </div>

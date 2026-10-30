@@ -2,12 +2,18 @@
 
 import { usePathname, useRouter, useSearchParams } from "next/navigation";
 import type { Periodo } from "@/lib/periodo";
-import { Calendario, ElegirAnio, ElegirMes } from "./Calendario";
+import { Calendario, MenuAnio, MenuMes } from "./Calendario";
 
 const CLAVES = ["periodo", "fecha", "mes", "anio", "desde", "hasta", "pagina"];
 
-/** Hoy, Mes o Año, más un calendario para elegir un día. Conserva los demás filtros de la dirección. */
-export function SelectorPeriodo({ p, hoy, conAnio = true, sinPeriodo }: { p: Periodo | null; hoy: string; conAnio?: boolean; ruta?: string; conDia?: boolean; extra?: string; sinPeriodo?: string }) {
+/**
+ * En este orden: calendario de un día, lo que vaya en medio (por ejemplo el equipo) y botones pequeños Hoy, Mes y Año.
+ * Mes y Año abren su menú por debajo. Conserva los demás filtros de la dirección.
+ * Con sinPeriodo, no elegir nada significa todo el historial.
+ */
+export function SelectorPeriodo({ p, hoy, conAnio = true, sinPeriodo, medio }: {
+  p: Periodo | null; hoy: string; conAnio?: boolean; ruta?: string; conDia?: boolean; extra?: string; sinPeriodo?: string; medio?: React.ReactNode;
+}) {
   const router = useRouter();
   const ruta = usePathname();
   const params = useSearchParams();
@@ -22,15 +28,14 @@ export function SelectorPeriodo({ p, hoy, conAnio = true, sinPeriodo }: { p: Per
   const esHoy = tipo === "dia" && p?.desde === hoy;
   return (
     <div className="fila selector-p">
-      <nav className="seg" aria-label="Periodo">
-        {sinPeriodo && <button type="button" aria-current={!p ? "page" : undefined} onClick={() => ir(null)}>{sinPeriodo}</button>}
-        <button type="button" aria-current={esHoy ? "page" : undefined} onClick={() => ir({ periodo: "dia" })}>Hoy</button>
-        <button type="button" aria-current={tipo === "mes" ? "page" : undefined} onClick={() => ir({ periodo: "mes", mes: p?.tipo === "mes" ? p.desde.slice(0, 7) : hoy.slice(0, 7) })}>Mes</button>
-        {conAnio && <button type="button" aria-current={tipo === "anio" ? "page" : undefined} onClick={() => ir({ periodo: "anio", anio: (p?.desde ?? hoy).slice(0, 4) })}>Año</button>}
-      </nav>
-      {tipo === "mes" && p && <ElegirMes key={p.desde} mes={p.desde.slice(0, 7)} hoy={hoy} elegir={(m) => ir({ periodo: "mes", mes: m })} />}
-      {tipo === "anio" && p && <ElegirAnio anio={p.desde.slice(0, 4)} hoy={hoy} elegir={(y) => ir({ periodo: "anio", anio: y })} />}
-      <Calendario key={p?.desde ?? "-"} fecha={tipo === "dia" && p ? p.desde : hoy} activo={tipo === "dia" && !esHoy} hoy={hoy} elegir={(f) => ir(f === hoy ? { periodo: "dia" } : { periodo: "dia", fecha: f })} />
+      <Calendario key={p?.desde ?? "-"} fecha={tipo === "dia" && p ? p.desde : hoy} activo={tipo === "dia" && !esHoy} hoy={hoy}
+        elegir={(f) => ir(f === hoy ? { periodo: "dia" } : { periodo: "dia", fecha: f })} />
+      {medio}
+      <div className="botones-p" role="group" aria-label="Periodo">
+        <button type="button" className={`bp ${esHoy ? "on" : ""}`} onClick={() => (esHoy && sinPeriodo ? ir(null) : ir({ periodo: "dia" }))}>Hoy</button>
+        <MenuMes key={`m${p?.desde ?? ""}`} mes={tipo === "mes" && p ? p.desde.slice(0, 7) : hoy.slice(0, 7)} activo={tipo === "mes"} hoy={hoy} elegir={(m) => ir({ periodo: "mes", mes: m })} />
+        {conAnio && <MenuAnio anio={tipo === "anio" && p ? p.desde.slice(0, 4) : hoy.slice(0, 4)} activo={tipo === "anio"} hoy={hoy} elegir={(y) => ir({ periodo: "anio", anio: y })} />}
+      </div>
     </div>
   );
 }
