@@ -5,6 +5,7 @@ import { Avatar } from "@/components/Avatar";
 import { Ayuda } from "@/components/Ayuda";
 import { Fl, Icono } from "@/components/Icono";
 import { Interruptor, Modal, Selector } from "@/components/ui";
+import { formatoDinero } from "@/lib/money";
 import type { Rol } from "@/lib/permisos";
 import { CamposFormaPago, type FormaActual } from "./CamposFormaPago";
 import { actualizarPersona, darDeAlta, darDeBaja, desactivar, reactivar, restablecer, verClave, type ClaveVisible, type EstadoPersona } from "./actions";
@@ -71,15 +72,41 @@ function VentanaClave({ c, cerrar }: { c: ClaveVisible | null; cerrar: () => voi
   );
 }
 
-function Estado({ p, acceso }: { p: Persona; acceso: () => void }) {
+function Estado({ p }: { p: Persona }) {
   const ms = useRestante(p.claveHasta);
-  if (!p.activo) return <span className="est off"><span className="d" />Desactivado</span>;
-  if (p.debeCambiar) return (
-    <button type="button" className="est temp enlace-est" onClick={acceso} title="Ver cómo darle acceso">
-      <span className="d" style={{ background: "var(--warn)", boxShadow: "0 0 0 3px var(--warn-soft)" }} />Acceso pendiente{p.claveHasta && ms > 0 ? `, ${Math.ceil(ms / 60000)} min` : ""}
-    </button>
+  if (!p.activo) return <span className="chip-e off"><i />Desactivado</span>;
+  if (p.debeCambiar) return <span className="chip-e pendiente"><i />Acceso pendiente{p.claveHasta && ms > 0 ? `, ${Math.ceil(ms / 60000)} min` : ""}</span>;
+  return <span className="chip-e ok"><i />Activo</span>;
+}
+
+/** Resumen de una persona, al tocar su fila. */
+function Ficha({ p, props, cerrar, editar }: { p: Persona; props: Props; cerrar: () => void; editar?: () => void }) {
+  const rol = rolDe(p.rol);
+  const extra = props.grupos.flatMap((g) => g.permisos).filter((x) => p.permisosExtra.includes(x.clave));
+  return (
+    <Modal abierto cerrar={cerrar} etiqueta="Usuario" titulo="Resumen">
+      <div className="ficha-u">
+        <div className="ficha-cab">
+          <Avatar avatar={p.avatar} nombre={p.nombre} t={72} />
+          <div>
+            <b>{p.nombre}</b>
+            <div className="fila" style={{ gap: 6, marginTop: 6 }}><span className={`rol-tag r-${rol}`}>{props.nombresRol[rol]}</span><Estado p={p} /></div>
+          </div>
+        </div>
+        <div className="perfil-datos">
+          <div><small>Usuario</small><span className="mono">{p.usuario}</span></div>
+          <div><small>Puesto</small><span>{props.nombresRol[rol]}</span></div>
+          {p.formaTexto && <div><small>Forma de pago</small><span>{p.formaTexto}</span></div>}
+          {esBarbero(p.rol) && <div><small>Meta individual</small><span>{p.metaSemanal ? `${formatoDinero(p.metaSemanal)} a la semana` : "Se calcula sola"}</span></div>}
+          <div><small>Permisos extra</small><span>{extra.length ? extra.map((x) => x.texto).join(", ") : "Solo los de su rol"}</span></div>
+        </div>
+      </div>
+      <div className="acciones">
+        <button type="button" className="bt sec solo" onClick={cerrar}>Cerrar</button>
+        {editar && <button type="button" className="bt" onClick={editar}>Editar usuario<span className="fl" aria-hidden="true"><Icono n="editar" /></span></button>}
+      </div>
+    </Modal>
   );
-  return <span className="est"><span className="d" />Activo</span>;
 }
 
 function MenuAcciones({ p, acciones }: { p: Persona; acciones: { editar: () => void; clave: () => void; desactivar: () => void; reactivar: () => void; eliminar: () => void } }) {
@@ -227,6 +254,9 @@ export function Personas(props: Props) {
     if (r.clave) setClave(r.clave);
     setAviso(r);
   });
+  const [ficha, setFicha] = useState<Persona | null>(null);
+  // Con acceso pendiente, tocar la fila lleva directo a la contraseña temporal; si no, al resumen.
+  const abrirFila = (p: Persona) => (p.debeCambiar && p.editable && p.activo ? acceso(p) : setFicha(p));
   const acceso = (p: Persona) => (p.claveHasta && p.claveHasta > Date.now() ? ejecutar(() => verClave(p.id)) : setConfirmar({ tipo: "restablecer", p }));
 
   const q = buscar.trim().toLowerCase();
@@ -262,13 +292,15 @@ export function Personas(props: Props) {
       <div className="glass lista-u">
         {lista.length === 0 && <p className="muted" style={{ padding: 16 }}>No hay usuarios con ese filtro.</p>}
         {lista.map((p) => (
-          <div key={p.id} className={`fila-u ${p.activo ? "" : "inactivo"}`}>
+          <div key={p.id} className={`fila-u ${p.activo ? "" : "inactivo"} ${p.debeCambiar && p.activo ? "pendiente" : ""}`} role="button" tabIndex={0}
+            title={p.debeCambiar && p.editable && p.activo ? "Ver la contraseña temporal" : "Ver resumen"}
+            onClick={(e) => { if ((e.target as HTMLElement).closest(".acts")) return; abrirFila(p); }}
+            onKeyDown={(e) => { if (e.key === "Enter" && e.target === e.currentTarget) abrirFila(p); }}>
             <Avatar avatar={p.avatar} nombre={p.nombre} t={34} />
             <span className="nom"><b>{p.nombre}</b>{p.yo && <span className="etiqueta" style={{ padding: "1px 7px", marginLeft: 6 }}>Tú</span>}<small>{p.usuario}{p.formaTexto ? ` - ${p.formaTexto}` : ""}</small></span>
             <span className={`rol-tag r-${rolDe(p.rol)}`}>{props.nombresRol[rolDe(p.rol)]}</span>
-            <span className="est-col"><Estado p={p} acceso={() => p.editable && acceso(p)} /></span>
+            <span className="est-col"><Estado p={p} /></span>
             <span className="acts">
-              {p.editable && <button type="button" className="icb" onClick={() => setEditar(p)} aria-label={`Editar a ${p.nombre}`} title="Editar"><Icono n="editar" /></button>}
               {p.editable && <MenuAcciones p={p} acciones={{
                 editar: () => setEditar(p), clave: () => setConfirmar({ tipo: "restablecer", p }), desactivar: () => setConfirmar({ tipo: "desactivar", p }),
                 reactivar: () => ejecutar(() => reactivar(p.id)), eliminar: () => setConfirmar({ tipo: "eliminar", p }),
@@ -306,6 +338,7 @@ export function Personas(props: Props) {
           </div>
         </Modal>
       )}
+      {ficha && <Ficha p={ficha} props={props} cerrar={() => setFicha(null)} editar={ficha.editable ? () => { setEditar(ficha); setFicha(null); } : undefined} />}
       {editar && <EditarPersona p={editar} props={props} cerrar={() => setEditar(null)} />}
       <VentanaClave c={clave} cerrar={() => setClave(null)} />
     </>

@@ -12,7 +12,7 @@ export default async function Servicios() {
     <>
       <div>
         <h1 className="titulo">Servicios y precios</h1>
-        <p className="sub">El precio de aquí es el que se cobra.<br />Cada cambio de precio queda en el historial.</p>
+        <p className="sub">El precio de aquí es el que se cobra.</p>
       </div>
       <TablaServicios servicios={servicios.map(({ id, nombre, categoria, precio, duracionMin, activo, comision }) => ({ id, nombre, categoria, precio, duracionMin, activo, comision }))} />
     </>

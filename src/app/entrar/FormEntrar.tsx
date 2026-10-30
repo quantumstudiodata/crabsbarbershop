@@ -29,7 +29,7 @@ export function FormEntrar() {
       <div>
         <span className="lab">Bienvenido</span>
         <h1 className="titulo" style={{ marginTop: 8 }}>Entra a tu cuenta</h1>
-        <p className="sub">Con el usuario y la contraseña que te dio el propietario.</p>
+        <p className="sub">Introduce tus credenciales para acceder a tu cuenta.</p>
       </div>
       <form action={accion} className="pila">
         <label className="campo">
