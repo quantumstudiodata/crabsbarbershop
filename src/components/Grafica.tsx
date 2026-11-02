@@ -21,7 +21,7 @@ function curva(p: Punto[]): string {
 
 const pesos = (c: number) => "$" + Math.round(c / 100).toLocaleString("en-US");
 
-export function Grafica({ id, actual, previo, etiquetas, alto = 170, ancho = 640, descripcion, vacio, cadaEtiqueta = 1, puntos, enCurso, minimo = 1, textoPoco }: {
+export function Grafica({ id, actual, previo, etiquetas, alto = 170, ancho = 640, descripcion, vacio, cadaEtiqueta = 1, puntos, enCurso, minimo = 1, textoPoco, globos }: {
   id: string;
   /** null = todavía no llega ese momento. */
   actual: (number | null)[];
@@ -39,6 +39,8 @@ export function Grafica({ id, actual, previo, etiquetas, alto = 170, ancho = 640
   /** Cuántos momentos con ventas hacen falta para dibujar una tendencia. */
   minimo?: number;
   textoPoco?: string;
+  /** Texto que aparece al pasar el cursor sobre cada momento: [título, importe, detalle]. */
+  globos?: ([string, string, string] | null)[];
 }) {
   const n = Math.max(actual.length, previo?.length ?? 0, 2);
   const max = Math.max(...actual.map((v) => v ?? 0), ...(previo ?? []), 1);
@@ -89,6 +91,16 @@ export function Grafica({ id, actual, previo, etiquetas, alto = 170, ancho = 640
           </g>
         )}
       </svg>
+      {globos && !sinDatos && (
+        <div className="zonas-g" aria-hidden="true">
+          {actual.map((v, i) => v === null || !globos[i] ? null : (
+            <span key={i} className="zona-g" style={{ left: `${(x(i) / ancho) * 100}%`, width: `${100 / n}%` }}>
+              <i className="marca-g" style={{ top: `${(y(v) / alto) * 100}%` }} />
+              <span className="globo-g" style={{ top: `${(y(v) / alto) * 100}%` }}>{globos[i]![0]}<b>{globos[i]![1]}</b><small>{globos[i]![2]}</small></span>
+            </span>
+          ))}
+        </div>
+      )}
       {sinDatos && vacio && <span className="grafica-vacia">{vacio}</span>}
       {poco && <span className="grafica-vacia">{textoPoco ?? "Todavía hay pocas ventas para ver una tendencia"}</span>}
       <div className="ejes">

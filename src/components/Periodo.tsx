@@ -11,8 +11,8 @@ const CLAVES = ["periodo", "fecha", "mes", "anio", "desde", "hasta", "pagina"];
  * Mes y Año abren su menú por debajo. Conserva los demás filtros de la dirección.
  * Con sinPeriodo, no elegir nada significa todo el historial.
  */
-export function SelectorPeriodo({ p, hoy, conAnio = true, sinPeriodo, medio }: {
-  p: Periodo | null; hoy: string; conAnio?: boolean; ruta?: string; conDia?: boolean; extra?: string; sinPeriodo?: string; medio?: React.ReactNode;
+export function SelectorPeriodo({ p, hoy, conAnio = true, conSemana, sinPeriodo, medio }: {
+  p: Periodo | null; hoy: string; conAnio?: boolean; conSemana?: boolean; ruta?: string; conDia?: boolean; extra?: string; sinPeriodo?: string; medio?: React.ReactNode;
 }) {
   const router = useRouter();
   const ruta = usePathname();
@@ -33,6 +33,7 @@ export function SelectorPeriodo({ p, hoy, conAnio = true, sinPeriodo, medio }: {
       {medio}
       <div className="botones-p" role="group" aria-label="Periodo">
         <button type="button" className={`bp ${esHoy ? "on" : ""}`} onClick={() => (esHoy && sinPeriodo ? ir(null) : ir({ periodo: "dia" }))}>Hoy</button>
+        {conSemana && <button type="button" className={`bp ${tipo === "semana" ? "on" : ""}`} onClick={() => ir({ periodo: "semana" })}>Semana</button>}
         <MenuMes key={`m${p?.desde ?? ""}`} mes={tipo === "mes" && p ? p.desde.slice(0, 7) : hoy.slice(0, 7)} activo={tipo === "mes"} hoy={hoy} elegir={(m) => ir({ periodo: "mes", mes: m })} />
         {conAnio && <MenuAnio anio={tipo === "anio" && p ? p.desde.slice(0, 4) : hoy.slice(0, 4)} activo={tipo === "anio"} hoy={hoy} elegir={(y) => ir({ periodo: "anio", anio: y })} />}
       </div>
