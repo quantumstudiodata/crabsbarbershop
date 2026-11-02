@@ -66,11 +66,47 @@ export default async function Cortes({ searchParams }: { searchParams: Promise<C
     return { fecha: f, titulo: fechaLarga(f), total: del.reduce((a, x) => a + x.total, 0), diferencia: del.reduce((a, x) => a + x.diferencia, 0), cortes: del };
   });
 
+  // El corte más reciente y el resumen de lo que se está viendo.
+  const u = filtrados[0];
+  const otrosU = u ? Object.values((u.verificacion ?? {}) as Record<string, { total?: number }>).reduce((a, x) => a + (x.total ?? 0), 0) : 0;
+  // Lo vendido en ese corte: si no está en la página que se ve, se calcula aparte.
+  const totalU = !u ? 0 : lista.find((x) => x.id === u.id)?.total
+    ?? (await detalleCortes(s.barberia.id, [u.id])).cobros.reduce((a, x) => a + x.total, 0);
+  const conDif = filtrados.filter((c) => (c.diferencia ?? 0) !== 0);
+  const neta = filtrados.reduce((a, c) => a + (c.diferencia ?? 0), 0);
+  const estado = (d: number) => (d === 0 ? <span className="est-c ok-c">Cuadró</span> : <span className="est-c mal-c">{d < 0 ? "Faltaron" : "Sobraron"} {formatoDinero(Math.abs(d))}</span>);
+
   return (
     <>
       <AvisoUrl aviso={q.aviso} error={q.error} />
       <BarraFiltros p={p} hoy={hoy} personas={personas} persona={f.persona} buscar={f.buscar} sinPeriodo="Todo"
         textoBuscar="Buscar por folio, observaciones o persona" descarga={s.puede("reportes.exportar") ? urlDescarga("cortes", f) : undefined} />
+      {u && (
+        <section className="cab-cortes subir">
+          <div className="glass ultimo-c">
+            <div className="entre"><span className="lab">Último corte, total vendido</span>{estado(u.diferencia ?? 0)}</div>
+            <div className="fila" style={{ gap: 14, alignItems: "baseline", marginTop: 8 }}>
+              <b className="big-mv num">{formatoDinero(totalU)}</b>
+              <span className="folio">{folios.get(u.id)}</span>
+            </div>
+            <small className="muted">{u.fechaOperativa === hoy ? "Hoy" : fechaLarga(u.fechaOperativa)}, {horaCorta(u.abiertoEn, zona)} a {u.cerradoEn ? horaCorta(u.cerradoEn, zona) : ""}. Abrió {persona(u.abiertoPor).nombre.split(" ")[0]}, cerró {(u.cerradoPor ?? "").split(" ")[0]}.</small>
+            <div className="tiles-egr" style={{ marginTop: 14 }}>
+              <div><span className="lab">Efectivo esperado</span><b className="num">{formatoDinero(u.efectivoEsperado ?? 0)}</b></div>
+              <div><span className="lab">Contado</span><b className="num">{formatoDinero(u.efectivoContado ?? 0)}</b></div>
+              <div><span className="lab">Otros métodos</span><b className="num">{formatoDinero(otrosU)}</b></div>
+            </div>
+          </div>
+          <div className="glass panel">
+            <span className="lab">{p ? p.nombre : "Todo el historial"}</span>
+            <div className="datos">
+              <div><span>Cortes</span><b>{filtrados.length}</b></div>
+              <div><span>Cuadraron</span><b>{filtrados.length - conDif.length}</b></div>
+              <div><span>Con diferencia</span><b>{conDif.length}</b></div>
+              <div><span>Diferencia neta</span><b className={neta < 0 ? "neg-t" : ""}>{neta === 0 ? "Sin diferencias" : `${neta < 0 ? "−" : "+"}${formatoDinero(Math.abs(neta))}`}</b></div>
+            </div>
+          </div>
+        </section>
+      )}
       {dias.length ? <HistorialCortes dias={dias} corregir={s.puede("caja.corregir")} /> : <p className="muted">No hay cortes con esos filtros.</p>}
       <Paginacion ruta="/analitica/cortes" params={q as Record<string, string | undefined>} pagina={r.pagina} paginas={r.paginas}
         texto={r.paginas > 1 ? `Página ${r.pagina} de ${r.paginas}` : ""} />

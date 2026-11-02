@@ -9,10 +9,11 @@ export default async function LayoutAnalitica({ children }: { children: React.Re
   if (s.puede("gastos.ver") || s.puede("gastos.registrar") || s.puede("reportes.ver")) items.push(["/analitica/gastos", "Egresos"]);
   if (s.puede("cortes.ver") || s.puede("caja.operar") || s.puede("reportes.ver")) items.push(["/analitica/cortes", "Cortes de caja"]);
   if (s.puede("reportes.ver")) items.push(["/analitica/finanzas", "Finanzas"]);
+  if (items.length <= 1) return <>{children}</>;
   return (
-    <>
-      {items.length > 1 && <Pestanas items={items} />}
-      {children}
-    </>
+    <div className="lay-lat">
+      <Pestanas items={items} />
+      <div className="lay-lat-c">{children}</div>
+    </div>
   );
 }
