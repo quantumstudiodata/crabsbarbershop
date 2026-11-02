@@ -49,8 +49,8 @@ export default async function Inicio({ searchParams }: { searchParams: Promise<Q
       {turno && turno.fechaOperativa < hoy && s.puede("reportes.ver") && (
         <div className="alerta-caja subir">
           <span className="icono-alerta grande"><Icono n="reloj" /></span>
-          <span><b>La caja del {fechaLarga(turno.fechaOperativa).toLowerCase()} sigue abierta</b><small>El día ha terminado y aún no se ha realizado el corte de caja. Realiza el cierre para iniciar una nueva jornada de cobros.</small></span>
-          <Link className="bt chico solo" href="/cobrar?caja=cerrar"><Icono n="candado" />Cerrar caja</Link>
+          <span><b>Tienes un corte de caja pendiente</b><small>La jornada del {fechaLarga(turno.fechaOperativa).toLowerCase()} aún no se ha cerrado. Realiza el corte para registrar el efectivo y finalizar el día.</small></span>
+          <Link className="bt chico solo" href="/cobrar?caja=cerrar"><Icono n="candado" />Realizar corte de caja</Link>
         </div>
       )}
       {turno && turno.fechaOperativa < hoy && !s.puede("reportes.ver") && s.puede("caja.operar") && <AvisoCajaEmergente dia={fechaLarga(turno.fechaOperativa).toLowerCase()} />}

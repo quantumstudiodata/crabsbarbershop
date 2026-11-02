@@ -64,9 +64,10 @@ export function CajaPendiente({ dia, opera }: { dia: string; opera: boolean }) {
   return (
     <section className="caja-puerta alerta subir">
       <span className="icono-caja"><Icono n="reloj" /></span>
-      <h1 className="titulo">La caja del {dia} sigue abierta</h1>
-      <p className="muted">El día ha terminado y aún no se ha realizado el corte de caja.<br />Realiza el cierre para iniciar una nueva jornada de cobros.</p>
-      {opera ? <button type="button" className="bt grande" style={{ width: "min(360px, 100%)" }} onClick={() => abrir("corte")}>Hacer corte de caja<Fl /></button>
+      <span className="lab">Cierre de caja</span>
+      <h1 className="titulo">Tienes un corte de caja pendiente</h1>
+      <p className="muted">La caja del {dia} aún no se ha cerrado.<br />Realiza el corte para registrar el efectivo y finalizar la jornada.</p>
+      {opera ? <button type="button" className="bt grande" style={{ width: "min(360px, 100%)" }} onClick={() => abrir("corte")}>Realizar corte de caja<Fl /></button>
         : <p className="muted">Pide que hagan el corte.</p>}
     </section>
   );

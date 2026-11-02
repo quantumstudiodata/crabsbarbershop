@@ -5,15 +5,21 @@ import { useState } from "react";
 import { Fl, Icono } from "@/components/Icono";
 import { Modal } from "@/components/ui";
 
-/** Para barberos: ventana emergente cuando la caja de ayer sigue abierta. */
+/** Para barberos: ventana emergente cuando la caja de un día anterior sigue abierta. */
 export function AvisoCajaEmergente({ dia }: { dia: string }) {
   const [abierto, setAbierto] = useState(true);
   return (
-    <Modal abierto={abierto} cerrar={() => setAbierto(false)} etiqueta="Caja" titulo={`La caja del ${dia} sigue abierta`}>
-      <div className="cronometro"><span className="exito alerta-i"><Icono n="reloj" /></span><p className="muted">El día ha terminado y aún no se ha realizado el corte de caja.<br />Realiza el cierre para iniciar una nueva jornada de cobros.</p></div>
+    <Modal abierto={abierto} cerrar={() => setAbierto(false)} etiqueta="Cierre de caja" titulo="Tienes un corte de caja pendiente" sinX>
+      <div className="aviso-corte">
+        <span className="reloj-suave"><Icono n="reloj" /></span>
+        <div>
+          <span className="pill-caja"><i />La caja sigue abierta</span>
+          <p>La jornada del {dia} aún no se ha cerrado. Realiza el corte para registrar el efectivo y finalizar el día.</p>
+        </div>
+      </div>
       <div className="acciones">
-        <button type="button" className="bt sec solo" onClick={() => setAbierto(false)}>Después</button>
-        <Link className="bt" href="/cobrar?caja=cerrar">Hacer corte de caja<Fl /></Link>
+        <button type="button" className="bt sec solo" onClick={() => setAbierto(false)}>Recordármelo después</button>
+        <Link className="bt principal-corte" href="/cobrar?caja=cerrar">Realizar corte de caja<Fl /></Link>
       </div>
     </Modal>
   );

@@ -5,8 +5,8 @@ import { createPortal } from "react-dom";
 import { Icono } from "./Icono";
 
 /** Ventana emergente. Se cierra con Esc o tocando fuera. */
-export function Modal({ abierto, cerrar, etiqueta, titulo, ancho, children }: {
-  abierto: boolean; cerrar: () => void; etiqueta?: string; titulo: React.ReactNode; ancho?: boolean; children: React.ReactNode;
+export function Modal({ abierto, cerrar, etiqueta, titulo, ancho, sinX, children }: {
+  abierto: boolean; cerrar: () => void; etiqueta?: string; titulo: React.ReactNode; ancho?: boolean; sinX?: boolean; children: React.ReactNode;
 }) {
   const ref = useRef<HTMLDivElement>(null);
   const alCerrar = useRef(cerrar);
@@ -33,7 +33,7 @@ export function Modal({ abierto, cerrar, etiqueta, titulo, ancho, children }: {
             {etiqueta && <span className="lab">{etiqueta}</span>}
             <h2 className="titulo" id={id}>{titulo}</h2>
           </div>
-          <button type="button" className="icb cerrar-x" onClick={cerrar} aria-label="Cerrar"><Icono n="cerrar" /></button>
+          {!sinX && <button type="button" className="icb cerrar-x" onClick={cerrar} aria-label="Cerrar"><Icono n="cerrar" /></button>}
         </div>
         <div className="modal-c">{children}</div>
       </div>

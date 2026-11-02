@@ -92,7 +92,7 @@ export async function GET() {
   const alertas: AlertaVivo[] = [];
   const [t] = await db.select().from(s.turnosCaja).where(and(eq(s.turnosCaja.barberiaId, bId), eq(s.turnosCaja.estado, "abierto"))).limit(1);
   if (t && t.fechaOperativa < fechaLocal(new Date(), se.barberia.zonaHoraria)) {
-    alertas.push({ id: `caja-${t.id}`, titulo: "No se cerró la caja de ayer", detalle: "Haz el corte para seguir cobrando", href: "/cobrar?caja=cerrar" });
+    alertas.push({ id: `caja-${t.id}`, titulo: "Tienes un corte de caja pendiente", detalle: "La caja sigue abierta. Realiza el corte para finalizar el día", href: "/cobrar?caja=cerrar" });
   }
   const avisos = await avisosPara(se);
   return Response.json({ eventos, solicitudes, alertas, avisos }, { headers: { "Cache-Control": "no-store" } });
