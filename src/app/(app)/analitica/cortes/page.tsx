@@ -15,7 +15,7 @@ export const metadata = { title: "Cortes de caja" };
 
 export default async function Cortes({ searchParams }: { searchParams: Promise<ConsultaFiltros & { aviso?: string; error?: string }> }) {
   const s = await requerirSesion();
-  if (!s.puede("caja.operar") && !s.puede("reportes.ver")) redirect("/");
+  if (!s.puede("cortes.ver") && !s.puede("caja.operar") && !s.puede("reportes.ver")) redirect("/");
   const q = await searchParams;
   const zona = s.barberia.zonaHoraria;
   const hoy = fechaLocal(new Date(), zona);
@@ -36,7 +36,6 @@ export default async function Cortes({ searchParams }: { searchParams: Promise<C
   const cortes = filtrados.filter((c) => r.dias.includes(c.fechaOperativa));
   const ids = cortes.map((c) => c.id);
   const [ajustes, det] = await Promise.all([ajustesDeTurnos(s.barberia.id, ids), detalleCortes(s.barberia.id, ids)]);
-  const diferenciaTotal = filtrados.reduce((a, c) => a + (c.diferencia ?? 0), 0);
   const persona = (id: string | null) => gente.find((g) => g.id === id) ?? { nombre: "", avatar: "iniciales" };
   const lista: Corte[] = cortes.map((c) => {
     const cobros = det.cobros.filter((x) => x.turnoId === c.id);
@@ -72,10 +71,6 @@ export default async function Cortes({ searchParams }: { searchParams: Promise<C
       <AvisoUrl aviso={q.aviso} error={q.error} />
       <BarraFiltros p={p} hoy={hoy} personas={personas} persona={f.persona} buscar={f.buscar} sinPeriodo="Todo"
         textoBuscar="Buscar por folio, observaciones o persona" descarga={s.puede("reportes.exportar") ? urlDescarga("cortes", f) : undefined} />
-      <div className="subir">
-        <span className="lab">{p ? p.etiqueta : "Todo el historial"}{f.buscar ? `, con "${f.buscar}"` : ""}</span>
-        <h1 className="titulo" style={{ marginTop: 8 }}>{filtrados.length} {filtrados.length === 1 ? "corte" : "cortes"}{diferenciaTotal ? `, ${diferenciaTotal < 0 ? "faltaron" : "sobraron"} ${formatoDinero(Math.abs(diferenciaTotal))}` : ", sin diferencias"}</h1>
-      </div>
       {dias.length ? <HistorialCortes dias={dias} corregir={s.puede("caja.corregir")} /> : <p className="muted">No hay cortes con esos filtros.</p>}
       <Paginacion ruta="/analitica/cortes" params={q as Record<string, string | undefined>} pagina={r.pagina} paginas={r.paginas}
         texto={r.paginas > 1 ? `Página ${r.pagina} de ${r.paginas}` : ""} />

@@ -12,6 +12,7 @@ export function describirEvento(tipo: string, accion: string, detalle: Record<st
   const m = (re: RegExp) => sin.match(re);
   let r: RegExpMatchArray | null;
   if ((r = m(/^cobró la venta (\S+)/))) return { categoria: "venta", titulo: "Venta cobrada", objeto: `Folio ${r[1]}`, extra: dinero(d.total) };
+  if ((r = m(/^modificó la venta (\S+)/))) return { categoria: "venta", titulo: "Venta modificada", objeto: `Folio ${r[1]}`, extra: typeof d.motivo === "string" ? d.motivo : "" };
   if ((r = m(/^canceló la venta (\S+)/))) return { categoria: "venta", titulo: "Venta cancelada", objeto: `Folio ${r[1]}`, extra: typeof d.motivo === "string" ? d.motivo : "" };
   if (m(/^abrió la caja/)) return { categoria: "caja", titulo: "Caja abierta", extra: d.fondo !== undefined ? `Fondo ${dinero(d.fondo)}` : "" };
   if (m(/^(hizo el corte de caja|cerró la caja)/)) {

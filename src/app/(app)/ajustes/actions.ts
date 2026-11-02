@@ -11,7 +11,7 @@ import { contrasenaTemporal, sugerirUsuario } from "@/lib/cuentas";
 import { db, schema } from "@/lib/db";
 import { registrar } from "@/lib/historial";
 import { formatoDinero, leerPesos } from "@/lib/money";
-import { NOMBRE_ROL, PERMISOS, PERMISOS_POR_ROL, rolesAsignables, type Rol } from "@/lib/permisos";
+import { expandirPermisos, NOMBRE_ROL, PERMISOS, PERMISOS_POR_ROL, type Permiso, rolesAsignables, type Rol } from "@/lib/permisos";
 import { texto } from "@/lib/volver";
 
 export type ClaveVisible = { nombre: string; usuario: string; clave: string; expira: number };
@@ -62,7 +62,7 @@ async function atenderSolicitudes(usuarioId: string) {
 
 /** Da de alta a una persona. La contraseña temporal se puede volver a ver durante 30 minutos. */
 export async function darDeAlta(_: EstadoPersona, form: FormData): Promise<EstadoPersona> {
-  const s = await requerirSesion("ajustes.usuarios");
+  const s = await requerirSesion("usuarios.editar");
   const nombre = texto(form, "nombre", 80).replace(/\s+/g, " ");
   const rol = texto(form, "rol") as Rol;
   if (nombre.split(" ").length < 2) return { error: "Escribe nombre y apellido." };
@@ -84,7 +84,7 @@ export async function darDeAlta(_: EstadoPersona, form: FormData): Promise<Estad
 }
 
 export async function restablecer(id: string): Promise<EstadoPersona> {
-  const s = await requerirSesion("ajustes.usuarios");
+  const s = await requerirSesion("usuarios.editar");
   const u = await personaDeMiBarberia(s.barberia.id, String(id));
   if (!u) return { error: "No se encontró a esa persona." };
   if (u.id === s.usuario.id) return { error: "Tu propia contraseña se cambia desde tu menú." };
@@ -101,7 +101,7 @@ export async function restablecer(id: string): Promise<EstadoPersona> {
 
 /** Vuelve a mostrar la contraseña temporal mientras no pasen los 30 minutos. */
 export async function verClave(id: string): Promise<EstadoPersona> {
-  const s = await requerirSesion("ajustes.usuarios");
+  const s = await requerirSesion("usuarios.editar");
   const u = await personaDeMiBarberia(s.barberia.id, String(id));
   if (!u || !rolesAsignables(s.usuario.rol).includes(u.rol === "encargada" ? "barbera" : u.rol)) return { error: "No se encontró a esa persona." };
   if (!u.claveTemporal || !u.claveTemporalExpira || u.claveTemporalExpira < new Date() || !u.debeCambiar) return { error: "Ya pasaron los 30 minutos. Restablécela otra vez para ver una nueva." };
@@ -111,7 +111,7 @@ export async function verClave(id: string): Promise<EstadoPersona> {
 }
 
 export async function actualizarPersona(_: EstadoPersona, form: FormData): Promise<EstadoPersona> {
-  const s = await requerirSesion("ajustes.usuarios");
+  const s = await requerirSesion("usuarios.editar");
   const u = await personaDeMiBarberia(s.barberia.id, texto(form, "id", 40));
   if (!u) return { error: "No se encontró a esa persona." };
   if (u.id === s.usuario.id) return { error: "No puedes cambiar tu propio rol." };
@@ -123,7 +123,8 @@ export async function actualizarPersona(_: EstadoPersona, form: FormData): Promi
   const forma = leerForma(form, rol);
   if (typeof forma === "string") return { error: forma };
   const base = new Set<string>(PERMISOS_POR_ROL[rol]);
-  const extra = form.getAll("permisos").map(String).filter((p) => p in PERMISOS && !base.has(p) && !p.startsWith("ajustes."));
+  // Solo se puede dar un permiso que quien edita también tiene.
+  const extra = form.getAll("permisos").map(String).filter((p) => p in PERMISOS && !base.has(p) && s.puede(p as Permiso));
   const meta = leerPesos(texto(form, "meta")) ?? 0;
   await db.transaction(async (tx) => {
     await tx.update(schema.usuarios).set({ nombre, rol, permisosExtra: extra, metaSemanal: meta }).where(eq(schema.usuarios.id, u.id));
@@ -131,13 +132,13 @@ export async function actualizarPersona(_: EstadoPersona, form: FormData): Promi
     if (nombre !== u.nombre) cambios.push(`nombre a ${nombre}`);
     if (rol !== u.rol) cambios.push(`rol a ${NOMBRE_ROL[rol]}`);
     if (forma && (await guardarForma(tx, s.barberia.id, u.id, forma))) cambios.push(`forma de pago a ${describirRegla(forma, formatoDinero)}`);
-    if ([...extra].sort().join() !== [...u.permisosExtra].sort().join()) cambios.push("permisos");
+    if ([...extra].sort().join() !== expandirPermisos(u.permisosExtra).sort().join()) cambios.push("permisos");
     if (meta !== u.metaSemanal) cambios.push("meta semanal");
     if (cambios.length) await registrar(tx, {
       barberiaId: s.barberia.id, usuarioId: s.usuario.id, tipo: "usuario", accion: `${s.usuario.nombre} cambió a ${u.nombre}: ${cambios.join(", ")}`,
       detalle: {
         usuario: u.usuario,
-        antes: [u.nombre, NOMBRE_ROL[u.rol], u.metaSemanal ? `meta ${formatoDinero(u.metaSemanal)}` : "", permisosTexto(u.permisosExtra)].filter(Boolean).join(", "),
+        antes: [u.nombre, NOMBRE_ROL[u.rol], u.metaSemanal ? `meta ${formatoDinero(u.metaSemanal)}` : "", permisosTexto(expandirPermisos(u.permisosExtra))].filter(Boolean).join(", "),
         ahora: [nombre, NOMBRE_ROL[rol], meta ? `meta ${formatoDinero(meta)}` : "", permisosTexto(extra)].filter(Boolean).join(", "),
         permisosExtra: extra,
       },
@@ -154,7 +155,7 @@ export async function actualizarPersona(_: EstadoPersona, form: FormData): Promi
  * contraseña, avatar, permisos) y sus ventas quedan a nombre de "Persona eliminada" para que las cuentas sigan cuadrando.
  */
 export async function darDeBaja(id: string, borrarDatos = false): Promise<EstadoPersona> {
-  const s = await requerirSesion("ajustes.usuarios");
+  const s = await requerirSesion("usuarios.editar");
   const u = await personaDeMiBarberia(s.barberia.id, String(id));
   if (!u) return { error: "No se encontró a esa persona." };
   if (u.id === s.usuario.id) return { error: "No puedes darte de baja a ti mismo." };
@@ -188,7 +189,7 @@ export async function darDeBaja(id: string, borrarDatos = false): Promise<Estado
 }
 
 async function personaEditable(id: string) {
-  const s = await requerirSesion("ajustes.usuarios");
+  const s = await requerirSesion("usuarios.editar");
   const u = await personaDeMiBarberia(s.barberia.id, String(id));
   if (!u || u.id === s.usuario.id || !rolesAsignables(s.usuario.rol).includes(u.rol === "encargada" ? "barbera" : u.rol)) return { s, u: null };
   return { s, u };

@@ -3,7 +3,7 @@
 import { and, eq, isNull, sql } from "drizzle-orm";
 import { revalidatePath } from "next/cache";
 import { requerirSesion } from "@/lib/auth";
-import { turnoAbierto } from "@/lib/datos";
+import { cajaDe } from "@/lib/datos";
 import { db, schema } from "@/lib/db";
 import { diasEntre, esFechaValida, fechaLocal } from "@/lib/fechas";
 import { registrar } from "@/lib/historial";
@@ -17,7 +17,9 @@ const listo = (mensaje: string): EstadoGasto => {
   return { ok: true, mensaje, n: Date.now() };
 };
 
-const METODOS = { efectivo: "efectivo", transferencia: "transferencia" } as const;
+const METODOS = { efectivo: "efectivo", transferencia: "transferencia", tarjeta: "tarjeta" } as const;
+const PERIODOS = ["unica", "semanal", "quincenal", "mensual"];
+const TIPOS_ARCHIVO = /^data:(image\/(jpeg|png|webp)|application\/pdf);base64,/;
 
 /**
  * Registra un egreso. Si se paga en efectivo hoy y la caja está abierta, puede salir de la caja:
@@ -34,11 +36,15 @@ export async function registrarEgreso(_: EstadoGasto, form: FormData): Promise<E
   const metodo = METODOS[texto(form, "metodo") as keyof typeof METODOS];
   const deCaja = texto(form, "deCaja") === "si";
   const hoy = fechaLocal(new Date(), s.barberia.zonaHoraria);
+  const periodicidad = s.barberia.usaPeriodicidad && PERIODOS.includes(texto(form, "periodicidad")) ? texto(form, "periodicidad") : "unica";
+  const archivo = s.barberia.usaComprobantes ? String(form.get("comprobante") ?? "") : "";
+  const nombreArchivo = texto(form, "comprobanteNombre", 120) || "comprobante";
+  if (archivo && (!TIPOS_ARCHIVO.test(archivo) || archivo.length > 2_800_000)) return { error: "El comprobante debe ser una foto o un PDF de máximo 2 MB." };
 
   if (!concepto) return { error: "Escribe el concepto del egreso." };
   if (!monto || monto <= 0) return { error: "Escribe una cantidad mayor a cero." };
   if (monto > 100_000_000) return { error: "La cantidad es demasiado grande. Revísala." };
-  if (!metodo) return { error: "Elige si se pagó en efectivo o por transferencia." };
+  if (!metodo) return { error: "Elige cómo se pagó." };
   if (!esFechaValida(fecha) || fecha > hoy || diasEntre(fecha, hoy) > 400) return { error: "Elige una fecha válida, que no sea futura." };
   const [cat] = await db.select({ nombre: schema.categoriasGasto.nombre }).from(schema.categoriasGasto)
     .where(and(eq(schema.categoriasGasto.barberiaId, s.barberia.id), eq(schema.categoriasGasto.nombre, categoria), eq(schema.categoriasGasto.activo, true)));
@@ -47,7 +53,7 @@ export async function registrarEgreso(_: EstadoGasto, form: FormData): Promise<E
   let turnoId: string | null = null;
   if (metodo === "efectivo" && deCaja) {
     if (fecha !== hoy) return { error: "Solo los gastos de hoy pueden salir de la caja." };
-    const turno = await turnoAbierto(s.barberia.id);
+    const turno = await cajaDe(s);
     if (!turno) return { error: "La caja está cerrada. Marca que no salió de la caja, o ábrela primero." };
     turnoId = turno.id;
   }
@@ -62,12 +68,15 @@ export async function registrarEgreso(_: EstadoGasto, form: FormData): Promise<E
 
   await db.transaction(async (tx) => {
     const [g] = await tx.insert(schema.gastos).values({
-      barberiaId: s.barberia.id, categoria: cat.nombre, concepto, descripcion, monto, fecha, metodo, turnoId, usuarioId: s.usuario.id,
+      barberiaId: s.barberia.id, categoria: cat.nombre, concepto, descripcion, monto, fecha, metodo, periodicidad, turnoId, usuarioId: s.usuario.id,
     }).returning({ id: schema.gastos.id });
+    if (archivo) {
+      await tx.insert(schema.comprobantes).values({ barberiaId: s.barberia.id, gastoId: g.id, nombre: nombreArchivo, tipo: archivo.slice(5, archivo.indexOf(";")), datos: archivo });
+    }
     await registrar(tx, {
       barberiaId: s.barberia.id, usuarioId: s.usuario.id, tipo: "gasto",
       accion: `${s.usuario.nombre} registró un egreso de ${formatoDinero(monto)}: ${concepto}`,
-      detalle: { gastoId: g.id, concepto, categoria: cat.nombre, monto, fecha, metodo, deCaja: !!turnoId, descripcion: descripcion || undefined },
+      detalle: { gastoId: g.id, concepto, categoria: cat.nombre, monto, fecha, metodo, periodicidad, deCaja: !!turnoId, comprobante: archivo ? nombreArchivo : undefined, descripcion: descripcion || undefined },
     });
   });
   return listo(`Egreso de ${formatoDinero(monto)} guardado.`);
@@ -108,6 +117,7 @@ export async function crearCategoria(_: EstadoGasto, form: FormData): Promise<Es
   const existentes = await db.select().from(schema.categoriasGasto).where(eq(schema.categoriasGasto.barberiaId, s.barberia.id));
   const igual = existentes.find((c) => c.nombre.toLowerCase() === nombreBonito.toLowerCase());
   if (igual?.activo) return { error: "Esa categoría ya existe." };
+  try {
   await db.transaction(async (tx) => {
     if (igual) await tx.update(schema.categoriasGasto).set({ activo: true }).where(eq(schema.categoriasGasto.id, igual.id));
     else await tx.insert(schema.categoriasGasto).values({ barberiaId: s.barberia.id, nombre: nombreBonito, orden: 60 });
@@ -116,6 +126,10 @@ export async function crearCategoria(_: EstadoGasto, form: FormData): Promise<Es
       accion: `${s.usuario.nombre} agregó la categoría de egresos ${nombreBonito}`, detalle: { categoria: nombreBonito },
     });
   });
+  } catch (err) {
+    console.error("crearCategoria", err);
+    return { error: "No se pudo guardar la categoría. Intenta de nuevo." };
+  }
   return listo(`Categoría ${nombreBonito} agregada.`);
 }
 

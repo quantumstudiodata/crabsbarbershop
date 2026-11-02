@@ -80,7 +80,7 @@ function Desplegable({ texto, activo, children }: { texto: string; activo: boole
 }
 
 /** Mes: se abre por debajo una cuadrícula con los meses y flechas para cambiar de año. */
-export function MenuMes({ mes, activo, hoy, elegir }: { mes: string; activo: boolean; hoy: string; elegir: (ym: string) => void }) {
+export function MenuMes({ mes, activo, hoy, elegir, conDatos }: { mes: string; activo: boolean; hoy: string; elegir: (ym: string) => void; conDatos?: string[] }) {
   const [anio, setAnio] = useState(Number(mes.slice(0, 4)));
   const tope = hoy.slice(0, 7);
   return (
@@ -95,7 +95,8 @@ export function MenuMes({ mes, activo, hoy, elegir }: { mes: string; activo: boo
           <div className="rejilla-m">
             {MESES.map((t, i) => {
               const k = aMes(anio, i);
-              return <button type="button" key={k} className={activo && k === mes ? "ext" : k === tope ? "hoy" : ""} disabled={k > tope} onClick={() => { elegir(k); cerrar(); }}>{t.slice(0, 3)}</button>;
+              const vacio = !!conDatos && !conDatos.includes(k);
+              return <button type="button" key={k} className={`${activo && k === mes ? "ext" : k === tope ? "hoy" : ""} ${vacio ? "vacio" : ""}`} disabled={k > tope || vacio} title={vacio ? "Sin información" : undefined} onClick={() => { elegir(k); cerrar(); }}>{t.slice(0, 3)}</button>;
             })}
           </div>
         </>

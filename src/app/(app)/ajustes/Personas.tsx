@@ -16,7 +16,7 @@ type Persona = {
 };
 type Props = {
   personas: Persona[]; roles: { valor: Rol; texto: string; detalle: string }[]; nombresRol: Record<Rol, string>; conRenta: boolean;
-  grupos: { titulo: string; permisos: { clave: string; texto: string }[] }[]; permisosPorRol: Record<Rol, readonly string[]>; restablecerId: string | null;
+  grupos: { titulo: string; permisos: { clave: string; texto: string }[] }[]; permisosPorRol: Record<Rol, readonly string[]>; restablecerId: string | null; puedeEditar: boolean; descuentoLibre: boolean;
 };
 
 const ROLES_VISIBLES: Rol[] = ["duena", "admin", "barbera", "contador"];
@@ -174,12 +174,16 @@ function EditarPersona({ p, props, cerrar }: { p: Persona; props: Props; cerrar:
                 <summary><b>{g.titulo}</b><span className="muted">{incluidos.length} de {g.permisos.length} incluidos</span></summary>
                 <div className="grupo-p-c">
                   {incluidos.length > 0 && <div className="incluidos">{incluidos.map((x) => <span key={x.clave} className="tag-i"><Icono n="palomita" />{x.texto}</span>)}</div>}
-                  {extra.map((x) => (
-                    <label key={x.clave} className="entre perm-l">
-                      <span>{x.texto}</span>
-                      <Interruptor name="permisos" value={x.clave} etiqueta={x.texto} defaultChecked={p.permisosExtra.includes(x.clave)} />
-                    </label>
-                  ))}
+                  {extra.map((x) => {
+                    // Con la autorización de descuentos al 100%, cualquiera puede dar cualquier descuento: este permiso ya no hace falta.
+                    const libre = x.clave === "ventas.descuento" && props.descuentoLibre;
+                    return (
+                      <label key={x.clave} className={`entre perm-l ${libre ? "apagado-p" : ""}`}>
+                        <span>{x.texto}{libre && <small className="nota-p">La autorización de descuentos está al 100%: ya puede dar cualquier descuento por su cuenta.</small>}</span>
+                        <Interruptor name={libre ? undefined : "permisos"} value={x.clave} etiqueta={x.texto} defaultChecked={libre ? false : p.permisosExtra.includes(x.clave)} disabled={libre} />
+                      </label>
+                    );
+                  })}
                   {extra.length === 0 && <small className="muted">Su rol ya incluye todo este grupo.</small>}
                 </div>
               </details>
@@ -269,7 +273,7 @@ export function Personas(props: Props) {
     <>
       <div className="entre">
         <h1 className="titulo">Usuarios</h1>
-        <button type="button" className="bt" onClick={() => setAlta((n) => n + 1)}>Agregar usuario<span className="fl" aria-hidden="true"><Icono n="mas" /></span></button>
+        {props.puedeEditar && <button type="button" className="bt" onClick={() => setAlta((n) => n + 1)}>Agregar usuario<span className="fl" aria-hidden="true"><Icono n="mas" /></span></button>}
       </div>
       {aviso.error && <p className="aviso error">{aviso.error}</p>}
       {aviso.mensaje && <p className="aviso ok">{aviso.mensaje}</p>}

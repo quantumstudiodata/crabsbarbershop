@@ -18,7 +18,7 @@ const MES_CORTO = ["ENE", "FEB", "MAR", "ABR", "MAY", "JUN", "JUL", "AGO", "SEP"
 
 export default async function Resumen({ searchParams }: { searchParams: Promise<ConsultaFiltros> }) {
   const s = await requerirSesion();
-  if (!s.puede("reportes.ver")) redirect(s.puede("ventas.ver_todas") ? "/analitica/ventas" : "/");
+  if (!s.puede("reportes.ver")) redirect(s.puede("ventas.ver_todas") ? "/analitica/ventas" : s.puede("gastos.ver") || s.puede("gastos.registrar") ? "/analitica/gastos" : s.puede("cortes.ver") ? "/analitica/cortes" : "/");
   const zona = s.barberia.zonaHoraria;
   const hoy = fechaLocal(new Date(), zona);
   const q = await searchParams;

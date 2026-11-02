@@ -4,6 +4,8 @@ const nextConfig: NextConfig = {
   poweredByHeader: false,
   // No se usa el optimizador de imágenes: evita exponer esa ruta del servidor.
   images: { unoptimized: true },
+  // Los comprobantes de egresos (fotos ya reducidas en el navegador) viajan en la acción del servidor.
+  experimental: { serverActions: { bodySizeLimit: "3mb" } },
   async headers() {
     return [
       {

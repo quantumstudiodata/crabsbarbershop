@@ -163,3 +163,13 @@ export async function aniosConDatos(barberiaId: string, hoy: string) {
   return [...anios].sort().reverse();
 }
 
+
+/** Meses (AAAA-MM) que tienen algo que mostrar: ventas, egresos o meses capturados del Excel. */
+export async function mesesConDatos(barberiaId: string, zona: string) {
+  const [h, v, g] = await Promise.all([
+    db.select({ m: s.historicoMensual.mes }).from(s.historicoMensual).where(eq(s.historicoMensual.barberiaId, barberiaId)),
+    db.selectDistinct({ m: sql<string>`to_char(${s.ventas.creadoEn} at time zone ${zona}, 'YYYY-MM')` }).from(s.ventas).where(eq(s.ventas.barberiaId, barberiaId)),
+    db.selectDistinct({ m: sql<string>`to_char(${s.gastos.fecha}, 'YYYY-MM')` }).from(s.gastos).where(eq(s.gastos.barberiaId, barberiaId)),
+  ]);
+  return [...new Set([...h, ...v, ...g].map((x) => x.m))].sort();
+}

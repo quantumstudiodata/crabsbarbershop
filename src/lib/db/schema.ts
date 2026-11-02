@@ -52,6 +52,12 @@ export const barberias = pgTable("barberias", {
   usaMetas: boolean("usa_metas").notNull().default(true),
   usaDividirPago: boolean("usa_dividir_pago").notNull().default(true),
   usaRentaSilla: boolean("usa_renta_silla").notNull().default(true),
+  // Caja: con apertura manual alguien abre la caja contando el fondo; si no, se abre sola con el fondo sugerido.
+  aperturaManual: boolean("apertura_manual").notNull().default(true),
+  // compartida: una caja para todos. individual: cada trabajador abre y corta la suya.
+  modeloCaja: text("modelo_caja").notNull().default("compartida"),
+  usaComprobantes: boolean("usa_comprobantes").notNull().default(true),
+  usaPeriodicidad: boolean("usa_periodicidad").notNull().default(true),
   // Preparado para suscripciones: el plan y su estado son de cada negocio.
   plan: text("plan").notNull().default("inicial"),
   estadoCuenta: text("estado_cuenta").notNull().default("activa"),
@@ -66,6 +72,8 @@ export const usuarios = pgTable(
     nombre: text("nombre").notNull(),
     usuario: text("usuario").notNull(),
     hash: text("hash").notNull(),
+    // Cuenta de soporte de la plataforma (no de un negocio): puede limpiar los datos de prueba.
+    esSoporte: boolean("es_soporte").notNull().default(false),
     rol: rolEnum("rol").notNull(),
     permisosExtra: text("permisos_extra").array().notNull().default(sql`'{}'::text[]`),
     activo: boolean("activo").notNull().default(true),
@@ -138,11 +146,13 @@ export const turnosCaja = pgTable(
     notasCierre: text("notas_cierre"),
     // Revisión de formas de pago que no son efectivo al cerrar: { "Transferencia": true, ... }
     verificacion: jsonb("verificacion").notNull().default(sql`'{}'::jsonb`),
+    // Con caja individual, de quién es esta caja. Vacío = caja compartida.
+    responsableId: uuid("responsable_id").references(() => usuarios.id),
   },
   (t) => [
     index("turnos_barberia_fecha_idx").on(t.barberiaId, t.fechaOperativa),
-    // Solo puede haber un turno abierto por barbería.
-    uniqueIndex("turnos_un_abierto_uq").on(t.barberiaId).where(sql`estado = 'abierto'`),
+    // Solo puede haber un turno abierto por barbería (o por persona, con caja individual).
+    uniqueIndex("turnos_un_abierto_uq").on(t.barberiaId, sql`coalesce(${t.responsableId}, '00000000-0000-0000-0000-000000000000'::uuid)`).where(sql`estado = 'abierto'`),
   ],
 );
 
@@ -275,6 +285,8 @@ export const gastos = pgTable("gastos", {
   metodo: text("metodo").notNull().default("efectivo"),
   // Si se pagó con el efectivo de la caja, aquí queda el turno.
   turnoId: uuid("turno_id").references(() => turnosCaja.id),
+  // unica, semanal, quincenal o mensual.
+  periodicidad: text("periodicidad").notNull().default("unica"),
   usuarioId: uuid("usuario_id")
     .notNull()
     .references(() => usuarios.id),
@@ -297,6 +309,29 @@ export const categoriasGasto = pgTable(
   },
   (t) => [uniqueIndex("categorias_gasto_uq").on(t.barberiaId, t.nombre)],
 );
+
+// Gastos que se repiten, para registrarlos con un toque.
+export const conceptosFrecuentes = pgTable("conceptos_frecuentes", {
+  id: id(),
+  barberiaId: barberiaId(),
+  concepto: text("concepto").notNull(),
+  categoria: text("categoria").notNull(),
+  monto: integer("monto").notNull().default(0),
+  metodo: text("metodo").notNull().default("efectivo"),
+  periodicidad: text("periodicidad").notNull().default("mensual"),
+  creadoEn: creadoEn(),
+});
+
+// Foto o archivo de un egreso. Se guarda en la base (máximo 2 MB) para no depender de otro servicio.
+export const comprobantes = pgTable("comprobantes", {
+  id: id(),
+  barberiaId: barberiaId(),
+  gastoId: uuid("gasto_id").notNull().references(() => gastos.id),
+  nombre: text("nombre").notNull(),
+  tipo: text("tipo").notNull(),
+  datos: text("datos").notNull(),
+  creadoEn: creadoEn(),
+});
 
 // Meses que se llevaban en Excel antes del sistema. Solo se consultan; las cifras nuevas salen de las ventas.
 export const historicoMensual = pgTable(

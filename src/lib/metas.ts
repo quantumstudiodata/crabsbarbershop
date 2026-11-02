@@ -28,7 +28,8 @@ export function explicarMeta(m: Meta, periodo: "semana" | "día"): string {
 // - Por comisión, al negocio le queda (100% - comisión) de cada cobro: hay que cobrar más para cubrir su parte.
 // - Con sueldo, al negocio le queda todo el cobro, pero el sueldo se suma a lo que hay que cubrir.
 // - Con renta de silla, lo que cobra es suyo: su renta se resta de lo que hay que cubrir y no lleva meta.
-// También se suman los egresos de un mes normal (promedio de los últimos meses).
+// La meta es lo que el negocio conserva después de pagar al equipo; no descuenta renta, luz ni otros gastos,
+// así que no es utilidad.
 
 export type BarberoMeta = {
   id: string; nombre: string;
@@ -42,7 +43,8 @@ export type MetaDiaria = { id: string; nombre: string; diaria: number; mensual: 
 export function metaDelNegocio(metaMensual: number, egresosMes: number, barberos: BarberoMeta[], diasHabiles: number) {
   const sueldos = barberos.reduce((a, b) => a + (b.tipo === "sueldo" || b.tipo === "mixto" ? b.mensual : 0), 0);
   const rentas = barberos.reduce((a, b) => a + (b.tipo === "renta" ? b.mensual : 0), 0);
-  const cubrir = Math.max(0, metaMensual + egresosMes + sueldos - rentas);
+  void egresosMes;
+  const cubrir = Math.max(0, metaMensual + sueldos - rentas);
   const conMeta = barberos.filter((b) => b.tipo !== "renta");
   const pesoTotal = conMeta.reduce((a, b) => a + b.peso, 0);
   const parte = (b: BarberoMeta) => {
@@ -55,10 +57,11 @@ export function metaDelNegocio(metaMensual: number, egresosMes: number, barberos
     if (b.tipo === "renta") return { id: b.id, nombre: b.nombre, diaria: 0, mensual: 0, parteNegocio: 0, aplica: false };
     const peso = pesoTotal > 0 ? b.peso / pesoTotal : 1 / Math.max(1, conMeta.length);
     const r = parte(b);
-    const mensual = redondear((cubrir * peso) / r);
-    return { id: b.id, nombre: b.nombre, mensual, diaria: redondear(mensual / dias), parteNegocio: Math.round(r * 100), aplica: true };
+    // Al peso, sin redondear hacia arriba: así las metas suman exactamente el objetivo.
+    const mensual = Math.round((cubrir * peso) / r);
+    return { id: b.id, nombre: b.nombre, mensual, diaria: Math.round(mensual / dias / 100) * 100, parteNegocio: Math.round(r * 100), aplica: true };
   });
-  return { cubrir, sueldos, rentas, egresos: egresosMes, porBarbero, diaria: porBarbero.reduce((a, b) => a + b.diaria, 0) };
+  return { cubrir, sueldos, rentas, egresos: 0, porBarbero, diaria: porBarbero.reduce((a, b) => a + b.diaria, 0) };
 }
 
 /** Días de trabajo del mes (lunes a sábado). */

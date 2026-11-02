@@ -16,7 +16,7 @@ async function servicioDe(barberiaId: string, id: string) {
 }
 
 export async function guardarServicio(d: { id?: string; nombre: string; categoria: string; precio: string; duracion: string; activo?: boolean; comision?: string }): Promise<Resultado> {
-  const s = await requerirSesion("ajustes.negocio");
+  const s = await requerirSesion("servicios.editar");
   const nombre = String(d.nombre ?? "").trim().slice(0, 60);
   const categoria = String(d.categoria ?? "").trim().slice(0, 40) || "Cortes";
   const precio = leerPesos(String(d.precio ?? ""));
@@ -53,7 +53,7 @@ export async function guardarServicio(d: { id?: string; nombre: string; categori
 
 /** Mostrar u ocultar en Cobro. */
 export async function alternarServicio(id: string): Promise<Resultado> {
-  const s = await requerirSesion("ajustes.negocio");
+  const s = await requerirSesion("servicios.editar");
   const x = await servicioDe(s.barberia.id, String(id));
   if (!x) return { error: "No se encontró el servicio." };
   await db.update(schema.servicios).set({ activo: !x.activo }).where(eq(schema.servicios.id, x.id));
@@ -64,7 +64,7 @@ export async function alternarServicio(id: string): Promise<Resultado> {
 
 /** Se borra solo si nunca se cobró. Si ya tiene ventas, se oculta para no perder el historial. */
 export async function eliminarServicio(id: string): Promise<Resultado> {
-  const s = await requerirSesion("ajustes.negocio");
+  const s = await requerirSesion("servicios.editar");
   const x = await servicioDe(s.barberia.id, String(id));
   if (!x) return { error: "No se encontró el servicio." };
   const [{ n }] = await db.select({ n: sql<number>`count(*)::int` }).from(schema.conceptos).where(eq(schema.conceptos.servicioId, x.id));
@@ -83,7 +83,7 @@ export async function eliminarServicio(id: string): Promise<Resultado> {
 
 /** Guarda el orden en que aparecen los servicios en Cobro. */
 export async function ordenarServicios(ids: string[]): Promise<Resultado> {
-  const s = await requerirSesion("ajustes.negocio");
+  const s = await requerirSesion("servicios.editar");
   const lista = ids.slice(0, 300).map(String);
   await db.transaction(async (tx) => {
     for (const [i, id] of lista.entries()) {
@@ -93,4 +93,18 @@ export async function ordenarServicios(ids: string[]): Promise<Resultado> {
   revalidatePath(R);
   revalidatePath("/cobrar");
   return {};
+}
+
+/** Borra una categoría: sus servicios pasan a otra, así nada se pierde ni cambia en las ventas. */
+export async function borrarCategoria(nombre: string, destino: string): Promise<Resultado> {
+  const s = await requerirSesion("servicios.editar");
+  const de = String(nombre ?? "").trim();
+  const a = String(destino ?? "").trim().slice(0, 40);
+  if (!de || !a || de === a) return { error: "Elige a qué categoría pasan sus servicios." };
+  const movidos = await db.update(schema.servicios).set({ categoria: a })
+    .where(and(eq(schema.servicios.barberiaId, s.barberia.id), eq(schema.servicios.categoria, de))).returning({ id: schema.servicios.id });
+  await registrar(db, { barberiaId: s.barberia.id, usuarioId: s.usuario.id, tipo: "ajuste", accion: `${s.usuario.nombre} borró la categoría de servicios ${de}`, detalle: { antes: de, ahora: a, servicios: movidos.length } });
+  revalidatePath(R);
+  revalidatePath("/cobrar");
+  return { mensaje: `La categoría ${de} se borró. Sus ${movidos.length} servicios pasaron a ${a}.` };
 }

@@ -4,14 +4,14 @@ import { requerirSesion } from "@/lib/auth";
 import { describirRegla } from "@/lib/comisiones";
 import { formatoDinero } from "@/lib/money";
 import { db, schema } from "@/lib/db";
-import { DESCRIPCION_ROL, GRUPOS_PERMISOS, NOMBRE_ROL, ORDEN_ROL, PERMISOS, PERMISOS_POR_ROL, rolesAsignables } from "@/lib/permisos";
+import { DESCRIPCION_ROL, expandirPermisos, GRUPOS_PERMISOS, NOMBRE_ROL, ORDEN_ROL, PERMISOS, PERMISOS_POR_ROL, rolesAsignables } from "@/lib/permisos";
 import { Personas } from "./Personas";
 
 export const metadata = { title: "Usuarios" };
 
 export default async function PaginaPersonas({ searchParams }: { searchParams: Promise<{ restablecer?: string }> }) {
   const s = await requerirSesion();
-  if (!s.puede("ajustes.usuarios")) redirect("/ajustes/servicios");
+  if (!s.puede("usuarios.ver")) redirect(s.puede("servicios.ver") ? "/ajustes/servicios" : "/ajustes/cobro");
   const q = await searchParams;
   const [gente, solicitudes, reglas] = await Promise.all([
     db.select().from(schema.usuarios).where(and(eq(schema.usuarios.barberiaId, s.barberia.id), notLike(schema.usuarios.usuario, "BORRADO-%"))).orderBy(asc(schema.usuarios.nombre)),
@@ -25,9 +25,9 @@ export default async function PaginaPersonas({ searchParams }: { searchParams: P
     .sort((a, b) => ORDEN_ROL.indexOf(a.rol) - ORDEN_ROL.indexOf(b.rol))
     .map((u) => ({
       id: u.id, nombre: u.nombre, usuario: u.usuario, rol: u.rol, avatar: u.avatar, activo: u.activo, metaSemanal: u.metaSemanal,
-      permisosExtra: u.permisosExtra, debeCambiar: u.debeCambiar, pide: pide.has(u.id),
+      permisosExtra: expandirPermisos(u.permisosExtra), debeCambiar: u.debeCambiar, pide: pide.has(u.id),
       claveHasta: u.claveTemporal && u.claveTemporalExpira && u.claveTemporalExpira.getTime() > ahora && u.debeCambiar ? u.claveTemporalExpira.getTime() : null,
-      yo: u.id === s.usuario.id, editable: u.id !== s.usuario.id && asignables.includes(u.rol === "encargada" ? "barbera" : u.rol),
+      yo: u.id === s.usuario.id, editable: s.puede("usuarios.editar") && u.id !== s.usuario.id && asignables.includes(u.rol === "encargada" ? "barbera" : u.rol),
       forma: (() => { const r = reglas.find((x) => x.barberoId === u.id); return r ? { tipo: r.tipo, porcentaje: r.porcentaje, montoFijo: r.montoFijo, montoSemanal: r.montoSemanal, periodo: r.periodo } : null; })(),
       formaTexto: (() => { const r = reglas.find((x) => x.barberoId === u.id); return r ? describirRegla(r, formatoDinero) : ""; })(),
     }));
@@ -39,6 +39,8 @@ export default async function PaginaPersonas({ searchParams }: { searchParams: P
       conRenta={s.barberia.usaRentaSilla}
       grupos={GRUPOS_PERMISOS.map((g) => ({ titulo: g.titulo, permisos: g.permisos.map((k) => ({ clave: k, texto: PERMISOS[k] })) }))}
       permisosPorRol={PERMISOS_POR_ROL}
+      puedeEditar={s.puede("usuarios.editar")}
+      descuentoLibre={s.barberia.limiteDescuentoPct >= 100}
       restablecerId={q.restablecer && personas.some((p) => p.id === q.restablecer && p.editable) ? q.restablecer : null}
     />
   );

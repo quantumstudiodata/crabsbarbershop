@@ -1,12 +1,11 @@
-import { and, desc, eq, gte, lte } from "drizzle-orm";
+import { and, desc, eq, gte, inArray, lte } from "drizzle-orm";
 import { alias } from "drizzle-orm/pg-core";
 import { redirect } from "next/navigation";
 import { SelectorPeriodo } from "@/components/Periodo";
 import { requerirSesion } from "@/lib/auth";
-import { categoriasGasto, turnoAbierto } from "@/lib/datos";
+import { categoriasGasto, cajaDe } from "@/lib/datos";
 import { db, schema } from "@/lib/db";
 import { fechaLarga, fechaLocal, horaCorta } from "@/lib/fechas";
-import { formatoDinero } from "@/lib/money";
 import { type ConsultaPeriodo, leerPeriodo } from "@/lib/periodo";
 import { Egresos, type DiaEgresos } from "./Egresos";
 
@@ -14,7 +13,7 @@ export const metadata = { title: "Egresos" };
 
 export default async function PaginaEgresos({ searchParams }: { searchParams: Promise<ConsultaPeriodo> }) {
   const s = await requerirSesion();
-  if (!s.puede("gastos.registrar") && !s.puede("reportes.ver")) redirect("/");
+  if (!s.puede("gastos.ver") && !s.puede("gastos.registrar") && !s.puede("reportes.ver")) redirect("/");
   const zona = s.barberia.zonaHoraria;
   const hoy = fechaLocal(new Date(), zona);
   const p = leerPeriodo(await searchParams, hoy, "mes");
@@ -27,13 +26,17 @@ export default async function PaginaEgresos({ searchParams }: { searchParams: Pr
       .where(and(eq(g.barberiaId, s.barberia.id), gte(g.fecha, p.desde), lte(g.fecha, p.hasta)))
       .orderBy(desc(g.fecha), desc(g.creadoEn)),
     categoriasGasto(s.barberia.id, false),
-    turnoAbierto(s.barberia.id),
+    cajaDe(s),
   ]);
+  const [comps, frecuentes] = await Promise.all([
+    filas.length ? db.select({ id: schema.comprobantes.id, gastoId: schema.comprobantes.gastoId, nombre: schema.comprobantes.nombre }).from(schema.comprobantes)
+      .where(and(eq(schema.comprobantes.barberiaId, s.barberia.id), inArray(schema.comprobantes.gastoId, filas.map((f) => f.g.id)))) : [],
+    db.select().from(schema.conceptosFrecuentes).where(eq(schema.conceptosFrecuentes.barberiaId, s.barberia.id)),
+  ]);
+  const PER: Record<string, string> = { semanal: "Semanal", quincenal: "Quincenal", mensual: "Mensual" };
   const vigentes = filas.filter((f) => !f.g.canceladoEn);
   const total = vigentes.reduce((a, f) => a + f.g.monto, 0);
   const porMetodo = (m: string) => vigentes.filter((f) => f.g.metodo === m).reduce((a, f) => a + f.g.monto, 0);
-  const porCat = new Map<string, number>();
-  for (const f of vigentes) porCat.set(f.g.categoria, (porCat.get(f.g.categoria) ?? 0) + f.g.monto);
 
   const dias: DiaEgresos[] = [];
   for (const f of filas) {
@@ -42,11 +45,12 @@ export default async function PaginaEgresos({ searchParams }: { searchParams: Pr
     if (!f.g.canceladoEn) d.total += f.g.monto;
     const cerrado = !!f.g.turnoId && f.g.turnoId !== turno?.id;
     d.filas.push({
-      id: f.g.id, concepto: f.g.concepto, categoria: f.g.categoria, metodo: f.g.metodo, monto: f.g.monto, cancelado: !!f.g.canceladoEn,
+      id: f.g.id, concepto: f.g.concepto, categoria: `${f.g.categoria}${PER[f.g.periodicidad] ? `, ${PER[f.g.periodicidad]}` : ""}`, metodo: f.g.metodo, monto: f.g.monto, cancelado: !!f.g.canceladoEn,
       puedeCancelar: s.puede("gastos.registrar") && !f.g.canceladoEn && !cerrado,
+      comprobante: comps.find((c) => c.gastoId === f.g.id) ? { id: comps.find((c) => c.gastoId === f.g.id)!.id, nombre: comps.find((c) => c.gastoId === f.g.id)!.nombre } : undefined,
       detalle: [
         ["Registró", `${f.quien.split(" ")[0]}, ${horaCorta(f.g.creadoEn, zona)}`],
-        ["Se pagó", f.g.metodo === "transferencia" ? "Por transferencia" : f.g.turnoId ? "En efectivo, de la caja" : "En efectivo, fuera de la caja"],
+        ["Se pagó", f.g.metodo === "transferencia" ? "Por transferencia" : f.g.metodo === "tarjeta" ? "Con tarjeta" : f.g.turnoId ? "En efectivo, de la caja" : "En efectivo, fuera de la caja"],
         ...(f.g.descripcion ? [["Descripción", f.g.descripcion] as [string, string]] : []),
         ...(f.g.canceladoEn ? [["Cancelado", `${f.cancelo?.split(" ")[0] ?? ""}: ${f.g.motivoCancelacion ?? ""}`] as [string, string]] : []),
       ],
@@ -60,9 +64,9 @@ export default async function PaginaEgresos({ searchParams }: { searchParams: Pr
       </div>
       <Egresos
         dias={dias} hoy={hoy} cajaAbierta={!!turno} puede={s.puede("gastos.registrar")}
-        categorias={cats} resumen={{ total, efectivo: porMetodo("efectivo"), transferencia: porMetodo("transferencia"), movimientos: vigentes.length }}
-        porCategoria={[...porCat.entries()].sort((a, b) => b[1] - a[1]).map(([n, m]) => ({ nombre: n, monto: m, texto: formatoDinero(m) }))}
-        etiqueta={p.etiqueta}
+        categorias={cats} resumen={{ total, efectivo: porMetodo("efectivo"), transferencia: porMetodo("transferencia"), tarjeta: porMetodo("tarjeta"), movimientos: vigentes.length, comprobantes: comps.length }}
+        etiqueta={p.etiqueta} ajustes={s.puede("ajustes.funciones")}
+        opciones={{ periodicidad: s.barberia.usaPeriodicidad, comprobantes: s.barberia.usaComprobantes, frecuentes: frecuentes.map(({ id, concepto, categoria, monto, metodo, periodicidad }) => ({ id, concepto, categoria, monto, metodo, periodicidad })) }}
       />
     </>
   );

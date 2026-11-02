@@ -17,7 +17,7 @@ export default async function LayoutApp({ children }: { children: React.ReactNod
   const rol = s.usuario.rol;
   const atiende = rol === "barbera" || rol === "encargada";
   const cobra = s.puede("ventas.registrar") || s.puede("ventas.registrar_otros");
-  const analitica = s.puede("reportes.ver") || s.puede("ventas.ver_todas");
+  const analitica = s.puede("reportes.ver") || s.puede("ventas.ver_todas") || s.puede("gastos.ver") || s.puede("cortes.ver");
 
   const items: ItemNav[] = [];
   if (rol !== "contador") items.push({ href: "/", texto: "Inicio", icono: "inicio" });
@@ -36,8 +36,9 @@ export default async function LayoutApp({ children }: { children: React.ReactNod
             usuario={s.usuario.usuario}
             rol={NOMBRE_ROL[rol]}
             avatar={s.usuario.avatar}
-            ajustes={s.puede("ajustes.usuarios") || s.puede("ajustes.negocio")}
-            historial={s.puede("historial.ver") || atiende}
+            ajustes={s.puede("usuarios.ver") || s.puede("servicios.ver") || s.puede("ajustes.funciones")}
+            historial={s.puede("ventas.ver_todas") || atiende}
+            soporte={s.usuario.esSoporte}
             formaPago={atiende ? describirRegla(copiaRegla(elegirRegla(await reglasDe(s.barberia.id), s.usuario.id, null, new Date())), formatoDinero) : null}
           />
           <Nav items={items} />

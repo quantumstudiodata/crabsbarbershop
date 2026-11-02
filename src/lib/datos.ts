@@ -9,13 +9,48 @@ import { type BarberoMeta, diasHabilesDelMes, metaDelNegocio } from "./metas";
 
 const s = schema;
 
-export async function turnoAbierto(barberiaId: string) {
+/**
+ * La caja abierta. Sin responsable se busca la compartida; con responsable, la de esa persona (caja individual).
+ * Sin el segundo dato, cualquiera abierta.
+ */
+export async function turnoAbierto(barberiaId: string, responsableId?: string | null) {
   const [t] = await db
     .select()
     .from(s.turnosCaja)
-    .where(and(eq(s.turnosCaja.barberiaId, barberiaId), eq(s.turnosCaja.estado, "abierto")))
+    .where(and(eq(s.turnosCaja.barberiaId, barberiaId), eq(s.turnosCaja.estado, "abierto"),
+      ...(responsableId === undefined ? [] : [responsableId === null ? isNull(s.turnosCaja.responsableId) : eq(s.turnosCaja.responsableId, responsableId)])))
+    .orderBy(asc(s.turnosCaja.abiertoEn))
     .limit(1);
   return t ?? null;
+}
+
+/** La caja con la que trabaja quien inició sesión, según el modelo de caja del negocio. */
+export function cajaDe(se: { barberia: { id: string; modeloCaja: string }; usuario: { id: string } }) {
+  return turnoAbierto(se.barberia.id, se.barberia.modeloCaja === "individual" ? se.usuario.id : null);
+}
+
+/**
+ * Con la apertura automática, la caja se abre sola con el fondo sugerido la primera vez que se necesita.
+ * Si ya hay una abierta (o dos personas lo intentan a la vez), se usa esa.
+ */
+export async function cajaOAbrir(se: { barberia: typeof s.barberias.$inferSelect; usuario: { id: string; nombre: string } }) {
+  const t = await cajaDe(se);
+  if (t || se.barberia.aperturaManual) return t;
+  const individual = se.barberia.modeloCaja === "individual";
+  try {
+    await db.transaction(async (tx) => {
+      await tx.insert(s.turnosCaja).values({
+        barberiaId: se.barberia.id, fondoInicial: se.barberia.fondoPredeterminado, abiertoPor: se.usuario.id,
+        responsableId: individual ? se.usuario.id : null, fechaOperativa: fechaLocal(new Date(), se.barberia.zonaHoraria),
+      });
+      await tx.insert(s.historial).values({
+        barberiaId: se.barberia.id, usuarioId: se.usuario.id, tipo: "caja",
+        accion: `${se.usuario.nombre} abrió la caja con ${(se.barberia.fondoPredeterminado / 100).toLocaleString("es-MX", { style: "currency", currency: "MXN" }).replace(".00", "")}`,
+        detalle: { fondo: se.barberia.fondoPredeterminado, automatica: true },
+      });
+    });
+  } catch {}
+  return cajaDe(se);
 }
 
 export async function movimientosDeTurno(barberiaId: string, turnoId: string, fondoInicial: number) {
@@ -119,7 +154,7 @@ export async function ventasEntre(barberiaId: string, desde: string, hasta: stri
   const [cs, ps, prs] = await Promise.all([
     db
       .select({
-        ventaId: s.conceptos.ventaId, nombre: s.conceptos.nombreServicio, barberoId: s.conceptos.barberoId, barbero: s.usuarios.nombre,
+        id: s.conceptos.id, ventaId: s.conceptos.ventaId, nombre: s.conceptos.nombreServicio, barberoId: s.conceptos.barberoId, barbero: s.usuarios.nombre,
         precioLista: s.conceptos.precioLista, descuento: s.conceptos.descuento, precioCobrado: s.conceptos.precioCobrado,
         comision: s.conceptos.comision, servicioId: s.conceptos.servicioId,
       })
@@ -127,7 +162,7 @@ export async function ventasEntre(barberiaId: string, desde: string, hasta: stri
       .innerJoin(s.usuarios, eq(s.usuarios.id, s.conceptos.barberoId))
       .where(and(eq(s.conceptos.barberiaId, barberiaId), inArray(s.conceptos.ventaId, ids))),
     db
-      .select({ ventaId: s.pagos.ventaId, metodo: s.pagos.nombreMetodo, esEfectivo: s.pagos.esEfectivo, monto: s.pagos.monto })
+      .select({ ventaId: s.pagos.ventaId, metodoId: s.pagos.metodoPagoId, metodo: s.pagos.nombreMetodo, esEfectivo: s.pagos.esEfectivo, monto: s.pagos.monto })
       .from(s.pagos)
       .where(and(eq(s.pagos.barberiaId, barberiaId), inArray(s.pagos.ventaId, ids))),
     db
@@ -147,8 +182,8 @@ export async function ventasEntre(barberiaId: string, desde: string, hasta: stri
   }
   return { ventas };
 }
-type ConceptoFila = { ventaId: string; nombre: string; barberoId: string; barbero: string; precioLista: number; descuento: number; precioCobrado: number; comision: number; servicioId: string | null };
-type PagoFila = { ventaId: string; metodo: string; esEfectivo: boolean; monto: number };
+type ConceptoFila = { id: string; ventaId: string; nombre: string; barberoId: string; barbero: string; precioLista: number; descuento: number; precioCobrado: number; comision: number; servicioId: string | null };
+type PagoFila = { ventaId: string; metodoId: string | null; metodo: string; esEfectivo: boolean; monto: number };
 type PropinaFila = { ventaId: string; barberoId: string; monto: number; esEfectivo: boolean };
 
 /** Resumen de un periodo. Ventas = lo cobrado por servicios ya con descuento; sin propinas ni ventas canceladas. */

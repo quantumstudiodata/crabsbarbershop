@@ -7,7 +7,7 @@ import { and, eq, gte, lte } from "drizzle-orm";
 import { Avatar } from "@/components/Avatar";
 import { Ayuda } from "@/components/Ayuda";
 import { describirRegla, elegirRegla, porSemana } from "@/lib/comisiones";
-import { copiaRegla, diasYTotalVentas, equipoConVentas, reglasDe, ventasEntre } from "@/lib/datos";
+import { copiaRegla, diasYTotalVentas, equipoConVentas, metodosActivos, reglasDe, ventasEntre } from "@/lib/datos";
 import { condicionVentas, type ConsultaFiltros, leerFiltros, rangoDePagina, urlDescarga } from "@/lib/filtros";
 import { db, schema } from "@/lib/db";
 import { diasEntre, lunesDe } from "@/lib/fechas";
@@ -38,6 +38,11 @@ export default async function Ventas({ searchParams }: { searchParams: Promise<Q
   const { ventas } = r.dias.length ? await ventasEntre(s.barberia.id, r.desde, r.hasta, { zona, condiciones }) : { ventas: [] };
   const dias = r.dias;
   const puedeCancelar = s.puede("ventas.cancelar");
+  const puedeModificar = s.puede("ventas.modificar");
+  const opciones = puedeModificar ? {
+    equipo: equipo.map((e) => ({ id: e.id, nombre: e.nombre })),
+    metodos: (await metodosActivos(s.barberia.id)).map((m) => ({ id: m.id, nombre: m.nombre })),
+  } : undefined;
   const historial: DiaVentas[] = dias.map((d) => {
     const delDia = ventas.filter((v) => v.fecha === d);
     const monto = (v: (typeof ventas)[number]) => (persona ? v.conceptos.filter((c) => c.barberoId === persona).reduce((a, c) => a + c.precioCobrado, 0) : v.total);
@@ -55,6 +60,10 @@ export default async function Ventas({ searchParams }: { searchParams: Promise<Q
           ...(v.estado === "cancelada" ? [["Cancelada", v.motivoCancelacion ?? ""] as [string, string]] : []),
         ] as [string, string][],
         accion: puedeCancelar && v.estado === "pagada" ? { tipo: "cancelar" as const } : undefined,
+        edicion: puedeModificar && v.estado === "pagada" ? {
+          conceptos: v.conceptos.map((c) => ({ id: c.id, nombre: c.nombre, barberoId: c.barberoId, precio: c.precioCobrado })),
+          pagos: v.pagos.filter((pg) => pg.metodoId).map((pg) => ({ metodoId: pg.metodoId!, monto: pg.monto })),
+        } : undefined,
       })),
     };
   });
@@ -100,7 +109,7 @@ export default async function Ventas({ searchParams }: { searchParams: Promise<Q
         </section>
       )}
 
-      <HistorialVentas dias={historial} regreso={regreso} />
+      <HistorialVentas dias={historial} regreso={regreso} opciones={opciones} />
       <Paginacion ruta="/analitica/ventas" params={q as Record<string, string | undefined>} pagina={r.pagina} paginas={r.paginas}
         texto={resumen.dias.length ? `${resumen.dias.length} ${resumen.dias.length === 1 ? "día" : "días"} con ventas${r.paginas > 1 ? `, página ${r.pagina} de ${r.paginas}` : ""}` : ""} />
     </>

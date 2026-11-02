@@ -3,7 +3,7 @@ import { redirect } from "next/navigation";
 import { Ayuda } from "@/components/Ayuda";
 import { requerirSesion } from "@/lib/auth";
 import { fechaLocal } from "@/lib/fechas";
-import { libretaAnio, libretaBarberos, libretaMes } from "@/lib/libreta";
+import { libretaAnio, libretaBarberos, libretaMes, mesesConDatos } from "@/lib/libreta";
 import { formatoDinero } from "@/lib/money";
 import { NavLibreta } from "./NavLibreta";
 
@@ -30,7 +30,7 @@ export default async function Libreta({ searchParams }: { searchParams: Promise<
         <span className="pill ok" style={{ display: "inline-flex", marginTop: 8 }}>Registro automático</span>
         <p className="muted" style={{ marginTop: 8, maxWidth: 620 }}>Lleva el control de los ingresos y egresos de tu barbería en un solo lugar. Los movimientos se registran automáticamente a partir de los cobros y gastos realizados en el sistema.</p>
       </div>
-      <NavLibreta vista={vista} mes={mes} anio={anio} hoy={hoy} descarga={descarga} />
+      <NavLibreta vista={vista} mes={mes} anio={anio} hoy={hoy} descarga={descarga} conDatos={await mesesConDatos(s.barberia.id, zona)} />
       {vista === "mes" ? <Mes barberiaId={s.barberia.id} mes={mes} zona={zona} puedeEgresos={s.puede("gastos.registrar")} />
         : vista === "anio" ? <Anio barberiaId={s.barberia.id} anio={anio} zona={zona} />
         : <Barberos barberiaId={s.barberia.id} anio={anio} zona={zona} />}
@@ -48,6 +48,30 @@ async function Mes({ barberiaId, mes, zona, puedeEgresos }: { barberiaId: string
   return (
     <>
       {m.historico && <p className="aviso">Este mes se llevó en Excel. Aquí solo están sus totales.</p>}
+      <section className="glass hero-lib subir">
+        <div className="cifras-lib">
+          <div><span className="lab">Ingresos</span><b className="num">{$(m.total)}</b><small>{m.subtotal !== m.total ? `${$(m.subtotal)} de comisión` : "del mes"}</small></div>
+          <div><span className="lab">Egresos</span><b className="num neg">{$(m.egresosTotal)}</b><small>{m.egresos.length} {m.egresos.length === 1 ? "concepto" : "conceptos"}</small></div>
+          <div><span className="lab">Utilidad</span><b className={`num ${m.total - m.egresosTotal < 0 ? "neg" : "pos"}`}>{$(m.total - m.egresosTotal)}</b><small>ingresos menos egresos</small></div>
+        </div>
+        {!m.historico && m.semanas.length > 0 && (
+          <div className="semanas-mini">
+            <span className="lab">Resumen por semana</span>
+            <div className="barras-lib">
+              {m.semanas.map((sem, i) => {
+                const max = Math.max(1, ...m.semanas.map((x) => x.total));
+                return (
+                  <div key={sem.numero}>
+                    <b className="num">{$(sem.total)}</b>
+                    <i style={{ height: `${Math.max((sem.total / max) * 100, 3)}%`, animationDelay: `${0.2 + i * 0.08}s` }} />
+                    <small>Semana {sem.numero}</small>
+                  </div>
+                );
+              })}
+            </div>
+          </div>
+        )}
+      </section>
       {!m.historico && (
         <section className="semanas-l subir">
           {m.semanas.map((sem) => (

@@ -21,7 +21,7 @@ export default async function Historial({ searchParams }: { searchParams: Promis
   const s = await requerirSesion();
   // Quien no ve el historial completo (los barberos) solo ve lo de la operación:
   // ventas, caja y cambios de servicios y precios; de accesos, solo los suyos. Nada administrativo.
-  const completo = s.puede("historial.ver");
+  const completo = s.puede("ventas.ver_todas");
   if (!completo && s.usuario.rol !== "barbera" && s.usuario.rol !== "encargada") redirect("/");
   const categorias = completo ? CATEGORIAS : CATEGORIAS.filter(([k]) => ["", "venta", "caja", "precio"].includes(k));
   const q = await searchParams;

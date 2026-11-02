@@ -59,7 +59,7 @@ export async function GET() {
   }
 
   // Lo demás que pasó: caja para todos; personas, precios y ajustes para quien ve el historial.
-  const verHistorial = se.puede("historial.ver");
+  const verHistorial = se.puede("ventas.ver_todas");
   const filas = await db
     .select({ id: s.historial.id, t: s.historial.creadoEn, accion: s.historial.accion, tipo: s.historial.tipo, nombre: s.usuarios.nombre, avatar: s.usuarios.avatar })
     .from(s.historial)
@@ -67,7 +67,7 @@ export async function GET() {
     .where(and(eq(s.historial.barberiaId, bId), gte(s.historial.creadoEn, desde), verHistorial ? inArray(s.historial.tipo, ["caja", "usuario", "precio", "ajuste", "equipo", "idea"]) : eq(s.historial.tipo, "caja")))
     .orderBy(desc(s.historial.creadoEn))
     .limit(20);
-  const verSolicitudes = se.puede("ajustes.usuarios");
+  const verSolicitudes = se.puede("usuarios.editar");
   for (const f of filas) {
     if (verSolicitudes && f.accion.endsWith("pidió restablecer su contraseña")) continue;
     // "Ana Martínez López abrió la caja" se lee mejor como "Ana abrió la caja".
@@ -78,7 +78,7 @@ export async function GET() {
   eventos = eventos.slice(0, 20);
 
   let solicitudes: SolicitudVivo[] = [];
-  if (se.puede("ajustes.usuarios")) {
+  if (se.puede("usuarios.editar")) {
     const filas = await db
       .select({ id: s.solicitudesClave.id, usuarioId: s.solicitudesClave.usuarioId, t: s.solicitudesClave.creadoEn, nombre: s.usuarios.nombre, avatar: s.usuarios.avatar, rol: s.usuarios.rol })
       .from(s.solicitudesClave)
@@ -144,7 +144,7 @@ async function avisosPara(se: Sesion): Promise<AvisoVivo[]> {
     }
   }
 
-  if (se.puede("reportes.ver") || se.puede("ajustes.usuarios")) {
+  if (se.puede("reportes.ver") || se.puede("usuarios.editar")) {
     const [cortes, canceladas, egresos] = await Promise.all([
       db.select({ id: s.turnosCaja.id, t: s.turnosCaja.cerradoEn, dif: s.turnosCaja.diferencia, nombre: s.usuarios.nombre, avatar: s.usuarios.avatar })
         .from(s.turnosCaja).leftJoin(s.usuarios, eq(s.usuarios.id, s.turnosCaja.cerradoPor))

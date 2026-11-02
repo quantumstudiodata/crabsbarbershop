@@ -4,7 +4,7 @@ import { and, eq } from "drizzle-orm";
 import { revalidatePath } from "next/cache";
 import { requerirSesion } from "@/lib/auth";
 import { compararConteo, requiereExplicacion } from "@/lib/caja";
-import { categoriasGasto, folioCorte, movimientosDeTurno, turnoAbierto } from "@/lib/datos";
+import { cajaDe, categoriasGasto, folioCorte, movimientosDeTurno } from "@/lib/datos";
 import { db, schema } from "@/lib/db";
 import { fechaLocal } from "@/lib/fechas";
 import { registrar } from "@/lib/historial";
@@ -27,10 +27,10 @@ export async function abrirCaja(_: EstadoCaja, form: FormData): Promise<EstadoCa
   if (!s.puede("caja.operar")) return { error: "No tienes permiso para abrir la caja." };
   const fondo = leerPesos(texto(form, "fondo"));
   if (fondo === null) return { error: "Escribe con cuánto efectivo se abre la caja. Si no hay, escribe 0." };
-  if (await turnoAbierto(s.barberia.id)) return { error: "La caja ya está abierta." };
+  if (await cajaDe(s)) return { error: "La caja ya está abierta." };
   try {
     await db.transaction(async (tx) => {
-      await tx.insert(schema.turnosCaja).values({ barberiaId: s.barberia.id, fondoInicial: fondo, abiertoPor: s.usuario.id, fechaOperativa: fechaLocal(new Date(), s.barberia.zonaHoraria) });
+      await tx.insert(schema.turnosCaja).values({ barberiaId: s.barberia.id, fondoInicial: fondo, abiertoPor: s.usuario.id, responsableId: s.barberia.modeloCaja === "individual" ? s.usuario.id : null, fechaOperativa: fechaLocal(new Date(), s.barberia.zonaHoraria) });
       await registrar(tx, { barberiaId: s.barberia.id, usuarioId: s.usuario.id, tipo: "caja", accion: `${s.usuario.nombre} abrió la caja con ${formatoDinero(fondo)}`, detalle: { fondo } });
     });
   } catch {
@@ -48,7 +48,7 @@ export async function registrarMovimiento(_: EstadoCaja, form: FormData): Promis
   if (tipo !== "entrada" && tipo !== "retiro") return { error: "Elige si es retiro o entrada." };
   if (!monto) return { error: "Escribe el monto." };
   if (!concepto) return { error: "Escribe para qué fue." };
-  const turno = await turnoAbierto(s.barberia.id);
+  const turno = await cajaDe(s);
   if (!turno) return { error: "La caja está cerrada." };
   await db.transaction(async (tx) => {
     await tx.insert(schema.movimientosCaja).values({ barberiaId: s.barberia.id, turnoId: turno.id, tipo, monto, concepto, usuarioId: s.usuario.id });
@@ -70,7 +70,7 @@ export async function registrarGasto(_: EstadoCaja, form: FormData): Promise<Est
   const categoria = cats.find((c) => c.nombre === elegida)?.nombre ?? "Otros";
   if (!monto) return { error: "Escribe el monto del gasto." };
   if (!concepto) return { error: "Escribe en qué se gastó." };
-  const turno = await turnoAbierto(s.barberia.id);
+  const turno = await cajaDe(s);
   if (!turno) return { error: "La caja está cerrada." };
   await db.transaction(async (tx) => {
     await tx.insert(schema.gastos).values({ barberiaId: s.barberia.id, categoria, concepto, monto, metodo: "efectivo", turnoId: turno.id, usuarioId: s.usuario.id, fecha: fechaLocal(new Date(), s.barberia.zonaHoraria) });
@@ -92,7 +92,7 @@ export async function cerrarCaja(_: EstadoCaja, form: FormData): Promise<EstadoC
   const contado = leerPesos(texto(form, "contado"));
   const notas = texto(form, "notas", 500);
   if (contado === null) return { error: "Escribe cuánto efectivo contaste." };
-  const turno = await turnoAbierto(s.barberia.id);
+  const turno = await cajaDe(s);
   if (!turno) return { error: "La caja ya está cerrada." };
   const datos = await movimientosDeTurno(s.barberia.id, turno.id, turno.fondoInicial);
   const r = compararConteo(datos.esperado, contado, formatoDinero);

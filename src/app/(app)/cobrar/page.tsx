@@ -1,6 +1,6 @@
 import { and, eq } from "drizzle-orm";
 import { requerirSesion } from "@/lib/auth";
-import { categoriasGasto, equipoQueAtiende, folioCorte, metodosActivos, movimientosDeTurno, serviciosActivos, turnoAbierto } from "@/lib/datos";
+import { cajaOAbrir, categoriasGasto, equipoQueAtiende, folioCorte, metodosActivos, movimientosDeTurno, serviciosActivos } from "@/lib/datos";
 import { db, schema } from "@/lib/db";
 import { fechaLarga, fechaLocal, horaCorta } from "@/lib/fechas";
 import { BarraCaja, CajaCerrada, CajaModal, CajaPendiente, type Turno } from "./CajaModal";
@@ -15,7 +15,7 @@ export default async function Cobrar({ searchParams }: { searchParams: Promise<{
   const q = await searchParams;
   const zona = s.barberia.zonaHoraria;
   const [t, servicios, equipo, metodos, cats] = await Promise.all([
-    turnoAbierto(s.barberia.id), serviciosActivos(s.barberia.id), equipoQueAtiende(s.barberia.id), metodosActivos(s.barberia.id), categoriasGasto(s.barberia.id),
+    cajaOAbrir(s), serviciosActivos(s.barberia.id), equipoQueAtiende(s.barberia.id), metodosActivos(s.barberia.id), categoriasGasto(s.barberia.id),
   ]);
   const opera = s.puede("caja.operar");
   let turno: Turno | null = null;

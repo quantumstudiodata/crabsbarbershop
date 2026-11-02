@@ -5,7 +5,7 @@ import { MenuAnio, MenuMes } from "@/components/Calendario";
 import { Icono } from "@/components/Icono";
 
 /** Mes, Año o Por barbero, con su selector y el botón de descarga. */
-export function NavLibreta({ vista, mes, anio, hoy, descarga }: { vista: "mes" | "anio" | "barberos"; mes: string; anio: string; hoy: string; descarga: string }) {
+export function NavLibreta({ vista, mes, anio, hoy, descarga, conDatos }: { vista: "mes" | "anio" | "barberos"; mes: string; anio: string; hoy: string; descarga: string; conDatos: string[] }) {
   const router = useRouter();
   const ir = (q: string) => router.push(`/libreta?${q}`);
   return (
@@ -18,7 +18,7 @@ export function NavLibreta({ vista, mes, anio, hoy, descarga }: { vista: "mes" |
         </nav>
         <div className="botones-p">
           {vista === "mes"
-            ? <MenuMes key={mes} mes={mes} activo hoy={hoy} elegir={(m) => ir(`vista=mes&mes=${m}`)} />
+            ? <MenuMes key={mes} mes={mes} activo hoy={hoy} conDatos={conDatos} elegir={(m) => ir(`vista=mes&mes=${m}`)} />
             : <MenuAnio anio={anio} activo hoy={hoy} elegir={(y) => ir(`vista=${vista}&anio=${y}`)} />}
         </div>
       </div>

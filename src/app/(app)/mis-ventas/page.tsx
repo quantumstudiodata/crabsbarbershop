@@ -6,12 +6,12 @@ import { SelectorPeriodo } from "@/components/Periodo";
 import { Cuenta } from "@/components/ui";
 import { requerirSesion } from "@/lib/auth";
 import { MINUTOS_CORRECCION } from "@/lib/caja";
-import { equipoQueAtiende, metasDelMes, turnoAbierto, ventasEntre } from "@/lib/datos";
+import { equipoQueAtiende, metasDelMes, cajaDe, ventasEntre } from "@/lib/datos";
 import { db, schema } from "@/lib/db";
 import { META_INICIAL } from "@/lib/metas";
-import { eq } from "drizzle-orm";
+import { and, eq, sql } from "drizzle-orm";
 import { Alternar } from "./Alternar";
-import { diasEntre, fechaLarga, fechaLocal, horaCorta, horaLocal, inicioDeMes, sumarDias } from "@/lib/fechas";
+import { diasEntre, fechaLarga, fechaLocal, horaCorta, horaLocal, inicioDeMes, lunesDe, sumarDias } from "@/lib/fechas";
 import { cambio, formatoDinero, porcentaje } from "@/lib/money";
 import { type ConsultaPeriodo, leerPeriodo } from "@/lib/periodo";
 import { serieHoy } from "@/lib/series";
@@ -30,8 +30,16 @@ export default async function MisVentas({ searchParams }: { searchParams: Promis
   const q = await searchParams;
   const zona = s.barberia.zonaHoraria;
   const hoy = fechaLocal(new Date(), zona);
-  const p = leerPeriodo(q, hoy, "dia");
   const yo = s.usuario.id;
+  // Sin periodo elegido: hoy si ya hay ventas hoy; si no, la semana; si tampoco, el mes.
+  const elegido = q.periodo || q.fecha || q.mes || q.anio || q.desde;
+  let porDefecto: "dia" | "semana" | "mes" = "dia";
+  if (!elegido) {
+    const [{ d }] = await db.select({ d: sql<string>`max(to_char(${schema.ventas.creadoEn} at time zone ${zona}, 'YYYY-MM-DD'))` }).from(schema.ventas)
+      .where(and(eq(schema.ventas.barberiaId, s.barberia.id), sql`exists (select 1 from ${schema.conceptos} c where c.venta_id = ${schema.ventas.id} and c.barbero_id = ${yo})`));
+    porDefecto = d === hoy ? "dia" : d && d >= lunesDe(hoy) ? "semana" : "mes";
+  }
+  const p = leerPeriodo(q, hoy, porDefecto);
   const largo = diasEntre(p.desde, p.hasta) + 1;
   const anual = p.tipo === "anio" || largo > 62;
   const prevDesde = p.tipo === "dia" ? sumarDias(p.desde, -7) : p.tipo === "anio" ? `${Number(p.desde.slice(0, 4)) - 1}-01-01` : p.tipo === "mes" ? inicioDeMes(sumarDias(p.desde, -1)) : sumarDias(p.desde, -largo);
@@ -40,7 +48,7 @@ export default async function MisVentas({ searchParams }: { searchParams: Promis
     ventasEntre(s.barberia.id, p.desde, p.hasta, { zona }),
     ventasEntre(s.barberia.id, prevDesde, prevHasta, { zona, barberoId: yo }),
     equipoQueAtiende(s.barberia.id),
-    turnoAbierto(s.barberia.id),
+    cajaDe(s),
   ]);
   const pagadasTodas = ventas.filter((v) => v.estado === "pagada");
   const mias = ventas.filter((v) => v.conceptos.some((c) => c.barberoId === yo));

@@ -10,7 +10,7 @@ import { Avatar } from "./Avatar";
 import { Fl, Icono } from "./Icono";
 import { Modal } from "./ui";
 
-export function MenuUsuario(p: { nombre: string; usuario: string; rol: string; avatar: string; ajustes: boolean; historial: boolean; formaPago: string | null }) {
+export function MenuUsuario(p: { nombre: string; usuario: string; rol: string; avatar: string; ajustes: boolean; historial: boolean; formaPago: string | null; soporte?: boolean }) {
   const [abierto, setAbierto] = useState(false);
   const [elegir, setElegir] = useState(false);
   const [perfil, setPerfil] = useState(false);
@@ -52,6 +52,7 @@ export function MenuUsuario(p: { nombre: string; usuario: string; rol: string; a
           <button type="button" role="menuitem" className="it" onClick={() => { setPerfil(true); setAbierto(false); }}><Icono n="usuario" />Mi perfil</button>
           {p.ajustes && <Link role="menuitem" className="it" href="/ajustes" onClick={() => setAbierto(false)}><Icono n="ajustes" />Ajustes</Link>}
           {p.historial && <Link role="menuitem" className="it" href="/historial" onClick={() => setAbierto(false)}><Icono n="historial" />Historial</Link>}
+          {p.soporte && <Link role="menuitem" className="it" href="/soporte" onClick={() => setAbierto(false)}><Icono n="llave" />Soporte</Link>}
           <div className="separador" style={{ margin: "4px 0" }} />
           <form action={salir}><button role="menuitem" className="it salir"><Icono n="salir" />Salir</button></form>
         </div>

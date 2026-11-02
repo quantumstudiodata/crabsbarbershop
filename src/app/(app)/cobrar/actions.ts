@@ -4,7 +4,7 @@ import { and, eq, inArray, sql } from "drizzle-orm";
 import { revalidatePath } from "next/cache";
 import { requerirSesion } from "@/lib/auth";
 import { comisionDeServicio, elegirRegla } from "@/lib/comisiones";
-import { copiaRegla, equipoQueAtiende, reglasDe, turnoAbierto } from "@/lib/datos";
+import { copiaRegla, equipoQueAtiende, reglasDe, cajaOAbrir } from "@/lib/datos";
 import { db, schema } from "@/lib/db";
 import { registrar } from "@/lib/historial";
 import { fechaLocal } from "@/lib/fechas";
@@ -56,7 +56,7 @@ export async function registrarVenta(_: EstadoCobro, form: FormData): Promise<Es
     .where(and(eq(schema.ventas.barberiaId, bId), eq(schema.ventas.claveUnica, e.clave))).limit(1);
   if (previa) return { ok: true, folio: previa.folio, total: previa.total };
 
-  const turno = await turnoAbierto(bId);
+  const turno = await cajaOAbrir(s);
   if (!turno) return { error: "La caja está cerrada. Hay que abrirla antes de cobrar." };
   // Pasadas las 12 de la noche, la caja del día anterior tiene que cerrarse antes de seguir cobrando.
   if (turno.fechaOperativa < fechaLocal(new Date(), s.barberia.zonaHoraria)) return { error: "La caja de ayer no se cerró. Haz el corte de caja antes de seguir cobrando." };

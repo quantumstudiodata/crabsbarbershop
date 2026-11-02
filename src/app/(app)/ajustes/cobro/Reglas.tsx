@@ -54,8 +54,8 @@ function FormGuardar({ children, className, conBoton = true }: { children: React
 export function ReglasCobro({ descuento, autorizan, funciones }: { descuento: number; autorizan: string; funciones: Funcion[] }) {
   const [conDescuentos, setConDescuentos] = useState(funciones.find((f) => f.clave === "descuentos")?.activa ?? true);
   return (
-    <FormGuardar className="glass panel bloque-a" conBoton={conDescuentos}>
-      <span className="lab">2. Reglas de cobro</span>
+    <FormGuardar className="pila" conBoton={conDescuentos}>
+      <span className="sub-a">Reglas de cobro</span>
       <p className="ayuda-txt" style={{ marginTop: -4 }}>Qué botones aparecen en la pantalla de cobro.</p>
       <Funciones funciones={funciones} alCambiar={(clave, activa) => { if (clave === "descuentos") setConDescuentos(activa); }} />
       {conDescuentos && (
@@ -67,17 +67,23 @@ export function ReglasCobro({ descuento, autorizan, funciones }: { descuento: nu
   );
 }
 
-export function CajaObjetivos({ fondo, diferencia, metaMensual, datosMeta }: { fondo: number; diferencia: number; metaMensual: number; datosMeta: { egresos: number; barberos: BarberoMeta[]; dias: number } }) {
+export function CajaAjustes({ fondo, diferencia }: { fondo: number; diferencia: number }) {
   return (
-    <FormGuardar className="glass panel bloque-a">
-      <span className="lab">3. Caja y objetivos</span>
-      <Ajuste name="fondo" titulo="Fondo inicial sugerido" ayuda="El efectivo que aparece listo al abrir la caja."
+    <FormGuardar className="pila">
+      <Ajuste name="fondo" titulo="Fondo inicial sugerido" ayuda="El efectivo con el que se abre la caja. Con la apertura automática, la caja se abre sola con esta cantidad."
         inicial={fondo} opciones={[0, 100, 200, 500]} max={2000} paso={50} formato={(v) => formatoDinero(v * 100)}
-        vista={(v) => v ? <>Al abrir la caja aparecerá <b>{formatoDinero(v * 100)}</b>; se puede cambiar en el momento.</> : <>Al abrir la caja se escribe el fondo cada vez.</>} />
+        vista={(v) => v ? <>La caja se abre con <b>{formatoDinero(v * 100)}</b>.</> : <>La caja se abre sin fondo.</>} />
       <Ajuste name="diferencia" titulo="Diferencia permitida al cerrar" ayuda="Si al contar falta o sobra más, se pide explicar qué pasó."
         inicial={diferencia} opciones={[0, 20, 50, 100]} max={500} paso={10} formato={(v) => formatoDinero(v * 100)}
         vista={(v) => v ? <>Faltar o sobrar hasta <b>{formatoDinero(v * 100)}</b> no pide explicación.</> : <>Cualquier diferencia pide explicación.</>} />
-      <Ajuste name="metaMensual" titulo="Meta mensual del negocio" ayuda="Lo que el negocio quiere que le quede al mes. Con esto se calcula cuánto debe cobrar cada barbero al día."
+    </FormGuardar>
+  );
+}
+
+export function MetaMensual({ metaMensual, datosMeta }: { metaMensual: number; datosMeta: { egresos: number; barberos: BarberoMeta[]; dias: number } }) {
+  return (
+    <FormGuardar className="pila">
+      <Ajuste name="metaMensual" titulo="Meta mensual del negocio" ayuda="Establece cuánto deseas obtener mensualmente después de pagar las comisiones de tus barberos. El sistema calculará las metas diarias de venta necesarias para alcanzar ese objetivo."
         inicial={metaMensual} opciones={[0, 10000, 20000, 40000]} max={150000} paso={1000} formato={(v) => (v ? formatoDinero(v * 100) : "Sin meta")}
         vista={(v) => <VistaMeta meta={v} datos={datosMeta} />} />
     </FormGuardar>
@@ -87,20 +93,23 @@ export function CajaObjetivos({ fondo, diferencia, metaMensual, datosMeta }: { f
 /** Cómo queda la meta de cada barbero con la meta mensual elegida. */
 function VistaMeta({ meta, datos }: { meta: number; datos: { egresos: number; barberos: BarberoMeta[]; dias: number } }) {
   if (!meta) return <>Sin meta mensual, la meta de cada día se calcula sola con lo que se ha vendido.</>;
-  const r = metaDelNegocio(meta * 100, datos.egresos, datos.barberos, datos.dias);
+  const r = metaDelNegocio(meta * 100, 0, datos.barberos, datos.dias);
+  const conMeta = r.porBarbero.filter((b) => b.aplica);
   return (
     <div className="vista-meta">
-      <span>Para que al negocio le queden <b>{formatoDinero(meta * 100)}</b> al mes hay que cubrir <b>{formatoDinero(r.cubrir)}</b>:
-        la meta{r.egresos ? <>, más {formatoDinero(r.egresos)} de egresos de un mes normal</> : null}{r.sueldos ? <>, más {formatoDinero(r.sueldos)} de sueldos</> : null}{r.rentas ? <>, menos {formatoDinero(r.rentas)} de rentas de silla</> : null}.</span>
+      <span><b style={{ fontSize: 15 }}>Objetivo mensual: {formatoDinero(meta * 100)}</b><br />
+        El equipo deberá generar suficientes ventas para que el negocio conserve {formatoDinero(meta * 100)} después de pagar las comisiones{r.sueldos ? " y los sueldos" : ""}.
+        Esta cifra todavía no descuenta renta, luz, agua y demás gastos.</span>
+      <span className="lab" style={{ marginTop: 4 }}>Meta diaria de ventas de cada barbero</span>
       <div className="metas-b">
         {r.porBarbero.map((b) => (
           <div key={b.id}>
             <b>{b.nombre.split(" ")[0]}</b>
-            {b.aplica ? <><span className="num">{formatoDinero(b.diaria)} al día</span><small>Al negocio le queda el {b.parteNegocio}% de lo que cobra</small></> : <><span className="muted">Sin meta</span><small>Paga renta de silla</small></>}
+            {b.aplica ? <><span className="num">{formatoDinero(b.diaria)}</span><small>en ventas cada día. No es su comisión: es lo que debe cobrar a clientes.</small></> : <><span className="muted">Sin meta</span><small>Paga renta de silla</small></>}
           </div>
         ))}
       </div>
-      <span>Meta del negocio por día: <b>{formatoDinero(r.diaria)}</b>, en {datos.dias} días de trabajo.</span>
+      {conMeta.length > 0 && <span>Entre todos: <b>{formatoDinero(r.diaria)}</b> en ventas al día, durante {datos.dias} días de trabajo (lunes a sábado).</span>}
     </div>
   );
 }

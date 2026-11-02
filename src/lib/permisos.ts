@@ -3,21 +3,33 @@
 export const PERMISOS = {
   "ventas.registrar": "Registrar ventas",
   "ventas.registrar_otros": "Cobrar servicios de otros",
-  "ventas.ver_todas": "Ver ventas del equipo",
   "ventas.descuento": "Aplicar descuentos mayores al límite",
   "ventas.cancelar": "Cancelar ventas",
+  "ventas.modificar": "Modificar ventas realizadas",
+  "servicios.editar": "Editar servicios y precios",
   "caja.operar": "Abrir y cerrar caja, registrar retiros y gastos",
   "caja.corregir": "Corregir cortes",
+  "cortes.ver": "Ver cortes de caja",
+  "gastos.ver": "Ver egresos",
   "gastos.registrar": "Registrar y cancelar egresos",
-  "equipo.ver": "Ver comisiones",
   "equipo.pagar": "Registrar pagos al equipo",
-  "reportes.ver": "Ver reportes",
-  "reportes.exportar": "Descargar reportes",
+  "ventas.ver_todas": "Ver movimientos del equipo",
+  "reportes.ver": "Ver analítica y finanzas",
+  "reportes.exportar": "Descargar analítica",
   "ideas.decidir": "Gestionar ideas",
-  "ajustes.usuarios": "Dar de alta personas y permisos",
-  "ajustes.negocio": "Cambiar servicios, precios y formas de pago",
-  "historial.ver": "Consultar historial",
+  "usuarios.ver": "Ver usuarios",
+  "usuarios.editar": "Editar usuarios",
+  "servicios.ver": "Ver servicios y precios",
+  "ajustes.funciones": "Editar funciones administrativas del sistema",
 } as const;
+
+/** Permisos que cambiaron de nombre o se juntaron: se traducen al leerlos para no perder lo que ya estaba dado. */
+const ANTES: Record<string, string[]> = {
+  "ajustes.usuarios": ["usuarios.ver", "usuarios.editar"],
+  "ajustes.negocio": ["servicios.ver", "servicios.editar", "ajustes.funciones"],
+  "historial.ver": ["ventas.ver_todas"],
+  "equipo.ver": [],
+};
 
 export type Permiso = keyof typeof PERMISOS;
 export type Rol = "admin" | "duena" | "encargada" | "barbera" | "contador";
@@ -33,7 +45,7 @@ export const PERMISOS_POR_ROL: Record<Rol, Permiso[]> = {
   // En el local hay una sola computadora: cualquiera puede cobrar lo que hizo otra persona.
   // Los barberos también abren y cierran la caja: son quienes cobran.
   barbera: ["ventas.registrar", "ventas.registrar_otros", "caja.operar"],
-  contador: ["ventas.ver_todas", "equipo.ver", "reportes.ver", "reportes.exportar", "historial.ver", "gastos.registrar"],
+  contador: ["ventas.ver_todas", "reportes.ver", "reportes.exportar", "gastos.ver", "gastos.registrar", "cortes.ver"],
 };
 
 export const NOMBRE_ROL: Record<Rol, string> = {
@@ -45,9 +57,14 @@ export const NOMBRE_ROL: Record<Rol, string> = {
   contador: "Contador",
 };
 
+/** Traduce permisos guardados con nombres anteriores a los actuales. */
+export function expandirPermisos(xs: string[]): string[] {
+  return [...new Set(xs.flatMap((p) => ANTES[p] ?? [p]).filter((p) => p in PERMISOS))];
+}
+
 export function permisosDe(rol: Rol, extra: string[] = []): Set<Permiso> {
   const s = new Set<Permiso>(PERMISOS_POR_ROL[rol]);
-  for (const p of extra) if (p in PERMISOS) s.add(p as Permiso);
+  for (const p of extra) for (const x of ANTES[p] ?? [p]) if (x in PERMISOS) s.add(x as Permiso);
   return s;
 }
 
@@ -71,7 +88,7 @@ export const DESCRIPCION_ROL: Record<Rol, string> = {
 
 /** Permisos agrupados para la ventana de edición de usuario. */
 export const GRUPOS_PERMISOS: { titulo: string; permisos: Permiso[] }[] = [
-  { titulo: "Ventas y cobros", permisos: ["ventas.registrar", "ventas.registrar_otros", "ventas.descuento", "ventas.cancelar"] },
-  { titulo: "Caja y pagos", permisos: ["caja.operar", "caja.corregir", "gastos.registrar", "equipo.pagar"] },
-  { titulo: "Reportes y administración", permisos: ["ventas.ver_todas", "equipo.ver", "reportes.ver", "reportes.exportar", "historial.ver", "ideas.decidir"] },
+  { titulo: "Ventas y cobros", permisos: ["ventas.registrar", "ventas.registrar_otros", "ventas.descuento", "ventas.cancelar", "ventas.modificar", "servicios.editar"] },
+  { titulo: "Caja y pagos", permisos: ["caja.operar", "caja.corregir", "cortes.ver", "gastos.ver", "gastos.registrar", "equipo.pagar"] },
+  { titulo: "Reportes y administración", permisos: ["ventas.ver_todas", "reportes.ver", "reportes.exportar", "ideas.decidir", "usuarios.ver", "usuarios.editar", "servicios.ver", "ajustes.funciones"] },
 ];

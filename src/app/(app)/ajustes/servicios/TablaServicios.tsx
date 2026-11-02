@@ -5,7 +5,7 @@ import { Ayuda } from "@/components/Ayuda";
 import { Fl, Icono } from "@/components/Icono";
 import { Interruptor, Modal, Selector } from "@/components/ui";
 import { formatoDinero } from "@/lib/money";
-import { alternarServicio, eliminarServicio, guardarServicio, ordenarServicios, type Resultado } from "./actions";
+import { alternarServicio, borrarCategoria, eliminarServicio, guardarServicio, ordenarServicios, type Resultado } from "./actions";
 
 type Servicio = { id: string; nombre: string; categoria: string; precio: number; duracionMin: number; activo: boolean; comision: number | null };
 type Borrador = { id?: string; nombre: string; categoria: string; precio: string; duracion: string; activo: boolean; comision: string };
@@ -66,7 +66,7 @@ function MenuServicio({ s, subir, bajar, eliminar }: { s: Servicio; subir?: () =
   );
 }
 
-export function TablaServicios({ servicios: inicial }: { servicios: Servicio[] }) {
+export function TablaServicios({ servicios: inicial, puedeEditar = true }: { servicios: Servicio[]; puedeEditar?: boolean }) {
   const [servicios, setServicios] = useState(inicial);
   const [edit, setEdit] = useState<Borrador | null>(null);
   const [borrar, setBorrar] = useState<Servicio | null>(null);
@@ -74,6 +74,8 @@ export function TablaServicios({ servicios: inicial }: { servicios: Servicio[] }
   const [arrastrando, setArrastrando] = useState<string | null>(null);
   const [alta, setAlta] = useState(false);
   const [pendiente, iniciar] = useTransition();
+  const [borrarCat, setBorrarCat] = useState<string | null>(null);
+  const [destino, setDestino] = useState("");
   useEffect(() => setServicios(inicial), [inicial]);
 
   const categorias = [...new Set(["Cortes", "Barba y paquetes", "Niños y extras", ...servicios.map((s) => s.categoria)])];
@@ -105,7 +107,7 @@ export function TablaServicios({ servicios: inicial }: { servicios: Servicio[] }
       {res.mensaje && <p className="aviso ok">{res.mensaje}</p>}
       <div className="entre">
         <p className="ayuda-txt"><Icono n="lista" className="ic" /> Arrastra un servicio para cambiar su lugar. Los primeros aparecen primero en Cobro.</p>
-        {!alta && <button type="button" className="bt solo chico" onClick={() => setAlta(true)}><Icono n="mas" />Agregar servicio</button>}
+        {!alta && puedeEditar && <button type="button" className="bt solo chico" onClick={() => setAlta(true)}><Icono n="mas" />Agregar servicio</button>}
       </div>
       {alta && (
         <FilaAlta categorias={categorias} cerrar={() => setAlta(false)} guardar={async (b, otro) => {
@@ -117,7 +119,8 @@ export function TablaServicios({ servicios: inicial }: { servicios: Servicio[] }
       )}
       {categorias.filter((c) => servicios.some((s) => s.categoria === c)).map((c) => (
         <section key={c} className="glass cat-s">
-          <div className="cat-h"><b>{c}</b><span className="muted">{servicios.filter((s) => s.categoria === c).length} servicios</span></div>
+          <div className="cat-h"><b>{c}</b><span className="fila" style={{ gap: 6 }}><span className="muted">{servicios.filter((s) => s.categoria === c).length} servicios</span>
+            {puedeEditar && <button type="button" className="icb" onClick={() => { setBorrarCat(c); setDestino(categorias.find((x) => x !== c) ?? ""); }} aria-label={`Borrar la categoría ${c}`} title="Borrar categoría"><Icono n="basura" /></button>}</span></div>
           {servicios.filter((s) => s.categoria === c).map((s) => {
             const arriba = vecino(s, -1), abajo = vecino(s, 1);
             return (
@@ -128,7 +131,7 @@ export function TablaServicios({ servicios: inicial }: { servicios: Servicio[] }
                 <span className="asa-d" aria-hidden="true">⋮⋮</span>
                 <span className="nom-s"><b>{s.nombre}</b>{!s.activo && <small>Oculto en Cobro</small>}</span>
                 <span className="num">{formatoDinero(s.precio)}</span>
-                <span className="acts">
+                <span className="acts" hidden={!puedeEditar}>
                   <button type="button" className="icb" onClick={() => setEdit({ id: s.id, nombre: s.nombre, categoria: s.categoria, precio: String(s.precio / 100), duracion: s.duracionMin ? String(s.duracionMin) : "", activo: s.activo, comision: s.comision === null ? "" : String(s.comision / 100) })} aria-label={`Editar ${s.nombre}`} title="Editar"><Icono n="editar" /></button>
                   <button type="button" className={`icb ojo ${s.activo ? "" : "apagado"}`} onClick={() => correr(() => alternarServicio(s.id))} aria-pressed={!s.activo} aria-label={s.activo ? `Ocultar ${s.nombre} en Cobro` : `Mostrar ${s.nombre} en Cobro`} title={s.activo ? "Visible en Cobro" : "Oculto en Cobro"}><Icono n={s.activo ? "ojo" : "ojoNo"} /></button>
                   <MenuServicio s={s} subir={arriba ? () => mover(s.id, arriba.id) : undefined} bajar={abajo ? () => mover(s.id, abajo.id) : undefined} eliminar={() => setBorrar(s)} />
@@ -163,6 +166,17 @@ export function TablaServicios({ servicios: inicial }: { servicios: Servicio[] }
               <button className="bt" disabled={pendiente}>{pendiente ? "Guardando…" : "Guardar servicio"}<Fl /></button>
             </div>
           </form>
+        </Modal>
+      )}
+      {borrarCat && (
+        <Modal abierto cerrar={() => setBorrarCat(null)} etiqueta="Servicios" titulo={`¿Borrar la categoría ${borrarCat}?`}>
+          <p className="muted">Sus servicios no se borran: pasan a la categoría que elijas. Las ventas pasadas no cambian.</p>
+          <div className="campo"><span>Pasar sus servicios a</span>
+            <Selector etiqueta="Categoría" valor={destino} onChange={setDestino} opciones={categorias.filter((x) => x !== borrarCat).map((x) => ({ valor: x, texto: x }))} /></div>
+          <div className="acciones">
+            <button type="button" className="bt sec solo" onClick={() => setBorrarCat(null)}>Regresar</button>
+            <button type="button" className="bt peligro" disabled={pendiente || !destino} onClick={() => correr(() => borrarCategoria(borrarCat, destino), () => { setServicios(servicios.map((x) => (x.categoria === borrarCat ? { ...x, categoria: destino } : x))); setBorrarCat(null); })}>Sí, borrar categoría</button>
+          </div>
         </Modal>
       )}
       {borrar && (

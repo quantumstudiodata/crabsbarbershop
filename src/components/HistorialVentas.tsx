@@ -2,6 +2,7 @@
 
 import { useState } from "react";
 import { CancelarVenta } from "@/app/(app)/analitica/ventas/CancelarVenta";
+import { type DatosEdicion, ModificarVenta, type Opciones } from "@/app/(app)/analitica/ventas/ModificarVenta";
 import { formatoDinero } from "@/lib/money";
 import { Icono } from "./Icono";
 
@@ -10,11 +11,13 @@ export type FilaVenta = {
   detalle: [string, string][];
   /** Cancelar (quien tiene permiso) o anular (el propio barbero en sus primeros minutos). */
   accion?: { tipo: "cancelar" | "anular"; hasta?: string };
+  /** Si quien ve puede modificar la venta. */
+  edicion?: DatosEdicion;
 };
 export type DiaVentas = { fecha: string; titulo: string; total: number; filas: FilaVenta[] };
 
 /** Historial agrupado por día: una fila por folio; al tocarla se ven los detalles. */
-export function HistorialVentas({ dias, regreso }: { dias: DiaVentas[]; regreso: string }) {
+export function HistorialVentas({ dias, regreso, opciones }: { dias: DiaVentas[]; regreso: string; opciones?: Opciones }) {
   const [abierta, setAbierta] = useState<string | null>(null);
   if (dias.length === 0) return <p className="muted">No hay ventas en estas fechas.</p>;
   return (
@@ -35,12 +38,13 @@ export function HistorialVentas({ dias, regreso }: { dias: DiaVentas[]; regreso:
                 {abierta === f.id && (
                   <div className="hist-det">
                     {f.detalle.map(([k, v]) => <span key={k}><small>{k}</small>{v}</span>)}
-                    {f.accion && (
+                    {(f.accion || (f.edicion && opciones)) && (
                       <span className="anular">
-                        <small>{f.accion.tipo === "anular" ? "¿Te equivocaste?" : "Cancelar venta"}</small>
+                        <small>{f.accion?.tipo === "anular" ? "¿Te equivocaste?" : "Corregir la venta"}</small>
                         <span className="fila" style={{ gap: 8 }}>
-                          {f.accion.tipo === "anular" ? `Puedes anularla hasta las ${f.accion.hasta}` : "Queda tachada con su motivo; no se borra."}
-                          <CancelarVenta id={f.id} folio={f.folio} total={formatoDinero(f.monto)} regreso={regreso} texto={f.accion.tipo === "anular" ? "Anular" : "Cancelar"} />
+                          {f.accion?.tipo === "anular" ? `Puedes anularla hasta las ${f.accion.hasta}` : f.edicion ? "Modifícala o cancélala. Todo queda en el historial." : "Queda tachada con su motivo; no se borra."}
+                          {f.edicion && opciones && <ModificarVenta id={f.id} folio={f.folio} datos={f.edicion} opciones={opciones} />}
+                          {f.accion && <CancelarVenta id={f.id} folio={f.folio} total={formatoDinero(f.monto)} regreso={regreso} texto={f.accion.tipo === "anular" ? "Anular" : "Cancelar"} />}
                         </span>
                       </span>
                     )}
