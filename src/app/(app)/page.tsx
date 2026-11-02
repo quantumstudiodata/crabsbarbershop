@@ -232,9 +232,9 @@ async function InicioBarbero({ s, hoy, zona, q, avisos }: { s: Sesion; hoy: stri
             <Link className="bt solo chico" href="/cobrar"><Icono n="mas" />Registrar</Link>
           </div>
           <ActividadBarbero
-            mios={recientes.map((c, i) => ({ id: `m${i}`, t: cuando(c.fecha, c.creadoEn), titulo: c.nombre, detalle: `${formatoDinero(c.precioCobrado)}, ${[...new Set(c.metodos)].join(" y ")}` }))}
-            equipo={delEquipo.map((v) => ({ id: v.id, t: cuando(v.fecha, v.creadoEn), titulo: v.conceptos.map((c) => c.nombre).join(", "), detalle: `${v.conceptos[0]?.barbero.split(" ")[0] ?? ""}, ${formatoDinero(v.total)}`, nombre: v.conceptos[0]?.barbero, avatar: avatarDe(v.conceptos[0]?.barberoId), tachada: v.estado === "cancelada" }))}
-            cortes={cortes.map((c) => ({ id: c.id, t: cuando(c.fechaOperativa, c.cerradoEn ?? new Date()), titulo: `Corte ${folios.get(c.id) ?? ""}`, detalle: `Cerró ${(c.cerradoPor ?? "").split(" ")[0]}${c.diferencia ? `, ${c.diferencia < 0 ? "faltaron" : "sobraron"} ${formatoDinero(Math.abs(c.diferencia))}` : ", sin diferencias"}` }))}
+            mios={recientes.map((c, i) => ({ id: `m${i}`, t: cuando(c.fecha, c.creadoEn), titulo: c.nombre, detalle: [...new Set(c.metodos)].join(" y "), monto: formatoDinero(c.precioCobrado) }))}
+            equipo={delEquipo.map((v) => ({ id: v.id, t: cuando(v.fecha, v.creadoEn), titulo: v.conceptos.map((c) => c.nombre).join(", "), detalle: v.conceptos[0]?.barbero.split(" ")[0] ?? "", monto: formatoDinero(v.total), nombre: v.conceptos[0]?.barbero, avatar: avatarDe(v.conceptos[0]?.barberoId), tachada: v.estado === "cancelada" }))}
+            cortes={cortes.map((c) => ({ id: c.id, t: cuando(c.fechaOperativa, c.cerradoEn ?? new Date()), titulo: `Cerró ${(c.cerradoPor ?? "").split(" ")[0]}`, detalle: c.diferencia ? `${c.diferencia < 0 ? "Faltaron" : "Sobraron"} ${formatoDinero(Math.abs(c.diferencia))}` : "Sin diferencias", chip: folios.get(c.id) }))}
           />
         </div>
       </section>

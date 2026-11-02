@@ -5,7 +5,7 @@ import Link from "next/link";
 import { requerirSesion } from "@/lib/auth";
 import { db, schema } from "@/lib/db";
 import { describirEvento } from "@/lib/eventos";
-import { esFechaValida, fechaLocal, horaCorta, ZONA } from "@/lib/fechas";
+import { esFechaValida, fechaLocal, fechaLarga, horaCorta, ZONA } from "@/lib/fechas";
 import { Filtros } from "./Filtros";
 import { Lista, type FilaHistorial } from "./Lista";
 
@@ -64,7 +64,7 @@ export default async function Historial({ searchParams }: { searchParams: Promis
     const etiquetaDia = dia === hoy ? "Hoy" : dia === ayer ? "Ayer" : `${Number(dia.slice(8))} ${MES[Number(dia.slice(5, 7)) - 1]}`;
     const folio = typeof d.folio === "string" ? d.folio : f.accion.match(/CRB-\d+|[A-Z]{2,5}-\d{6}/)?.[0];
     return {
-      id: f.id, cuando: `${etiquetaDia}, ${horaCorta(f.creadoEn, zona)}`,
+      id: f.id, cuando: `${etiquetaDia}, ${horaCorta(f.creadoEn, zona)}`, dia, diaTitulo: dia === hoy ? "Hoy" : dia === ayer ? "Ayer" : fechaLarga(dia), hora: horaCorta(f.creadoEn, zona),
       exacto: new Intl.DateTimeFormat("es-MX", { timeZone: zona, dateStyle: "full", timeStyle: "medium" }).format(f.creadoEn),
       nombre: f.nombre ?? "Sistema", usuario: f.usuario ?? "", avatar: f.avatar ?? "cangrejo", categoria: e.categoria,
       titulo: e.titulo, objeto: e.objeto, extra: e.extra, accion: f.accion,

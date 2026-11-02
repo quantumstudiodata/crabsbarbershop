@@ -7,7 +7,7 @@ import { Icono } from "@/components/Icono";
 import { Modal } from "@/components/ui";
 
 export type FilaHistorial = {
-  id: number; cuando: string; exacto: string; nombre: string; usuario: string; avatar: string; categoria: string;
+  id: number; cuando: string; dia: string; diaTitulo: string; hora: string; exacto: string; nombre: string; usuario: string; avatar: string; categoria: string;
   titulo: string; objeto?: string; extra?: string; accion: string; antes?: string; ahora?: string; motivo?: string; folio?: string;
 };
 
@@ -16,20 +16,28 @@ export function Lista({ filas }: { filas: FilaHistorial[] }) {
   if (filas.length === 0) return <p className="muted" style={{ padding: 16 }}>No hay eventos con esos filtros.</p>;
   return (
     <>
-      <div className="glass tabla-h">
-        <div className="th-h"><span>#</span><span>Fecha</span><span>Quién</span><span>Qué pasó</span></div>
-        {filas.map((f) => (
-          <button type="button" key={f.id} className={`fila-h c-${f.categoria}`} onClick={() => setAbierta(f)}>
-            <span className="num-h">{f.id}</span>
-            <span className="cuando">{f.cuando}</span>
-            <span className="quien-h"><Avatar avatar={f.avatar} nombre={f.nombre} t={24} />{f.nombre.split(" ")[0]}</span>
-            <span className="que">
-              <b>{f.titulo}</b>
-              {f.objeto && <span className="chip-h">{f.objeto}</span>}
-              {f.extra && <span className="muted">{f.extra}</span>}
-            </span>
-          </button>
-        ))}
+      <div className="glass historial">
+        <div className="hist-scroll">
+          {[...new Set(filas.map((f) => f.dia))].map((d) => {
+            const delDia = filas.filter((f) => f.dia === d);
+            return (
+              <div key={d}>
+                <div className="hist-dia"><span>{delDia[0].diaTitulo}</span><span className="muted" style={{ fontWeight: 500 }}>{delDia.length} {delDia.length === 1 ? "movimiento" : "movimientos"}</span></div>
+                {delDia.map((f) => (
+                  <div key={f.id} className={`hist-fila c-${f.categoria}`}>
+                    <button type="button" className="hist-linea evento-l" onClick={() => setAbierta(f)}>
+                      <span className="t">{f.hora}</span>
+                      <span className="quien-h"><Avatar avatar={f.avatar} nombre={f.nombre} t={24} />{f.nombre.split(" ")[0]}</span>
+                      <span className="srv">{f.titulo}{f.extra && <small>{f.extra}</small>}</span>
+                      {f.objeto ? <span className="folio">{f.objeto}</span> : <span />}
+                      <Icono n="derecha" />
+                    </button>
+                  </div>
+                ))}
+              </div>
+            );
+          })}
+        </div>
       </div>
       {abierta && (
         <Modal abierto cerrar={() => setAbierta(null)} etiqueta={`Evento #${abierta.id}`} titulo={abierta.titulo}>

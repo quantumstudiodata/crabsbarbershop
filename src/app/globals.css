@@ -1035,3 +1035,27 @@ button.paso-v:hover { background: rgba(255,255,255,.8); }
 .principal-corte { box-shadow: 0 14px 28px -12px rgba(20,26,32,.7); }
 .principal-corte:hover { transform: translateY(-1px); }
 .principal-corte { padding: 13px 13px 13px 22px; font-size: 15px; }
+
+/* Historial con el mismo estilo que Mis ventas */
+.hist-linea.evento-l { grid-template-columns: 52px 130px minmax(0, 1fr) auto 16px; }
+.hist-linea.evento-l .quien-h { font-size: 13px; }
+.hist-linea.evento-l .srv small { display: block; font-weight: 400; font-size: 12px; color: var(--muted); overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.hist-linea.evento-l .folio { max-width: 230px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.hist-linea.evento-l .ic { transition: transform .2s; }
+.hist-linea.evento-l:hover .ic { transform: translateX(3px); color: var(--fg); }
+.hist-fila[class*="c-"] .hist-linea { box-shadow: inset 3px 0 0 var(--cat, transparent); }
+.hist-fila.c-venta { --cat: #4b6274; } .hist-fila.c-caja { --cat: #2f7d57; } .hist-fila.c-gasto { --cat: #a0525a; }
+.hist-fila.c-precio, .hist-fila.c-ajuste { --cat: #c58a3e; } .hist-fila.c-usuario, .hist-fila.c-acceso { --cat: #56506e; }
+.hist-fila.c-equipo { --cat: #6d5a4b; } .hist-fila.c-idea { --cat: #8ea5b8; }
+@media (max-width: 640px) { .hist-linea.evento-l { grid-template-columns: 44px minmax(0, 1fr) 14px; } .hist-linea.evento-l .quien-h, .hist-linea.evento-l .folio { display: none; } }
+
+/* Actividad reciente con el mismo estilo */
+.feed-corto { display: grid; gap: 0; border-radius: 14px; overflow: hidden; }
+.feed-corto > div { grid-template-columns: 46px minmax(0, 1fr) auto; padding: 10px 12px !important; border-top: 1px solid var(--line); align-items: center; transition: background .15s; }
+.feed-corto > div:nth-child(odd) { background: rgba(255,255,255,.4); }
+.feed-corto > div:hover { background: rgba(255,255,255,.85); }
+.feed-corto .der { display: flex; align-items: center; gap: 10px; justify-content: flex-end; }
+.feed-corto .der .num { font-weight: 600; font-size: 13.5px; }
+.feed-corto .folio { font-size: 11px; padding: 3px 7px; }
+.feed > .tachada .num { text-decoration: line-through; color: var(--faint); }
+.feed-corto span > small::first-letter { text-transform: uppercase; }

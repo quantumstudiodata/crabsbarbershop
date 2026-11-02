@@ -4,7 +4,7 @@ import Link from "next/link";
 import { useState } from "react";
 import { Avatar } from "@/components/Avatar";
 
-export type FilaActividad = { id: string; t: string; titulo: string; detalle: string; avatar?: string; nombre?: string; tachada?: boolean };
+export type FilaActividad = { id: string; t: string; titulo: string; detalle: string; avatar?: string; nombre?: string; tachada?: boolean; chip?: string; monto?: string };
 
 /** Lo reciente para un barbero: sus servicios, los del equipo y los cortes de caja. */
 export function ActividadBarbero({ mios, equipo, cortes }: { mios: FilaActividad[]; equipo: FilaActividad[]; cortes: FilaActividad[] }) {
@@ -25,7 +25,7 @@ export function ActividadBarbero({ mios, equipo, cortes }: { mios: FilaActividad
             <div key={f.id} className={`subir ${f.tachada ? "tachada" : ""}`} style={{ animationDelay: `${0.05 + i * 0.04}s` }}>
               <span className="t">{f.t}</span>
               <span><b style={{ fontWeight: 600 }}>{f.titulo}</b><small>{f.detalle}</small></span>
-              {f.nombre ? <Avatar avatar={f.avatar ?? "iniciales"} nombre={f.nombre} t={24} /> : <span />}
+              <span className="der">{f.chip && <span className="folio">{f.chip}</span>}{f.monto && <span className="num">{f.monto}</span>}{f.nombre && <Avatar avatar={f.avatar ?? "iniciales"} nombre={f.nombre} t={22} />}</span>
             </div>
           ))}
         </div>
