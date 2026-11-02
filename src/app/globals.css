@@ -1244,3 +1244,6 @@ button.paso-v:hover { background: rgba(255,255,255,.8); }
   .dos-fin { grid-template-columns: 1fr; }
   .pasos-fin > div { grid-template-columns: 110px 1fr auto; }
 }
+/* El menú de acciones queda por encima de las tarjetas siguientes */
+.cat-s { position: relative; }
+.cat-s:has([aria-expanded="true"]), .glass:has(> * [aria-expanded="true"].icb) { z-index: 30; overflow: visible; }
