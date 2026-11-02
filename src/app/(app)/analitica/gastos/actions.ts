@@ -128,7 +128,10 @@ export async function crearCategoria(_: EstadoGasto, form: FormData): Promise<Es
   });
   } catch (err) {
     console.error("crearCategoria", err);
-    return { error: "No se pudo guardar la categoría. Intenta de nuevo." };
+    const e = err as { code?: string; cause?: { code?: string } };
+    const codigo = e.code ?? e.cause?.code ?? "";
+    if (codigo === "23505") return { error: "Esa categoría ya existe." };
+    return { error: `No se pudo guardar la categoría. Intenta de nuevo.${codigo ? ` (código ${codigo})` : ""}` };
   }
   return listo(`Categoría ${nombreBonito} agregada.`);
 }

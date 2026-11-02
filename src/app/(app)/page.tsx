@@ -136,13 +136,13 @@ export default async function Inicio({ searchParams }: { searchParams: Promise<Q
             <div><span>Clientes atendidos</span><b><Cuenta valor={deHoy.length} formato="entero" /></b></div>
             <div><span>Servicios</span><b><Cuenta valor={servicios} formato="entero" /></b></div>
             <div><span>Promedio por cliente</span><b>{deHoy.length ? formatoDinero(Math.round(netas / deHoy.length)) : "Sin datos"}</b></div>
-            {s.barberia.usaMetas && <div style={{ display: "grid", gap: 8 }}>
-              <span className="entre"><span>{delMes ? "Meta del día, todo el equipo" : "Meta diaria"}</span><b>{formatoDinero(meta.monto)}</b></span>
-              <div className="meta grande"><i style={{ width: `${Math.max(avance * 100, 3)}%` }} /></div>
-              <small className="muted">{porcentaje(netas, meta.monto)}% alcanzado{delMes ? `, para llegar a ${formatoDinero(s.barberia.metaMensual)} al mes` : ""}</small>
+            {s.barberia.usaMetas && <div className="meta-hoy">
+              <div className="entre"><span>{delMes ? "Meta del día, todo el equipo" : "Meta diaria"}</span><b className="num">{formatoDinero(meta.monto)}</b></div>
+              <div className="pista-meta"><i style={{ width: `${Math.min(avance * 100, 100)}%` }} /></div>
+              <div className="entre"><small className="muted">{porcentaje(netas, meta.monto)}% alcanzado</small>{delMes && <small className="muted">Meta del mes {formatoDinero(s.barberia.metaMensual)}</small>}</div>
               {delMes && delMes.porBarbero.filter((b) => b.aplica).length > 0 && (
                 <div className="metas-eq">
-                  {delMes.porBarbero.filter((b) => b.aplica).map((b) => <span key={b.id}>{b.nombre.split(" ")[0]}<b>{formatoDinero(b.diaria)}</b></span>)}
+                  {delMes.porBarbero.filter((b) => b.aplica).map((b) => <span key={b.id}>{b.nombre.split(" ")[0]}<b className="num">{formatoDinero(b.diaria)}</b></span>)}
                 </div>
               )}
             </div>}
