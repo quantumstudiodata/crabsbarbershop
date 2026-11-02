@@ -27,100 +27,118 @@ export default async function Libreta({ searchParams }: { searchParams: Promise<
     <>
       <div>
         <h1 className="titulo">Control financiero</h1>
-        <span className="pill ok" style={{ display: "inline-flex", marginTop: 8 }}>Registro automático</span>
-        <p className="muted" style={{ marginTop: 8, maxWidth: 620 }}>Lleva el control de los ingresos y egresos de tu barbería en un solo lugar. Los movimientos se registran automáticamente a partir de los cobros y gastos realizados en el sistema.</p>
+        <p className="muted" style={{ marginTop: 6, maxWidth: 620 }}>Ingresos y egresos del negocio. Se llenan solos con los cobros y gastos del sistema.</p>
       </div>
       <NavLibreta vista={vista} mes={mes} anio={anio} hoy={hoy} descarga={descarga} conDatos={await mesesConDatos(s.barberia.id, zona)} />
-      {vista === "mes" ? <Mes barberiaId={s.barberia.id} mes={mes} zona={zona} puedeEgresos={s.puede("gastos.registrar")} />
+      {vista === "mes" ? <Mes barberiaId={s.barberia.id} mes={mes} hoy={hoy} zona={zona} puedeEgresos={s.puede("gastos.registrar")} />
         : vista === "anio" ? <Anio barberiaId={s.barberia.id} anio={anio} zona={zona} />
         : <Barberos barberiaId={s.barberia.id} anio={anio} zona={zona} />}
     </>
   );
 }
 
-async function Mes({ barberiaId, mes, zona, puedeEgresos }: { barberiaId: string; mes: string; zona: string; puedeEgresos: boolean }) {
+const MESES = ["enero", "febrero", "marzo", "abril", "mayo", "junio", "julio", "agosto", "septiembre", "octubre", "noviembre", "diciembre"];
+
+async function Mes({ barberiaId, mes, hoy, zona, puedeEgresos }: { barberiaId: string; mes: string; hoy: string; zona: string; puedeEgresos: boolean }) {
   const m = await libretaMes(barberiaId, mes, zona);
   const com = m.columnas.filter((c) => c.comision);
   const fij = m.columnas.filter((c) => !c.comision);
+  const nombreMes = MESES[Number(mes.slice(5, 7)) - 1];
+  const utilidad = m.total - m.egresosTotal;
+  const firma = (c: number) => (c < 0 ? `−${$(-c)}` : $(c));
   const cabeza = (primera: string) => (
     <tr><th>{primera}</th>{com.map((c) => <th key={c.clave}>{c.nombre}</th>)}<th className="sub">Subtotal</th>{fij.map((c) => <th key={c.clave}>{c.nombre}</th>)}<th className="tot">Total</th></tr>
   );
+  const dia = (f: string) => Number(f.slice(8, 10));
+  // Se abre la semana de hoy; en meses pasados, la última semana con ventas.
+  const abierta = m.semanas.find((x) => x.dias.some((d) => d.fecha === hoy))?.numero
+    ?? [...m.semanas].reverse().find((x) => x.total > 0)?.numero ?? m.semanas[0]?.numero;
+  const maxSem = Math.max(1, ...m.semanas.map((x) => x.total));
   return (
     <>
       {m.historico && <p className="aviso">Este mes se llevó en Excel. Aquí solo están sus totales.</p>}
       <section className="glass hero-lib subir">
-        <div className="cifras-lib">
-          <div><span className="lab">Ingresos</span><b className="num">{$(m.total)}</b><small>{m.subtotal !== m.total ? `${$(m.subtotal)} de comisión` : "del mes"}</small></div>
-          <div><span className="lab">Egresos</span><b className="num neg">{$(m.egresosTotal)}</b><small>{m.egresos.length} {m.egresos.length === 1 ? "concepto" : "conceptos"}</small></div>
-          <div><span className="lab">Utilidad</span><b className={`num ${m.total - m.egresosTotal < 0 ? "neg" : "pos"}`}>{$(m.total - m.egresosTotal)}</b><small>ingresos menos egresos</small></div>
+        <div className="hero-lib-izq">
+          <span className="lab">Utilidad de {nombreMes}</span>
+          <b className="big-mv num">{firma(utilidad)}</b>
+          <div className="tres-fin">
+            <div><span className="lab">Ingresos</span><b className="num">{$(m.total)}</b><small>{m.subtotal !== m.total ? `${$(m.subtotal)} de comisión` : "del mes"}</small></div>
+            <div><span className="lab">Egresos</span><b className="num">{$(m.egresosTotal)}</b><small>{m.egresos.length} {m.egresos.length === 1 ? "concepto" : "conceptos"}</small></div>
+            <div><span className="lab">Margen</span><b className="num">{m.total > 0 ? `${Math.round((utilidad / m.total) * 100)}%` : "Sin datos"}</b><small>de cada peso vendido</small></div>
+          </div>
         </div>
         {!m.historico && m.semanas.length > 0 && (
           <div className="semanas-mini">
-            <span className="lab">Resumen por semana</span>
+            <span className="lab">Por semana</span>
             <div className="barras-lib">
-              {m.semanas.map((sem, i) => {
-                const max = Math.max(1, ...m.semanas.map((x) => x.total));
-                return (
-                  <div key={sem.numero}>
-                    <b className="num">{$(sem.total)}</b>
-                    <i style={{ height: `${Math.max((sem.total / max) * 100, 3)}%`, animationDelay: `${0.2 + i * 0.08}s` }} />
-                    <small>Semana {sem.numero}</small>
-                  </div>
-                );
-              })}
+              {m.semanas.map((sem, i) => (
+                <div key={sem.numero}>
+                  <b className="num">{$(sem.total)}</b>
+                  <i style={{ height: `${Math.max((sem.total / maxSem) * 100, 3)}%`, animationDelay: `${0.2 + i * 0.08}s` }} className={sem.total ? "" : "vacia"} />
+                  <small>Sem {sem.numero}</small>
+                </div>
+              ))}
             </div>
           </div>
         )}
       </section>
-      {!m.historico && (
-        <section className="semanas-l subir">
-          {m.semanas.map((sem) => (
-            <div key={sem.numero} className="glass tabla-l">
-              <span className="lab">Semana {sem.numero}</span>
-              <div className="desliza"><table>
-                <thead>{cabeza("Fecha")}</thead>
-                <tbody>
-                  {sem.dias.map((d) => (
-                    <tr key={d.fecha}><td className="f">{d.etiqueta}</td>{com.map((c) => <td key={c.clave}>{vacio(d.valores[c.clave] ?? 0)}</td>)}<td className="sub">{vacio(d.subtotal)}</td>{fij.map((c) => <td key={c.clave}>{vacio(d.valores[c.clave] ?? 0)}</td>)}<td className="tot">{vacio(d.total)}</td></tr>
-                  ))}
-                </tbody>
-                <tfoot><tr><td className="f">Total</td>{com.map((c) => <td key={c.clave}>{$(sem.valores[c.clave] ?? 0)}</td>)}<td className="sub">{$(sem.subtotal)}</td>{fij.map((c) => <td key={c.clave}>{$(sem.valores[c.clave] ?? 0)}</td>)}<td className="tot">{$(sem.total)}</td></tr></tfoot>
-              </table></div>
+
+      <section className="dos-lib subir d1">
+        {!m.historico && (
+          <div className="glass panel">
+            <span className="lab">Día por día</span>
+            <div className="plegables">
+              {m.semanas.map((sem) => (
+                <details key={sem.numero} open={sem.numero === abierta}>
+                  <summary>
+                    <b>Semana {sem.numero}, {dia(sem.dias[0].fecha)} al {dia(sem.dias[sem.dias.length - 1].fecha)} de {nombreMes}</b>
+                    <span className="der-p"><span className="muted">{sem.dias.length} {sem.dias.length === 1 ? "día" : "días"}</span><b className="num">{$(sem.total)}</b></span>
+                  </summary>
+                  <div className="desliza tabla-l"><table>
+                    <thead>{cabeza("Fecha")}</thead>
+                    <tbody>
+                      {sem.dias.map((d) => (
+                        <tr key={d.fecha} className={d.fecha === hoy ? "hoy-l" : ""}><td className="f">{d.etiqueta}</td>{com.map((c) => <td key={c.clave}>{vacio(d.valores[c.clave] ?? 0)}</td>)}<td className="sub">{vacio(d.subtotal)}</td>{fij.map((c) => <td key={c.clave}>{vacio(d.valores[c.clave] ?? 0)}</td>)}<td className="tot">{vacio(d.total)}</td></tr>
+                      ))}
+                    </tbody>
+                    <tfoot><tr><td className="f">Total</td>{com.map((c) => <td key={c.clave}>{$(sem.valores[c.clave] ?? 0)}</td>)}<td className="sub">{$(sem.subtotal)}</td>{fij.map((c) => <td key={c.clave}>{$(sem.valores[c.clave] ?? 0)}</td>)}<td className="tot">{$(sem.total)}</td></tr></tfoot>
+                  </table></div>
+                </details>
+              ))}
             </div>
-          ))}
+          </div>
+        )}
+        <div className="col-lib">
+          <div className="glass panel">
+            <span className="lab">Resultado del mes</span>
+            <div className="datos">
+              <div><span>Ingresos</span><b className="num">{$(m.total)}</b></div>
+              <div><span>Egresos</span><b className="num">{m.egresosTotal ? `−${$(m.egresosTotal)}` : $(0)}</b></div>
+              <div className="fuerte-l"><span>Utilidad</span><b className="num">{firma(utilidad)}</b></div>
+              {m.subtotal !== m.total && <div><span>Utilidad solo de comisión<Ayuda titulo="Solo de comisión">Cuenta solo lo que cobraron quienes ganan por comisión.</Ayuda></span><b className="num">{firma(m.subtotal - m.egresosTotal)}</b></div>}
+            </div>
+            {!m.historico && m.comisionesGeneradas > 0 && <p className="ayuda-txt">Comisiones generadas en el mes: {$(m.comisionesGeneradas)}. Cuentan como egreso cuando se pagan al equipo.</p>}
+          </div>
+          <div className="glass panel">
+            <div className="entre"><span className="lab">Egresos</span>{puedeEgresos && <Link className="enlace" href={`/analitica/gastos?periodo=mes&mes=${m.mes}`}>Registrar o ver detalle</Link>}</div>
+            <div className="datos">
+              {m.egresos.length ? m.egresos.map((e) => <div key={e.concepto}><span>{e.concepto}</span><b className="num">{$(e.monto)}</b></div>) : <div><span className="muted">Sin egresos registrados</span><b>-</b></div>}
+              <div className="fuerte-l"><span>Total</span><b className="num">{$(m.egresosTotal)}</b></div>
+            </div>
+          </div>
+        </div>
+      </section>
+
+      {!m.historico && (
+        <section className="glass tabla-l subir d2">
+          <span className="lab">Resumen por semana</span>
+          <div className="desliza"><table>
+            <thead>{cabeza("Semana")}</thead>
+            <tbody>{m.semanas.map((sem) => <tr key={sem.numero}><td className="f">Semana {sem.numero} <small className="muted">{dia(sem.dias[0].fecha)} al {dia(sem.dias[sem.dias.length - 1].fecha)}</small></td>{com.map((c) => <td key={c.clave}>{$(sem.valores[c.clave] ?? 0)}</td>)}<td className="sub">{$(sem.subtotal)}</td>{fij.map((c) => <td key={c.clave}>{$(sem.valores[c.clave] ?? 0)}</td>)}<td className="tot">{$(sem.total)}</td></tr>)}</tbody>
+            <tfoot><tr><td className="f">Total</td>{com.map((c) => <td key={c.clave}>{$(m.semanas.reduce((a, x) => a + (x.valores[c.clave] ?? 0), 0))}</td>)}<td className="sub">{$(m.subtotal)}</td>{fij.map((c) => <td key={c.clave}>{$(m.semanas.reduce((a, x) => a + (x.valores[c.clave] ?? 0), 0))}</td>)}<td className="tot">{$(m.total)}</td></tr></tfoot>
+          </table></div>
         </section>
       )}
-      <section className="cierre-l subir d1">
-        {!m.historico && (
-          <div className="glass tabla-l">
-            <span className="lab">Resumen por semana</span>
-            <div className="desliza"><table>
-              <thead>{cabeza("Semana")}</thead>
-              <tbody>{m.semanas.map((sem) => <tr key={sem.numero}><td className="f">{sem.numero}</td>{com.map((c) => <td key={c.clave}>{$(sem.valores[c.clave] ?? 0)}</td>)}<td className="sub">{$(sem.subtotal)}</td>{fij.map((c) => <td key={c.clave}>{$(sem.valores[c.clave] ?? 0)}</td>)}<td className="tot">{$(sem.total)}</td></tr>)}</tbody>
-              <tfoot><tr><td className="f">Total</td>{com.map((c) => <td key={c.clave}>{$(m.semanas.reduce((a, x) => a + (x.valores[c.clave] ?? 0), 0))}</td>)}<td className="sub">{$(m.subtotal)}</td>{fij.map((c) => <td key={c.clave}>{$(m.semanas.reduce((a, x) => a + (x.valores[c.clave] ?? 0), 0))}</td>)}<td className="tot">{$(m.total)}</td></tr></tfoot>
-            </table></div>
-          </div>
-        )}
-        <div className="glass tabla-l">
-          <div className="entre"><span className="lab">Egresos</span>{puedeEgresos && <Link className="enlace" href={`/analitica/gastos?periodo=mes&mes=${m.mes}`}>Registrar o ver detalle</Link>}</div>
-          <table>
-            <tbody>{m.egresos.length ? m.egresos.map((e) => <tr key={e.concepto}><td className="f">{e.concepto}</td><td>{$(e.monto)}</td></tr>) : <tr><td className="f muted">Sin egresos registrados</td><td>-</td></tr>}</tbody>
-            <tfoot><tr><td className="f">Total</td><td>{$(m.egresosTotal)}</td></tr></tfoot>
-          </table>
-        </div>
-        <div className="glass tabla-l resultado-l">
-          <span className="lab">Resultado del mes</span>
-          <table>
-            <thead><tr><th /><th className="sub">Subtotal<Ayuda titulo="Subtotal">Solo lo que cobraron quienes ganan por comisión.</Ayuda></th><th className="tot">Total<Ayuda titulo="Total">Todo lo cobrado, incluido quien tiene pago fijo.</Ayuda></th></tr></thead>
-            <tbody>
-              <tr><td className="f">Ingresos</td><td className="sub">{$(m.subtotal)}</td><td className="tot">{$(m.total)}</td></tr>
-              <tr><td className="f">Egresos</td><td className="sub">{$(m.egresosTotal)}</td><td className="tot">{$(m.egresosTotal)}</td></tr>
-            </tbody>
-            <tfoot><tr><td className="f">Utilidad</td><td className={`sub ${m.subtotal - m.egresosTotal < 0 ? "neg" : ""}`}>{$(m.subtotal - m.egresosTotal)}</td><td className={`tot ${m.total - m.egresosTotal < 0 ? "neg" : ""}`}>{$(m.total - m.egresosTotal)}</td></tr></tfoot>
-          </table>
-          {!m.historico && m.comisionesGeneradas > 0 && <p className="ayuda-txt">Comisiones generadas en el mes: {$(m.comisionesGeneradas)}. Se cuentan como egreso cuando se registran como pago al equipo.</p>}
-        </div>
-      </section>
     </>
   );
 }

@@ -1306,3 +1306,25 @@ button.paso-v:hover { background: rgba(255,255,255,.8); }
 .nom-fin { display: grid; min-width: 0; }
 .nom-fin b { white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
 .nom-fin small { color: #7a8691; font-size: 12px; }
+
+/* Libreta, opción 1: semanas plegables */
+.hero-lib-izq { display: grid; gap: 8px; min-width: 0; }
+.hero-lib-izq .tres-fin { margin-top: 10px; }
+.hero-lib-izq .tres-fin b { font-size: 24px; }
+.barras-lib i.vacia { background: rgba(43,58,71,.12) !important; }
+.dos-lib { display: grid; grid-template-columns: minmax(0, 1.7fr) minmax(0, 1fr); gap: 16px; align-items: start; }
+.col-lib { display: grid; gap: 16px; }
+.plegables { display: grid; gap: 6px; margin-top: 12px; }
+.plegables details { border-radius: 16px; transition: background .2s; }
+.plegables details:not([open]) { background: rgba(255,255,255,.55); }
+.plegables summary { list-style: none; cursor: pointer; display: flex; justify-content: space-between; align-items: center; gap: 12px; padding: 13px 16px; font-size: 14px; border-radius: 16px; }
+.plegables summary::-webkit-details-marker { display: none; }
+.plegables summary > b::before { content: "›"; display: inline-block; width: 16px; transition: transform .2s; }
+.plegables details[open] summary > b::before { transform: rotate(90deg); }
+.plegables summary:hover { background: rgba(255,255,255,.7); }
+.plegables .der-p { display: flex; gap: 24px; align-items: center; }
+.plegables details[open] .tabla-l { padding: 0 8px 8px; animation: subir .3s ease both; }
+.tabla-l tr.hoy-l td { font-weight: 600; }
+.datos > .fuerte-l span { font-weight: 600; }
+.datos > .fuerte-l b { font-size: 20px; }
+@media (max-width: 900px) { .dos-lib { grid-template-columns: 1fr; } }
