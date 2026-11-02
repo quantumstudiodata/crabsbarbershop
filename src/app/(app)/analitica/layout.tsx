@@ -11,9 +11,9 @@ export default async function LayoutAnalitica({ children }: { children: React.Re
   if (s.puede("reportes.ver")) items.push(["/analitica/finanzas", "Finanzas"]);
   if (items.length <= 1) return <>{children}</>;
   return (
-    <div className="lay-lat">
+    <div className="lay-sup">
       <Pestanas items={items} />
-      <div className="lay-lat-c">{children}</div>
+      <div className="lay-sup-c">{children}</div>
     </div>
   );
 }

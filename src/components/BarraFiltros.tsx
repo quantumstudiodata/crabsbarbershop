@@ -33,8 +33,11 @@ export function BarraFiltros({ p, hoy, personas, persona, buscar, conBuscar = tr
   );
   return (
     <div className="barra-filtros">
-      <SelectorPeriodo p={p} hoy={hoy} sinPeriodo={sinPeriodo} medio={equipo} />
-      <div className="fila filtros-extra">
+      <div className="fila filtros-sup">
+        <SelectorPeriodo p={p} hoy={hoy} sinPeriodo={sinPeriodo} medio={equipo} />
+        {!conBuscar && descarga && <a className="chipf" href={descarga}><Icono n="descargar" />Descargar</a>}
+      </div>
+      {(conBuscar || hayFiltros) && <div className="fila filtros-extra">
         {conBuscar && (
           <form className="con-icono buscar-f" onSubmit={(e) => { e.preventDefault(); ir({ q: q.trim() }); }}>
             <Icono n="buscar" />
@@ -42,8 +45,8 @@ export function BarraFiltros({ p, hoy, personas, persona, buscar, conBuscar = tr
           </form>
         )}
         {hayFiltros && <button type="button" className="enlace" onClick={() => { setQ(""); router.push(ruta); }}>Quitar filtros</button>}
-        {descarga && <a className="chipf" href={descarga}><Icono n="descargar" />Descargar</a>}
-      </div>
+        {conBuscar && descarga && <a className="chipf" href={descarga}><Icono n="descargar" />Descargar</a>}
+      </div>}
     </div>
   );
 }
