@@ -320,7 +320,11 @@ a.vivo-t:hover { transform: translateX(-3px); }
 
 /* ---------- Inicio ---------- */
 .hero { display: grid; grid-template-columns: minmax(0, 1fr) 270px; gap: 32px; align-items: center; }
-.inicio-b { display: grid; grid-template-columns: minmax(0, 1.6fr) minmax(0, 1fr); gap: 22px; align-items: start; }
+.inicio-b { display: grid; grid-template-columns: minmax(0, 1.6fr) minmax(0, 1fr); gap: 22px; align-items: stretch; }
+.inicio-b > .panel:last-child { display: flex; flex-direction: column; }
+.inicio-b .feed-corto { flex: 1; }
+.inicio-b .ver-todo-a { margin-top: auto; padding-top: 12px; display: inline-block; }
+.feed-corto > div { padding: 10px 0; }
 .inicio-b > * { min-width: 0; }
 .meta.grande { height: 14px; border-radius: 7px; }
 .meta.grande i { border-radius: 7px; }
