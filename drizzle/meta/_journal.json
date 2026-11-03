@@ -71,6 +71,13 @@
       "when": 1793598390444,
       "tag": "0009_limpieza",
       "breakpoints": true
+    },
+    {
+      "idx": 10,
+      "version": "7",
+      "when": 1793688776541,
+      "tag": "0010_permisos_tablas_nuevas",
+      "breakpoints": true
     }
   ]
 }
