@@ -5,17 +5,19 @@ import { requerirSesion } from "@/lib/auth";
 import { categoriasGasto, datosParaMeta } from "@/lib/datos";
 import { db, schema } from "@/lib/db";
 import { fechaLocal } from "@/lib/fechas";
+import { formatoDinero } from "@/lib/money";
 import { NOMBRE_ROL, PERMISOS_CONFIG, permisosDe } from "@/lib/permisos";
 import { redirect } from "next/navigation";
 import { agregarMetodo } from "./actions";
 import { Funciones } from "./Funciones";
 import { Metodos } from "./Metodos";
 import { CajaAjustes, MetaMensual, ReglasCobro } from "./Reglas";
-import { CategoriasEgresos, ConceptosFrecuentes, ModeloCaja } from "./Secciones";
+import { ModeloCaja } from "./Secciones";
+import { Bloque, CategoriasEgresos, GastosFrecuentes, OpcionesRegistro, Resumen } from "./Bloques";
 
-export const metadata = { title: "Editar funciones" };
+export const metadata = { title: "Configurar negocio" };
 
-export default async function EditarFunciones({ searchParams }: { searchParams: Promise<{ aviso?: string; error?: string }> }) {
+export default async function ConfigurarNegocio({ searchParams }: { searchParams: Promise<{ aviso?: string; error?: string }> }) {
   const s = await requerirSesion();
   if (!PERMISOS_CONFIG.some((p) => s.puede(p))) redirect("/?aviso=sin-permiso");
   const q = await searchParams;
@@ -28,16 +30,26 @@ export default async function EditarFunciones({ searchParams }: { searchParams: 
   ]);
   // Quiénes pueden autorizar descuentos mayores al límite.
   const autorizan = [...new Set(gente.filter((u) => permisosDe(u.rol, u.extra, u.quitados, u.puesto).has("ventas.descuento")).map((u) => (u.rol === "duena" || u.rol === "admin" ? NOMBRE_ROL[u.rol].toLowerCase() : u.nombre.split(" ")[0])))].join(", ") || "el titular";
+  const $ = (c: number) => formatoDinero(c);
+  const si = (v: boolean) => (v ? "Activo" : "Apagado");
+  const activos = metodos.filter((m) => m.activo);
+  const edita = (p: "cobros" | "caja" | "metas" | "egresos") => s.puede(`configuracion.${p}`) && !s.vista;
+  const NOMBRE_MET: Record<string, string> = { efectivo: "Efectivo", transferencia: "Transferencia", tarjeta: "Tarjeta" };
   return (
     <>
       <AvisoUrl aviso={q.aviso} error={q.error} />
       <div>
-        <h1 className="titulo">Editar funciones</h1>
-        <p className="sub">Cómo se cobra, cómo se maneja la caja, las metas y los egresos.</p>
+        <h1 className="titulo">Configurar negocio</h1>
+        <p className="sub">Abre cada apartado para ver cómo está configurado.</p>
       </div>
 
-      <section className="glass panel bloque-a">
-        <span className="lab">1. Cobros y métodos de pago</span>
+      <Bloque numero={1} titulo="Cobros y métodos de pago" puedeEditar={edita("cobros")}
+        resumen={`${activos.length} ${activos.length === 1 ? "forma de pago" : "formas de pago"}, descuentos hasta ${b.limiteDescuentoPct}% sin autorización`}
+        detalle={<Resumen filas={[
+          ["Formas de pago activas", activos.map((m) => m.nombre).join(", ") || "Ninguna"],
+          ["Descuento sin autorización", `Hasta ${b.limiteDescuentoPct}%`],
+          ["Descuentos", si(b.usaDescuentos)], ["Propinas", si(b.usaPropinas)], ["Dividir pago", si(b.usaDividirPago)],
+        ]} />}>
         <Metodos metodos={metodos.map(({ id, nombre, esEfectivo, activo }) => ({ id, nombre, esEfectivo, activo }))} />
         <form action={agregarMetodo} className="fila" style={{ marginTop: 4 }}>
           <input className="input" name="nombre" placeholder="Otro método de pago, por ejemplo: Vales" style={{ flex: "1 1 220px" }} required aria-label="Nuevo método de pago" />
@@ -48,40 +60,40 @@ export default async function EditarFunciones({ searchParams }: { searchParams: 
           { clave: "propinas", nombre: "Propinas", activa: b.usaPropinas, encendida: "Aparecen al cobrar.", apagada: "No aparecen al cobrar." },
           { clave: "dividir", nombre: "Dividir pago", activa: b.usaDividirPago, encendida: "Un cliente puede pagar con dos formas de pago.", apagada: "Cada venta se paga con una sola forma." },
         ]} />
-      </section>
+      </Bloque>
 
-      <section className="glass panel bloque-a">
-        <span className="lab">2. Caja</span>
+      <Bloque numero={2} titulo="Caja" puedeEditar={edita("caja")}
+        resumen={`${b.modeloCaja === "individual" ? "Una caja por trabajador" : "Caja compartida"}, ${b.aperturaManual ? "se abre contando el fondo" : "se abre sola"}`}
+        detalle={<Resumen filas={[
+          ["Modelo de caja", b.modeloCaja === "individual" ? "Individual por trabajador" : "Compartida"],
+          ["Apertura", b.aperturaManual ? "Manual, contando el fondo" : "Automática al primer cobro"],
+          ["Fondo inicial sugerido", $(b.fondoPredeterminado)], ["Diferencia permitida", $(b.limiteDiferenciaCaja)],
+        ]} />}>
         <Funciones funciones={[
           { clave: "apertura", nombre: "Apertura de caja", activa: b.aperturaManual, encendida: "Alguien abre la caja contando el fondo inicial.", apagada: "La caja se abre sola con el fondo inicial sugerido al primer cobro del día." },
         ]} />
         <CajaAjustes fondo={Math.round(b.fondoPredeterminado / 100)} diferencia={Math.round(b.limiteDiferenciaCaja / 100)} />
         <ModeloCaja actual={b.modeloCaja} />
-      </section>
+      </Bloque>
 
-      <section className="glass panel bloque-a">
-        <span className="lab">3. Metas</span>
+      <Bloque numero={3} titulo="Metas" puedeEditar={edita("metas")}
+        resumen={b.usaMetas ? (b.metaMensual ? `Objetivo mensual de ${$(b.metaMensual)}` : "Activas, sin objetivo mensual") : "Apagadas"}
+        detalle={<Resumen filas={[["Metas de ventas", si(b.usaMetas)], ["Objetivo mensual", b.metaMensual ? $(b.metaMensual) : "Sin objetivo"]]} />}>
         <Funciones funciones={[
           { clave: "metas", nombre: "Metas de ventas", activa: b.usaMetas, encendida: "Inicio muestra la meta de ventas y cuánto lleva acumulado el negocio.", apagada: "Inicio no muestra metas." },
         ]} />
         <MetaMensual metaMensual={Math.round(b.metaMensual / 100)} datosMeta={await datosParaMeta(b.id, b.zonaHoraria, fechaLocal(new Date(), b.zonaHoraria))} />
-      </section>
+      </Bloque>
 
-      <section className="glass panel bloque-a">
-        <span className="lab">4. Egresos y finanzas</span>
-        <CategoriasEgresos categorias={cats} />
-        <ConceptosFrecuentes conceptos={conceptos} categorias={cats.filter((c) => c.activo).map((c) => c.nombre)} />
-        <div className="ajuste">
-          <span><b>Métodos de pago de egresos</b><small>Cómo se pueden pagar los gastos del negocio. Solo el efectivo que sale de la caja afecta el corte.</small></span>
-          <div className="metodos-g"><span className="chip-m cm-e">Efectivo</span><span className="chip-m cm-t">Transferencia</span><span className="chip-m cm-k">Tarjeta</span></div>
-        </div>
-        <Funciones funciones={[
-          { clave: "comprobantes", nombre: "Registro de comprobantes", activa: b.usaComprobantes, encendida: "Se puede adjuntar una foto o archivo a cada egreso.", apagada: "Los egresos se registran sin comprobante." },
-          { clave: "periodicidad", nombre: "Periodicidad de gastos", activa: b.usaPeriodicidad, encendida: "Cada egreso puede marcarse como semanal, quincenal o mensual.", apagada: "Los egresos no llevan periodicidad." },
-          { clave: "renta", nombre: "Renta de silla", activa: b.usaRentaSilla, encendida: "Se puede elegir como forma de pago de un barbero.", apagada: "No aparece al dar de alta a un barbero." },
-        ]} />
-        <p className="ayuda-txt">Apagar una función solo la esconde. Lo que ya se registró se conserva.</p>
-      </section>
+      <Bloque numero={4} titulo="Egresos y finanzas" puedeEditar={edita("egresos")}
+        resumen={`${cats.filter((c) => c.activo).length} categorías, ${conceptos.length} ${conceptos.length === 1 ? "gasto frecuente" : "gastos frecuentes"}, pagos con ${b.metodosEgreso.map((m) => NOMBRE_MET[m].toLowerCase()).join(", ")}`}
+        detalle={
+          <div className="pila">
+            <CategoriasEgresos categorias={cats} puede={edita("egresos")} />
+            <GastosFrecuentes gastos={conceptos} categorias={cats.filter((c) => c.activo).map((c) => c.nombre)} metodos={b.metodosEgreso} puede={edita("egresos")} />
+            <OpcionesRegistro metodos={b.metodosEgreso} comprobantes={b.usaComprobantes} periodicidad={b.usaPeriodicidad} puede={edita("egresos")} />
+          </div>
+        } />
     </>
   );
 }

@@ -79,19 +79,29 @@ export async function cambiarModeloCaja(valor: string): Promise<EstadoAjuste> {
 const PERIODOS_G = ["semanal", "quincenal", "mensual"];
 const METODOS_G = ["efectivo", "transferencia", "tarjeta"];
 
+/** Guarda un gasto frecuente (nuevo o editado). Es solo una plantilla: no genera egresos por sí solo. */
 export async function agregarConcepto(_: EstadoAjuste, form: FormData): Promise<EstadoAjuste> {
   const s = await requerirSesion("configuracion.egresos");
+  const id = texto(form, "id", 40);
   const concepto = texto(form, "concepto", 120);
   const categoria = texto(form, "categoria", 60);
   const monto = leerPesos(texto(form, "monto")) ?? 0;
   const metodo = METODOS_G.includes(texto(form, "metodo")) ? texto(form, "metodo") : "efectivo";
-  const periodicidad = PERIODOS_G.includes(texto(form, "periodicidad")) ? texto(form, "periodicidad") : "mensual";
-  if (concepto.length < 2) return { error: "Escribe el concepto." };
+  const periodicidad = PERIODOS_G.includes(texto(form, "periodicidad")) ? texto(form, "periodicidad") : "";
+  if (concepto.length < 2) return { error: "Escribe el nombre del gasto." };
   if (monto < 0 || monto > 100_000_000) return { error: "Revisa la cantidad." };
   const [cat] = await db.select({ id: schema.categoriasGasto.id }).from(schema.categoriasGasto).where(and(eq(schema.categoriasGasto.barberiaId, s.barberia.id), eq(schema.categoriasGasto.nombre, categoria)));
   if (!cat) return { error: "Elige una categoría." };
+  if (id) {
+    const [c] = await db.select().from(schema.conceptosFrecuentes).where(and(eq(schema.conceptosFrecuentes.id, id), eq(schema.conceptosFrecuentes.barberiaId, s.barberia.id)));
+    if (!c) return { error: "No se encontró el gasto frecuente." };
+    await db.update(schema.conceptosFrecuentes).set({ concepto, categoria, monto, metodo, periodicidad }).where(eq(schema.conceptosFrecuentes.id, c.id));
+    await registrar(db, { barberiaId: s.barberia.id, usuarioId: s.usuario.id, tipo: "ajuste", accion: `${s.usuario.nombre} editó el gasto frecuente ${concepto}`, detalle: { antes: `${c.concepto}, ${c.categoria}, ${c.monto ? formatoDinero(c.monto) : "sin importe"}`, ahora: `${concepto}, ${categoria}, ${monto ? formatoDinero(monto) : "sin importe"}` } });
+    revalidatePath("/", "layout");
+    return { ok: true, n: Date.now() };
+  }
   await db.insert(schema.conceptosFrecuentes).values({ barberiaId: s.barberia.id, concepto, categoria, monto, metodo, periodicidad });
-  await registrar(db, { barberiaId: s.barberia.id, usuarioId: s.usuario.id, tipo: "ajuste", accion: `${s.usuario.nombre} agregó el concepto frecuente ${concepto}`, detalle: { categoria, monto, metodo, periodicidad } });
+  await registrar(db, { barberiaId: s.barberia.id, usuarioId: s.usuario.id, tipo: "ajuste", accion: `${s.usuario.nombre} agregó el gasto frecuente ${concepto}`, detalle: { categoria, monto, metodo, periodicidad } });
   revalidatePath("/", "layout");
   return { ok: true, n: Date.now() };
 }
@@ -101,7 +111,7 @@ export async function quitarConcepto(id: string): Promise<EstadoAjuste> {
   const [c] = await db.select().from(schema.conceptosFrecuentes).where(and(eq(schema.conceptosFrecuentes.id, String(id)), eq(schema.conceptosFrecuentes.barberiaId, s.barberia.id)));
   if (!c) return { error: "No se encontró." };
   await db.delete(schema.conceptosFrecuentes).where(eq(schema.conceptosFrecuentes.id, c.id));
-  await registrar(db, { barberiaId: s.barberia.id, usuarioId: s.usuario.id, tipo: "ajuste", accion: `${s.usuario.nombre} quitó el concepto frecuente ${c.concepto}` });
+  await registrar(db, { barberiaId: s.barberia.id, usuarioId: s.usuario.id, tipo: "ajuste", accion: `${s.usuario.nombre} quitó el gasto frecuente ${c.concepto}` });
   revalidatePath("/", "layout");
   return { ok: true, n: Date.now() };
 }
@@ -179,4 +189,17 @@ export async function alternarFuncion(clave: string) {
     detalle: { antes: antes ? "Encendida" : "Apagada", ahora: antes ? "Apagada" : "Encendida" },
   });
   revalidatePath("/", "layout");
+}
+
+/** Formas de pago que se pueden usar al registrar un egreso. Siempre queda al menos una. */
+export async function alternarMetodoEgreso(metodo: string): Promise<EstadoAjuste> {
+  const s = await requerirSesion("configuracion.egresos");
+  if (!METODOS_G.includes(metodo)) return { error: "Método no válido." };
+  const actual = s.barberia.metodosEgreso;
+  const nuevo = actual.includes(metodo) ? actual.filter((m) => m !== metodo) : METODOS_G.filter((m) => m === metodo || actual.includes(m));
+  if (nuevo.length === 0) return { error: "Deja al menos una forma de pago para los egresos." };
+  await db.update(schema.barberias).set({ metodosEgreso: nuevo }).where(eq(schema.barberias.id, s.barberia.id));
+  await registrar(db, { barberiaId: s.barberia.id, usuarioId: s.usuario.id, tipo: "ajuste", accion: `${s.usuario.nombre} ${actual.includes(metodo) ? "apagó" : "encendió"} ${metodo} para egresos`, detalle: { antes: actual.join(", "), ahora: nuevo.join(", ") } });
+  revalidatePath("/", "layout");
+  return { ok: true, n: Date.now() };
 }

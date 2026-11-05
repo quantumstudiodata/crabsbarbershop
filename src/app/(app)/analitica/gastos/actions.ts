@@ -44,7 +44,7 @@ export async function registrarEgreso(_: EstadoGasto, form: FormData): Promise<E
   if (!concepto) return { error: "Escribe el concepto del egreso." };
   if (!monto || monto <= 0) return { error: "Escribe una cantidad mayor a cero." };
   if (monto > 100_000_000) return { error: "La cantidad es demasiado grande. Revísala." };
-  if (!metodo) return { error: "Elige cómo se pagó." };
+  if (!metodo || !s.barberia.metodosEgreso.includes(metodo)) return { error: "Elige cómo se pagó." };
   if (!esFechaValida(fecha) || fecha > hoy || diasEntre(fecha, hoy) > 400) return { error: "Elige una fecha válida, que no sea futura." };
   const [cat] = await db.select({ nombre: schema.categoriasGasto.nombre }).from(schema.categoriasGasto)
     .where(and(eq(schema.categoriasGasto.barberiaId, s.barberia.id), eq(schema.categoriasGasto.nombre, categoria), eq(schema.categoriasGasto.activo, true)));
@@ -151,4 +151,19 @@ export async function alternarCategoria(id: string): Promise<EstadoGasto> {
     });
   });
   return listo(c.activo ? `${c.nombre} ya no aparece al registrar.` : `${c.nombre} vuelve a aparecer.`);
+}
+
+/** Una categoría solo se borra si ningún egreso ni gasto frecuente la usa; si no, se archiva (se apaga). */
+export async function eliminarCategoriaGasto(id: string): Promise<EstadoGasto> {
+  const s = await requerirSesion();
+  if (!s.puede("configuracion.egresos")) return { error: "No tienes permiso para cambiar categorías." };
+  const [c] = await db.select().from(schema.categoriasGasto).where(and(eq(schema.categoriasGasto.id, String(id)), eq(schema.categoriasGasto.barberiaId, s.barberia.id)));
+  if (!c) return { error: "No se encontró la categoría." };
+  const [{ n }] = await db.select({ n: sql<number>`count(*)::int` }).from(schema.gastos).where(and(eq(schema.gastos.barberiaId, s.barberia.id), eq(schema.gastos.categoria, c.nombre)));
+  const [{ f }] = await db.select({ f: sql<number>`count(*)::int` }).from(schema.conceptosFrecuentes).where(and(eq(schema.conceptosFrecuentes.barberiaId, s.barberia.id), eq(schema.conceptosFrecuentes.categoria, c.nombre)));
+  if (n > 0 || f > 0) return { error: `${c.nombre} ya tiene ${n > 0 ? "egresos registrados" : "gastos frecuentes"}: solo se puede archivar para conservar el historial.` };
+  await db.delete(schema.categoriasGasto).where(eq(schema.categoriasGasto.id, c.id));
+  await registrar(db, { barberiaId: s.barberia.id, usuarioId: s.usuario.id, tipo: "ajuste", accion: `${s.usuario.nombre} eliminó la categoría de egresos ${c.nombre}` });
+  revalidatePath("/", "layout");
+  return listo(`${c.nombre} se eliminó.`);
 }

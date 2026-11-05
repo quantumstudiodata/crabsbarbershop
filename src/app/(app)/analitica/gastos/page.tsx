@@ -66,7 +66,7 @@ export default async function PaginaEgresos({ searchParams }: { searchParams: Pr
         dias={dias} hoy={hoy} cajaAbierta={!!turno} puede={s.puede("gastos.registrar")}
         categorias={cats} resumen={{ total, efectivo: porMetodo("efectivo"), transferencia: porMetodo("transferencia"), tarjeta: porMetodo("tarjeta"), movimientos: vigentes.length, comprobantes: comps.length }}
         etiqueta={p.etiqueta} ajustes={s.puede("configuracion.egresos")}
-        opciones={{ periodicidad: s.barberia.usaPeriodicidad, comprobantes: s.barberia.usaComprobantes, frecuentes: frecuentes.map(({ id, concepto, categoria, monto, metodo, periodicidad }) => ({ id, concepto, categoria, monto, metodo, periodicidad })) }}
+        opciones={{ metodos: s.barberia.metodosEgreso, periodicidad: s.barberia.usaPeriodicidad, comprobantes: s.barberia.usaComprobantes, frecuentes: frecuentes.map(({ id, concepto, categoria, monto, metodo, periodicidad }) => ({ id, concepto, categoria, monto, metodo, periodicidad })) }}
       />
     </>
   );

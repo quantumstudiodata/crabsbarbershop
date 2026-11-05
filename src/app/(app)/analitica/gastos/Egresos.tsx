@@ -95,7 +95,7 @@ export function Egresos({ dias, hoy, cajaAbierta, puede, categorias, resumen, et
 const pct = (a: number, b: number) => (b ? `${Math.round((a / b) * 100)}%` : "0%");
 
 export type Frecuente = { id: string; concepto: string; categoria: string; monto: number; metodo: string; periodicidad: string };
-export type OpcionesEgreso = { periodicidad: boolean; comprobantes: boolean; frecuentes: Frecuente[] };
+export type OpcionesEgreso = { periodicidad: boolean; comprobantes: boolean; frecuentes: Frecuente[]; metodos: string[] };
 const PERIODOS: [string, string][] = [["unica", "Una vez"], ["semanal", "Semanal"], ["quincenal", "Quincenal"], ["mensual", "Mensual"]];
 
 /** Reduce una foto a 1600 px de lado y la convierte a JPEG, para que pese poco. Los PDF pasan tal cual. */
@@ -112,7 +112,7 @@ async function prepararArchivo(f: File): Promise<string> {
 
 function Nuevo({ hoy, cajaAbierta, categorias, cerrar, otro, opciones }: { hoy: string; cajaAbierta: boolean; categorias: Categoria[]; cerrar: () => void; otro: () => void; opciones: OpcionesEgreso }) {
   const [e, accion, guardando] = useActionState<EstadoGasto, FormData>(registrarEgreso, {});
-  const [metodo, setMetodo] = useState<"efectivo" | "transferencia" | "tarjeta">("efectivo");
+  const [metodo, setMetodo] = useState<"efectivo" | "transferencia" | "tarjeta">((opciones.metodos[0] ?? "efectivo") as "efectivo");
   const [concepto, setConcepto] = useState("");
   const [monto, setMonto] = useState("");
   const [periodo, setPeriodo] = useState("unica");
@@ -120,7 +120,8 @@ function Nuevo({ hoy, cajaAbierta, categorias, cerrar, otro, opciones }: { hoy: 
   const [errArchivo, setErrArchivo] = useState<string | null>(null);
   const usar = (f: Frecuente) => {
     setConcepto(f.concepto); setMonto(f.monto ? String(f.monto / 100) : ""); setCategoria(f.categoria);
-    setMetodo(f.metodo as "efectivo"); setPeriodo(f.periodicidad);
+    if (opciones.metodos.includes(f.metodo)) setMetodo(f.metodo as "efectivo");
+    setPeriodo(f.periodicidad || "unica");
   };
   const [fecha, setFecha] = useState(hoy);
   const [categoria, setCategoria] = useState(categorias[0]?.nombre ?? "");
@@ -150,9 +151,9 @@ function Nuevo({ hoy, cajaAbierta, categorias, cerrar, otro, opciones }: { hoy: 
           <div className="campo"><span>Fecha</span><Calendario fecha={fecha} hoy={hoy} elegir={setFecha} /></div>
           <div className="campo"><span>Cómo se pagó</span>
             <div className="seg" role="radiogroup" aria-label="Cómo se pagó">
-              <button type="button" className={metodo === "efectivo" ? "on" : ""} onClick={() => setMetodo("efectivo")}><Icono n="efectivo" />Efectivo</button>
-              <button type="button" className={metodo === "transferencia" ? "on" : ""} onClick={() => setMetodo("transferencia")}><Icono n="cobro" />Transferencia</button>
-              <button type="button" className={metodo === "tarjeta" ? "on" : ""} onClick={() => setMetodo("tarjeta")}><Icono n="tarjeta" />Tarjeta</button>
+              {opciones.metodos.includes("efectivo") && <button type="button" className={metodo === "efectivo" ? "on" : ""} onClick={() => setMetodo("efectivo")}><Icono n="efectivo" />Efectivo</button>}
+              {opciones.metodos.includes("transferencia") && <button type="button" className={metodo === "transferencia" ? "on" : ""} onClick={() => setMetodo("transferencia")}><Icono n="cobro" />Transferencia</button>}
+              {opciones.metodos.includes("tarjeta") && <button type="button" className={metodo === "tarjeta" ? "on" : ""} onClick={() => setMetodo("tarjeta")}><Icono n="tarjeta" />Tarjeta</button>}
             </div>
           </div>
           {opciones.periodicidad && (
