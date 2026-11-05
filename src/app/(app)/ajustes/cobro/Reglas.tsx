@@ -8,9 +8,9 @@ import { Funciones, type Funcion } from "./Funciones";
 import { type EstadoReglas, guardarReglas } from "./actions";
 
 /** Un ajuste con botones rápidos, control deslizante y una vista previa de lo que significa. */
-function Ajuste({ name, titulo, ayuda, inicial, opciones, max, paso, formato, vista }: {
+function Ajuste({ name, titulo, ayuda, inicial, opciones, max, paso, formato, vista, sinDeslizador }: {
   name: string; titulo: string; ayuda: string; inicial: number; opciones: number[]; max: number; paso: number;
-  formato: (v: number) => string; vista: (v: number) => React.ReactNode;
+  formato: (v: number) => string; vista: (v: number) => React.ReactNode; sinDeslizador?: boolean;
 }) {
   const [v, setV] = useState(inicial);
   return (
@@ -20,33 +20,33 @@ function Ajuste({ name, titulo, ayuda, inicial, opciones, max, paso, formato, vi
         <span><b>{titulo}</b><small>{ayuda}</small></span>
         <span className="valor-a" key={v}>{formato(v)}</span>
       </div>
-      <input type="range" min={0} max={max} step={paso} value={Math.min(v, max)} onChange={(e) => setV(Number(e.target.value))} aria-label={titulo}
-        style={{ "--p": `${(Math.min(v, max) / max) * 100}%` } as React.CSSProperties} />
+      {!sinDeslizador && <input type="range" min={0} max={max} step={paso} value={Math.min(v, max)} onChange={(e) => setV(Number(e.target.value))} aria-label={titulo}
+        style={{ "--p": `${(Math.min(v, max) / max) * 100}%` } as React.CSSProperties} />}
       <div className="billetes">
         {opciones.map((o) => <button type="button" key={o} className={v === o ? "on" : ""} onClick={() => setV(o)}>{formato(o)}</button>)}
       </div>
-      <div className="vista-a">{vista(v)}</div>
+      <div className="vista-a" key={`v${v}`}>{vista(v)}</div>
     </div>
   );
 }
 
-/** Formulario que guarda sin recargar. El botón dice "Guardado" hasta que se cambie algo. */
+/** Formulario que guarda sin recargar. La barra de guardar aparece solo cuando hay cambios pendientes. */
 function FormGuardar({ children, className, conBoton = true }: { children: React.ReactNode; className: string; conBoton?: boolean }) {
   const [e, accion, guardando] = useActionState<EstadoReglas, FormData>(guardarReglas, {});
   const [sucio, setSucio] = useState(false);
   useEffect(() => { if (e.ok) setSucio(false); }, [e.ok, e.n]);
-  const guardado = !!e.ok && !sucio && !guardando;
   const marcar = (x: React.SyntheticEvent) => { const t = x.target as HTMLElement; if (t.closest(".billetes button, input[type=range]")) setSucio(true); };
   return (
     <form action={accion} className={className} onChange={marcar} onClick={marcar}>
       {children}
       {e.error && !sucio && <p className="aviso error">{e.error}</p>}
-      {conBoton && <div className="acciones">
-        <button className={`bt ${guardado ? "guardado" : ""}`} disabled={guardando || guardado}>
-          {guardando ? "Guardando…" : guardado ? "Guardado" : "Guardar"}
-          {guardado ? <span className="fl" aria-hidden="true"><Icono n="palomita" /></span> : <Fl />}
-        </button>
-      </div>}
+      {e.ok && !sucio && !guardando && <p className="confirma" key={e.n}><Icono n="palomita" />Cambios guardados.</p>}
+      {conBoton && sucio && (
+        <div className="barra-guardar">
+          <span>Tienes cambios sin guardar</span>
+          <button className="bt chico" disabled={guardando}>{guardando ? "Guardando…" : "Guardar"}<Fl /></button>
+        </div>
+      )}
     </form>
   );
 }
@@ -56,12 +56,11 @@ export function ReglasCobro({ descuento, autorizan, funciones }: { descuento: nu
   return (
     <FormGuardar className="pila" conBoton={conDescuentos}>
       <span className="sub-a">Reglas de cobro</span>
-      <p className="ayuda-txt" style={{ marginTop: -4 }}>Qué botones aparecen en la pantalla de cobro.</p>
       <Funciones funciones={funciones} alCambiar={(clave, activa) => { if (clave === "descuentos") setConDescuentos(activa); }} />
       {conDescuentos && (
         <Ajuste name="descuento" titulo="Autorización de descuentos" ayuda="Hasta cuánto puede descontar un barbero por su cuenta. Más que eso lo autoriza alguien con permiso."
-          inicial={descuento} opciones={[0, 10, 20, 50, 100]} max={100} paso={5} formato={(v) => `${v}%`}
-          vista={(v) => v === 0 ? <>Ningún barbero puede dar descuentos sin autorización.</> : v === 100 ? <>Un barbero puede dar cualquier descuento por su cuenta, hasta dejar el servicio gratis.</> : <>En un corte de $150, un barbero puede descontar hasta <b>{formatoDinero(Math.round(15000 * v / 100))}</b>. Más que eso lo autoriza: {autorizan}.</>} />
+          inicial={descuento} opciones={[0, 10, 20, 50, 100]} max={100} paso={5} formato={(v) => `${v}%`} sinDeslizador
+          vista={(v) => v === 0 ? <>Ningún barbero puede dar descuentos sin autorización.</> : v === 100 ? <><b>No se necesita autorización.</b> Cualquier barbero puede dar el descuento que quiera por su cuenta, hasta dejar el servicio gratis.</> : <>En un corte de $150, un barbero puede descontar hasta <b>{formatoDinero(Math.round(15000 * v / 100))}</b>. Más que eso lo autoriza: {autorizan}.</>} />
       )}
     </FormGuardar>
   );

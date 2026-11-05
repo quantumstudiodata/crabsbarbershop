@@ -28,14 +28,15 @@ export function EditorPermisos({ grupos, marcados, cambiar, descuentoLibre, solo
         const libres = g.permisos.filter((x) => !(x.clave === "ventas.descuento" && descuentoLibre));
         const editables = libres.filter((x) => x.puedeDar);
         const n = libres.filter((x) => marcados.has(x.clave)).length;
-        const todos = editables.length > 0 && editables.every((x) => marcados.has(x.clave));
+        // El encabezado está encendido mientras el grupo tenga algún permiso; al apagarlo se quitan todos.
+        const alguno = editables.some((x) => marcados.has(x.clave));
         return (
           <details key={g.titulo} className="grupo-p">
             <summary>
               <span className="g-tit"><b>{g.titulo}</b><span className="muted">{n} de {libres.length} incluidos</span></span>
               {!soloLectura && editables.length > 0 && (
                 <span className="g-todos" onClick={(e) => e.stopPropagation()} onKeyDown={(e) => e.stopPropagation()}>
-                  <Interruptor etiqueta={`Todos los permisos de ${g.titulo}`} checked={todos} onChange={(v) => poner(editables.map((x) => x.clave), v)} />
+                  <Interruptor etiqueta={`Permisos de ${g.titulo}`} checked={alguno} onChange={(v) => poner(editables.map((x) => x.clave), v)} />
                 </span>
               )}
             </summary>
@@ -46,7 +47,7 @@ export function EditorPermisos({ grupos, marcados, cambiar, descuentoLibre, solo
                   <label key={x.clave} className={`entre perm-l ${libre ? "apagado-p" : ""}`}>
                     <span>{x.texto}{(libre || x.detalle) && <small className="nota-p">{libre ? LIBRE : x.detalle}</small>}</span>
                     {soloLectura
-                      ? <span className={`chip-e ${marcados.has(x.clave) ? "ok" : "off"}`}><i />{marcados.has(x.clave) ? "Incluido" : "No"}</span>
+                      ? <span className={`chip-p ${marcados.has(x.clave) ? "si" : ""}`}>{marcados.has(x.clave) ? "Incluido" : "No incluido"}</span>
                       : <Interruptor etiqueta={x.texto} checked={!libre && marcados.has(x.clave)} disabled={libre || !x.puedeDar} onChange={(v) => poner([x.clave], v)} />}
                   </label>
                 );

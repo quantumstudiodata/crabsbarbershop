@@ -1,59 +1,68 @@
 "use client";
 
 import { useState, useTransition } from "react";
-import { Icono } from "@/components/Icono";
-import { Interruptor, Modal } from "@/components/ui";
-import { alternarMetodo, eliminarMetodo, renombrarMetodo } from "./actions";
+import { Fl, Icono } from "@/components/Icono";
+import { MenuPuntos } from "@/components/MenuPuntos";
+import { Modal } from "@/components/ui";
+import { alternarMetodo, eliminarMetodo, guardarMetodo } from "./actions";
 
-type Metodo = { id: string; nombre: string; esEfectivo: boolean; activo: boolean };
+type Metodo = { id: string; nombre: string; descripcion: string; esEfectivo: boolean; activo: boolean };
 
-/** Formas de pago: cada una se puede renombrar, activar o desactivar y eliminar (el efectivo solo se desactiva). */
+/** Formas de pago en una lista compacta. Las acciones aparecen en el menú de tres puntos. */
 export function Metodos({ metodos }: { metodos: Metodo[] }) {
   const [lista, setLista] = useState(metodos);
-  const [editando, setEditando] = useState<string | null>(null);
-  const [nombre, setNombre] = useState("");
+  const [form, setForm] = useState<{ id?: string; nombre: string; descripcion: string } | null>(null);
   const [borrar, setBorrar] = useState<Metodo | null>(null);
-  const [error, setError] = useState<string | null>(null);
+  const [aviso, setAviso] = useState<{ error?: string; ok?: string }>({});
+  const [nuevo, setNuevo] = useState<string | null>(null);
   const [pendiente, iniciar] = useTransition();
-  const correr = (f: () => Promise<{ error?: string }>, despues?: () => void) => iniciar(async () => {
+  const correr = (f: () => Promise<{ error?: string; id?: string }>, despues: (id?: string) => void, ok?: string) => iniciar(async () => {
     const r = await f();
-    setError(r.error ?? null);
-    if (!r.error) despues?.();
+    setAviso(r.error ? { error: r.error } : { ok });
+    if (!r.error) despues(r.id);
   });
+  const nota = (m: Metodo) => m.descripcion || (m.esEfectivo ? "Es lo que se cuenta al cerrar la caja." : "Aparece en Cobro.");
   return (
     <div className="pila-chica">
-      <div className="permisos metodos-e">
+      <div className="entre"><span className="sub-a">Métodos de pago</span>
+        <button type="button" className="bt sec solo chico" onClick={() => setForm({ nombre: "", descripcion: "" })}><Icono n="mas" />Agregar método de pago</button></div>
+      <div className="lista-cfg">
         {lista.map((m) => (
-          <div key={m.id} className={m.activo ? "" : "inactivo-m"}>
-            {editando === m.id ? (
-              <form className="fila" style={{ gap: 8, flex: 1 }} onSubmit={(e) => { e.preventDefault(); correr(() => renombrarMetodo(m.id, nombre), () => { setLista(lista.map((x) => (x.id === m.id ? { ...x, nombre: nombre.trim() } : x))); setEditando(null); }); }}>
-                <input className="input" value={nombre} onChange={(e) => setNombre(e.target.value)} autoFocus maxLength={40} aria-label="Nombre de la forma de pago" style={{ flex: 1 }} />
-                <button className="icb" disabled={pendiente} aria-label="Guardar nombre" title="Guardar"><Icono n="palomita" /></button>
-                <button type="button" className="icb" onClick={() => setEditando(null)} aria-label="Cancelar" title="Cancelar"><Icono n="cerrar" /></button>
-              </form>
-            ) : (
-              <span>
-                <b style={{ fontWeight: 600 }}>{m.nombre}</b>
-                <small>{m.esEfectivo ? (m.activo ? "Es lo que se cuenta al cerrar la caja." : "No se recibe efectivo.") : m.activo ? "Aparece en Cobro." : "No aparece en Cobro. Sus ventas pasadas se conservan."}</small>
-              </span>
-            )}
-            {editando !== m.id && (
-              <span className="fila" style={{ gap: 6 }}>
-                <button type="button" className="icb" onClick={() => { setEditando(m.id); setNombre(m.nombre); }} aria-label={`Cambiar el nombre de ${m.nombre}`} title="Cambiar nombre"><Icono n="editar" /></button>
-                {!m.esEfectivo && <button type="button" className="icb" onClick={() => setBorrar(m)} aria-label={`Eliminar ${m.nombre}`} title="Eliminar"><Icono n="basura" /></button>}
-                <Interruptor etiqueta={`${m.nombre} activo`} checked={m.activo} disabled={pendiente}
-                  onChange={() => correr(() => alternarMetodo(m.id), () => setLista(lista.map((x) => (x.id === m.id ? { ...x, activo: !x.activo } : x))))} />
-              </span>
-            )}
+          <div key={m.id} className={`${m.activo ? "" : "apagada"} ${nuevo === m.id ? "nuevo-s" : ""}`}>
+            <span><b>{m.nombre}</b><small>{m.activo ? nota(m) : "Desactivado: no aparece en Cobro. Sus ventas pasadas se conservan."}</small></span>
+            <span className={`chip-p ${m.activo ? "si" : ""}`}>{m.activo ? "Activo" : "Desactivado"}</span>
+            <MenuPuntos etiqueta={`Opciones de ${m.nombre}`} items={[
+              { texto: "Editar", icono: "editar", hacer: () => setForm({ id: m.id, nombre: m.nombre, descripcion: m.descripcion }) },
+              { texto: m.activo ? "Desactivar" : "Activar", icono: m.activo ? "candado" : "palomita", hacer: () => correr(() => alternarMetodo(m.id), () => setLista(lista.map((x) => (x.id === m.id ? { ...x, activo: !x.activo } : x))), m.activo ? `${m.nombre} desactivado.` : `${m.nombre} activado.`) },
+              ...(m.esEfectivo ? [] : [{ texto: "Eliminar", icono: "basura", peligro: true, hacer: () => setBorrar(m) }]),
+            ]} />
           </div>
         ))}
       </div>
-      {error && <p className="aviso error">{error}</p>}
+      {aviso.error && <p className="aviso error">{aviso.error}</p>}
+      {aviso.ok && <p className="confirma" key={aviso.ok}><Icono n="palomita" />{aviso.ok}</p>}
+      {form && (
+        <Modal abierto cerrar={() => setForm(null)} etiqueta="Métodos de pago" titulo={form.id ? "Editar método de pago" : "Agregar método de pago"}>
+          <form className="pila" onSubmit={(e) => {
+            e.preventDefault();
+            const d = form;
+            correr(() => guardarMetodo(d), (id) => {
+              if (d.id) setLista(lista.map((x) => (x.id === d.id ? { ...x, nombre: d.nombre.trim(), descripcion: d.descripcion.trim() } : x)));
+              else if (id) { setLista([...lista, { id, nombre: d.nombre.trim(), descripcion: d.descripcion.trim(), esEfectivo: false, activo: true }]); setNuevo(id); }
+              setForm(null);
+            }, "Guardado.");
+          }}>
+            <label className="campo"><span>Nombre</span><input className="input" value={form.nombre} onChange={(e) => setForm({ ...form, nombre: e.target.value })} maxLength={40} required autoFocus placeholder="Ejemplo: Vales" /></label>
+            <label className="campo"><span>Descripción (opcional)</span><input className="input" value={form.descripcion} onChange={(e) => setForm({ ...form, descripcion: e.target.value })} maxLength={120} placeholder="Ejemplo: Vales de despensa de la empresa" /></label>
+            <div className="acciones"><button className="bt" disabled={pendiente}>{pendiente ? "Guardando…" : "Guardar"}<Fl /></button></div>
+          </form>
+        </Modal>
+      )}
       {borrar && (
-        <Modal abierto cerrar={() => setBorrar(null)} etiqueta="Formas de pago" titulo={`¿Eliminar ${borrar.nombre}?`}>
-          <p className="muted">Deja de aparecer en Cobro y en Ajustes. Los cobros que ya se hicieron con {borrar.nombre} se conservan con ese nombre.</p>
+        <Modal abierto cerrar={() => setBorrar(null)} etiqueta="Métodos de pago" titulo={`¿Eliminar ${borrar.nombre}?`}>
+          <p className="muted">Deja de aparecer en Cobro. Los cobros que ya se hicieron con {borrar.nombre} se conservan con ese nombre.</p>
           <div className="acciones">
-            <button type="button" className="bt peligro" disabled={pendiente} onClick={() => correr(() => eliminarMetodo(borrar.id), () => { setLista(lista.filter((x) => x.id !== borrar.id)); setBorrar(null); })}>Sí, eliminar</button>
+            <button type="button" className="bt peligro" disabled={pendiente} onClick={() => correr(() => eliminarMetodo(borrar.id), () => { setLista(lista.filter((x) => x.id !== borrar.id)); setBorrar(null); }, `${borrar.nombre} se eliminó.`)}>Sí, eliminar<Fl /></button>
           </div>
         </Modal>
       )}

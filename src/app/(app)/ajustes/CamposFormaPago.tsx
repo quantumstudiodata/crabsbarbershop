@@ -17,7 +17,7 @@ const PERIODOS: [string, string][] = [["semana", "Semanal"], ["quincena", "Quinc
 const EJEMPLO = 15000;
 
 /** Remuneración de un barbero, dentro del alta o la edición del usuario. */
-export function CamposFormaPago({ actual, conRenta = false }: { actual: FormaActual; conRenta?: boolean }) {
+export function CamposFormaPago({ actual, conRenta = true }: { actual: FormaActual; conRenta?: boolean }) {
   const [tipo, setTipo] = useState<TipoPago>(actual?.tipo ?? "porcentaje");
   const [pct, setPct] = useState(actual?.porcentaje ? String(actual.porcentaje / 100) : "40");
   const [fijo, setFijo] = useState(actual?.montoFijo ? String(actual.montoFijo / 100) : "");

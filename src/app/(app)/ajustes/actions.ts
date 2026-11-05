@@ -106,7 +106,6 @@ export async function darDeAlta(_: EstadoPersona, form: FormData): Promise<Estad
   const { extra, quitados } = ajustesDePermisos(s, form, puesto.base);
   const forma = leerForma(form, rol);
   if (typeof forma === "string") return { error: forma };
-  if (forma?.tipo === "renta") return { error: "Elige otra forma de pago." };
   const existentes = (await db.select({ u: schema.usuarios.usuario }).from(schema.usuarios)).map((x) => x.u);
   const usuario = sugerirUsuario(nombre, existentes);
   const clave = contrasenaTemporal(nombre);
@@ -163,7 +162,6 @@ export async function actualizarPersona(_: EstadoPersona, form: FormData): Promi
   const nombre = texto(form, "nombre", 80).replace(/\s+/g, " ") || u.nombre;
   const forma = leerForma(form, rol);
   if (typeof forma === "string") return { error: forma };
-  if (forma?.tipo === "renta") return { error: "Elige otra forma de pago." };
   const { extra, quitados } = ajustesDePermisos(s, form, puesto.base);
   const meta = leerPesos(texto(form, "meta")) ?? 0;
   const antes = permisosDe(u.rol, u.permisosExtra, u.permisosQuitados, pActual?.permisos ?? null);

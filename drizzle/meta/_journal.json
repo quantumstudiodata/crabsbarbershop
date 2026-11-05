@@ -85,6 +85,13 @@
       "when": 1793862057631,
       "tag": "0011_puestos_y_categorias",
       "breakpoints": true
+    },
+    {
+      "idx": 12,
+      "version": "7",
+      "when": 1793865907726,
+      "tag": "0012_descripcion_metodos",
+      "breakpoints": true
     }
   ]
 }

@@ -1,0 +1,1 @@
+ALTER TABLE "metodos_pago" ADD COLUMN "descripcion" text DEFAULT '' NOT NULL;

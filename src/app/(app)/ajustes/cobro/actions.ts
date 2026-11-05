@@ -10,7 +10,7 @@ import { texto, volver } from "@/lib/volver";
 
 const R = "/ajustes/cobro";
 
-export type EstadoAjuste = { ok?: boolean; error?: string; n?: number };
+export type EstadoAjuste = { ok?: boolean; error?: string; n?: number; id?: string };
 
 async function metodoDe(barberiaId: string, id: string) {
   const [m] = await db.select().from(schema.metodosPago).where(and(eq(schema.metodosPago.id, String(id)), eq(schema.metodosPago.barberiaId, barberiaId))).limit(1);
@@ -202,4 +202,25 @@ export async function alternarMetodoEgreso(metodo: string): Promise<EstadoAjuste
   await registrar(db, { barberiaId: s.barberia.id, usuarioId: s.usuario.id, tipo: "ajuste", accion: `${s.usuario.nombre} ${actual.includes(metodo) ? "apagó" : "encendió"} ${metodo} para egresos`, detalle: { antes: actual.join(", "), ahora: nuevo.join(", ") } });
   revalidatePath("/", "layout");
   return { ok: true, n: Date.now() };
+}
+
+/** Crear o editar una forma de pago (nombre y descripción opcional). */
+export async function guardarMetodo(d: { id?: string; nombre: string; descripcion?: string }): Promise<EstadoAjuste> {
+  const s = await requerirSesion("configuracion.cobros");
+  const nombre = String(d.nombre ?? "").trim().replace(/\s+/g, " ").slice(0, 40);
+  const descripcion = String(d.descripcion ?? "").trim().slice(0, 120);
+  if (nombre.length < 2) return { error: "Escribe el nombre de la forma de pago." };
+  if (d.id) {
+    const m = await metodoDe(s.barberia.id, d.id);
+    if (!m) return { error: "No se encontró esa forma de pago." };
+    // El nombre que quedó guardado en cada cobro no cambia: así el historial dice lo que se usó entonces.
+    await db.update(schema.metodosPago).set({ nombre, descripcion }).where(eq(schema.metodosPago.id, m.id));
+    if (m.nombre !== nombre) await registrar(db, { barberiaId: s.barberia.id, usuarioId: s.usuario.id, tipo: "ajuste", accion: `${s.usuario.nombre} cambió el nombre de la forma de pago ${m.nombre}`, detalle: { antes: m.nombre, ahora: nombre } });
+    revalidatePath("/", "layout");
+    return { ok: true, n: Date.now(), id: m.id };
+  }
+  const [m] = await db.insert(schema.metodosPago).values({ barberiaId: s.barberia.id, nombre, descripcion, esEfectivo: false, orden: 100 }).returning({ id: schema.metodosPago.id });
+  await registrar(db, { barberiaId: s.barberia.id, usuarioId: s.usuario.id, tipo: "ajuste", accion: `${s.usuario.nombre} agregó la forma de pago ${nombre}` });
+  revalidatePath("/", "layout");
+  return { ok: true, n: Date.now(), id: m.id };
 }

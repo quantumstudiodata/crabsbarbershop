@@ -127,6 +127,7 @@ export const metodosPago = pgTable("metodos_pago", {
   barberiaId: barberiaId(),
   nombre: text("nombre").notNull(),
   esEfectivo: boolean("es_efectivo").notNull().default(false),
+  descripcion: text("descripcion").notNull().default(""),
   activo: boolean("activo").notNull().default(true),
   orden: integer("orden").notNull().default(0),
 });

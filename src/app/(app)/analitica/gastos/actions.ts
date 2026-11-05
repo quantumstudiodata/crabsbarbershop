@@ -167,3 +167,25 @@ export async function eliminarCategoriaGasto(id: string): Promise<EstadoGasto> {
   revalidatePath("/", "layout");
   return listo(`${c.nombre} se eliminó.`);
 }
+
+/** Cambiar el nombre de una categoría de egresos. Los egresos y gastos frecuentes que la usan se mueven con ella. */
+export async function renombrarCategoriaGasto(id: string, nombre: string): Promise<EstadoGasto> {
+  const s = await requerirSesion();
+  if (!s.puede("configuracion.egresos")) return { error: "No tienes permiso para cambiar categorías." };
+  const limpio = String(nombre ?? "").trim().replace(/\s+/g, " ").slice(0, 40);
+  if (limpio.length < 2) return { error: "Escribe el nombre de la categoría." };
+  const bonito = limpio[0].toUpperCase() + limpio.slice(1);
+  const [c] = await db.select().from(schema.categoriasGasto).where(and(eq(schema.categoriasGasto.id, String(id)), eq(schema.categoriasGasto.barberiaId, s.barberia.id)));
+  if (!c) return { error: "No se encontró la categoría." };
+  if (c.nombre === bonito) return listo("Sin cambios.");
+  const [igual] = await db.select({ id: schema.categoriasGasto.id }).from(schema.categoriasGasto).where(and(eq(schema.categoriasGasto.barberiaId, s.barberia.id), sql`lower(${schema.categoriasGasto.nombre}) = lower(${bonito})`));
+  if (igual) return { error: "Ya hay una categoría con ese nombre." };
+  await db.transaction(async (tx) => {
+    await tx.update(schema.categoriasGasto).set({ nombre: bonito }).where(eq(schema.categoriasGasto.id, c.id));
+    // Solo cambia la etiqueta: los importes y fechas de cada egreso quedan igual.
+    await tx.update(schema.gastos).set({ categoria: bonito }).where(and(eq(schema.gastos.barberiaId, s.barberia.id), eq(schema.gastos.categoria, c.nombre)));
+    await tx.update(schema.conceptosFrecuentes).set({ categoria: bonito }).where(and(eq(schema.conceptosFrecuentes.barberiaId, s.barberia.id), eq(schema.conceptosFrecuentes.categoria, c.nombre)));
+    await registrar(tx, { barberiaId: s.barberia.id, usuarioId: s.usuario.id, tipo: "ajuste", accion: `${s.usuario.nombre} cambió el nombre de la categoría de egresos ${c.nombre}`, detalle: { antes: c.nombre, ahora: bonito } });
+  });
+  return listo(`La categoría ahora se llama ${bonito}.`);
+}

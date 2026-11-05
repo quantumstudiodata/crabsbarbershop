@@ -100,6 +100,7 @@ function Ficha({ p, props, cerrar, editar }: { p: Persona; props: Props; cerrar:
           {esBarbero(p.rol) && <div><small>Meta individual</small><span>{p.metaSemanal ? `${formatoDinero(p.metaSemanal)} a la semana` : "Se calcula sola"}</span></div>}
           <div><small>Permisos</small><span>{p.permisos.length} de {total(props.grupos)}</span></div>
         </div>
+        <span className="paso-t">Permisos</span>
         <EditorPermisos grupos={props.grupos} marcados={new Set(p.permisos)} descuentoLibre={props.descuentoLibre} soloLectura />
       </div>
       <div className="acciones">

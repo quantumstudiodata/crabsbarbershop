@@ -3,37 +3,18 @@
 import { useEffect, useRef, useState, useTransition } from "react";
 import { Ayuda } from "@/components/Ayuda";
 import { Fl, Icono } from "@/components/Icono";
+import { MenuPuntos } from "@/components/MenuPuntos";
 import { Interruptor, Modal, Selector } from "@/components/ui";
 import { formatoDinero } from "@/lib/money";
 import {
   alternarCategoria, alternarServicio, eliminarCategoria, eliminarServicio, guardarCategoria, guardarServicio,
-  ordenarCategorias, ordenarServicios, type Resultado,
+  ordenarCategorias, ordenarServicios, revisarCategoria, type Resultado,
 } from "./actions";
 
 type Servicio = { id: string; nombre: string; categoria: string; precio: number; duracionMin: number; activo: boolean; comision: number | null; descripcion: string };
 type Categoria = { id: string; nombre: string; descripcion: string; activo: boolean };
 type Borrador = { id?: string; nombre: string; categoria: string; precio: string; duracion: string; activo: boolean; comision: string; descripcion: string };
 
-function Menu({ etiqueta, items }: { etiqueta: string; items: { texto: string; icono: string; peligro?: boolean; hacer: () => void }[] }) {
-  const [abierto, setAbierto] = useState(false);
-  const caja = useRef<HTMLDivElement>(null);
-  useEffect(() => {
-    if (!abierto) return;
-    const fuera = (e: MouseEvent) => { if (!caja.current?.contains(e.target as Node)) setAbierto(false); };
-    document.addEventListener("mousedown", fuera);
-    return () => document.removeEventListener("mousedown", fuera);
-  }, [abierto]);
-  return (
-    <div ref={caja} style={{ position: "relative" }} onClick={(e) => e.stopPropagation()}>
-      <button type="button" className="icb" aria-label={etiqueta} aria-expanded={abierto} onClick={() => setAbierto((a) => !a)}>⋯</button>
-      {abierto && (
-        <div className="menu acciones-m" role="menu">
-          {items.map((x) => <button key={x.texto} type="button" role="menuitem" className={`it ${x.peligro ? "salir" : ""}`} onClick={() => { setAbierto(false); x.hacer(); }}><Icono n={x.icono as never} />{x.texto}</button>)}
-        </div>
-      )}
-    </div>
-  );
-}
 
 export function TablaServicios({ servicios: inicialS, categorias: inicialC, puedeEditar = true, nuevaCategoria }: {
   servicios: Servicio[]; categorias: Categoria[]; puedeEditar?: boolean; nuevaCategoria: number;
@@ -47,7 +28,7 @@ export function TablaServicios({ servicios: inicialS, categorias: inicialC, pued
   const [edit, setEdit] = useState<Borrador | null>(null);
   const [editCat, setEditCat] = useState<{ id?: string; nombre: string; descripcion: string } | null>(null);
   const [borrar, setBorrar] = useState<Servicio | null>(null);
-  const [borrarCat, setBorrarCat] = useState<Categoria | null>(null);
+  const [borrarCat, setBorrarCat] = useState<(Categoria & { conVentas: string[]; total: number }) | null>(null);
   const [destino, setDestino] = useState("");
   const [res, setRes] = useState<Resultado>({});
   const [arrastra, setArrastra] = useState<{ tipo: "s" | "c"; id: string } | null>(null);
@@ -107,10 +88,10 @@ export function TablaServicios({ servicios: inicialS, categorias: inicialC, pued
                 <span className="cat-t"><b>{c.nombre}</b>{c.descripcion && <small>{c.descripcion}</small>}</span>
                 {!c.activo && <span className="chip-e off"><i />Oculta en Cobro</span>}
                 <span className="muted cuenta-c">{lista.length} {lista.length === 1 ? "servicio" : "servicios"}</span>
-                {puedeEditar && <Menu etiqueta={`Opciones de ${c.nombre}`} items={[
+                {puedeEditar && <MenuPuntos etiqueta={`Opciones de ${c.nombre}`} items={[
                   { texto: "Editar categoría", icono: "editar", hacer: () => setEditCat({ id: c.id, nombre: c.nombre, descripcion: c.descripcion }) },
                   { texto: c.activo ? "Ocultar en Cobro" : "Mostrar en Cobro", icono: c.activo ? "ojoNo" : "ojo", hacer: () => correr(() => alternarCategoria(c.id), () => setCats(cats.map((x) => (x.id === c.id ? { ...x, activo: !x.activo } : x)))) },
-                  { texto: "Eliminar categoría", icono: "basura", peligro: true, hacer: () => { setBorrarCat(c); setDestino(cats.find((x) => x.id !== c.id)?.id ?? ""); } },
+                  { texto: "Eliminar categoría", icono: "basura", peligro: true, hacer: () => iniciar(async () => { const r = await revisarCategoria(c.id); if (r.error) { setRes({ error: r.error }); return; } setBorrarCat({ ...c, conVentas: r.conVentas, total: r.servicios }); setDestino(cats.find((x) => x.id !== c.id)?.id ?? ""); }) },
                 ]} />}
               </div>
               {abierta && (
@@ -125,7 +106,7 @@ export function TablaServicios({ servicios: inicialS, categorias: inicialC, pued
                       <span className="nom-s"><b>{s.nombre}</b>{s.descripcion && <small>{s.descripcion}</small>}{!s.activo && <small>Oculto en Cobro</small>}</span>
                       <span className="num">{formatoDinero(s.precio)}</span>
                       <span className="acts" hidden={!puedeEditar}>
-                        <Menu etiqueta={`Opciones de ${s.nombre}`} items={[
+                        <MenuPuntos etiqueta={`Opciones de ${s.nombre}`} items={[
                           { texto: "Editar servicio", icono: "editar", hacer: () => setEdit({ id: s.id, nombre: s.nombre, categoria: s.categoria, precio: String(s.precio / 100), duracion: s.duracionMin ? String(s.duracionMin) : "", activo: s.activo, comision: s.comision === null ? "" : String(s.comision / 100), descripcion: s.descripcion }) },
                           { texto: s.activo ? "Ocultar en Cobro" : "Mostrar en Cobro", icono: s.activo ? "ojoNo" : "ojo", hacer: () => correr(() => alternarServicio(s.id), () => setServicios(servicios.map((x) => (x.id === s.id ? { ...x, activo: !x.activo } : x)))) },
                           { texto: "Eliminar servicio", icono: "basura", peligro: true, hacer: () => setBorrar(s) },
@@ -175,7 +156,7 @@ export function TablaServicios({ servicios: inicialS, categorias: inicialC, pued
             <label className="campo"><span>Nombre del servicio</span><input className="input" value={edit.nombre} onChange={(e) => setEdit({ ...edit, nombre: e.target.value })} required autoFocus /></label>
             <label className="campo"><span>Precio</span><input className="input" inputMode="decimal" value={edit.precio} onChange={(e) => setEdit({ ...edit, precio: e.target.value })} placeholder="$0" required /></label>
             <label className="campo"><span>Descripción (opcional)</span><input className="input" value={edit.descripcion} onChange={(e) => setEdit({ ...edit, descripcion: e.target.value })} maxLength={160} /></label>
-            <div className="campo"><span>Categoría</span><span className="info-c">{edit.categoria}</span></div>
+            <div className="campo"><span>Categoría</span><Selector etiqueta="Categoría" valor={edit.categoria} onChange={(v) => setEdit({ ...edit, categoria: v })} opciones={cats.map((c) => ({ valor: c.nombre, texto: c.nombre }))} /></div>
             <div className="entre"><span>Activo en Cobro</span><Interruptor etiqueta="Activo en Cobro" checked={edit.activo} onChange={(v) => setEdit({ ...edit, activo: v })} /></div>
             <details className="revisar-p">
               <summary>Más opciones</summary>
@@ -193,25 +174,39 @@ export function TablaServicios({ servicios: inicialS, categorias: inicialC, pued
       )}
 
       {borrarCat && (() => {
-        const n = de(borrarCat.nombre).length;
+        const conVentas = borrarCat.conVentas;
+        const quitar = () => {
+          const a = cats.find((x) => x.id === destino)?.nombre ?? "";
+          setServicios(conVentas.length ? servicios.map((x) => (x.categoria === borrarCat.nombre ? { ...x, categoria: a } : x)) : servicios.filter((x) => x.categoria !== borrarCat.nombre));
+          setCats(cats.filter((x) => x.id !== borrarCat.id));
+          setBorrarCat(null);
+        };
         return (
           <Modal abierto cerrar={() => setBorrarCat(null)} etiqueta="Eliminar categoría" titulo={`¿Eliminar ${borrarCat.nombre}?`}>
-            {n === 0 ? <p className="muted">No tiene servicios. Se borra sin afectar nada.</p> : (
+            {conVentas.length === 0 ? (
               <>
-                <p className="muted">Tiene {n} {n === 1 ? "servicio" : "servicios"}. Antes de borrarla, pásalos a otra categoría o archívala. Las ventas pasadas no cambian.</p>
-                <div className="campo"><span>Pasar sus servicios a</span>
-                  <Selector etiqueta="Categoría" valor={destino} onChange={setDestino} opciones={cats.filter((x) => x.id !== borrarCat.id).map((x) => ({ valor: x.id, texto: x.nombre }))} /></div>
+                <p className="muted">{borrarCat.total ? `Sus ${borrarCat.total === 1 ? "servicio no tiene" : `${borrarCat.total} servicios no tienen`} ventas registradas, así que se eliminan con la categoría.` : "No tiene servicios. Se elimina sin afectar nada."}</p>
+                <div className="acciones"><button type="button" className="bt peligro" disabled={pendiente} onClick={() => correr(() => eliminarCategoria(borrarCat.id, ""), quitar)}>Sí, eliminar<Fl /></button></div>
+              </>
+            ) : (
+              <>
+                <p className="muted">Esta categoría tiene {conVentas.length} {conVentas.length === 1 ? "servicio" : "servicios"} con ventas registradas. ¿Qué deseas hacer?</p>
+                <div className="opcion-borrar">
+                  <b>Opción 1. Reasignar servicios y eliminar categoría</b>
+                  <small>Selecciona dónde quieres trasladar sus servicios.</small>
+                  <ul className="lista-mini">{de(borrarCat.nombre).map((x) => <li key={x.id}>{x.nombre}</li>)}</ul>
+                  <div className="campo"><span>Pasar sus servicios a</span>
+                    <Selector etiqueta="Categoría" valor={destino} onChange={setDestino} opciones={cats.filter((x) => x.id !== borrarCat.id).map((x) => ({ valor: x.id, texto: x.nombre }))} /></div>
+                  <button type="button" className="bt peligro chico" style={{ justifySelf: "start" }} disabled={pendiente || !destino} onClick={() => correr(() => eliminarCategoria(borrarCat.id, destino), quitar)}>Reasignar y eliminar</button>
+                </div>
+                <div className="opcion-borrar">
+                  <b>Opción 2. Archivar categoría</b>
+                  <small>La categoría y sus servicios dejarán de estar disponibles para nuevos cobros. El historial se conservará.</small>
+                  <button type="button" className="bt sec solo chico" style={{ justifySelf: "start" }} disabled={pendiente} onClick={() => correr(() => eliminarCategoria(borrarCat.id, null), () => { setCats(cats.map((x) => (x.id === borrarCat.id ? { ...x, activo: false } : x))); setServicios(servicios.map((x) => (x.categoria === borrarCat.nombre ? { ...x, activo: false } : x))); setBorrarCat(null); })}>Archivar categoría</button>
+                </div>
+                <p className="ayuda-txt">Las ventas anteriores conservarán sus datos originales.</p>
               </>
             )}
-            <div className="acciones">
-              {n > 0 && <button type="button" className="bt sec solo" disabled={pendiente} onClick={() => correr(() => eliminarCategoria(borrarCat.id, null), () => { setCats(cats.map((x) => (x.id === borrarCat.id ? { ...x, activo: false } : x))); setServicios(servicios.map((x) => (x.categoria === borrarCat.nombre ? { ...x, activo: false } : x))); setBorrarCat(null); })}>Archivar categoría</button>}
-              <button type="button" className="bt peligro" disabled={pendiente || (n > 0 && !destino)} onClick={() => correr(() => eliminarCategoria(borrarCat.id, n ? destino : ""), () => {
-                const a = cats.find((x) => x.id === destino)?.nombre ?? "";
-                setServicios(servicios.map((x) => (x.categoria === borrarCat.nombre ? { ...x, categoria: a } : x)));
-                setCats(cats.filter((x) => x.id !== borrarCat.id));
-                setBorrarCat(null);
-              })}>{n ? "Pasar y eliminar" : "Sí, eliminar"}<Fl /></button>
-            </div>
           </Modal>
         );
       })()}

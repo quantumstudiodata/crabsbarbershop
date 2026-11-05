@@ -1246,7 +1246,6 @@ button.paso-v:hover { background: rgba(255,255,255,.8); }
 }
 /* El menú de acciones queda por encima de las tarjetas siguientes */
 .cat-s { position: relative; }
-.cat-s:has([aria-expanded="true"]), .glass:has(> * [aria-expanded="true"].icb) { z-index: 30; overflow: visible; }
 /* Meta del día en Inicio: bloque a todo el ancho */
 .datos > .meta-hoy { display: grid; gap: 10px; justify-content: stretch; }
 .meta-hoy > .entre > span { font-size: 15px; }
@@ -1395,7 +1394,8 @@ button.paso-v:hover { background: rgba(255,255,255,.8); }
 .cuerpo-cfg { display: grid; gap: 14px; padding: 0 22px 20px; animation: subir .3s ease both; }
 .resumen-cfg > div { padding: 10px 0; }
 .resumen-cfg b { font-size: 14px !important; font-weight: 600; text-align: right; white-space: normal !important; }
-.sub-cfg { display: grid; gap: 12px; padding: 16px; border-radius: 16px; background: rgba(255,255,255,.55); border: 1px solid rgba(255,255,255,.9); }
+.sub-cfg { display: grid; gap: 10px; padding: 16px 0 4px; border-top: 1px solid var(--line); }
+.sub-cfg:first-child { border-top: 0; padding-top: 0; }
 .sub-cfg > span, .sub-cfg > .entre > span { display: grid; gap: 2px; }
 .sub-cfg b { font-weight: 600; font-size: 14.5px; }
 .sub-cfg small { color: var(--muted); font-size: 12.5px; }
@@ -1411,3 +1411,42 @@ button.paso-v:hover { background: rgba(255,255,255,.8); }
 .ajuste-f > span { display: grid; gap: 2px; }
 .metodos-eg { display: grid; grid-template-columns: repeat(auto-fit, minmax(150px, 1fr)); gap: 8px; }
 .metodos-eg label { padding: 8px 12px; border-radius: 12px; background: rgba(43,58,71,.05); font-size: 14px; }
+.menu-p { position: relative; }
+/* Mientras un menú de tres puntos está abierto, su tarjeta queda por encima de las siguientes. */
+.glass:has(.icb.puntos[aria-expanded="true"]), .cat-s:has(.icb.puntos[aria-expanded="true"]), .svc-f:has(.icb.puntos[aria-expanded="true"]) { position: relative; z-index: 40; overflow: visible; }
+.glass:has(.icb[aria-haspopup="menu"][aria-expanded="true"]) { position: relative; z-index: 40; overflow: visible; }
+.chip-p { flex: none; display: inline-flex; align-items: center; padding: 3px 9px; border-radius: 999px; font-size: 11.5px; font-weight: 500; line-height: 1.4; white-space: nowrap; background: rgba(43,58,71,.06); color: var(--faint); transition: background .2s, color .2s; }
+.chip-p.si { background: rgba(43,58,71,.12); color: #2b3a47; }
+.perm-l { gap: 12px; align-items: center; }
+.lista-pu { display: grid; }
+.lista-pu > div { display: grid; grid-template-columns: minmax(0, 1fr) auto auto 34px; gap: 12px; align-items: center; padding: 12px 6px; border-top: 1px solid var(--line); cursor: pointer; border-radius: 10px; transition: background .15s; }
+.lista-pu > div:first-child { border-top: 0; }
+.lista-pu > div:hover { background: rgba(255,255,255,.6); }
+.lista-pu > div > span:first-child { display: grid; gap: 2px; min-width: 0; }
+.lista-pu small { font-size: 12.5px; color: var(--muted); }
+.lista-pu .inactivo { opacity: .6; }
+.opcion-borrar { display: grid; gap: 8px; padding: 14px 0; border-top: 1px solid var(--line); }
+.opcion-borrar small { color: var(--muted); font-size: 12.5px; }
+.lista-mini { margin: 0; padding-left: 18px; font-size: 13.5px; color: #2b3a47; display: grid; gap: 2px; }
+
+/* Listas de configuración: filas planas, acciones en menú */
+.lista-cfg { display: grid; }
+.lista-cfg > div, .lista-cfg > label { display: grid; grid-template-columns: minmax(0, 1fr) auto auto; gap: 12px; align-items: center; padding: 11px 4px; border-top: 1px solid var(--line); transition: opacity .25s, background .15s; border-radius: 8px; }
+.lista-cfg > :first-child { border-top: 0; }
+.lista-cfg > div:hover, .lista-cfg > label:hover { background: rgba(255,255,255,.45); }
+.lista-cfg > * > span:first-child { display: grid; gap: 2px; min-width: 0; }
+.lista-cfg b { font-weight: 600; font-size: 14px; }
+.lista-cfg small { font-size: 12.5px; color: var(--muted); }
+.lista-cfg .apagada > span:first-child b { color: var(--faint); }
+.lista-cfg .titulo-l { grid-template-columns: 1fr; padding-bottom: 4px; }
+.lista-cfg .sangria { padding-left: 18px; border-top-style: dashed; }
+.lista-cfg .sangria b { font-weight: 500; }
+.vacio-cfg { display: flex; justify-content: space-between; align-items: center; gap: 12px; flex-wrap: wrap; padding: 12px 14px; border-radius: 14px; border: 1px dashed rgba(43,58,71,.2); }
+.vacio-cfg > span { display: grid; gap: 2px; }
+.vacio-cfg b { font-size: 13.5px; font-weight: 600; }
+.confirma { display: inline-flex; align-items: center; gap: 6px; margin: 0; font-size: 13px; color: #2b3a47; animation: confirma 2.6s ease both; }
+.confirma svg, .confirma .ic { width: 14px; height: 14px; }
+@keyframes confirma { 0% { opacity: 0; transform: translateY(4px); } 12%, 75% { opacity: 1; transform: none; } 100% { opacity: 0; } }
+.barra-guardar { position: sticky; bottom: 0; z-index: 5; display: flex; justify-content: space-between; align-items: center; gap: 12px; padding: 10px 12px 10px 16px; border-radius: 14px; background: #141a20; color: #e8edf1; font-size: 13.5px; box-shadow: 0 14px 30px -16px rgba(20,35,50,.7); animation: subir .25s ease both; }
+.barra-guardar .bt { background: #fff; color: #141a20; }
+.vista-a { animation: aparecer .25s ease both; }

@@ -1,7 +1,8 @@
 "use client";
 
 import { useActionState, useEffect, useState, useTransition } from "react";
-import { alternarCategoria, crearCategoria, eliminarCategoriaGasto, type EstadoGasto } from "@/app/(app)/analitica/gastos/actions";
+import { alternarCategoria, crearCategoria, eliminarCategoriaGasto, renombrarCategoriaGasto, type EstadoGasto } from "@/app/(app)/analitica/gastos/actions";
+import { MenuPuntos } from "@/components/MenuPuntos";
 import { Fl, Icono } from "@/components/Icono";
 import { Interruptor, Modal, Selector } from "@/components/ui";
 import { formatoDinero } from "@/lib/money";
@@ -45,23 +46,29 @@ export function CategoriasEgresos({ categorias, puede }: { categorias: Categoria
   const [pendiente, iniciar] = useTransition();
   const [aviso, setAviso] = useState<EstadoGasto>({});
   const [nueva, setNueva] = useState(false);
+  const [renombrar, setRenombrar] = useState<{ c: Categoria; nombre: string } | null>(null);
   const [borrar, setBorrar] = useState<Categoria | null>(null);
   useEffect(() => { if (e.ok) { setNueva(false); setAviso(e); } }, [e.ok, e.n, e]);
+  const hacer = (f: () => Promise<EstadoGasto>, despues?: () => void) => iniciar(async () => { const r = await f(); setAviso(r); if (!r.error) despues?.(); });
   return (
-    <div className="sub-cfg">
-      <div className="entre"><span><b>Categorías de egresos</b><small>Toca una para archivarla o volver a usarla. Archivar no cambia los egresos que ya la usan.</small></span>
+    <section className="sub-cfg">
+      <div className="entre"><span><b>Categorías de egresos</b><small>Archivar una categoría no cambia los egresos que ya la usan.</small></span>
         {puede && <button type="button" className="bt sec solo chico" onClick={() => setNueva(true)}><Icono n="mas" />Agregar categoría</button>}</div>
-      <div className="chips-cat">
+      <div className="lista-cfg">
         {categorias.map((c) => (
-          <span key={c.id} className={`chip-cat ${c.activo ? "on" : ""}`}>
-            <button type="button" disabled={pendiente || !puede} aria-pressed={c.activo} title={c.activo ? "Archivar" : "Volver a usar"}
-              onClick={() => iniciar(async () => setAviso(await alternarCategoria(c.id)))}><Icono n={c.activo ? "palomita" : "cerrar"} />{c.nombre}</button>
-            {puede && <button type="button" className="x-cat" aria-label={`Eliminar ${c.nombre}`} title="Eliminar" onClick={() => setBorrar(c)}><Icono n="basura" /></button>}
-          </span>
+          <div key={c.id} className={c.activo ? "" : "apagada"}>
+            <span><b>{c.nombre}</b></span>
+            <span className={`chip-p ${c.activo ? "si" : ""}`}>{c.activo ? "En uso" : "Archivada"}</span>
+            {puede ? <MenuPuntos etiqueta={`Opciones de ${c.nombre}`} items={[
+              { texto: "Editar nombre", icono: "editar", hacer: () => setRenombrar({ c, nombre: c.nombre }) },
+              { texto: c.activo ? "Archivar" : "Volver a usar", icono: c.activo ? "archivo" : "palomita", hacer: () => hacer(() => alternarCategoria(c.id)) },
+              { texto: "Eliminar", icono: "basura", peligro: true, hacer: () => setBorrar(c) },
+            ]} /> : <span />}
+          </div>
         ))}
       </div>
       {aviso.error && <p className="aviso error" style={{ margin: 0 }}>{aviso.error}</p>}
-      {aviso.mensaje && !aviso.error && <p className="aviso ok" style={{ margin: 0 }}>{aviso.mensaje}</p>}
+      {aviso.mensaje && !aviso.error && <p className="confirma" key={aviso.n}><Icono n="palomita" />{aviso.mensaje}</p>}
       {nueva && (
         <Modal abierto cerrar={() => setNueva(false)} etiqueta="Egresos" titulo="Agregar categoría">
           <form action={accion} className="pila">
@@ -71,15 +78,24 @@ export function CategoriasEgresos({ categorias, puede }: { categorias: Categoria
           </form>
         </Modal>
       )}
+      {renombrar && (
+        <Modal abierto cerrar={() => setRenombrar(null)} etiqueta="Egresos" titulo="Editar categoría">
+          <form className="pila" onSubmit={(x) => { x.preventDefault(); hacer(() => renombrarCategoriaGasto(renombrar.c.id, renombrar.nombre), () => setRenombrar(null)); }}>
+            <label className="campo"><span>Nombre de la categoría</span><input className="input" value={renombrar.nombre} onChange={(x) => setRenombrar({ ...renombrar, nombre: x.target.value })} maxLength={40} required autoFocus /></label>
+            <p className="ayuda-txt">Los egresos que ya la usan se mueven con el nombre nuevo. Sus importes y fechas no cambian.</p>
+            <div className="acciones"><button className="bt" disabled={pendiente}>{pendiente ? "Guardando…" : "Guardar"}<Fl /></button></div>
+          </form>
+        </Modal>
+      )}
       {borrar && (
         <Modal abierto cerrar={() => setBorrar(null)} etiqueta="Egresos" titulo={`¿Eliminar ${borrar.nombre}?`}>
           <p className="muted">Solo se puede eliminar si nunca se usó. Si ya tiene egresos, archívala para conservar el historial.</p>
           <div className="acciones">
-            <button type="button" className="bt peligro" disabled={pendiente} onClick={() => iniciar(async () => { setAviso(await eliminarCategoriaGasto(borrar.id)); setBorrar(null); })}>Sí, eliminar<Fl /></button>
+            <button type="button" className="bt peligro" disabled={pendiente} onClick={() => hacer(() => eliminarCategoriaGasto(borrar.id), () => setBorrar(null))}>Sí, eliminar<Fl /></button>
           </div>
         </Modal>
       )}
-    </div>
+    </section>
   );
 }
 
@@ -117,19 +133,24 @@ export function GastosFrecuentes({ gastos, categorias, metodos, puede }: { gasto
   const [borrar, setBorrar] = useState<Gasto | null>(null);
   const [pendiente, iniciar] = useTransition();
   return (
-    <div className="sub-cfg">
-      <div className="entre"><span><b>Gastos frecuentes</b><small>Guarda los gastos habituales de tu negocio para registrarlos más rápidamente cuando vuelvan a ocurrir.</small></span>
-        {puede && <button type="button" className="bt sec solo chico" onClick={() => setForm({ g: null })}><Icono n="mas" />Agregar gasto frecuente</button>}</div>
-      {gastos.length === 0 ? <p className="muted" style={{ margin: 0 }}>Todavía no hay gastos frecuentes.</p> : (
-        <div className="lista-cf">
+    <section className="sub-cfg">
+      <div className="entre"><span><b>Gastos frecuentes</b><small>Guarda gastos que registras habitualmente para no tener que llenar los mismos datos cada vez.</small></span>
+        {puede && gastos.length > 0 && <button type="button" className="bt sec solo chico" onClick={() => setForm({ g: null })}><Icono n="mas" />Crear gasto frecuente</button>}</div>
+      {gastos.length === 0 ? (
+        <div className="vacio-cfg">
+          <span><b>Todavía no tienes gastos frecuentes</b><small>Puedes crear uno cuando quieras.</small></span>
+          {puede && <button type="button" className="bt sec solo chico" onClick={() => setForm({ g: null })}><Icono n="mas" />Crear gasto frecuente</button>}
+        </div>
+      ) : (
+        <div className="lista-cfg">
           {gastos.map((g) => (
             <div key={g.id}>
               <span><b>{g.concepto}</b><small>{[g.categoria, PERIODOS.find(([k]) => k === g.periodicidad && k)?.[1].toLowerCase(), METODOS.find(([k]) => k === g.metodo)?.[1].toLowerCase()].filter(Boolean).join(", ")}</small></span>
               <b className="num">{g.monto ? formatoDinero(g.monto) : ""}</b>
-              {puede && <span className="fila" style={{ gap: 4 }}>
-                <button type="button" className="icb" onClick={() => setForm({ g })} aria-label={`Editar ${g.concepto}`} title="Editar"><Icono n="editar" /></button>
-                <button type="button" className="icb" onClick={() => setBorrar(g)} aria-label={`Eliminar ${g.concepto}`} title="Eliminar"><Icono n="basura" /></button>
-              </span>}
+              {puede ? <MenuPuntos etiqueta={`Opciones de ${g.concepto}`} items={[
+                { texto: "Editar", icono: "editar", hacer: () => setForm({ g }) },
+                { texto: "Eliminar", icono: "basura", peligro: true, hacer: () => setBorrar(g) },
+              ]} /> : <span />}
             </div>
           ))}
         </div>
@@ -141,39 +162,42 @@ export function GastosFrecuentes({ gastos, categorias, metodos, puede }: { gasto
           <div className="acciones"><button type="button" className="bt peligro" disabled={pendiente} onClick={() => iniciar(async () => { await quitarConcepto(borrar.id); setBorrar(null); })}>Sí, eliminar<Fl /></button></div>
         </Modal>
       )}
-    </div>
+    </section>
   );
 }
 
-/** Formas de pago de egresos y funciones opcionales al registrar un egreso. */
+/** Qué información y opciones hay al registrar un egreso, como una lista de configuración. */
 export function OpcionesRegistro({ metodos, comprobantes, periodicidad, puede }: { metodos: string[]; comprobantes: boolean; periodicidad: boolean; puede: boolean }) {
   const [pendiente, iniciar] = useTransition();
   const [error, setError] = useState<string | null>(null);
-  const opciones: [string, string, string, boolean][] = [
-    ["comprobantes", "Registro de comprobantes", "Permite adjuntar fotografías o archivos a cada egreso.", comprobantes],
-    ["periodicidad", "Periodicidad de gastos", "Permite marcar cada egreso como semanal, quincenal o mensual.", periodicidad],
+  const [mets, setMets] = useState(metodos);
+  const [fun, setFun] = useState({ comprobantes, periodicidad });
+  const opciones: ["comprobantes" | "periodicidad", string, string][] = [
+    ["comprobantes", "Comprobantes", "Adjuntar fotografías o archivos a los egresos."],
+    ["periodicidad", "Periodicidad de gastos", "Registrar gastos semanales, quincenales o mensuales."],
   ];
   return (
-    <div className="sub-cfg">
-      <span><b>Opciones de registro</b><small>Apagar una opción solo la esconde. Lo que ya se registró se conserva.</small></span>
-      <div className="opc-reg">
-        <div className="ajuste-f">
-          <span><b>Métodos de pago de egresos</b><small>Solo el efectivo que sale de la caja afecta el corte de caja.</small></span>
-          <div className="metodos-eg">
-            {METODOS.map(([k, t]) => (
-              <label key={k} className="entre"><span>{t}</span><Interruptor etiqueta={`${t} para egresos`} checked={metodos.includes(k)} disabled={!puede || pendiente}
-                onChange={() => iniciar(async () => { const r = await alternarMetodoEgreso(k); setError(r.error ?? null); })} /></label>
-            ))}
-          </div>
-        </div>
-        {opciones.map(([k, t, d, v]) => (
-          <label key={k} className="ajuste-f entre">
+    <section className="sub-cfg">
+      <span><b>Opciones de registro</b><small>Configura qué información y opciones estarán disponibles al registrar egresos.</small></span>
+      <div className="lista-cfg">
+        <div className="titulo-l"><span><b>Métodos de pago</b><small>Solo el efectivo que sale de la caja afecta el corte.</small></span></div>
+        {METODOS.map(([k, t]) => (
+          <label key={k} className={`sangria ${mets.includes(k) ? "" : "apagada"}`}>
+            <span><b>{t}</b></span>
+            <span className={`chip-p ${mets.includes(k) ? "si" : ""}`}>{mets.includes(k) ? "Activo" : "Apagado"}</span>
+            <Interruptor etiqueta={`${t} para egresos`} checked={mets.includes(k)} disabled={!puede || pendiente}
+              onChange={() => iniciar(async () => { const r = await alternarMetodoEgreso(k); setError(r.error ?? null); if (!r.error) setMets(mets.includes(k) ? mets.filter((x) => x !== k) : [...mets, k]); })} />
+          </label>
+        ))}
+        {opciones.map(([k, t, d]) => (
+          <label key={k} className={fun[k] ? "" : "apagada"}>
             <span><b>{t}</b><small>{d}</small></span>
-            <Interruptor etiqueta={t} checked={v} disabled={!puede || pendiente} onChange={() => iniciar(async () => { await alternarFuncion(k); })} />
+            <span className={`chip-p ${fun[k] ? "si" : ""}`}>{fun[k] ? "Activo" : "Apagado"}</span>
+            <Interruptor etiqueta={t} checked={fun[k]} disabled={!puede || pendiente} onChange={() => iniciar(async () => { setFun({ ...fun, [k]: !fun[k] }); await alternarFuncion(k); })} />
           </label>
         ))}
       </div>
       {error && <p className="aviso error" style={{ margin: 0 }}>{error}</p>}
-    </div>
+    </section>
   );
 }

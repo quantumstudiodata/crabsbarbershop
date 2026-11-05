@@ -1,6 +1,5 @@
 import { and, asc, eq } from "drizzle-orm";
 import { AvisoUrl } from "@/components/Encabezado";
-import { Icono } from "@/components/Icono";
 import { requerirSesion } from "@/lib/auth";
 import { categoriasGasto, datosParaMeta } from "@/lib/datos";
 import { db, schema } from "@/lib/db";
@@ -8,7 +7,6 @@ import { fechaLocal } from "@/lib/fechas";
 import { formatoDinero } from "@/lib/money";
 import { NOMBRE_ROL, PERMISOS_CONFIG, permisosDe } from "@/lib/permisos";
 import { redirect } from "next/navigation";
-import { agregarMetodo } from "./actions";
 import { Funciones } from "./Funciones";
 import { Metodos } from "./Metodos";
 import { CajaAjustes, MetaMensual, ReglasCobro } from "./Reglas";
@@ -50,11 +48,7 @@ export default async function ConfigurarNegocio({ searchParams }: { searchParams
           ["Descuento sin autorización", `Hasta ${b.limiteDescuentoPct}%`],
           ["Descuentos", si(b.usaDescuentos)], ["Propinas", si(b.usaPropinas)], ["Dividir pago", si(b.usaDividirPago)],
         ]} />}>
-        <Metodos metodos={metodos.map(({ id, nombre, esEfectivo, activo }) => ({ id, nombre, esEfectivo, activo }))} />
-        <form action={agregarMetodo} className="fila" style={{ marginTop: 4 }}>
-          <input className="input" name="nombre" placeholder="Otro método de pago, por ejemplo: Vales" style={{ flex: "1 1 220px" }} required aria-label="Nuevo método de pago" />
-          <button className="bt sec solo"><Icono n="mas" />Agregar</button>
-        </form>
+        <Metodos metodos={metodos.map(({ id, nombre, descripcion, esEfectivo, activo }) => ({ id, nombre, descripcion, esEfectivo, activo }))} />
         <ReglasCobro descuento={b.limiteDescuentoPct} autorizan={autorizan} funciones={[
           { clave: "descuentos", nombre: "Descuentos", activa: b.usaDescuentos, encendida: "Aparecen al cobrar.", apagada: "No aparecen al cobrar." },
           { clave: "propinas", nombre: "Propinas", activa: b.usaPropinas, encendida: "Aparecen al cobrar.", apagada: "No aparecen al cobrar." },

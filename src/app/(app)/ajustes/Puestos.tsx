@@ -2,32 +2,13 @@
 
 import { useActionState, useEffect, useRef, useState, useTransition } from "react";
 import { Fl, Icono } from "@/components/Icono";
+import { MenuPuntos } from "@/components/MenuPuntos";
 import { Modal } from "@/components/ui";
 import { alternarPuesto, eliminarPuesto, guardarPuesto, type EstadoPuesto } from "./puestos";
 import { EditorPermisos, type GrupoPermisos, type OpcionPuesto } from "./Permisos";
 
 export type PuestoNegocio = OpcionPuesto & { id: string; activo: boolean; base: string; usuarios: number };
 
-function Menu({ items }: { items: { texto: string; icono: string; peligro?: boolean; hacer: () => void }[] }) {
-  const [abierto, setAbierto] = useState(false);
-  const caja = useRef<HTMLDivElement>(null);
-  useEffect(() => {
-    if (!abierto) return;
-    const fuera = (e: MouseEvent) => { if (!caja.current?.contains(e.target as Node)) setAbierto(false); };
-    document.addEventListener("mousedown", fuera);
-    return () => document.removeEventListener("mousedown", fuera);
-  }, [abierto]);
-  return (
-    <div ref={caja} style={{ position: "relative" }}>
-      <button type="button" className="icb" aria-label="Opciones del puesto" aria-expanded={abierto} onClick={() => setAbierto((a) => !a)}>⋯</button>
-      {abierto && (
-        <div className="menu acciones-m" role="menu">
-          {items.map((x) => <button key={x.texto} type="button" role="menuitem" className={`it ${x.peligro ? "salir" : ""}`} onClick={() => { setAbierto(false); x.hacer(); }}><Icono n={x.icono as never} />{x.texto}</button>)}
-        </div>
-      )}
-    </div>
-  );
-}
 
 /** Crear o editar un puesto: nombre, descripción, plantilla de partida y permisos. */
 function FormPuesto({ puesto, plantillas, grupos, descuentoLibre, cerrar, listo }: {
@@ -77,7 +58,8 @@ export function Puestos({ plantillas, puestos, grupos, descuentoLibre, puedeEdit
   const [escrito, setEscrito] = useState("");
   const [aviso, setAviso] = useState<EstadoPuesto>({});
   const [pendiente, iniciar] = useTransition();
-  useEffect(() => { if (nuevo > 0) setForm({ p: null }); }, [nuevo]);
+  const [lista, setLista] = useState(false);
+  useEffect(() => { if (nuevo > 0) setLista(true); }, [nuevo]);
   const total = grupos.reduce((a, g) => a + g.permisos.length, 0);
   const ejecutar = (f: () => Promise<EstadoPuesto>) => iniciar(async () => {
     const r = await f();
@@ -87,36 +69,40 @@ export function Puestos({ plantillas, puestos, grupos, descuentoLibre, puedeEdit
   });
 
   return (
-    <section className="puestos-s subir d1">
-      <div className="entre"><span className="lab">Puestos</span><small className="muted">Las plantillas son el punto de partida; los puestos del negocio guardan sus propios permisos.</small></div>
+    <>
       {aviso.error && <p className="aviso error">{aviso.error}</p>}
       {aviso.mensaje && <p className="aviso ok">{aviso.mensaje}</p>}
-      <div className="puestos-l">
-        {plantillas.map((p) => (
-          <button key={p.valor} type="button" className="glass puesto-c" onClick={() => setVer(p)}>
-            <span className="entre"><b>{p.texto}</b><span className="pill">Plantilla</span></span>
-            <small>{p.detalle}</small>
-            <small className="muted">{p.permisos.length} de {total} permisos</small>
-          </button>
-        ))}
-        {puestos.map((p) => (
-          <div key={p.id} className={`glass puesto-c ${p.activo ? "" : "inactivo"}`} role="button" tabIndex={0} onClick={(e) => { if (!(e.target as HTMLElement).closest(".acts")) setVer(p); }} onKeyDown={(e) => { if (e.key === "Enter" && e.target === e.currentTarget) setVer(p); }}>
-            <span className="entre"><b>{p.texto}</b>
-              <span className="acts fila" style={{ gap: 6 }}>
-                {!p.activo && <span className="chip-e off"><i />Desactivado</span>}
-                {puedeEditar && p.asignable !== undefined && <Menu items={[
+      {lista && !form && !ver && !borrar && (
+        <Modal abierto cerrar={() => setLista(false)} etiqueta="Usuarios" titulo="Puestos" ancho>
+          <div className="entre" style={{ gap: 12 }}>
+            <p className="muted" style={{ margin: 0 }}>Las plantillas son el punto de partida. Los puestos del negocio guardan sus propios permisos.</p>
+            {puedeEditar && <button type="button" className="bt chico" onClick={() => setForm({ p: null })}><Icono n="mas" />Crear puesto</button>}
+          </div>
+          <div className="lista-pu">
+            {plantillas.map((p) => (
+              <div key={p.valor} role="button" tabIndex={0} onClick={() => setVer(p)} onKeyDown={(e) => { if (e.key === "Enter") setVer(p); }}>
+                <span><b>{p.texto}</b><small>{p.detalle}</small></span>
+                <span className="chip-p">Plantilla</span>
+                <small className="muted">{p.permisos.length} de {total}</small>
+                <span className="flecha-c" aria-hidden="true">›</span>
+              </div>
+            ))}
+            {puestos.map((p) => (
+              <div key={p.id} className={p.activo ? "" : "inactivo"} role="button" tabIndex={0} onClick={() => setVer(p)} onKeyDown={(e) => { if (e.key === "Enter" && e.target === e.currentTarget) setVer(p); }}>
+                <span><b>{p.texto}</b><small>{p.detalle || `Parte de ${p.base}`}, {p.usuarios} {p.usuarios === 1 ? "usuario" : "usuarios"}</small></span>
+                <span className={`chip-p ${p.activo ? "si" : ""}`}>{p.activo ? "Activo" : "Desactivado"}</span>
+                <small className="muted">{p.permisos.length} de {total}</small>
+                {puedeEditar ? <MenuPuntos etiqueta={`Opciones de ${p.texto}`} items={[
                   { texto: "Editar puesto", icono: "editar", hacer: () => setForm({ p }) },
-                  { texto: "Ver permisos", icono: "ojo", hacer: () => setVer(p) },
                   { texto: p.activo ? "Desactivar" : "Reactivar", icono: p.activo ? "candado" : "palomita", hacer: () => ejecutar(() => alternarPuesto(p.id)) },
                   { texto: "Eliminar puesto", icono: "basura", peligro: true, hacer: () => setBorrar({ p, paso: "confirmar" }) },
-                ]} />}
-              </span>
-            </span>
-            <small>{p.detalle || `Parte de ${p.base}`}</small>
-            <small className="muted">{p.permisos.length} de {total} permisos, {p.usuarios} {p.usuarios === 1 ? "usuario" : "usuarios"}</small>
+                ]} /> : <span />}
+              </div>
+            ))}
           </div>
-        ))}
-      </div>
+          {aviso.mensaje && <p className="aviso ok" style={{ margin: 0 }}>{aviso.mensaje}</p>}
+        </Modal>
+      )}
 
       {form && <FormPuesto puesto={form.p} plantillas={plantillas} grupos={grupos} descuentoLibre={descuentoLibre} cerrar={() => setForm(null)} listo={(m) => { setForm(null); setAviso({ ok: true, mensaje: m }); }} />}
       {ver && (
@@ -150,6 +136,6 @@ export function Puestos({ plantillas, puestos, grupos, descuentoLibre, puedeEdit
           </div>
         </Modal>
       )}
-    </section>
+    </>
   );
 }
