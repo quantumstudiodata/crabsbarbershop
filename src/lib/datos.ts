@@ -248,12 +248,16 @@ export async function resumenPeriodo(barberiaId: string, desde: string, hasta: s
   };
 }
 
+/** Servicios visibles en Cobro: en el orden de su categoría y sin los de categorías ocultas. */
 export async function serviciosActivos(barberiaId: string) {
-  return db
-    .select()
+  const c = s.categoriasServicio;
+  const filas = await db
+    .select({ x: s.servicios, orden: c.orden, visible: c.activo })
     .from(s.servicios)
+    .leftJoin(c, and(eq(c.barberiaId, s.servicios.barberiaId), eq(c.nombre, s.servicios.categoria)))
     .where(and(eq(s.servicios.barberiaId, barberiaId), eq(s.servicios.activo, true)))
-    .orderBy(asc(s.servicios.orden), asc(s.servicios.nombre));
+    .orderBy(asc(sql`coalesce(${c.orden}, 100000)`), asc(s.servicios.orden), asc(s.servicios.nombre));
+  return filas.filter((f) => f.visible !== false).map((f) => f.x);
 }
 
 export async function metodosActivos(barberiaId: string) {

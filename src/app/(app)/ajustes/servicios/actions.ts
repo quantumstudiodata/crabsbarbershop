@@ -1,13 +1,13 @@
 "use server";
 
-import { and, eq, sql } from "drizzle-orm";
+import { and, eq, inArray, sql } from "drizzle-orm";
 import { revalidatePath } from "next/cache";
 import { requerirSesion } from "@/lib/auth";
 import { db, schema } from "@/lib/db";
 import { registrar } from "@/lib/historial";
 import { formatoDinero, leerPesos } from "@/lib/money";
 
-export type Resultado = { error?: string; mensaje?: string };
+export type Resultado = { error?: string; mensaje?: string; id?: string };
 const R = "/ajustes/servicios";
 
 async function servicioDe(barberiaId: string, id: string) {
@@ -15,7 +15,7 @@ async function servicioDe(barberiaId: string, id: string) {
   return x ?? null;
 }
 
-export async function guardarServicio(d: { id?: string; nombre: string; categoria: string; precio: string; duracion: string; activo?: boolean; comision?: string }): Promise<Resultado> {
+export async function guardarServicio(d: { id?: string; nombre: string; categoria: string; precio: string; duracion: string; activo?: boolean; comision?: string; descripcion?: string }): Promise<Resultado> {
   const s = await requerirSesion("servicios.editar");
   const nombre = String(d.nombre ?? "").trim().slice(0, 60);
   const categoria = String(d.categoria ?? "").trim().slice(0, 40) || "Cortes";
@@ -28,11 +28,13 @@ export async function guardarServicio(d: { id?: string; nombre: string; categori
   if (!Number.isInteger(duracion) || duracion < 0 || duracion > 480) return { error: "La duración va de 0 a 480 minutos." };
   if (comision !== null && (!Number.isFinite(comision) || comision < 0 || comision > 10000)) return { error: "La comisión va de 0 a 100%." };
   const activo = d.activo ?? true;
+  const descripcion = String(d.descripcion ?? "").trim().slice(0, 160);
+  await asegurarCategoria(s.barberia.id, categoria);
   if (d.id) {
     const actual = await servicioDe(s.barberia.id, d.id);
     if (!actual) return { error: "No se encontró el servicio." };
     await db.transaction(async (tx) => {
-      await tx.update(schema.servicios).set({ nombre, categoria, precio, duracionMin: duracion, activo, comision }).where(eq(schema.servicios.id, actual.id));
+      await tx.update(schema.servicios).set({ nombre, categoria, precio, duracionMin: duracion, activo, comision, descripcion }).where(eq(schema.servicios.id, actual.id));
       const pct = (c: number | null) => (c === null ? "la de cada barbero" : `${c / 100}%`);
       const desc = (n: string, c: string, p: number, du: number, a: boolean, co: number | null) => `${n}, ${c}, ${formatoDinero(p)}, ${du ? `${du} min` : "sin duración"}, ${a ? "visible" : "oculto"}, comisión ${pct(co)}`;
       const antes = desc(actual.nombre, actual.categoria, actual.precio, actual.duracionMin, actual.activo, actual.comision);
@@ -42,10 +44,14 @@ export async function guardarServicio(d: { id?: string; nombre: string; categori
         if (actual.precio === precio) await registrar(tx, { barberiaId: s.barberia.id, usuarioId: s.usuario.id, tipo: "ajuste", accion: `${s.usuario.nombre} editó el servicio ${nombre}`, detalle: { servicio: nombre, antes, ahora } });
     });
   } else {
+    let nuevoId = "";
     await db.transaction(async (tx) => {
-      await tx.insert(schema.servicios).values({ barberiaId: s.barberia.id, nombre, categoria, precio, duracionMin: duracion, orden: 1000, activo, comision });
+      const [n] = await tx.insert(schema.servicios).values({ barberiaId: s.barberia.id, nombre, categoria, precio, duracionMin: duracion, orden: 1000, activo, comision, descripcion }).returning({ id: schema.servicios.id });
+      nuevoId = n.id;
       await registrar(tx, { barberiaId: s.barberia.id, usuarioId: s.usuario.id, tipo: "precio", accion: `${s.usuario.nombre} agregó el servicio ${nombre} a ${formatoDinero(precio)}` });
     });
+    revalidatePath(R);
+    return { mensaje: `${nombre} se agregó.`, id: nuevoId };
   }
   revalidatePath(R);
   return { mensaje: "Guardado." };
@@ -95,16 +101,89 @@ export async function ordenarServicios(ids: string[]): Promise<Resultado> {
   return {};
 }
 
-/** Borra una categoría: sus servicios pasan a otra, así nada se pierde ni cambia en las ventas. */
-export async function borrarCategoria(nombre: string, destino: string): Promise<Resultado> {
+async function asegurarCategoria(barberiaId: string, nombre: string) {
+  const [{ m }] = await db.select({ m: sql<number>`coalesce(max(${schema.categoriasServicio.orden}), 0)::int` }).from(schema.categoriasServicio).where(eq(schema.categoriasServicio.barberiaId, barberiaId));
+  await db.insert(schema.categoriasServicio).values({ barberiaId, nombre, orden: m + 10 }).onConflictDoNothing();
+}
+
+async function categoriaDe(barberiaId: string, id: string) {
+  const [c] = await db.select().from(schema.categoriasServicio).where(and(eq(schema.categoriasServicio.id, String(id)), eq(schema.categoriasServicio.barberiaId, barberiaId))).limit(1);
+  return c ?? null;
+}
+
+/** Crea una categoría (queda al final) o le cambia nombre y descripción. */
+export async function guardarCategoria(d: { id?: string; nombre: string; descripcion?: string }): Promise<Resultado> {
   const s = await requerirSesion("servicios.editar");
-  const de = String(nombre ?? "").trim();
-  const a = String(destino ?? "").trim().slice(0, 40);
-  if (!de || !a || de === a) return { error: "Elige a qué categoría pasan sus servicios." };
-  const movidos = await db.update(schema.servicios).set({ categoria: a })
-    .where(and(eq(schema.servicios.barberiaId, s.barberia.id), eq(schema.servicios.categoria, de))).returning({ id: schema.servicios.id });
-  await registrar(db, { barberiaId: s.barberia.id, usuarioId: s.usuario.id, tipo: "ajuste", accion: `${s.usuario.nombre} borró la categoría de servicios ${de}`, detalle: { antes: de, ahora: a, servicios: movidos.length } });
+  const nombre = String(d.nombre ?? "").trim().replace(/\s+/g, " ").slice(0, 40);
+  const descripcion = String(d.descripcion ?? "").trim().slice(0, 160);
+  if (nombre.length < 2) return { error: "Escribe el nombre de la categoría." };
+  const [igual] = await db.select().from(schema.categoriasServicio).where(and(eq(schema.categoriasServicio.barberiaId, s.barberia.id), sql`lower(${schema.categoriasServicio.nombre}) = lower(${nombre})`)).limit(1);
+  if (igual && igual.id !== d.id) return { error: "Ya hay una categoría con ese nombre." };
+  if (d.id) {
+    const c = await categoriaDe(s.barberia.id, d.id);
+    if (!c) return { error: "No se encontró la categoría." };
+    await db.transaction(async (tx) => {
+      await tx.update(schema.categoriasServicio).set({ nombre, descripcion }).where(eq(schema.categoriasServicio.id, c.id));
+      if (c.nombre !== nombre) await tx.update(schema.servicios).set({ categoria: nombre }).where(and(eq(schema.servicios.barberiaId, s.barberia.id), eq(schema.servicios.categoria, c.nombre)));
+      await registrar(tx, { barberiaId: s.barberia.id, usuarioId: s.usuario.id, tipo: "ajuste", accion: `${s.usuario.nombre} editó la categoría ${nombre}`, detalle: { antes: c.nombre, ahora: nombre } });
+    });
+    revalidatePath(R); revalidatePath("/cobrar");
+    return { mensaje: "Categoría guardada.", id: c.id };
+  }
+  const [{ m }] = await db.select({ m: sql<number>`coalesce(max(${schema.categoriasServicio.orden}), 0)::int` }).from(schema.categoriasServicio).where(eq(schema.categoriasServicio.barberiaId, s.barberia.id));
+  const [c] = await db.insert(schema.categoriasServicio).values({ barberiaId: s.barberia.id, nombre, descripcion, orden: m + 10 }).returning({ id: schema.categoriasServicio.id });
+  await registrar(db, { barberiaId: s.barberia.id, usuarioId: s.usuario.id, tipo: "ajuste", accion: `${s.usuario.nombre} creó la categoría de servicios ${nombre}` });
   revalidatePath(R);
-  revalidatePath("/cobrar");
-  return { mensaje: `La categoría ${de} se borró. Sus ${movidos.length} servicios pasaron a ${a}.` };
+  return { mensaje: `Categoría ${nombre} creada.`, id: c.id };
+}
+
+/** Ocultar una categoría la quita de Cobro con todos sus servicios; no borra nada. */
+export async function alternarCategoria(id: string): Promise<Resultado> {
+  const s = await requerirSesion("servicios.editar");
+  const c = await categoriaDe(s.barberia.id, id);
+  if (!c) return { error: "No se encontró la categoría." };
+  await db.update(schema.categoriasServicio).set({ activo: !c.activo }).where(eq(schema.categoriasServicio.id, c.id));
+  await registrar(db, { barberiaId: s.barberia.id, usuarioId: s.usuario.id, tipo: "ajuste", accion: `${s.usuario.nombre} ${c.activo ? "ocultó" : "volvió a mostrar"} la categoría ${c.nombre}`, detalle: { antes: c.activo ? "Visible" : "Oculta", ahora: c.activo ? "Oculta" : "Visible" } });
+  revalidatePath(R); revalidatePath("/cobrar");
+  return {};
+}
+
+export async function ordenarCategorias(ids: string[]): Promise<Resultado> {
+  const s = await requerirSesion("servicios.editar");
+  await db.transaction(async (tx) => {
+    for (const [i, id] of ids.slice(0, 100).map(String).entries())
+      await tx.update(schema.categoriasServicio).set({ orden: (i + 1) * 10 }).where(and(eq(schema.categoriasServicio.id, id), eq(schema.categoriasServicio.barberiaId, s.barberia.id)));
+  });
+  revalidatePath(R); revalidatePath("/cobrar");
+  return {};
+}
+
+/**
+ * Eliminar una categoría. Si tiene servicios, primero se pasan a otra o se archivan (se ocultan con la categoría).
+ * Nunca se tocan las ventas pasadas: guardan su propio nombre y precio.
+ */
+export async function eliminarCategoria(id: string, destino: string | null): Promise<Resultado> {
+  const s = await requerirSesion("servicios.editar");
+  const c = await categoriaDe(s.barberia.id, id);
+  if (!c) return { error: "No se encontró la categoría." };
+  const suyos = await db.select({ id: schema.servicios.id }).from(schema.servicios).where(and(eq(schema.servicios.barberiaId, s.barberia.id), eq(schema.servicios.categoria, c.nombre)));
+  if (suyos.length && destino === null) {
+    // Archivar: la categoría y sus servicios se ocultan, sin borrar nada.
+    await db.transaction(async (tx) => {
+      await tx.update(schema.categoriasServicio).set({ activo: false }).where(eq(schema.categoriasServicio.id, c.id));
+      await tx.update(schema.servicios).set({ activo: false }).where(inArray(schema.servicios.id, suyos.map((x) => x.id)));
+      await registrar(tx, { barberiaId: s.barberia.id, usuarioId: s.usuario.id, tipo: "ajuste", accion: `${s.usuario.nombre} archivó la categoría ${c.nombre} con ${suyos.length === 1 ? "su servicio" : `sus ${suyos.length} servicios`}` });
+    });
+    revalidatePath(R); revalidatePath("/cobrar");
+    return { mensaje: `${c.nombre} se archivó: queda oculta con sus servicios.` };
+  }
+  if (suyos.length) {
+    const d = await categoriaDe(s.barberia.id, String(destino));
+    if (!d || d.id === c.id) return { error: "Elige a qué categoría pasan sus servicios." };
+    await db.update(schema.servicios).set({ categoria: d.nombre }).where(inArray(schema.servicios.id, suyos.map((x) => x.id)));
+  }
+  await db.delete(schema.categoriasServicio).where(eq(schema.categoriasServicio.id, c.id));
+  await registrar(db, { barberiaId: s.barberia.id, usuarioId: s.usuario.id, tipo: "ajuste", accion: `${s.usuario.nombre} borró la categoría de servicios ${c.nombre}`, detalle: { servicios: suyos.length } });
+  revalidatePath(R); revalidatePath("/cobrar");
+  return { mensaje: suyos.length ? `${c.nombre} se borró. ${suyos.length === 1 ? "Su servicio pasó" : `Sus ${suyos.length} servicios pasaron`} a otra categoría.` : `${c.nombre} se borró.` };
 }

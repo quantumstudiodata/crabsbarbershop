@@ -1,20 +1,27 @@
-import { asc, eq } from "drizzle-orm";
+import { asc, eq, sql } from "drizzle-orm";
 import { requerirSesion } from "@/lib/auth";
 import { db, schema } from "@/lib/db";
-import { TablaServicios } from "./TablaServicios";
+import { PantallaServicios } from "./TablaServicios";
 
 export const metadata = { title: "Servicios" };
 
 export default async function Servicios() {
   const s = await requerirSesion("servicios.ver");
-  const servicios = await db.select().from(schema.servicios).where(eq(schema.servicios.barberiaId, s.barberia.id)).orderBy(asc(schema.servicios.orden), asc(schema.servicios.nombre));
+  const b = s.barberia.id;
+  const servicios = await db.select().from(schema.servicios).where(eq(schema.servicios.barberiaId, b)).orderBy(asc(schema.servicios.orden), asc(schema.servicios.nombre));
+  let categorias = await db.select().from(schema.categoriasServicio).where(eq(schema.categoriasServicio.barberiaId, b)).orderBy(asc(schema.categoriasServicio.orden), asc(schema.categoriasServicio.creadoEn));
+  // Una categoría que solo existe en algún servicio (de antes) se registra al final para poder administrarla.
+  const faltan = [...new Set(servicios.map((x) => x.categoria))].filter((n) => !categorias.some((c) => c.nombre === n));
+  if (faltan.length) {
+    const max = categorias.reduce((m, c) => Math.max(m, c.orden), 0);
+    await db.insert(schema.categoriasServicio).values(faltan.map((nombre, i) => ({ barberiaId: b, nombre, orden: max + (i + 1) * 10 }))).onConflictDoNothing();
+    categorias = await db.select().from(schema.categoriasServicio).where(eq(schema.categoriasServicio.barberiaId, b)).orderBy(asc(schema.categoriasServicio.orden), asc(sql`creado_en`));
+  }
   return (
-    <>
-      <div>
-        <h1 className="titulo">Servicios</h1>
-        <p className="sub">El precio de aquí es el que se cobra.</p>
-      </div>
-      <TablaServicios servicios={servicios.map(({ id, nombre, categoria, precio, duracionMin, activo, comision }) => ({ id, nombre, categoria, precio, duracionMin, activo, comision }))} puedeEditar={s.puede("servicios.editar")} />
-    </>
+    <PantallaServicios
+      servicios={servicios.map(({ id, nombre, categoria, precio, duracionMin, activo, comision, descripcion }) => ({ id, nombre, categoria, precio, duracionMin, activo, comision, descripcion }))}
+      categorias={categorias.map(({ id, nombre, descripcion, activo }) => ({ id, nombre, descripcion, activo }))}
+      puedeEditar={s.puede("servicios.editar") && !s.vista}
+    />
   );
 }
