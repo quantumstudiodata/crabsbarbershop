@@ -105,14 +105,27 @@ describe("permisos", () => {
     // En el local hay una sola computadora: un barbero puede cobrar lo que hizo otra persona.
     expect(permisosDe("barbera").has("ventas.registrar_otros")).toBe(true);
     expect(permisosDe("barbera").has("caja.operar")).toBe(true);
-    expect(permisosDe("barbera", ["no.existe"]).size).toBe(3);
+    expect(permisosDe("barbera", ["no.existe"]).size).toBe(4);
     expect(permisosDe("contador").has("ventas.registrar")).toBe(false);
     expect(permisosDe("contador").has("reportes.exportar")).toBe(true);
-    // El propietario puede crear administradores; nadie puede crear el rol de encargado (ya no existe).
+    // El titular puede crear Soporte técnico; nadie puede crear el rol de encargado (ya no existe).
     expect(rolesAsignables("duena")).toContain("admin");
     expect(rolesAsignables("duena")).not.toContain("encargada");
-    expect(rolesAsignables("barbera")).toEqual([]);
-    expect(rolesAsignables("encargada")).toEqual([]);
+    // Quien tiene un puesto personalizado solo asigna Administrador y Barbero.
+    expect(rolesAsignables("duena", true)).toEqual(["contador", "barbera"]);
+  });
+
+  it("puestos y permisos individuales", () => {
+    // Permisos antiguos se traducen: abrir caja incluía retiros; editar funciones se separó por apartado.
+    expect(permisosDe("contador", ["caja.operar"]).has("caja.retiros")).toBe(true);
+    expect(permisosDe("contador", ["ajustes.funciones"]).has("configuracion.metas")).toBe(true);
+    // El titular puede quitarse permisos sin perder los demás.
+    const t = permisosDe("duena", [], ["reportes.ver"]);
+    expect(t.has("reportes.ver")).toBe(false);
+    expect(t.has("usuarios.editar")).toBe(true);
+    // Un puesto personalizado manda sobre la plantilla.
+    const r = permisosDe("duena", [], [], ["ventas.registrar"]);
+    expect([...r]).toEqual(["ventas.registrar"]);
   });
 });
 

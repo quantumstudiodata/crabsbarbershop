@@ -25,7 +25,6 @@ export function Pagar({ id, nombre, semana, renta, pendiente, regreso }: { id: s
           </div>
           <p className="ayuda-txt">Saldo en estas fechas: {pendiente}.</p>
           <div className="acciones">
-            <button type="button" className="bt sec solo" onClick={() => setAbierto(false)}>Regresar</button>
             <button className="bt">Guardar<Fl /></button>
           </div>
         </form>

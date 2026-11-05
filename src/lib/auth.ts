@@ -5,9 +5,11 @@ import { cookies } from "next/headers";
 import { redirect } from "next/navigation";
 import { cache } from "react";
 import { db, schema } from "./db";
-import { permisosDe, type Permiso, type Rol } from "./permisos";
+import { NOMBRE_ROL, permisosDe, PLANTILLAS, type Permiso, type Rol } from "./permisos";
 
 const COOKIE = "crabs_sesion";
+/** Modo de visualización del soporte de la plataforma: muestra el sistema como lo vería otro puesto, sin poder guardar. */
+export const COOKIE_VISTA = "crabs_vista";
 const DURACION_MS = 12 * 60 * 60 * 1000; // 12 horas
 export const INTENTOS_MAXIMOS = 5;
 export const BLOQUEO_MS = 15 * 60 * 1000;
@@ -18,10 +20,12 @@ export const hashContrasena = (texto: string) => bcrypt.hash(texto, 10);
 export const verificarContrasena = (texto: string, hash: string) => bcrypt.compare(texto, hash);
 
 export type Sesion = {
-  usuario: { id: string; nombre: string; usuario: string; rol: Rol; debeCambiar: boolean; avatar: string; esSoporte: boolean };
+  usuario: { id: string; nombre: string; usuario: string; rol: Rol; debeCambiar: boolean; avatar: string; esSoporte: boolean; puestoId: string | null; puesto: string };
   barberia: typeof schema.barberias.$inferSelect;
   permisos: Set<Permiso>;
   puede: (p: Permiso) => boolean;
+  /** Solo en el modo de visualización: el puesto que se está viendo. */
+  vista: string | null;
 };
 
 export async function crearSesion(usuarioId: string) {
@@ -29,7 +33,9 @@ export async function crearSesion(usuarioId: string) {
   const expiraEn = new Date(Date.now() + DURACION_MS);
   await db.insert(schema.sesiones).values({ id: sha256(token), usuarioId, expiraEn });
   await db.delete(schema.sesiones).where(lt(schema.sesiones.expiraEn, new Date()));
-  (await cookies()).set(COOKIE, token, {
+  const jar = await cookies();
+  jar.delete(COOKIE_VISTA);
+  jar.set(COOKIE, token, {
     httpOnly: true,
     secure: process.env.NODE_ENV === "production",
     sameSite: "lax",
@@ -43,6 +49,7 @@ export async function cerrarSesion() {
   const token = jar.get(COOKIE)?.value;
   if (token) await db.delete(schema.sesiones).where(eq(schema.sesiones.id, sha256(token)));
   jar.delete(COOKIE);
+  jar.delete(COOKIE_VISTA);
 }
 
 /** Cierra todas las sesiones de una persona (al restablecer contraseña o desactivarla). */
@@ -51,23 +58,41 @@ export async function cerrarSesionesDe(usuarioId: string) {
 }
 
 export const obtenerSesion = cache(async (): Promise<Sesion | null> => {
-  const token = (await cookies()).get(COOKIE)?.value;
+  const jar = await cookies();
+  const token = jar.get(COOKIE)?.value;
   if (!token) return null;
   const [fila] = await db
-    .select({ u: schema.usuarios, b: schema.barberias })
+    .select({ u: schema.usuarios, b: schema.barberias, p: schema.puestos })
     .from(schema.sesiones)
     .innerJoin(schema.usuarios, eq(schema.usuarios.id, schema.sesiones.usuarioId))
     .innerJoin(schema.barberias, eq(schema.barberias.id, schema.usuarios.barberiaId))
+    .leftJoin(schema.puestos, eq(schema.puestos.id, schema.usuarios.puestoId))
     .where(and(eq(schema.sesiones.id, sha256(token)), gt(schema.sesiones.expiraEn, new Date())))
     .limit(1);
   // Un negocio suspendido (por ejemplo, sin suscripción) no puede entrar; sus datos se conservan.
   if (!fila || !fila.u.activo || fila.b.estadoCuenta !== "activa") return null;
-  const permisos = permisosDe(fila.u.rol, fila.u.permisosExtra);
+  // Un puesto desactivado deja sin acceso a quienes lo tienen.
+  if (fila.p && !fila.p.activo) return null;
+  let rol: Rol = fila.u.rol;
+  let puesto = fila.p?.nombre ?? NOMBRE_ROL[fila.u.rol];
+  let permisos = permisosDe(fila.u.rol, fila.u.permisosExtra, fila.u.permisosQuitados, fila.p?.permisos ?? null);
+  let vista: string | null = null;
+  // Modo de visualización: solo para el soporte de la plataforma, y solo cambia lo que se ve.
+  const pedido = fila.u.esSoporte ? jar.get(COOKIE_VISTA)?.value : undefined;
+  if (pedido && PLANTILLAS.includes(pedido as Rol)) {
+    rol = pedido as Rol;
+    permisos = permisosDe(rol);
+    vista = puesto = NOMBRE_ROL[rol];
+  } else if (pedido?.startsWith("puesto:")) {
+    const [p] = await db.select().from(schema.puestos).where(and(eq(schema.puestos.id, pedido.slice(7)), eq(schema.puestos.barberiaId, fila.b.id))).limit(1).catch(() => []);
+    if (p) { rol = p.plantilla; permisos = permisosDe(rol, [], [], p.permisos); vista = puesto = p.nombre; }
+  }
   return {
-    usuario: { id: fila.u.id, nombre: fila.u.nombre, usuario: fila.u.usuario, rol: fila.u.rol, debeCambiar: fila.u.debeCambiar, avatar: fila.u.avatar, esSoporte: fila.u.esSoporte },
+    usuario: { id: fila.u.id, nombre: fila.u.nombre, usuario: fila.u.usuario, rol, debeCambiar: fila.u.debeCambiar, avatar: fila.u.avatar, esSoporte: fila.u.esSoporte, puestoId: fila.u.puestoId, puesto },
     barberia: fila.b,
     permisos,
     puede: (p) => permisos.has(p),
+    vista,
   };
 });
 

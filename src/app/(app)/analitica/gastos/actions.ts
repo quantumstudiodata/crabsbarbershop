@@ -85,7 +85,7 @@ export async function registrarEgreso(_: EstadoGasto, form: FormData): Promise<E
 /** Un egreso no se borra: se cancela con motivo, queda tachado y deja de contar. */
 export async function cancelarEgreso(_: EstadoGasto, form: FormData): Promise<EstadoGasto> {
   const s = await requerirSesion();
-  if (!s.puede("gastos.registrar")) return { error: "No tienes permiso para cancelar egresos." };
+  if (!s.puede("gastos.cancelar")) return { error: "No tienes permiso para cancelar egresos." };
   const id = texto(form, "id", 40);
   const motivo = texto(form, "motivo", 300);
   if (!motivo) return { error: "Escribe por qué se cancela." };
@@ -110,7 +110,7 @@ export async function cancelarEgreso(_: EstadoGasto, form: FormData): Promise<Es
 /** Crea una categoría, o vuelve a mostrar una que estaba oculta. */
 export async function crearCategoria(_: EstadoGasto, form: FormData): Promise<EstadoGasto> {
   const s = await requerirSesion();
-  if (!s.puede("gastos.registrar")) return { error: "No tienes permiso para cambiar categorías." };
+  if (!s.puede("configuracion.egresos")) return { error: "No tienes permiso para cambiar categorías." };
   const nombre = texto(form, "nombre", 40).replace(/\s+/g, " ");
   if (nombre.length < 2) return { error: "Escribe el nombre de la categoría." };
   const nombreBonito = nombre[0].toUpperCase() + nombre.slice(1);
@@ -139,7 +139,7 @@ export async function crearCategoria(_: EstadoGasto, form: FormData): Promise<Es
 /** Ocultar una categoría no toca los egresos que ya la usan. */
 export async function alternarCategoria(id: string): Promise<EstadoGasto> {
   const s = await requerirSesion();
-  if (!s.puede("gastos.registrar")) return { error: "No tienes permiso para cambiar categorías." };
+  if (!s.puede("configuracion.egresos")) return { error: "No tienes permiso para cambiar categorías." };
   const [c] = await db.select().from(schema.categoriasGasto).where(and(eq(schema.categoriasGasto.id, id), eq(schema.categoriasGasto.barberiaId, s.barberia.id)));
   if (!c) return { error: "No se encontró la categoría." };
   await db.transaction(async (tx) => {

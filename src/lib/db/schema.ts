@@ -58,6 +58,8 @@ export const barberias = pgTable("barberias", {
   modeloCaja: text("modelo_caja").notNull().default("compartida"),
   usaComprobantes: boolean("usa_comprobantes").notNull().default(true),
   usaPeriodicidad: boolean("usa_periodicidad").notNull().default(true),
+  // Formas de pago que se pueden usar al registrar un egreso.
+  metodosEgreso: text("metodos_egreso").array().notNull().default(sql`'{efectivo,transferencia,tarjeta}'::text[]`),
   // Preparado para suscripciones: el plan y su estado son de cada negocio.
   plan: text("plan").notNull().default("inicial"),
   estadoCuenta: text("estado_cuenta").notNull().default("activa"),
@@ -76,6 +78,10 @@ export const usuarios = pgTable(
     esSoporte: boolean("es_soporte").notNull().default(false),
     rol: rolEnum("rol").notNull(),
     permisosExtra: text("permisos_extra").array().notNull().default(sql`'{}'::text[]`),
+    // Permisos de su puesto que se le quitaron solo a esta persona.
+    permisosQuitados: text("permisos_quitados").array().notNull().default(sql`'{}'::text[]`),
+    // Puesto personalizado del negocio. Vacío: usa la plantilla de su rol.
+    puestoId: uuid("puesto_id").references(() => puestos.id),
     activo: boolean("activo").notNull().default(true),
     debeCambiar: boolean("debe_cambiar").notNull().default(true),
     intentosFallidos: integer("intentos_fallidos").notNull().default(0),
@@ -431,4 +437,36 @@ export const solicitudesClave = pgTable(
     creadoEn: creadoEn(),
   },
   (t) => [index("solicitudes_barberia_idx").on(t.barberiaId, t.atendida)],
+);
+
+// Puestos que cada negocio crea (Recepcionista, Contador externo...). Parten de una plantilla y guardan sus propios permisos.
+export const puestos = pgTable(
+  "puestos",
+  {
+    id: id(),
+    barberiaId: barberiaId(),
+    nombre: text("nombre").notNull(),
+    descripcion: text("descripcion").notNull().default(""),
+    // Plantilla de la que partió; define el menú principal (por ejemplo, si atiende clientes).
+    plantilla: rolEnum("plantilla").notNull().default("duena"),
+    permisos: text("permisos").array().notNull().default(sql`'{}'::text[]`),
+    activo: boolean("activo").notNull().default(true),
+    creadoEn: creadoEn(),
+  },
+  (t) => [uniqueIndex("puestos_uq").on(t.barberiaId, t.nombre)],
+);
+
+// Categorías de servicios, con su propio orden. Los servicios las enlazan por nombre.
+export const categoriasServicio = pgTable(
+  "categorias_servicio",
+  {
+    id: id(),
+    barberiaId: barberiaId(),
+    nombre: text("nombre").notNull(),
+    descripcion: text("descripcion").notNull().default(""),
+    orden: integer("orden").notNull().default(0),
+    activo: boolean("activo").notNull().default(true),
+    creadoEn: creadoEn(),
+  },
+  (t) => [uniqueIndex("categorias_servicio_uq").on(t.barberiaId, t.nombre)],
 );

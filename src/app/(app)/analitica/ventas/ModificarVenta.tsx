@@ -54,7 +54,6 @@ export function ModificarVenta({ id, folio, datos, opciones }: { id: string; fol
           {e.error && <p className="aviso error">{e.error}</p>}
           <p className="ayuda-txt">Queda en el historial con el antes y el después.</p>
           <div className="acciones">
-            <button type="button" className="bt sec solo" onClick={() => setAbierto(false)}>Cancelar</button>
             <button className="bt" disabled={guardando}>{guardando ? "Guardando…" : "Guardar cambios"}<Fl /></button>
           </div>
         </form>

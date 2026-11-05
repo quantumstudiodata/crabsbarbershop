@@ -22,7 +22,7 @@ export async function entrar(_: EstadoEntrada, form: FormData): Promise<EstadoEn
     await verificarContrasena(contrasena, await relleno);
     return { error: "El usuario o la contraseña no coinciden." };
   }
-  if (!u.activo) return { error: "Este usuario está desactivado. Pide ayuda al propietario." };
+  if (!u.activo) return { error: "Este usuario está desactivado. Pide ayuda al titular." };
   const [negocio] = await db.select({ estado: schema.barberias.estadoCuenta }).from(schema.barberias).where(eq(schema.barberias.id, u.barberiaId)).limit(1);
   if (negocio?.estado !== "activa") return { error: "La cuenta de este negocio está suspendida. Comunícate con soporte." };
   if (u.bloqueadoHasta && u.bloqueadoHasta > new Date()) {
@@ -51,7 +51,7 @@ export async function entrar(_: EstadoEntrada, form: FormData): Promise<EstadoEn
 }
 
 /**
- * Pide al propietario que restablezca la contraseña. Siempre responde igual,
+ * Pide al titular que restablezca la contraseña. Siempre responde igual,
  * exista o no el usuario, para no revelar quién tiene cuenta.
  */
 export async function solicitarRestablecer(usuarioTxt: string): Promise<{ ok: true }> {

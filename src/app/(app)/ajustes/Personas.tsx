@@ -9,19 +9,21 @@ import { formatoDinero } from "@/lib/money";
 import type { Rol } from "@/lib/permisos";
 import { CamposFormaPago, type FormaActual } from "./CamposFormaPago";
 import { actualizarPersona, darDeAlta, darDeBaja, desactivar, reactivar, restablecer, verClave, type ClaveVisible, type EstadoPersona } from "./actions";
+import { EditorPermisos, SelectorPuesto, type GrupoPermisos, type OpcionPuesto } from "./Permisos";
+import { Puestos, type PuestoNegocio } from "./Puestos";
 
 type Persona = {
-  id: string; nombre: string; usuario: string; rol: Rol; avatar: string; activo: boolean; metaSemanal: number; permisosExtra: string[];
+  id: string; nombre: string; usuario: string; rol: Rol; avatar: string; activo: boolean; metaSemanal: number; permisos: string[]; puestoId: string | null; puesto: string;
   debeCambiar: boolean; pide: boolean; claveHasta: number | null; yo: boolean; editable: boolean; forma: FormaActual; formaTexto: string;
 };
 type Props = {
-  personas: Persona[]; roles: { valor: Rol; texto: string; detalle: string }[]; nombresRol: Record<Rol, string>; conRenta: boolean;
-  grupos: { titulo: string; permisos: { clave: string; texto: string }[] }[]; permisosPorRol: Record<Rol, readonly string[]>; restablecerId: string | null; puedeEditar: boolean; descuentoLibre: boolean;
+  personas: Persona[]; plantillas: OpcionPuesto[]; puestos: PuestoNegocio[]; grupos: GrupoPermisos[]; editoTotal: boolean;
+  restablecerId: string | null; puedeEditar: boolean; descuentoLibre: boolean;
 };
 
-const ROLES_VISIBLES: Rol[] = ["duena", "admin", "barbera", "contador"];
-const rolDe = (r: Rol): Rol => (r === "encargada" ? "barbera" : r);
-const esBarbero = (r: Rol) => r === "barbera" || r === "encargada";
+const esBarbero = (r: string) => r === "barbera" || r === "encargada";
+const valorPuesto = (p: Persona) => (p.puestoId ? `puesto:${p.puestoId}` : `rol:${p.rol === "encargada" ? "barbera" : p.rol}`);
+const total = (g: GrupoPermisos[]) => g.reduce((a, x) => a + x.permisos.length, 0);
 
 /** Minutos que faltan, actualizado cada segundo. */
 function useRestante(hasta: number | null) {
@@ -81,8 +83,6 @@ function Estado({ p }: { p: Persona }) {
 
 /** Resumen de una persona, al tocar su fila. */
 function Ficha({ p, props, cerrar, editar }: { p: Persona; props: Props; cerrar: () => void; editar?: () => void }) {
-  const rol = rolDe(p.rol);
-  const extra = props.grupos.flatMap((g) => g.permisos).filter((x) => p.permisosExtra.includes(x.clave));
   return (
     <Modal abierto cerrar={cerrar} etiqueta="Usuario" titulo="Resumen">
       <div className="ficha-u">
@@ -90,26 +90,26 @@ function Ficha({ p, props, cerrar, editar }: { p: Persona; props: Props; cerrar:
           <Avatar avatar={p.avatar} nombre={p.nombre} t={72} />
           <div>
             <b>{p.nombre}</b>
-            <div className="fila" style={{ gap: 6, marginTop: 6 }}><span className={`rol-tag r-${rol}`}>{props.nombresRol[rol]}</span><Estado p={p} /></div>
+            <div className="fila" style={{ gap: 6, marginTop: 6 }}><span className={`rol-tag r-${p.rol}`}>{p.puesto}</span><Estado p={p} /></div>
           </div>
         </div>
         <div className="perfil-datos">
           <div><small>Usuario</small><span className="mono">{p.usuario}</span></div>
-          <div><small>Puesto</small><span>{props.nombresRol[rol]}</span></div>
+          <div><small>Puesto</small><span>{p.puesto}</span></div>
           {p.formaTexto && <div><small>Forma de pago</small><span>{p.formaTexto}</span></div>}
           {esBarbero(p.rol) && <div><small>Meta individual</small><span>{p.metaSemanal ? `${formatoDinero(p.metaSemanal)} a la semana` : "Se calcula sola"}</span></div>}
-          <div><small>Permisos extra</small><span>{extra.length ? extra.map((x) => x.texto).join(", ") : "Solo los de su rol"}</span></div>
+          <div><small>Permisos</small><span>{p.permisos.length} de {total(props.grupos)}</span></div>
         </div>
+        <EditorPermisos grupos={props.grupos} marcados={new Set(p.permisos)} descuentoLibre={props.descuentoLibre} soloLectura />
       </div>
       <div className="acciones">
-        <button type="button" className="bt sec solo" onClick={cerrar}>Cerrar</button>
         {editar && <button type="button" className="bt" onClick={editar}>Editar usuario<span className="fl" aria-hidden="true"><Icono n="editar" /></span></button>}
       </div>
     </Modal>
   );
 }
 
-function MenuAcciones({ p, acciones }: { p: Persona; acciones: { editar: () => void; clave: () => void; desactivar: () => void; reactivar: () => void; eliminar: () => void } }) {
+function MenuAcciones({ p, acciones }: { p: Persona; acciones: { clave: () => void; desactivar: () => void; reactivar: () => void; eliminar: () => void } }) {
   const [abierto, setAbierto] = useState(false);
   const caja = useRef<HTMLDivElement>(null);
   useEffect(() => {
@@ -126,7 +126,6 @@ function MenuAcciones({ p, acciones }: { p: Persona; acciones: { editar: () => v
         <div className="menu acciones-m" role="menu">
           {p.activo ? (
             <>
-              <button type="button" role="menuitem" className="it" onClick={ir(acciones.editar)}><Icono n="editar" />Editar usuario</button>
               <button type="button" role="menuitem" className="it" onClick={ir(acciones.clave)}><Icono n="llave" />Restablecer contraseña</button>
               <button type="button" role="menuitem" className="it salir" onClick={ir(acciones.desactivar)}><Icono n="candado" />Desactivar usuario</button>
             </>
@@ -142,58 +141,29 @@ function MenuAcciones({ p, acciones }: { p: Persona; acciones: { editar: () => v
   );
 }
 
-function RolTarjetas({ roles, valor, cambiar }: { roles: Props["roles"]; valor: Rol; cambiar: (r: Rol) => void }) {
-  return (
-    <div className="opciones-t chicas" role="radiogroup" aria-label="Rol">
-      {roles.filter((r) => ROLES_VISIBLES.includes(r.valor)).map((r) => (
-        <label key={r.valor} className="opcion-t"><input type="radio" name="rol" value={r.valor} checked={valor === r.valor} onChange={() => cambiar(r.valor)} /><b>{r.texto}</b><small>{r.detalle}</small></label>
-      ))}
-    </div>
-  );
-}
-
 function EditarPersona({ p, props, cerrar }: { p: Persona; props: Props; cerrar: () => void }) {
   const [e, accion, guardando] = useActionState<EstadoPersona, FormData>(actualizarPersona, {});
-  const [rol, setRol] = useState<Rol>(rolDe(p.rol));
+  const opciones = [...props.plantillas, ...props.puestos];
+  const [puesto, setPuesto] = useState(valorPuesto(p));
+  const [marcados, setMarcados] = useState(() => new Set(p.permisos));
   useEffect(() => { if (e.ok) cerrar(); }, [e.ok, e.n, cerrar]);
-  const base = new Set(props.permisosPorRol[rol]);
+  const elegido = opciones.find((o) => o.valor === puesto);
+  const rol = elegido?.rol ?? p.rol;
   return (
-    <Modal abierto cerrar={cerrar} etiqueta="Editar usuario" titulo={p.nombre} ancho>
+    <Modal abierto cerrar={cerrar} etiqueta={p.yo ? "Mis permisos" : "Editar usuario"} titulo={p.nombre} ancho>
       <form action={accion} className="pila">
         <input type="hidden" name="id" value={p.id} />
         <span className="paso-t">Datos del usuario</span>
         <label className="campo"><span>Nombre completo</span><input className="input" name="nombre" defaultValue={p.nombre} /></label>
-        <div className="campo"><span>Rol</span><RolTarjetas roles={props.roles} valor={rol} cambiar={setRol} /></div>
+        {p.yo
+          ? <p className="ayuda-txt">Puedes apagar los permisos que no uses. Si te quitas Editar usuarios, solo Soporte técnico podrá devolvértelo.</p>
+          : <div className="campo"><span>Puesto</span><SelectorPuesto opciones={opciones} valor={puesto} cambiar={(o) => { setPuesto(o.valor); setMarcados(new Set(o.permisos)); }} /></div>}
         <span className="paso-t">Permisos</span>
-        <div className="grupos-p">
-          {props.grupos.map((g) => {
-            const incluidos = g.permisos.filter((x) => base.has(x.clave));
-            const extra = g.permisos.filter((x) => !base.has(x.clave));
-            return (
-              <details key={`${rol}-${g.titulo}`} className="grupo-p">
-                <summary><b>{g.titulo}</b><span className="muted">{incluidos.length} de {g.permisos.length} incluidos</span></summary>
-                <div className="grupo-p-c">
-                  {incluidos.length > 0 && <div className="incluidos">{incluidos.map((x) => <span key={x.clave} className="tag-i"><Icono n="palomita" />{x.texto}</span>)}</div>}
-                  {extra.map((x) => {
-                    // Con la autorización de descuentos al 100%, cualquiera puede dar cualquier descuento: este permiso ya no hace falta.
-                    const libre = x.clave === "ventas.descuento" && props.descuentoLibre;
-                    return (
-                      <label key={x.clave} className={`entre perm-l ${libre ? "apagado-p" : ""}`}>
-                        <span>{x.texto}{libre && <small className="nota-p">La autorización de descuentos está al 100%: ya puede dar cualquier descuento por su cuenta.</small>}</span>
-                        <Interruptor name={libre ? undefined : "permisos"} value={x.clave} etiqueta={x.texto} defaultChecked={libre ? false : p.permisosExtra.includes(x.clave)} disabled={libre} />
-                      </label>
-                    );
-                  })}
-                  {extra.length === 0 && <small className="muted">Su rol ya incluye todo este grupo.</small>}
-                </div>
-              </details>
-            );
-          })}
-        </div>
+        <EditorPermisos grupos={props.grupos} marcados={marcados} cambiar={setMarcados} descuentoLibre={props.descuentoLibre} />
         {esBarbero(rol) && (
           <>
             <span className="paso-t">Forma de pago</span>
-            <CamposFormaPago actual={p.forma} conRenta={props.conRenta} />
+            <CamposFormaPago actual={p.forma} />
             <span className="paso-t">Meta individual</span>
             <label className="campo">
               <span>Meta de ventas por semana (opcional)</span>
@@ -203,7 +173,6 @@ function EditarPersona({ p, props, cerrar }: { p: Persona; props: Props; cerrar:
         )}
         {e.error && <p className="aviso error">{e.error}</p>}
         <div className="acciones">
-          <button type="button" className="bt sec solo" onClick={cerrar}>Cancelar</button>
           <button className="bt" disabled={guardando}>{guardando ? "Guardando…" : "Guardar cambios"}<Fl /></button>
         </div>
       </form>
@@ -214,7 +183,10 @@ function EditarPersona({ p, props, cerrar }: { p: Persona; props: Props; cerrar:
 function AltaUsuario({ props, cerrar, alGuardar }: { props: Props; cerrar: () => void; alGuardar: (c: ClaveVisible) => void }) {
   const [e, accion, guardando] = useActionState<EstadoPersona, FormData>(darDeAlta, {});
   const [paso, setPaso] = useState(1);
-  const [rol, setRol] = useState<Rol>("barbera");
+  const opciones = [...props.plantillas, ...props.puestos];
+  const [puesto, setPuesto] = useState("rol:barbera");
+  const [marcados, setMarcados] = useState(() => new Set(props.plantillas.find((o) => o.valor === "rol:barbera")?.permisos ?? []));
+  const rol = opciones.find((o) => o.valor === puesto)?.rol ?? "barbera";
   const [nombre, setNombre] = useState("");
   useEffect(() => { if (e.ok && e.clave) alGuardar(e.clave); }, [e.ok, e.n, e.clave, alGuardar]);
   const dosPasos = esBarbero(rol);
@@ -223,13 +195,14 @@ function AltaUsuario({ props, cerrar, alGuardar }: { props: Props; cerrar: () =>
       <form action={accion} className="pila">
         <div className="pila" style={{ display: paso === 1 ? undefined : "none" }}>
           <label className="campo"><span>Nombre completo</span><input className="input" name="nombre" value={nombre} onChange={(x) => setNombre(x.target.value)} placeholder="Ejemplo: Ana Martínez López" required /></label>
-          <div className="campo"><span>Rol</span><RolTarjetas roles={props.roles} valor={rol} cambiar={setRol} /></div>
+          <div className="campo"><span>Puesto</span><SelectorPuesto opciones={opciones} valor={puesto} cambiar={(o) => { setPuesto(o.valor); setMarcados(new Set(o.permisos)); }} /></div>
+          <details className="revisar-p"><summary>Revisar permisos del puesto (opcional)</summary><EditorPermisos grupos={props.grupos} marcados={marcados} cambiar={setMarcados} descuentoLibre={props.descuentoLibre} /></details>
           <p className="ayuda-txt">El usuario se arma con las iniciales y el primer apellido. La contraseña temporal se verá 30 minutos.</p>
         </div>
-        {dosPasos && <div style={{ display: paso === 2 ? undefined : "none" }}><CamposFormaPago actual={null} conRenta={props.conRenta} /><p className="ayuda-txt" style={{ marginTop: 8 }}>Se puede cambiar después.</p></div>}
+        {dosPasos && <div style={{ display: paso === 2 ? undefined : "none" }}><CamposFormaPago actual={null} /><p className="ayuda-txt" style={{ marginTop: 8 }}>Se puede cambiar después.</p></div>}
         {e.error && <p className="aviso error">{e.error}</p>}
         <div className="acciones">
-          {paso === 2 ? <button type="button" className="bt sec solo" onClick={() => setPaso(1)}>Regresar</button> : <button type="button" className="bt sec solo" onClick={cerrar}>Cancelar</button>}
+          {paso === 2 && <button type="button" className="bt sec solo" onClick={() => setPaso(1)}>Paso anterior</button>}
           {dosPasos && paso === 1
             ? <button key="sig" type="button" className="bt" disabled={nombre.trim().split(/\s+/).length < 2} onClick={() => setPaso(2)}>Siguiente<Fl /></button>
             : <button key="alta" className="bt" disabled={guardando}>{guardando ? "Guardando…" : "Dar de alta"}<Fl /></button>}
@@ -246,6 +219,7 @@ export function Personas(props: Props) {
     () => (props.restablecerId ? { tipo: "restablecer", p: props.personas.find((x) => x.id === props.restablecerId)! } : null),
   );
   const [alta, setAlta] = useState(0);
+  const [nuevoPuesto, setNuevoPuesto] = useState(0);
   const [aviso, setAviso] = useState<EstadoPersona>({});
   const [buscar, setBuscar] = useState("");
   const [filtroRol, setFiltroRol] = useState("");
@@ -265,7 +239,7 @@ export function Personas(props: Props) {
   const acceso = (p: Persona) => (p.claveHasta && p.claveHasta > Date.now() ? ejecutar(() => verClave(p.id)) : setConfirmar({ tipo: "restablecer", p }));
 
   const q = buscar.trim().toLowerCase();
-  const lista = props.personas.filter((p) => (verInactivos ? !p.activo : p.activo) && (!filtroRol || rolDe(p.rol) === filtroRol) && (!q || `${p.nombre} ${p.usuario}`.toLowerCase().includes(q)));
+  const lista = props.personas.filter((p) => (verInactivos ? !p.activo : p.activo) && (!filtroRol || valorPuesto(p) === filtroRol) && (!q || `${p.nombre} ${p.usuario}`.toLowerCase().includes(q)));
   const piden = props.personas.filter((p) => p.pide && p.editable);
   const inactivos = props.personas.filter((p) => !p.activo).length;
 
@@ -273,7 +247,12 @@ export function Personas(props: Props) {
     <>
       <div className="entre">
         <h1 className="titulo">Usuarios</h1>
-        {props.puedeEditar && <button type="button" className="bt" onClick={() => setAlta((n) => n + 1)}>Agregar usuario<span className="fl" aria-hidden="true"><Icono n="mas" /></span></button>}
+        {props.puedeEditar && (
+          <span className="fila" style={{ gap: 8 }}>
+            <button type="button" className="bt sec solo" onClick={() => setNuevoPuesto((n) => n + 1)}><Icono n="mas" />Agregar puesto</button>
+            <button type="button" className="bt" onClick={() => setAlta((n) => n + 1)}>Agregar usuario<span className="fl" aria-hidden="true"><Icono n="mas" /></span></button>
+          </span>
+        )}
       </div>
       {aviso.error && <p className="aviso error">{aviso.error}</p>}
       {aviso.mensaje && <p className="aviso ok">{aviso.mensaje}</p>}
@@ -289,7 +268,7 @@ export function Personas(props: Props) {
       <div className="herr-usuarios">
         <label className="con-icono" style={{ flex: "1 1 220px" }}><Icono n="buscar" /><input className="input" value={buscar} onChange={(e) => setBuscar(e.target.value)} placeholder="Buscar por nombre o usuario" aria-label="Buscar usuario" /></label>
         <div style={{ width: 200 }}>
-          <Selector etiqueta="Filtrar por rol" valor={filtroRol} onChange={setFiltroRol} opciones={[{ valor: "", texto: "Todos los roles" }, ...ROLES_VISIBLES.map((r) => ({ valor: r, texto: props.nombresRol[r] }))]} />
+          <Selector etiqueta="Filtrar por puesto" valor={filtroRol} onChange={setFiltroRol} opciones={[{ valor: "", texto: "Todos los puestos" }, ...[...props.plantillas, ...props.puestos].map((o) => ({ valor: o.valor, texto: o.texto }))]} />
         </div>
         {inactivos > 0 && <button type="button" className={`chipf ${verInactivos ? "on" : ""}`} onClick={() => setVerInactivos((v) => !v)}>Desactivados ({inactivos})</button>}
       </div>
@@ -303,11 +282,11 @@ export function Personas(props: Props) {
             onKeyDown={(e) => { if (e.key === "Enter" && e.target === e.currentTarget) abrirFila(p); }}>
             <Avatar avatar={p.avatar} nombre={p.nombre} t={34} />
             <span className="nom"><b>{p.nombre}</b>{p.yo && <span className="etiqueta" style={{ padding: "1px 7px", marginLeft: 6 }}>Tú</span>}<small>{p.usuario}{p.formaTexto ? ` - ${p.formaTexto}` : ""}</small></span>
-            <span className={`rol-tag r-${rolDe(p.rol)}`}>{props.nombresRol[rolDe(p.rol)]}</span>
+            <span className={`rol-tag r-${p.rol}`}>{p.puesto}</span>
             <span className="est-col"><Estado p={p} /></span>
             <span className="acts">
-              {p.editable && <MenuAcciones p={p} acciones={{
-                editar: () => setEditar(p), clave: () => setConfirmar({ tipo: "restablecer", p }), desactivar: () => setConfirmar({ tipo: "desactivar", p }),
+              {p.editable && !p.yo && <MenuAcciones p={p} acciones={{
+                clave: () => setConfirmar({ tipo: "restablecer", p }), desactivar: () => setConfirmar({ tipo: "desactivar", p }),
                 reactivar: () => ejecutar(() => reactivar(p.id)), eliminar: () => setConfirmar({ tipo: "eliminar", p }),
               }} />}
             </span>
@@ -315,12 +294,12 @@ export function Personas(props: Props) {
         ))}
       </div>
 
+      <Puestos plantillas={props.plantillas} puestos={props.puestos} grupos={props.grupos} descuentoLibre={props.descuentoLibre} puedeEditar={props.puedeEditar} nuevo={nuevoPuesto} />
       {alta > 0 && <AltaUsuario key={alta} props={props} cerrar={() => setAlta(0)} alGuardar={(c) => { setAlta(0); setClave(c); }} />}
       {confirmar?.tipo === "restablecer" && (
         <Modal abierto cerrar={() => setConfirmar(null)} etiqueta="Acceso" titulo={`Darle acceso a ${confirmar.p.nombre.split(" ")[0]}`}>
           <p className="muted">Se genera una contraseña temporal que verás 30 minutos para dársela.<br />Su contraseña anterior deja de servir y al entrar elegirá una propia.</p>
           <div className="acciones">
-            <button type="button" className="bt sec solo" onClick={() => setConfirmar(null)}>Regresar</button>
             <button type="button" className="bt" disabled={pendiente} onClick={() => ejecutar(() => restablecer(confirmar.p.id))}>{pendiente ? "Generando…" : "Generar contraseña"}<Fl /></button>
           </div>
         </Modal>
@@ -329,7 +308,6 @@ export function Personas(props: Props) {
         <Modal abierto cerrar={() => setConfirmar(null)} etiqueta="Desactivar usuario" titulo={`¿Desactivar a ${confirmar.p.nombre.split(" ")[0]}?`}>
           <p className="muted">Ya no podrá entrar.<br />Sus ventas y todo lo que hizo se conservan. Se puede reactivar cuando quieras.</p>
           <div className="acciones">
-            <button type="button" className="bt sec solo" onClick={() => setConfirmar(null)}>Regresar</button>
             <button type="button" className="bt peligro" disabled={pendiente} onClick={() => ejecutar(() => desactivar(confirmar.p.id))}>Sí, desactivar<Fl /></button>
           </div>
         </Modal>
@@ -338,7 +316,6 @@ export function Personas(props: Props) {
         <Modal abierto cerrar={() => setConfirmar(null)} etiqueta="Eliminar usuario" titulo={`¿Eliminar a ${confirmar.p.nombre.split(" ")[0]} definitivamente?`}>
           <p className="muted">Se borra su cuenta. Si ya tiene ventas o movimientos, te preguntaremos antes de borrar sus datos.</p>
           <div className="acciones">
-            <button type="button" className="bt sec solo" onClick={() => setConfirmar(null)}>Regresar</button>
             <button type="button" className="bt peligro" disabled={pendiente} onClick={() => ejecutar(() => darDeBaja(confirmar.p.id))}>Sí, eliminar<Fl /></button>
           </div>
         </Modal>
@@ -351,9 +328,8 @@ export function Personas(props: Props) {
             <p><b>{confirmar.p.nombre} ya tiene ventas o movimientos registrados.</b><br />
               Si continúas, se borran para siempre su nombre, usuario, contraseña, avatar, forma de pago y permisos. Ya no podrá entrar.</p>
           </div>
-          <p className="muted" style={{ fontSize: 13 }}>Sus ventas, cortes y pagos se quedan en las cuentas a nombre de &quot;Persona eliminada&quot;, para que los reportes y la caja sigan cuadrando. Esto no se puede deshacer.</p>
+          <p className="muted" style={{ fontSize: 13 }}>Sus ventas, cortes y pagos se quedan en los registros como &quot;Usuario eliminado&quot;, para que los reportes y la caja sigan cuadrando. Esto no se puede deshacer.</p>
           <div className="acciones">
-            <button type="button" className="bt sec solo" onClick={() => setConfirmar(null)}>Mejor no</button>
             <button type="button" className="bt peligro" disabled={pendiente} onClick={() => ejecutar(() => darDeBaja(confirmar.p.id, true))}>{pendiente ? "Borrando…" : "Sí, borrar sus datos"}<Fl /></button>
           </div>
         </Modal>

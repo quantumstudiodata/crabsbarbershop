@@ -18,7 +18,7 @@ async function metodoDe(barberiaId: string, id: string) {
 }
 
 export async function alternarMetodo(id: string): Promise<EstadoAjuste> {
-  const s = await requerirSesion("ajustes.funciones");
+  const s = await requerirSesion("configuracion.cobros");
   const m = await metodoDe(s.barberia.id, id);
   if (!m) return { error: "No se encontró esa forma de pago." };
   if (m.activo) {
@@ -32,7 +32,7 @@ export async function alternarMetodo(id: string): Promise<EstadoAjuste> {
 }
 
 export async function renombrarMetodo(id: string, nombre: string): Promise<EstadoAjuste> {
-  const s = await requerirSesion("ajustes.funciones");
+  const s = await requerirSesion("configuracion.cobros");
   const limpio = String(nombre ?? "").trim().replace(/\s+/g, " ").slice(0, 40);
   if (limpio.length < 2) return { error: "Escribe el nombre." };
   const m = await metodoDe(s.barberia.id, id);
@@ -47,7 +47,7 @@ export async function renombrarMetodo(id: string, nombre: string): Promise<Estad
 
 /** Eliminar una forma de pago. Los cobros que ya la usaron conservan su nombre, así que el historial no cambia. */
 export async function eliminarMetodo(id: string): Promise<EstadoAjuste> {
-  const s = await requerirSesion("ajustes.funciones");
+  const s = await requerirSesion("configuracion.cobros");
   const m = await metodoDe(s.barberia.id, id);
   if (!m) return { error: "No se encontró esa forma de pago." };
   if (m.esEfectivo) return { error: "El efectivo no se elimina; si no lo usan, desactívalo." };
@@ -64,7 +64,7 @@ export async function eliminarMetodo(id: string): Promise<EstadoAjuste> {
 
 /** Caja compartida o una por trabajador. Solo se cambia con todas las cajas cerradas. */
 export async function cambiarModeloCaja(valor: string): Promise<EstadoAjuste> {
-  const s = await requerirSesion("ajustes.funciones");
+  const s = await requerirSesion("configuracion.caja");
   const modelo = valor === "individual" ? "individual" : "compartida";
   if (modelo === s.barberia.modeloCaja) return { ok: true, n: Date.now() };
   const abiertas = await db.select({ id: schema.turnosCaja.id }).from(schema.turnosCaja).where(and(eq(schema.turnosCaja.barberiaId, s.barberia.id), eq(schema.turnosCaja.estado, "abierto")));
@@ -80,7 +80,7 @@ const PERIODOS_G = ["semanal", "quincenal", "mensual"];
 const METODOS_G = ["efectivo", "transferencia", "tarjeta"];
 
 export async function agregarConcepto(_: EstadoAjuste, form: FormData): Promise<EstadoAjuste> {
-  const s = await requerirSesion("ajustes.funciones");
+  const s = await requerirSesion("configuracion.egresos");
   const concepto = texto(form, "concepto", 120);
   const categoria = texto(form, "categoria", 60);
   const monto = leerPesos(texto(form, "monto")) ?? 0;
@@ -97,7 +97,7 @@ export async function agregarConcepto(_: EstadoAjuste, form: FormData): Promise<
 }
 
 export async function quitarConcepto(id: string): Promise<EstadoAjuste> {
-  const s = await requerirSesion("ajustes.funciones");
+  const s = await requerirSesion("configuracion.egresos");
   const [c] = await db.select().from(schema.conceptosFrecuentes).where(and(eq(schema.conceptosFrecuentes.id, String(id)), eq(schema.conceptosFrecuentes.barberiaId, s.barberia.id)));
   if (!c) return { error: "No se encontró." };
   await db.delete(schema.conceptosFrecuentes).where(eq(schema.conceptosFrecuentes.id, c.id));
@@ -107,7 +107,7 @@ export async function quitarConcepto(id: string): Promise<EstadoAjuste> {
 }
 
 export async function agregarMetodo(form: FormData) {
-  const s = await requerirSesion("ajustes.funciones");
+  const s = await requerirSesion("configuracion.cobros");
   const nombre = texto(form, "nombre", 40);
   if (!nombre) volver(R, { error: "Escribe el nombre de la forma de pago." });
   await db.insert(schema.metodosPago).values({ barberiaId: s.barberia.id, nombre, esEfectivo: false, orden: 100 });
@@ -120,7 +120,11 @@ export type EstadoReglas = { ok?: boolean; error?: string; n?: number };
 
 /** Guarda sin recargar la página: el botón pasa a "Guardado". */
 export async function guardarReglas(_: EstadoReglas, form: FormData): Promise<EstadoReglas> {
-  const s = await requerirSesion("ajustes.funciones");
+  const s = await requerirSesion();
+  // Cada apartado se protege con su propio permiso.
+  if (form.has("descuento") && !s.puede("configuracion.cobros")) return { error: "No tienes permiso para cambiar las reglas de cobro." };
+  if ((form.has("diferencia") || form.has("fondo")) && !s.puede("configuracion.caja")) return { error: "No tienes permiso para cambiar la caja." };
+  if ((form.has("meta") || form.has("metaMensual")) && !s.puede("configuracion.metas")) return { error: "No tienes permiso para cambiar las metas." };
   const num = (k: string) => Number(texto(form, k, 9).replace(/\D/g, ""));
   const b = s.barberia;
   const cambios: Partial<typeof schema.barberias.$inferInsert> = {};
@@ -153,21 +157,20 @@ export async function guardarReglas(_: EstadoReglas, form: FormData): Promise<Es
 }
 
 const FUNCIONES = {
-  propinas: ["usaPropinas", "Propinas"],
-  descuentos: ["usaDescuentos", "Descuentos"],
-  dividir: ["usaDividirPago", "Dividir pago"],
-  metas: ["usaMetas", "Metas de ventas"],
-  renta: ["usaRentaSilla", "Renta de silla"],
-  apertura: ["aperturaManual", "Apertura de caja"],
-  comprobantes: ["usaComprobantes", "Registro de comprobantes"],
-  periodicidad: ["usaPeriodicidad", "Periodicidad de gastos"],
+  propinas: ["usaPropinas", "Propinas", "configuracion.cobros"],
+  descuentos: ["usaDescuentos", "Descuentos", "configuracion.cobros"],
+  dividir: ["usaDividirPago", "Dividir pago", "configuracion.cobros"],
+  metas: ["usaMetas", "Metas de ventas", "configuracion.metas"],
+  apertura: ["aperturaManual", "Apertura de caja", "configuracion.caja"],
+  comprobantes: ["usaComprobantes", "Registro de comprobantes", "configuracion.egresos"],
+  periodicidad: ["usaPeriodicidad", "Periodicidad de gastos", "configuracion.egresos"],
 } as const;
 
 export async function alternarFuncion(clave: string) {
-  const s = await requerirSesion("ajustes.funciones");
   const f = FUNCIONES[clave as keyof typeof FUNCIONES];
   if (!f) return;
-  const [campo, nombre] = f;
+  const [campo, nombre, permiso] = f;
+  const s = await requerirSesion(permiso);
   const antes = s.barberia[campo];
   await db.update(schema.barberias).set({ [campo]: !antes }).where(eq(schema.barberias.id, s.barberia.id));
   await registrar(db, {

@@ -184,7 +184,6 @@ function Nuevo({ hoy, cajaAbierta, categorias, cerrar, otro, opciones }: { hoy: 
         <label className="campo"><span>Descripción (opcional)</span><textarea className="input" name="descripcion" rows={2} maxLength={500} placeholder="Algún detalle que ayude a recordarlo" /></label>
         {e.error && <p className="aviso error">{e.error}</p>}
         <div className="acciones">
-          <button type="button" className="bt sec solo" onClick={cerrar}>Cancelar</button>
           <button className="bt sec solo" disabled={guardando} onClick={() => setSeguir(true)}>Guardar y agregar otro</button>
           <button className="bt" disabled={guardando} onClick={() => setSeguir(false)}>{guardando ? "Guardando…" : "Guardar egreso"}<Fl /></button>
         </div>
@@ -204,7 +203,6 @@ function Cancelar({ f, cerrar }: { f: FilaEgreso; cerrar: () => void }) {
         <label className="campo"><span>Motivo</span><input className="input" name="motivo" placeholder="Ejemplo: se registró dos veces" required autoFocus /></label>
         {e.error && <p className="aviso error">{e.error}</p>}
         <div className="acciones">
-          <button type="button" className="bt sec solo" onClick={cerrar}>Regresar</button>
           <button className="bt peligro" disabled={guardando}>Sí, cancelar<Fl /></button>
         </div>
       </form>

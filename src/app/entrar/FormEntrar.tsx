@@ -63,7 +63,7 @@ export function FormEntrar() {
           </button>
           <button type="button" className="opcion-t" style={{ textAlign: "left", border: 0 }} onClick={() => setPaso("confirmar")}>
             <b>Restablecerla</b>
-            <small>No la recuerdas. El propietario te dará una temporal.</small>
+            <small>No la recuerdas. El titular te dará una temporal.</small>
           </button>
         </div>
       </Modal>
@@ -82,7 +82,7 @@ export function FormEntrar() {
 
       <Modal abierto={paso === "confirmar" || paso === "enviando"} cerrar={cerrar} etiqueta="Restablecer contraseña" titulo="¿Seguro que quieres restablecerla?">
         <p className="muted">
-          Se le avisará al propietario.
+          Se le avisará al titular.
           <br />
           Te dará una contraseña temporal y, al entrar, elegirás una nueva.
         </p>
@@ -106,7 +106,7 @@ export function FormEntrar() {
         <div className="cronometro">
           <span className="exito"><Icono n="palomita" /></span>
           <p className="muted">
-            Tu solicitud llegó al propietario y se aprobará pronto.
+            Tu solicitud llegó al titular y se aprobará pronto.
             <br />
             Cuando te dé la contraseña temporal, entra con ella.
           </p>

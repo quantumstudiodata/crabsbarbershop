@@ -72,7 +72,7 @@ export function MenuUsuario(p: { nombre: string; usuario: string; rol: string; a
           <div><small>Usuario</small><span className="mono">{p.usuario}</span></div>
           {p.formaPago && <div><small>Tipo de pago</small><span>{p.formaPago}</span></div>}
         </div>
-        <p className="ayuda-txt" style={{ textAlign: "center" }}>Para cambiar tus datos, pídeselo al propietario.</p>
+        <p className="ayuda-txt" style={{ textAlign: "center" }}>Para cambiar tus datos, pídeselo al titular.</p>
         <div className="acciones">
           <button type="button" className="bt sec solo" onClick={() => { setPerfil(false); setVez((v) => v + 1); setClave(true); }}><Icono n="candado" />Cambiar contraseña</button>
           <button type="button" className="bt" onClick={() => setPerfil(false)}>Listo<span className="fl" aria-hidden="true"><Icono n="palomita" /></span></button>
@@ -119,7 +119,6 @@ function VentanaClave({ cerrar }: { cerrar: () => void }) {
           <p className="ayuda-txt">Al menos 8 caracteres, con letras y números.</p>
           {eClave.error && <p className="aviso error" role="alert">{eClave.error}</p>}
           <div className="acciones">
-            <button type="button" className="bt sec solo" onClick={cerrar}>Regresar</button>
             <button className="bt" disabled={guardandoClave}>{guardandoClave ? "Guardando…" : "Guardar"}<Fl /></button>
           </div>
         </form>

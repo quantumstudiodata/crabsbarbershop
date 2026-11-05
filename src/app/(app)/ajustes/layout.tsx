@@ -1,5 +1,6 @@
 import { redirect } from "next/navigation";
 import { requerirSesion } from "@/lib/auth";
+import { PERMISOS_CONFIG } from "@/lib/permisos";
 import { NavAjustes } from "./NavAjustes";
 
 export default async function LayoutAjustes({ children }: { children: React.ReactNode }) {
@@ -7,7 +8,7 @@ export default async function LayoutAjustes({ children }: { children: React.Reac
   const links: [string, string, string][] = [];
   if (s.puede("usuarios.ver")) links.push(["/ajustes", "Usuarios", "persona"]);
   if (s.puede("servicios.ver")) links.push(["/ajustes/servicios", "Servicios", "etiqueta"]);
-  if (s.puede("ajustes.funciones")) links.push(["/ajustes/cobro", "Editar funciones", "caja"]);
+  if (PERMISOS_CONFIG.some((p) => s.puede(p))) links.push(["/ajustes/cobro", "Configurar negocio", "caja"]);
   if (links.length === 0) redirect("/?aviso=sin-permiso");
   return (
     <div className="ajustes">

@@ -244,7 +244,7 @@ export function FormCobro(p: {
                 <span className="otra"><input placeholder="Otro" value={["Cliente frecuente", "Promoción", "Cortesía"].includes(motivo) ? "" : motivo} onChange={(e) => setMotivo(e.target.value)} aria-label="Otro motivo" style={{ width: 90 }} /></span>
               </div>
             )}
-            {pasaLimite && <small className="muted">Pasa del {p.limiteDescuento}% permitido. Solo el propietario o el administrador pueden registrarlo.</small>}
+            {pasaLimite && <small className="muted">Pasa del {p.limiteDescuento}% permitido. Solo el titular o el administrador pueden registrarlo.</small>}
           </div>
         )}
         {panel === "propina" && (

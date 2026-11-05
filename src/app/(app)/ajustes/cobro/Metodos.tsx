@@ -53,7 +53,6 @@ export function Metodos({ metodos }: { metodos: Metodo[] }) {
         <Modal abierto cerrar={() => setBorrar(null)} etiqueta="Formas de pago" titulo={`¿Eliminar ${borrar.nombre}?`}>
           <p className="muted">Deja de aparecer en Cobro y en Ajustes. Los cobros que ya se hicieron con {borrar.nombre} se conservan con ese nombre.</p>
           <div className="acciones">
-            <button type="button" className="bt sec solo" onClick={() => setBorrar(null)}>Regresar</button>
             <button type="button" className="bt peligro" disabled={pendiente} onClick={() => correr(() => eliminarMetodo(borrar.id), () => { setLista(lista.filter((x) => x.id !== borrar.id)); setBorrar(null); })}>Sí, eliminar</button>
           </div>
         </Modal>

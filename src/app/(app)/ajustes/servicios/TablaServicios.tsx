@@ -162,7 +162,6 @@ export function TablaServicios({ servicios: inicial, puedeEditar = true }: { ser
             </label>
             <div className="entre"><span>Visible en Cobro</span><Interruptor etiqueta="Visible en Cobro" checked={edit.activo} onChange={(v) => setEdit({ ...edit, activo: v })} /></div>
             <div className="acciones">
-              <button type="button" className="bt sec solo" onClick={() => setEdit(null)}>Cancelar</button>
               <button className="bt" disabled={pendiente}>{pendiente ? "Guardando…" : "Guardar servicio"}<Fl /></button>
             </div>
           </form>
@@ -174,7 +173,6 @@ export function TablaServicios({ servicios: inicial, puedeEditar = true }: { ser
           <div className="campo"><span>Pasar sus servicios a</span>
             <Selector etiqueta="Categoría" valor={destino} onChange={setDestino} opciones={categorias.filter((x) => x !== borrarCat).map((x) => ({ valor: x, texto: x }))} /></div>
           <div className="acciones">
-            <button type="button" className="bt sec solo" onClick={() => setBorrarCat(null)}>Regresar</button>
             <button type="button" className="bt peligro" disabled={pendiente || !destino} onClick={() => correr(() => borrarCategoria(borrarCat, destino), () => { setServicios(servicios.map((x) => (x.categoria === borrarCat ? { ...x, categoria: destino } : x))); setBorrarCat(null); })}>Sí, borrar categoría</button>
           </div>
         </Modal>
@@ -183,7 +181,6 @@ export function TablaServicios({ servicios: inicial, puedeEditar = true }: { ser
         <Modal abierto cerrar={() => setBorrar(null)} etiqueta="Eliminar servicio" titulo={`¿Eliminar ${borrar.nombre}?`}>
           <p className="muted">Si ya se cobró alguna vez, solo se oculta para no perder las ventas pasadas.</p>
           <div className="acciones">
-            <button type="button" className="bt sec solo" onClick={() => setBorrar(null)}>Regresar</button>
             <button type="button" className="bt peligro" disabled={pendiente} onClick={() => correr(() => eliminarServicio(borrar.id), () => setBorrar(null))}>Sí, eliminar<Fl /></button>
           </div>
         </Modal>

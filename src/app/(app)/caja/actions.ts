@@ -41,7 +41,7 @@ export async function abrirCaja(_: EstadoCaja, form: FormData): Promise<EstadoCa
 
 export async function registrarMovimiento(_: EstadoCaja, form: FormData): Promise<EstadoCaja> {
   const s = await requerirSesion();
-  if (!s.puede("caja.operar")) return { error: "No tienes permiso para mover la caja." };
+  if (!s.puede("caja.retiros")) return { error: "No tienes permiso para registrar retiros." };
   const tipo = texto(form, "tipo");
   const monto = leerPesos(texto(form, "monto"));
   const concepto = texto(form, "concepto");
@@ -62,7 +62,7 @@ export async function registrarMovimiento(_: EstadoCaja, form: FormData): Promis
 
 export async function registrarGasto(_: EstadoCaja, form: FormData): Promise<EstadoCaja> {
   const s = await requerirSesion();
-  if (!s.puede("caja.operar")) return { error: "No tienes permiso para registrar gastos de caja." };
+  if (!s.puede("caja.retiros")) return { error: "No tienes permiso para registrar gastos de caja." };
   const monto = leerPesos(texto(form, "monto"));
   const concepto = texto(form, "concepto");
   const elegida = texto(form, "categoria", 60);

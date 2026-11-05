@@ -124,7 +124,7 @@ export function CajaModal({ inicial, turno, limiteDiferencia, categorias }: { in
   if (!vista || !turno) return null;
 
   if (vista === "retiro") {
-    const sugeridos = tipoMov === "retiro" ? ["Depósito al banco", "Propinas entregadas", "Lo llevó el propietario"] : ["Más cambio", "Reposición del fondo"];
+    const sugeridos = tipoMov === "retiro" ? ["Depósito al banco", "Propinas entregadas", "Lo llevó el titular"] : ["Más cambio", "Reposición del fondo"];
     return (
       <Modal abierto cerrar={cerrar} etiqueta="Caja" titulo={tipoMov === "retiro" ? "Sacar efectivo" : "Meter efectivo"}>
         <form action={accMov} className="pila">
@@ -139,7 +139,7 @@ export function CajaModal({ inicial, turno, limiteDiferencia, categorias }: { in
             <input className="input" name="concepto" value={concepto} onChange={(e) => setConcepto(e.target.value)} placeholder="Motivo" required aria-label="Motivo" />
           </div>
           {eMov.error && <p className="aviso error">{eMov.error}</p>}
-          <div className="acciones"><button type="button" className="bt sec solo" onClick={cerrar}>Regresar</button><button className="bt" disabled={guardandoMov}>{guardandoMov ? "Guardando…" : "Guardar"}<Fl /></button></div>
+          <div className="acciones"><button className="bt" disabled={guardandoMov}>{guardandoMov ? "Guardando…" : "Guardar"}<Fl /></button></div>
         </form>
       </Modal>
     );
@@ -154,7 +154,7 @@ export function CajaModal({ inicial, turno, limiteDiferencia, categorias }: { in
           <input className="input" name="concepto" placeholder="En qué se gastó" required aria-label="En qué se gastó" />
           <div className="billetes">{categorias.map((c) => <button type="button" key={c} className={categoria === c ? "on" : ""} onClick={() => setCategoria(c)}>{c}</button>)}</div>
           {eGasto.error && <p className="aviso error">{eGasto.error}</p>}
-          <div className="acciones"><button type="button" className="bt sec solo" onClick={cerrar}>Regresar</button><button className="bt" disabled={guardandoGasto}>{guardandoGasto ? "Guardando…" : "Guardar"}<Fl /></button></div>
+          <div className="acciones"><button className="bt" disabled={guardandoGasto}>{guardandoGasto ? "Guardando…" : "Guardar"}<Fl /></button></div>
         </form>
       </Modal>
     );
@@ -202,7 +202,7 @@ export function CajaModal({ inicial, turno, limiteDiferencia, categorias }: { in
           <textarea className="input" name="notas" placeholder={dif !== null && Math.abs(dif) > limiteDiferencia ? "Hay diferencia. Escribe qué pasó." : "Opcional"} />
         </label>
         {eCerrar.error && <p className="aviso error">{eCerrar.error}</p>}
-        <div className="acciones"><button type="button" className="bt sec solo" onClick={cerrar}>Regresar</button><button className="bt" disabled={cerrando}>{cerrando ? "Cerrando…" : "Cerrar caja"}<Fl /></button></div>
+        <div className="acciones"><button className="bt" disabled={cerrando}>{cerrando ? "Cerrando…" : "Cerrar caja"}<Fl /></button></div>
       </form>
     </Modal>
   );

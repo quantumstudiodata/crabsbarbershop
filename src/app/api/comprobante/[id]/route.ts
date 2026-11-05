@@ -8,7 +8,7 @@ export const dynamic = "force-dynamic";
 export async function GET(_: Request, { params }: { params: Promise<{ id: string }> }) {
   const s = await obtenerSesion();
   if (!s || s.usuario.debeCambiar) return new Response("Inicia sesión.", { status: 401 });
-  if (!s.puede("gastos.ver") && !s.puede("gastos.registrar") && !s.puede("reportes.ver")) return new Response("Sin permiso.", { status: 403 });
+  if (!s.puede("gastos.ver")) return new Response("Sin permiso.", { status: 403 });
   const { id } = await params;
   if (!/^[0-9a-f-]{36}$/.test(id)) return new Response("No encontrado.", { status: 404 });
   const [c] = await db.select().from(schema.comprobantes).where(and(eq(schema.comprobantes.id, id), eq(schema.comprobantes.barberiaId, s.barberia.id))).limit(1);

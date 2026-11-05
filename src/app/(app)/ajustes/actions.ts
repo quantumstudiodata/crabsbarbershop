@@ -11,7 +11,9 @@ import { contrasenaTemporal, sugerirUsuario } from "@/lib/cuentas";
 import { db, schema } from "@/lib/db";
 import { registrar } from "@/lib/historial";
 import { formatoDinero, leerPesos } from "@/lib/money";
-import { expandirPermisos, NOMBRE_ROL, PERMISOS, PERMISOS_POR_ROL, type Permiso, rolesAsignables, type Rol } from "@/lib/permisos";
+import { expandirPermisos, NOMBRE_ROL, PERMISOS, PERMISOS_POR_ROL, type Permiso, permisosDe, rolesAsignables, type Rol } from "@/lib/permisos";
+import { esTotal, puedeEditarA, puedeManejar } from "@/lib/puestos";
+import type { Sesion } from "@/lib/auth";
 import { texto } from "@/lib/volver";
 
 export type ClaveVisible = { nombre: string; usuario: string; clave: string; expira: number };
@@ -22,11 +24,17 @@ async function personaDeMiBarberia(barberiaId: string, id: string) {
   return u ?? null;
 }
 
+/** La persona y si quien edita puede tocarla. */
+async function objetivo(s: Sesion, id: string) {
+  const u = await personaDeMiBarberia(s.barberia.id, id);
+  if (!u) return { u: null, puede: false };
+  const [p] = u.puestoId ? await db.select().from(schema.puestos).where(eq(schema.puestos.id, u.puestoId)).limit(1) : [];
+  return { u, puede: puedeEditarA(s, u, permisosDe(u.rol, u.permisosExtra, u.permisosQuitados, p?.permisos ?? null)) };
+}
+
 type ReglaNueva = { tipo: "porcentaje" | "fijo" | "renta" | "sueldo" | "mixto"; porcentaje: number; montoFijo: number; montoSemanal: number; periodo: string };
 
 /** Lee la forma de pago del formulario. null si no aplica; texto si hay un error. */
-/** Permisos extra en palabras, para el antes y después del historial. */
-const permisosTexto = (xs: string[]) => (xs.length ? `además puede: ${xs.map((x) => PERMISOS[x as keyof typeof PERMISOS] ?? x).join(", ").toLowerCase()}` : "solo los permisos de su rol");
 
 function leerForma(form: FormData, rol: Rol): ReglaNueva | null | string {
   if (rol !== "barbera" && rol !== "encargada") return null;
@@ -56,6 +64,33 @@ async function guardarForma(tx: Tx, barberiaId: string, usuarioId: string, r: Re
   return true;
 }
 
+/** Lee el puesto elegido: una plantilla ("rol:barbera") o un puesto del negocio ("puesto:id"). */
+async function leerPuesto(s: Sesion, form: FormData): Promise<{ rol: Rol; puestoId: string | null; nombre: string; base: Set<string> } | string> {
+  const v = texto(form, "puesto", 60);
+  if (v.startsWith("rol:")) {
+    const rol = v.slice(4) as Rol;
+    if (!rolesAsignables(s.usuario.rol, !!s.usuario.puestoId).includes(rol)) return "Elige un puesto.";
+    return { rol, puestoId: null, nombre: NOMBRE_ROL[rol], base: new Set(PERMISOS_POR_ROL[rol]) };
+  }
+  if (v.startsWith("puesto:")) {
+    const [p] = await db.select().from(schema.puestos).where(and(eq(schema.puestos.id, v.slice(7)), eq(schema.puestos.barberiaId, s.barberia.id))).limit(1);
+    if (!p || !p.activo) return "Ese puesto ya no está disponible.";
+    if (!puedeManejar(s, p.permisos)) return "No puedes asignar ese puesto.";
+    return { rol: p.plantilla, puestoId: p.id, nombre: p.nombre, base: new Set(expandirPermisos(p.permisos)) };
+  }
+  return "Elige un puesto.";
+}
+
+/** Lo marcado en los interruptores, comparado con lo que trae el puesto: lo que se agrega y lo que se quita. */
+function ajustesDePermisos(s: Sesion, form: FormData, base: Set<string>) {
+  if (!form.has("conPermisos")) return { extra: [] as string[], quitados: [] as string[] };
+  const marcados = new Set(form.getAll("permisos").map(String).filter((p) => p in PERMISOS));
+  // Solo se puede dar un permiso que quien edita también tiene.
+  const extra = [...marcados].filter((p) => !base.has(p) && (esTotal(s) || s.puede(p as Permiso)));
+  const quitados = [...base].filter((p) => !marcados.has(p));
+  return { extra, quitados };
+}
+
 async function atenderSolicitudes(usuarioId: string) {
   await db.update(schema.solicitudesClave).set({ atendida: true }).where(and(eq(schema.solicitudesClave.usuarioId, usuarioId), eq(schema.solicitudesClave.atendida, false)));
 }
@@ -64,20 +99,22 @@ async function atenderSolicitudes(usuarioId: string) {
 export async function darDeAlta(_: EstadoPersona, form: FormData): Promise<EstadoPersona> {
   const s = await requerirSesion("usuarios.editar");
   const nombre = texto(form, "nombre", 80).replace(/\s+/g, " ");
-  const rol = texto(form, "rol") as Rol;
   if (nombre.split(" ").length < 2) return { error: "Escribe nombre y apellido." };
-  if (!rolesAsignables(s.usuario.rol).includes(rol)) return { error: "Elige un rol." };
+  const puesto = await leerPuesto(s, form);
+  if (typeof puesto === "string") return { error: puesto };
+  const { rol, puestoId } = puesto;
+  const { extra, quitados } = ajustesDePermisos(s, form, puesto.base);
   const forma = leerForma(form, rol);
   if (typeof forma === "string") return { error: forma };
-  if (forma?.tipo === "renta" && !s.barberia.usaRentaSilla) return { error: "La renta de silla está apagada en Ajustes." };
+  if (forma?.tipo === "renta") return { error: "Elige otra forma de pago." };
   const existentes = (await db.select({ u: schema.usuarios.usuario }).from(schema.usuarios)).map((x) => x.u);
   const usuario = sugerirUsuario(nombre, existentes);
   const clave = contrasenaTemporal(nombre);
   const expira = expiraClave();
   await db.transaction(async (tx) => {
-    const [nuevo] = await tx.insert(schema.usuarios).values({ barberiaId: s.barberia.id, nombre, usuario, rol, hash: await hashContrasena(clave), debeCambiar: true, claveTemporal: cifrar(clave), claveTemporalExpira: expira }).returning({ id: schema.usuarios.id });
+    const [nuevo] = await tx.insert(schema.usuarios).values({ barberiaId: s.barberia.id, nombre, usuario, rol, puestoId, permisosExtra: extra, permisosQuitados: quitados, hash: await hashContrasena(clave), debeCambiar: true, claveTemporal: cifrar(clave), claveTemporalExpira: expira }).returning({ id: schema.usuarios.id });
     if (forma) await guardarForma(tx, s.barberia.id, nuevo.id, forma);
-    await registrar(tx, { barberiaId: s.barberia.id, usuarioId: s.usuario.id, tipo: "usuario", accion: `${s.usuario.nombre} dio de alta a ${nombre} como ${NOMBRE_ROL[rol]}`, detalle: { usuario, formaDePago: forma ? describirRegla(forma, formatoDinero) : undefined } });
+    await registrar(tx, { barberiaId: s.barberia.id, usuarioId: s.usuario.id, tipo: "usuario", accion: `${s.usuario.nombre} dio de alta a ${nombre} como ${puesto.nombre}`, detalle: { usuario, formaDePago: forma ? describirRegla(forma, formatoDinero) : undefined } });
   });
   revalidatePath("/ajustes");
   return { ok: true, clave: { nombre, usuario, clave, expira: expira.getTime() }, n: Date.now() };
@@ -85,10 +122,10 @@ export async function darDeAlta(_: EstadoPersona, form: FormData): Promise<Estad
 
 export async function restablecer(id: string): Promise<EstadoPersona> {
   const s = await requerirSesion("usuarios.editar");
-  const u = await personaDeMiBarberia(s.barberia.id, String(id));
+  const { u, puede } = await objetivo(s, String(id));
   if (!u) return { error: "No se encontró a esa persona." };
   if (u.id === s.usuario.id) return { error: "Tu propia contraseña se cambia desde tu menú." };
-  if (!rolesAsignables(s.usuario.rol).includes(u.rol === "encargada" ? "barbera" : u.rol)) return { error: "No puedes restablecer la contraseña de esa persona." };
+  if (!puede) return { error: "No puedes restablecer la contraseña de esa persona." };
   const clave = contrasenaTemporal(u.nombre);
   const expira = expiraClave();
   await db.update(schema.usuarios).set({ hash: await hashContrasena(clave), debeCambiar: true, intentosFallidos: 0, bloqueadoHasta: null, claveTemporal: cifrar(clave), claveTemporalExpira: expira }).where(eq(schema.usuarios.id, u.id));
@@ -102,8 +139,8 @@ export async function restablecer(id: string): Promise<EstadoPersona> {
 /** Vuelve a mostrar la contraseña temporal mientras no pasen los 30 minutos. */
 export async function verClave(id: string): Promise<EstadoPersona> {
   const s = await requerirSesion("usuarios.editar");
-  const u = await personaDeMiBarberia(s.barberia.id, String(id));
-  if (!u || !rolesAsignables(s.usuario.rol).includes(u.rol === "encargada" ? "barbera" : u.rol)) return { error: "No se encontró a esa persona." };
+  const { u, puede } = await objetivo(s, String(id));
+  if (!u || !puede) return { error: "No se encontró a esa persona." };
   if (!u.claveTemporal || !u.claveTemporalExpira || u.claveTemporalExpira < new Date() || !u.debeCambiar) return { error: "Ya pasaron los 30 minutos. Restablécela otra vez para ver una nueva." };
   const clave = descifrar(u.claveTemporal);
   if (!clave) return { error: "No se pudo leer la contraseña. Restablécela otra vez." };
@@ -112,35 +149,40 @@ export async function verClave(id: string): Promise<EstadoPersona> {
 
 export async function actualizarPersona(_: EstadoPersona, form: FormData): Promise<EstadoPersona> {
   const s = await requerirSesion("usuarios.editar");
-  const u = await personaDeMiBarberia(s.barberia.id, texto(form, "id", 40));
+  const { u, puede } = await objetivo(s, texto(form, "id", 40));
   if (!u) return { error: "No se encontró a esa persona." };
-  if (u.id === s.usuario.id) return { error: "No puedes cambiar tu propio rol." };
-  const asignables = rolesAsignables(s.usuario.rol);
-  if (!asignables.includes(u.rol === "encargada" ? "barbera" : u.rol)) return { error: "No puedes cambiar a esa persona." };
-  const rol = texto(form, "rol") as Rol;
-  if (!asignables.includes(rol)) return { error: "Elige un rol." };
+  if (!puede) return { error: "No puedes cambiar a esa persona." };
+  const yo = u.id === s.usuario.id;
+  // A uno mismo solo se le cambian los permisos: el puesto lo cambia otra persona.
+  const [pActual] = u.puestoId ? await db.select().from(schema.puestos).where(eq(schema.puestos.id, u.puestoId)).limit(1) : [];
+  const puesto = yo
+    ? { rol: u.rol, puestoId: u.puestoId, nombre: pActual?.nombre ?? NOMBRE_ROL[u.rol], base: new Set<string>(pActual ? expandirPermisos(pActual.permisos) : PERMISOS_POR_ROL[u.rol]) }
+    : await leerPuesto(s, form);
+  if (typeof puesto === "string") return { error: puesto };
+  const { rol, puestoId } = puesto;
   const nombre = texto(form, "nombre", 80).replace(/\s+/g, " ") || u.nombre;
   const forma = leerForma(form, rol);
   if (typeof forma === "string") return { error: forma };
-  const base = new Set<string>(PERMISOS_POR_ROL[rol]);
-  // Solo se puede dar un permiso que quien edita también tiene.
-  const extra = form.getAll("permisos").map(String).filter((p) => p in PERMISOS && !base.has(p) && s.puede(p as Permiso));
+  if (forma?.tipo === "renta") return { error: "Elige otra forma de pago." };
+  const { extra, quitados } = ajustesDePermisos(s, form, puesto.base);
   const meta = leerPesos(texto(form, "meta")) ?? 0;
+  const antes = permisosDe(u.rol, u.permisosExtra, u.permisosQuitados, pActual?.permisos ?? null);
+  const ahora = permisosDe(rol, extra, quitados, puestoId ? [...puesto.base] : null);
+  const lista = (x: Set<string>) => [...x].map((k) => PERMISOS[k as Permiso]).join(", ").toLowerCase();
   await db.transaction(async (tx) => {
-    await tx.update(schema.usuarios).set({ nombre, rol, permisosExtra: extra, metaSemanal: meta }).where(eq(schema.usuarios.id, u.id));
+    await tx.update(schema.usuarios).set({ nombre, rol, puestoId, permisosExtra: extra, permisosQuitados: quitados, metaSemanal: meta }).where(eq(schema.usuarios.id, u.id));
     const cambios: string[] = [];
     if (nombre !== u.nombre) cambios.push(`nombre a ${nombre}`);
-    if (rol !== u.rol) cambios.push(`rol a ${NOMBRE_ROL[rol]}`);
+    if (rol !== u.rol || puestoId !== u.puestoId) cambios.push(`puesto a ${puesto.nombre}`);
     if (forma && (await guardarForma(tx, s.barberia.id, u.id, forma))) cambios.push(`forma de pago a ${describirRegla(forma, formatoDinero)}`);
-    if ([...extra].sort().join() !== expandirPermisos(u.permisosExtra).sort().join()) cambios.push("permisos");
+    if ([...antes].sort().join() !== [...ahora].sort().join()) cambios.push("permisos");
     if (meta !== u.metaSemanal) cambios.push("meta semanal");
     if (cambios.length) await registrar(tx, {
-      barberiaId: s.barberia.id, usuarioId: s.usuario.id, tipo: "usuario", accion: `${s.usuario.nombre} cambió a ${u.nombre}: ${cambios.join(", ")}`,
+      barberiaId: s.barberia.id, usuarioId: s.usuario.id, tipo: "usuario", accion: `${s.usuario.nombre} cambió a ${yo ? "sus propios permisos" : u.nombre}: ${cambios.join(", ")}`,
       detalle: {
         usuario: u.usuario,
-        antes: [u.nombre, NOMBRE_ROL[u.rol], u.metaSemanal ? `meta ${formatoDinero(u.metaSemanal)}` : "", permisosTexto(expandirPermisos(u.permisosExtra))].filter(Boolean).join(", "),
-        ahora: [nombre, NOMBRE_ROL[rol], meta ? `meta ${formatoDinero(meta)}` : "", permisosTexto(extra)].filter(Boolean).join(", "),
-        permisosExtra: extra,
+        antes: [u.nombre, pActual?.nombre ?? NOMBRE_ROL[u.rol], u.metaSemanal ? `meta ${formatoDinero(u.metaSemanal)}` : "", `puede: ${lista(antes)}`].filter(Boolean).join(", "),
+        ahora: [nombre, puesto.nombre, meta ? `meta ${formatoDinero(meta)}` : "", `puede: ${lista(ahora)}`].filter(Boolean).join(", "),
       },
     });
   });
@@ -152,14 +194,14 @@ export async function actualizarPersona(_: EstadoPersona, form: FormData): Promi
 /**
  * Eliminar definitivamente. Sin ventas ni movimientos, se borra por completo.
  * Con movimientos, primero se pide confirmar; al confirmar se borran sus datos personales (nombre, usuario,
- * contraseña, avatar, permisos) y sus ventas quedan a nombre de "Persona eliminada" para que las cuentas sigan cuadrando.
+ * contraseña, avatar, permisos) y sus ventas quedan a nombre de "Usuario eliminado" para que las cuentas sigan cuadrando.
  */
 export async function darDeBaja(id: string, borrarDatos = false): Promise<EstadoPersona> {
   const s = await requerirSesion("usuarios.editar");
-  const u = await personaDeMiBarberia(s.barberia.id, String(id));
+  const { u, puede } = await objetivo(s, String(id));
   if (!u) return { error: "No se encontró a esa persona." };
   if (u.id === s.usuario.id) return { error: "No puedes darte de baja a ti mismo." };
-  if (!rolesAsignables(s.usuario.rol).includes(u.rol === "encargada" ? "barbera" : u.rol)) return { error: "No puedes eliminar a esa persona." };
+  if (!puede) return { error: "No puedes eliminar a esa persona." };
   try {
     await db.transaction(async (tx) => {
       await tx.delete(schema.solicitudesClave).where(eq(schema.solicitudesClave.usuarioId, u.id));
@@ -172,8 +214,8 @@ export async function darDeBaja(id: string, borrarDatos = false): Promise<Estado
     const ahora = new Date();
     await db.transaction(async (tx) => {
       await tx.update(schema.usuarios).set({
-        nombre: "Persona eliminada", usuario: `BORRADO-${u.id.slice(0, 8).toUpperCase()}`, hash: await hashContrasena(randomUUID()),
-        activo: false, avatar: "iniciales", permisosExtra: [], metaSemanal: 0, claveTemporal: null, claveTemporalExpira: null, debeCambiar: false,
+        nombre: "Usuario eliminado", usuario: `BORRADO-${u.id.slice(0, 8).toUpperCase()}`, hash: await hashContrasena(randomUUID()),
+        activo: false, avatar: "iniciales", permisosExtra: [], permisosQuitados: [], puestoId: null, metaSemanal: 0, claveTemporal: null, claveTemporalExpira: null, debeCambiar: false,
       }).where(and(eq(schema.usuarios.id, u.id), eq(schema.usuarios.barberiaId, s.barberia.id)));
       await tx.delete(schema.sesiones).where(eq(schema.sesiones.usuarioId, u.id));
       await tx.delete(schema.solicitudesClave).where(eq(schema.solicitudesClave.usuarioId, u.id));
@@ -181,7 +223,7 @@ export async function darDeBaja(id: string, borrarDatos = false): Promise<Estado
       await registrar(tx, { barberiaId: s.barberia.id, usuarioId: s.usuario.id, tipo: "usuario", accion: `${s.usuario.nombre} eliminó a ${u.nombre}`, detalle: { usuario: u.usuario, datosBorrados: true } });
     });
     revalidatePath("/", "layout");
-    return { ok: true, mensaje: `Se borraron los datos de ${u.nombre}. Sus ventas quedan como "Persona eliminada".`, n: Date.now() };
+    return { ok: true, mensaje: `Se borraron los datos de ${u.nombre}. Sus ventas quedan como "Usuario eliminado".`, n: Date.now() };
   }
   await registrar(db, { barberiaId: s.barberia.id, usuarioId: s.usuario.id, tipo: "usuario", accion: `${s.usuario.nombre} eliminó a ${u.nombre}` });
   revalidatePath("/", "layout");
@@ -190,8 +232,8 @@ export async function darDeBaja(id: string, borrarDatos = false): Promise<Estado
 
 async function personaEditable(id: string) {
   const s = await requerirSesion("usuarios.editar");
-  const u = await personaDeMiBarberia(s.barberia.id, String(id));
-  if (!u || u.id === s.usuario.id || !rolesAsignables(s.usuario.rol).includes(u.rol === "encargada" ? "barbera" : u.rol)) return { s, u: null };
+  const { u, puede } = await objetivo(s, String(id));
+  if (!u || u.id === s.usuario.id || !puede) return { s, u: null };
   return { s, u };
 }
 

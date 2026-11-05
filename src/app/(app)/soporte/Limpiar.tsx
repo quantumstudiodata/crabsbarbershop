@@ -22,7 +22,6 @@ export function Limpiar({ negocio }: { negocio: string }) {
           <label className="campo"><span>Escribe BORRAR para confirmar</span><input className="input" name="confirmar" autoComplete="off" required /></label>
           {e.error && <p className="aviso error">{e.error}</p>}
           <div className="acciones">
-            <button type="button" className="bt sec solo" onClick={() => setAbierto(false)}>Regresar</button>
             <button className="bt peligro" disabled={borrando}>{borrando ? "Borrando…" : "Sí, borrar todo"}<Fl /></button>
           </div>
         </form>

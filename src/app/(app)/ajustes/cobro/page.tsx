@@ -5,7 +5,8 @@ import { requerirSesion } from "@/lib/auth";
 import { categoriasGasto, datosParaMeta } from "@/lib/datos";
 import { db, schema } from "@/lib/db";
 import { fechaLocal } from "@/lib/fechas";
-import { NOMBRE_ROL, permisosDe } from "@/lib/permisos";
+import { NOMBRE_ROL, PERMISOS_CONFIG, permisosDe } from "@/lib/permisos";
+import { redirect } from "next/navigation";
 import { agregarMetodo } from "./actions";
 import { Funciones } from "./Funciones";
 import { Metodos } from "./Metodos";
@@ -15,17 +16,18 @@ import { CategoriasEgresos, ConceptosFrecuentes, ModeloCaja } from "./Secciones"
 export const metadata = { title: "Editar funciones" };
 
 export default async function EditarFunciones({ searchParams }: { searchParams: Promise<{ aviso?: string; error?: string }> }) {
-  const s = await requerirSesion("ajustes.funciones");
+  const s = await requerirSesion();
+  if (!PERMISOS_CONFIG.some((p) => s.puede(p))) redirect("/?aviso=sin-permiso");
   const q = await searchParams;
   const b = s.barberia;
   const [metodos, gente, cats, conceptos] = await Promise.all([
     db.select().from(schema.metodosPago).where(eq(schema.metodosPago.barberiaId, b.id)).orderBy(asc(schema.metodosPago.orden)),
-    db.select({ rol: schema.usuarios.rol, extra: schema.usuarios.permisosExtra, nombre: schema.usuarios.nombre }).from(schema.usuarios).where(and(eq(schema.usuarios.barberiaId, b.id), eq(schema.usuarios.activo, true))),
+    db.select({ rol: schema.usuarios.rol, extra: schema.usuarios.permisosExtra, quitados: schema.usuarios.permisosQuitados, puesto: schema.puestos.permisos, nombre: schema.usuarios.nombre }).from(schema.usuarios).leftJoin(schema.puestos, eq(schema.puestos.id, schema.usuarios.puestoId)).where(and(eq(schema.usuarios.barberiaId, b.id), eq(schema.usuarios.activo, true))),
     categoriasGasto(b.id, false),
     db.select().from(schema.conceptosFrecuentes).where(eq(schema.conceptosFrecuentes.barberiaId, b.id)).orderBy(asc(schema.conceptosFrecuentes.concepto)),
   ]);
   // Quiénes pueden autorizar descuentos mayores al límite.
-  const autorizan = [...new Set(gente.filter((u) => permisosDe(u.rol, u.extra).has("ventas.descuento")).map((u) => (u.rol === "duena" || u.rol === "admin" ? NOMBRE_ROL[u.rol].toLowerCase() : u.nombre.split(" ")[0])))].join(", ") || "el propietario";
+  const autorizan = [...new Set(gente.filter((u) => permisosDe(u.rol, u.extra, u.quitados, u.puesto).has("ventas.descuento")).map((u) => (u.rol === "duena" || u.rol === "admin" ? NOMBRE_ROL[u.rol].toLowerCase() : u.nombre.split(" ")[0])))].join(", ") || "el titular";
   return (
     <>
       <AvisoUrl aviso={q.aviso} error={q.error} />

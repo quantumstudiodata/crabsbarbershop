@@ -18,7 +18,7 @@ export function calcularMeta(asignada: number, periodos: number[]): Meta {
 }
 
 export function explicarMeta(m: Meta, periodo: "semana" | "día"): string {
-  if (m.origen === "asignada") return `La asignó el propietario.`;
+  if (m.origen === "asignada") return `La asignó el titular.`;
   if (m.origen === "inicial") return `Es la meta de arranque. Cuando haya al menos dos ${periodo === "semana" ? "semanas" : "días iguales"} con ventas, se calcula sola.`;
   return `Se calcula sola: el promedio de ${periodo === "semana" ? "las últimas semanas" : "los mismos días de las últimas semanas"}, más 10%.`;
 }

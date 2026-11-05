@@ -17,7 +17,6 @@ export function CancelarVenta({ id, folio, total, regreso, texto = "Cancelar" }:
           <p className="muted">No se borra.<br />Queda tachada, con tu nombre y el motivo, y deja de contar en las ventas.</p>
           <label className="campo"><span>Motivo</span><input className="input" name="motivo" placeholder="Ejemplo: se cobró dos veces" required autoFocus /></label>
           <div className="acciones">
-            <button type="button" className="bt sec solo" onClick={() => setAbierto(false)}>Regresar</button>
             <button className="bt peligro">Sí, {texto.toLowerCase()}<Fl /></button>
           </div>
         </form>

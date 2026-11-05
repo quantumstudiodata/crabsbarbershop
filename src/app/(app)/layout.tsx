@@ -8,7 +8,7 @@ import { requerirSesion } from "@/lib/auth";
 import { describirRegla, elegirRegla } from "@/lib/comisiones";
 import { copiaRegla, reglasDe } from "@/lib/datos";
 import { formatoDinero } from "@/lib/money";
-import { NOMBRE_ROL } from "@/lib/permisos";
+import { PERMISOS_CONFIG } from "@/lib/permisos";
 
 export const dynamic = "force-dynamic";
 
@@ -29,14 +29,23 @@ export default async function LayoutApp({ children }: { children: React.ReactNod
 
   return (
     <>
+      {s.vista && (
+        <div className="banda-vista" role="status">
+          <span><Icono n="ojo" /><b>Modo de visualización:</b> {s.vista}. Así lo ve este puesto; no se guarda ningún cambio.</span>
+          <span className="fila" style={{ gap: 8 }}>
+            <a className="bt chico sec solo" href="/soporte">Cambiar experiencia</a>
+            <a className="bt chico" href="/api/vista?salir=1">Salir</a>
+          </span>
+        </div>
+      )}
       <header className="barra">
         <div className="barra-in">
           <MenuUsuario
             nombre={s.usuario.nombre}
             usuario={s.usuario.usuario}
-            rol={NOMBRE_ROL[rol]}
+            rol={s.usuario.puesto}
             avatar={s.usuario.avatar}
-            ajustes={s.puede("usuarios.ver") || s.puede("servicios.ver") || s.puede("ajustes.funciones")}
+            ajustes={s.puede("usuarios.ver") || s.puede("servicios.ver") || PERMISOS_CONFIG.some((p) => s.puede(p))}
             historial={s.puede("ventas.ver_todas") || atiende}
             soporte={s.usuario.esSoporte}
             formaPago={atiende ? describirRegla(copiaRegla(elegirRegla(await reglasDe(s.barberia.id), s.usuario.id, null, new Date())), formatoDinero) : null}

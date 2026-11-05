@@ -13,7 +13,7 @@ export const metadata = { title: "Egresos" };
 
 export default async function PaginaEgresos({ searchParams }: { searchParams: Promise<ConsultaPeriodo> }) {
   const s = await requerirSesion();
-  if (!s.puede("gastos.ver") && !s.puede("gastos.registrar") && !s.puede("reportes.ver")) redirect("/");
+  if (!s.puede("gastos.ver")) redirect("/?aviso=sin-permiso");
   const zona = s.barberia.zonaHoraria;
   const hoy = fechaLocal(new Date(), zona);
   const p = leerPeriodo(await searchParams, hoy, "mes");
@@ -46,7 +46,7 @@ export default async function PaginaEgresos({ searchParams }: { searchParams: Pr
     const cerrado = !!f.g.turnoId && f.g.turnoId !== turno?.id;
     d.filas.push({
       id: f.g.id, concepto: f.g.concepto, categoria: `${f.g.categoria}${PER[f.g.periodicidad] ? `, ${PER[f.g.periodicidad]}` : ""}`, metodo: f.g.metodo, monto: f.g.monto, cancelado: !!f.g.canceladoEn,
-      puedeCancelar: s.puede("gastos.registrar") && !f.g.canceladoEn && !cerrado,
+      puedeCancelar: s.puede("gastos.cancelar") && !f.g.canceladoEn && !cerrado,
       comprobante: comps.find((c) => c.gastoId === f.g.id) ? { id: comps.find((c) => c.gastoId === f.g.id)!.id, nombre: comps.find((c) => c.gastoId === f.g.id)!.nombre } : undefined,
       detalle: [
         ["Registró", `${f.quien.split(" ")[0]}, ${horaCorta(f.g.creadoEn, zona)}`],
@@ -65,7 +65,7 @@ export default async function PaginaEgresos({ searchParams }: { searchParams: Pr
       <Egresos
         dias={dias} hoy={hoy} cajaAbierta={!!turno} puede={s.puede("gastos.registrar")}
         categorias={cats} resumen={{ total, efectivo: porMetodo("efectivo"), transferencia: porMetodo("transferencia"), tarjeta: porMetodo("tarjeta"), movimientos: vigentes.length, comprobantes: comps.length }}
-        etiqueta={p.etiqueta} ajustes={s.puede("ajustes.funciones")}
+        etiqueta={p.etiqueta} ajustes={s.puede("configuracion.egresos")}
         opciones={{ periodicidad: s.barberia.usaPeriodicidad, comprobantes: s.barberia.usaComprobantes, frecuentes: frecuentes.map(({ id, concepto, categoria, monto, metodo, periodicidad }) => ({ id, concepto, categoria, monto, metodo, periodicidad })) }}
       />
     </>

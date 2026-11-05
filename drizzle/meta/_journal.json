@@ -78,6 +78,13 @@
       "when": 1793688776541,
       "tag": "0010_permisos_tablas_nuevas",
       "breakpoints": true
+    },
+    {
+      "idx": 11,
+      "version": "7",
+      "when": 1793862057631,
+      "tag": "0011_puestos_y_categorias",
+      "breakpoints": true
     }
   ]
 }

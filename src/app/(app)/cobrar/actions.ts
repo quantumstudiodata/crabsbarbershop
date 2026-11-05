@@ -80,7 +80,7 @@ export async function registrarVenta(_: EstadoCobro, form: FormData): Promise<Es
   if (e.descuento > 0 && !e.motivoDescuento) return { error: "Escribe el motivo del descuento." };
   const limite = Math.floor((subtotal * s.barberia.limiteDescuentoPct) / 100);
   if (e.descuento > limite && !s.puede("ventas.descuento")) {
-    return { error: `Ese descuento pasa del ${s.barberia.limiteDescuentoPct}% permitido. Pide al encargado o al propietario que lo registre.` };
+    return { error: `Ese descuento pasa del ${s.barberia.limiteDescuentoPct}% permitido. Pide a quien tenga permiso de aplicar descuentos mayores que lo registre.` };
   }
   const total = subtotal - e.descuento;
 

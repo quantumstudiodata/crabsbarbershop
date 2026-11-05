@@ -15,7 +15,7 @@ export const metadata = { title: "Cortes de caja" };
 
 export default async function Cortes({ searchParams }: { searchParams: Promise<ConsultaFiltros & { aviso?: string; error?: string }> }) {
   const s = await requerirSesion();
-  if (!s.puede("cortes.ver") && !s.puede("caja.operar") && !s.puede("reportes.ver")) redirect("/");
+  if (!s.puede("cortes.ver")) redirect("/?aviso=sin-permiso");
   const q = await searchParams;
   const zona = s.barberia.zonaHoraria;
   const hoy = fechaLocal(new Date(), zona);

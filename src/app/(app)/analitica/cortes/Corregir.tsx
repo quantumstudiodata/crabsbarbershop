@@ -21,7 +21,6 @@ export function Corregir({ id, dia }: { id: string; dia: string }) {
           <label className="campo"><span>Monto</span><input className="input" name="monto" inputMode="decimal" required /></label>
           <label className="campo"><span>Motivo</span><input className="input" name="motivo" placeholder="Ejemplo: se encontró un billete en el cajón" required /></label>
           <div className="acciones">
-            <button type="button" className="bt sec solo" onClick={() => setAbierto(false)}>Regresar</button>
             <button className="bt">Guardar ajuste<Fl /></button>
           </div>
         </form>
