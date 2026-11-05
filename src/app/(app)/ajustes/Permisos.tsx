@@ -30,6 +30,8 @@ export function EditorPermisos({ grupos, marcados, cambiar, descuentoLibre, solo
         const n = libres.filter((x) => marcados.has(x.clave)).length;
         // El encabezado está encendido mientras el grupo tenga algún permiso; al apagarlo se quitan todos.
         const alguno = editables.some((x) => marcados.has(x.clave));
+        // En consulta no hay nada que tocar: la fila no es una etiqueta de formulario.
+        const Fila = soloLectura ? "div" : "label";
         return (
           <details key={g.titulo} className="grupo-p">
             <summary>
@@ -44,12 +46,12 @@ export function EditorPermisos({ grupos, marcados, cambiar, descuentoLibre, solo
               {g.permisos.map((x) => {
                 const libre = x.clave === "ventas.descuento" && descuentoLibre;
                 return (
-                  <label key={x.clave} className={`entre perm-l ${libre ? "apagado-p" : ""}`}>
+                  <Fila key={x.clave} className={`entre perm-l ${libre ? "apagado-p" : ""} ${soloLectura ? "lectura" : ""}`}>
                     <span>{x.texto}{(libre || x.detalle) && <small className="nota-p">{libre ? LIBRE : x.detalle}</small>}</span>
                     {soloLectura
                       ? <span className={`chip-p ${marcados.has(x.clave) ? "si" : ""}`}>{marcados.has(x.clave) ? "Incluido" : "No incluido"}</span>
                       : <Interruptor etiqueta={x.texto} checked={!libre && marcados.has(x.clave)} disabled={libre || !x.puedeDar} onChange={(v) => poner([x.clave], v)} />}
-                  </label>
+                  </Fila>
                 );
               })}
             </div>

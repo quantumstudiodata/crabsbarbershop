@@ -1450,3 +1450,4 @@ button.paso-v:hover { background: rgba(255,255,255,.8); }
 .barra-guardar { position: sticky; bottom: 0; z-index: 5; display: flex; justify-content: space-between; align-items: center; gap: 12px; padding: 10px 12px 10px 16px; border-radius: 14px; background: #141a20; color: #e8edf1; font-size: 13.5px; box-shadow: 0 14px 30px -16px rgba(20,35,50,.7); animation: subir .25s ease both; }
 .barra-guardar .bt { background: #fff; color: #141a20; }
 .vista-a { animation: aparecer .25s ease both; }
+.perm-l.lectura { cursor: default; }
