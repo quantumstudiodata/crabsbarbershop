@@ -66,7 +66,7 @@ export default async function Inicio({ searchParams }: { searchParams: Promise<Q
           <Link className="bt chico solo" href="/cobrar?caja=cerrar"><Icono n="candado" />Realizar corte de caja</Link>
         </div>
       )}
-      {turno && turno.fechaOperativa < hoy && !s.puede("reportes.ver") && s.puede("caja.operar") && <AvisoCajaEmergente dia={fechaLarga(turno.fechaOperativa).toLowerCase()} />}
+      {turno && turno.fechaOperativa < hoy && s.barberia.corteObligatorio && !s.puede("reportes.ver") && s.puede("caja.operar") && <AvisoCajaEmergente dia={fechaLarga(turno.fechaOperativa).toLowerCase()} />}
     </>
   );
   if (!s.puede("reportes.ver")) return <InicioBarbero s={s} hoy={hoy} zona={zona} q={q} avisos={avisos} />;

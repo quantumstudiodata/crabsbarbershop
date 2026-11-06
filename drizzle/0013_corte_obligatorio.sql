@@ -1,0 +1,1 @@
+ALTER TABLE "barberias" ADD COLUMN "corte_obligatorio" boolean DEFAULT true NOT NULL;

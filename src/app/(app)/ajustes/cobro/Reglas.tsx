@@ -2,6 +2,7 @@
 
 import { useActionState, useEffect, useState } from "react";
 import { Fl, Icono } from "@/components/Icono";
+import { Interruptor } from "@/components/ui";
 import { type BarberoMeta, metaDelNegocio } from "@/lib/metas";
 import { formatoDinero } from "@/lib/money";
 import { Funciones, type Funcion } from "./Funciones";
@@ -23,7 +24,7 @@ function Ajuste({ name, titulo, ayuda, inicial, opciones, max, paso, formato, vi
       {!sinDeslizador && <input type="range" min={0} max={max} step={paso} value={Math.min(v, max)} onChange={(e) => setV(Number(e.target.value))} aria-label={titulo}
         style={{ "--p": `${(Math.min(v, max) / max) * 100}%` } as React.CSSProperties} />}
       <div className="billetes">
-        {opciones.map((o) => <button type="button" key={o} className={v === o ? "on" : ""} onClick={() => setV(o)}>{formato(o)}</button>)}
+        {(opciones.includes(inicial) ? opciones : [...opciones, inicial].sort((a, b) => a - b)).map((o) => <button type="button" key={o} className={v === o ? "on" : ""} onClick={() => setV(o)}>{formato(o)}</button>)}
       </div>
       <div className="vista-a" key={`v${v}`}>{vista(v)}</div>
     </div>
@@ -35,7 +36,7 @@ function FormGuardar({ children, className, conBoton = true }: { children: React
   const [e, accion, guardando] = useActionState<EstadoReglas, FormData>(guardarReglas, {});
   const [sucio, setSucio] = useState(false);
   useEffect(() => { if (e.ok) setSucio(false); }, [e.ok, e.n]);
-  const marcar = (x: React.SyntheticEvent) => { const t = x.target as HTMLElement; if (t.closest(".billetes button, input[type=range]")) setSucio(true); };
+  const marcar = (x: React.SyntheticEvent) => { const t = x.target as HTMLElement; if (t.closest(".billetes button, input[type=range], [data-sucio]")) setSucio(true); };
   return (
     <form action={accion} className={className} onChange={marcar} onClick={marcar}>
       {children}
@@ -66,16 +67,40 @@ export function ReglasCobro({ descuento, autorizan, funciones }: { descuento: nu
   );
 }
 
-export function CajaAjustes({ fondo, diferencia }: { fondo: number; diferencia: number }) {
+/**
+ * Caja: apertura, cierre obligatorio, fondo inicial y diferencia permitida.
+ * El fondo sugerido solo hace falta cuando la caja se abre sola; la diferencia se elige con botones de sugerencia.
+ */
+export function CajaConfig({ apertura, corte, fondo, diferencia }: { apertura: boolean; corte: boolean; fondo: number; diferencia: number }) {
+  const [manual, setManual] = useState(apertura);
+  const [obligatorio, setObligatorio] = useState(corte);
+  const [conTolerancia, setConTolerancia] = useState(diferencia > 0);
   return (
-    <FormGuardar className="pila">
-      <Ajuste name="fondo" titulo="Fondo inicial sugerido" ayuda="El efectivo con el que se abre la caja. Con la apertura automática, la caja se abre sola con esta cantidad."
-        inicial={fondo} opciones={[0, 100, 200, 500]} max={2000} paso={50} formato={(v) => formatoDinero(v * 100)}
-        vista={(v) => v ? <>La caja se abre con <b>{formatoDinero(v * 100)}</b>.</> : <>La caja se abre sin fondo.</>} />
-      <Ajuste name="diferencia" titulo="Diferencia permitida al cerrar" ayuda="Si al contar falta o sobra más, se pide explicar qué pasó."
-        inicial={diferencia} opciones={[0, 20, 50, 100]} max={500} paso={10} formato={(v) => formatoDinero(v * 100)}
-        vista={(v) => v ? <>Faltar o sobrar hasta <b>{formatoDinero(v * 100)}</b> no pide explicación.</> : <>Cualquier diferencia pide explicación.</>} />
-    </FormGuardar>
+    <div className="pila">
+      <Funciones alCambiar={(k, v) => { if (k === "apertura") setManual(v); if (k === "corte") setObligatorio(v); }} funciones={[
+        { clave: "apertura", nombre: "Apertura de caja", activa: apertura, encendida: "Alguien abre la caja contando el fondo inicial.", apagada: "La caja se abre sola con el fondo inicial sugerido al primer cobro del día." },
+        { clave: "corte", nombre: "Cierre de caja obligatorio", activa: corte, encendida: "No se puede cobrar con la caja de un día anterior abierta: primero se hace el corte.", apagada: "Se puede seguir cobrando sin cerrar la caja del día anterior." },
+      ]} />
+      {!obligatorio && <p className="aviso-riesgo">Sin cierre obligatorio, las ventas de varios días pueden quedar en un mismo corte y es más difícil saber cuándo faltó o sobró dinero.</p>}
+      <FormGuardar className="pila">
+        {!manual && (
+          <Ajuste name="fondo" titulo="Fondo inicial sugerido" ayuda="El efectivo con el que la caja se abre sola al primer cobro del día."
+            inicial={fondo} opciones={[0, 100, 200, 500]} max={2000} paso={50} formato={(v) => formatoDinero(v * 100)} sinDeslizador
+            vista={(v) => v ? <>La caja se abre con <b>{formatoDinero(v * 100)}</b>.</> : <>La caja se abre sin fondo.</>} />
+        )}
+        <div className="ajuste">
+          <div className="entre" style={{ alignItems: "flex-start" }}>
+            <span><b>Permitir una diferencia al cerrar</b><small>{conTolerancia ? "Si falta o sobra poco, no se pide explicar qué pasó." : "Cualquier diferencia, por pequeña que sea, pide explicar qué pasó."}</small></span>
+            <span data-sucio=""><Interruptor etiqueta="Permitir una diferencia al cerrar" checked={conTolerancia} onChange={setConTolerancia} /></span>
+          </div>
+          {conTolerancia
+            ? <Ajuste name="diferencia" titulo="Diferencia permitida al cerrar" ayuda="Si al contar falta o sobra más que esto, se pide explicar qué pasó."
+                inicial={diferencia || 20} opciones={[20, 50, 100, 200]} max={500} paso={10} formato={(v) => formatoDinero(v * 100)} sinDeslizador
+                vista={(v) => <>Faltar o sobrar hasta <b>{formatoDinero(v * 100)}</b> no pide explicación.</>} />
+            : <input type="hidden" name="diferencia" value="0" />}
+        </div>
+      </FormGuardar>
+    </div>
   );
 }
 

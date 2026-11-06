@@ -59,7 +59,7 @@ export async function registrarVenta(_: EstadoCobro, form: FormData): Promise<Es
   const turno = await cajaOAbrir(s);
   if (!turno) return { error: "La caja está cerrada. Hay que abrirla antes de cobrar." };
   // Pasadas las 12 de la noche, la caja del día anterior tiene que cerrarse antes de seguir cobrando.
-  if (turno.fechaOperativa < fechaLocal(new Date(), s.barberia.zonaHoraria)) return { error: "La caja de ayer no se cerró. Haz el corte de caja antes de seguir cobrando." };
+  if (s.barberia.corteObligatorio && turno.fechaOperativa < fechaLocal(new Date(), s.barberia.zonaHoraria)) return { error: "La caja de ayer no se cerró. Haz el corte de caja antes de seguir cobrando." };
 
   // Precios siempre desde la base de datos, nunca desde el navegador.
   const ids = [...new Set(e.lineas.map((l) => l.servicioId))];

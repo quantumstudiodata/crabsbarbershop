@@ -92,6 +92,13 @@
       "when": 1793865907726,
       "tag": "0012_descripcion_metodos",
       "breakpoints": true
+    },
+    {
+      "idx": 13,
+      "version": "7",
+      "when": 1793968516793,
+      "tag": "0013_corte_obligatorio",
+      "breakpoints": true
     }
   ]
 }

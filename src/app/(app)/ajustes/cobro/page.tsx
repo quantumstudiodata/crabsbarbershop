@@ -9,7 +9,7 @@ import { NOMBRE_ROL, PERMISOS_CONFIG, permisosDe } from "@/lib/permisos";
 import { redirect } from "next/navigation";
 import { Funciones } from "./Funciones";
 import { Metodos } from "./Metodos";
-import { CajaAjustes, MetaMensual, ReglasCobro } from "./Reglas";
+import { CajaConfig, MetaMensual, ReglasCobro } from "./Reglas";
 import { ModeloCaja } from "./Secciones";
 import { Bloque, CategoriasEgresos, GastosFrecuentes, OpcionesRegistro, Resumen } from "./Bloques";
 
@@ -61,12 +61,11 @@ export default async function ConfigurarNegocio({ searchParams }: { searchParams
         detalle={<Resumen filas={[
           ["Modelo de caja", b.modeloCaja === "individual" ? "Individual por trabajador" : "Compartida"],
           ["Apertura", b.aperturaManual ? "Manual, contando el fondo" : "Automática al primer cobro"],
-          ["Fondo inicial sugerido", $(b.fondoPredeterminado)], ["Diferencia permitida", $(b.limiteDiferenciaCaja)],
+          ["Cierre de caja", b.corteObligatorio ? "Obligatorio cada día" : "No obligatorio"],
+          ...(b.aperturaManual ? [] : [["Fondo inicial sugerido", $(b.fondoPredeterminado)] as [string, string]]),
+          ["Diferencia permitida", b.limiteDiferenciaCaja ? $(b.limiteDiferenciaCaja) : "Ninguna, toda diferencia se explica"],
         ]} />}>
-        <Funciones funciones={[
-          { clave: "apertura", nombre: "Apertura de caja", activa: b.aperturaManual, encendida: "Alguien abre la caja contando el fondo inicial.", apagada: "La caja se abre sola con el fondo inicial sugerido al primer cobro del día." },
-        ]} />
-        <CajaAjustes fondo={Math.round(b.fondoPredeterminado / 100)} diferencia={Math.round(b.limiteDiferenciaCaja / 100)} />
+        <CajaConfig apertura={b.aperturaManual} corte={b.corteObligatorio} fondo={Math.round(b.fondoPredeterminado / 100)} diferencia={Math.round(b.limiteDiferenciaCaja / 100)} />
         <ModeloCaja actual={b.modeloCaja} />
       </Bloque>
 

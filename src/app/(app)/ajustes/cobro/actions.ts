@@ -172,6 +172,7 @@ const FUNCIONES = {
   dividir: ["usaDividirPago", "Dividir pago", "configuracion.cobros"],
   metas: ["usaMetas", "Metas de ventas", "configuracion.metas"],
   apertura: ["aperturaManual", "Apertura de caja", "configuracion.caja"],
+  corte: ["corteObligatorio", "Cierre de caja obligatorio", "configuracion.caja"],
   comprobantes: ["usaComprobantes", "Registro de comprobantes", "configuracion.egresos"],
   periodicidad: ["usaPeriodicidad", "Periodicidad de gastos", "configuracion.egresos"],
 } as const;

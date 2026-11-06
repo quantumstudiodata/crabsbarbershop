@@ -37,7 +37,7 @@ export default async function Cobrar({ searchParams }: { searchParams: Promise<{
     <>
       <ModoFoco />
       {!turno ? <CajaCerrada opera={opera} sugerido={s.barberia.fondoPredeterminado} />
-        : turno.deOtroDia ? <CajaPendiente dia={turno.dia} opera={opera} />
+        : turno.deOtroDia && s.barberia.corteObligatorio ? <CajaPendiente dia={turno.dia} opera={opera} />
         : (
           <>
             <BarraCaja turno={turno} folioVenta={folioVenta} />

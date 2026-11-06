@@ -1451,3 +1451,4 @@ button.paso-v:hover { background: rgba(255,255,255,.8); }
 .barra-guardar .bt { background: #fff; color: #141a20; }
 .vista-a { animation: aparecer .25s ease both; }
 .perm-l.lectura { cursor: default; }
+.aviso-riesgo { margin: 0; padding: 12px 16px; border-radius: 14px; background: rgba(197,138,62,.12); color: #8a5a1e; font-size: 13px; line-height: 1.5; animation: subir .25s ease both; }

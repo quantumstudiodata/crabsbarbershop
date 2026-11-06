@@ -56,6 +56,8 @@ export const barberias = pgTable("barberias", {
   aperturaManual: boolean("apertura_manual").notNull().default(true),
   // compartida: una caja para todos. individual: cada trabajador abre y corta la suya.
   modeloCaja: text("modelo_caja").notNull().default("compartida"),
+  // Si es obligatorio, no se puede cobrar con la caja de un día anterior abierta: primero se hace el corte.
+  corteObligatorio: boolean("corte_obligatorio").notNull().default(true),
   usaComprobantes: boolean("usa_comprobantes").notNull().default(true),
   usaPeriodicidad: boolean("usa_periodicidad").notNull().default(true),
   // Formas de pago que se pueden usar al registrar un egreso.
