@@ -18,6 +18,12 @@ export default async function LayoutApp({ children }: { children: React.ReactNod
   const atiende = rol === "barbera" || rol === "encargada";
   const cobra = s.puede("ventas.registrar") || s.puede("ventas.registrar_otros");
   const analitica = s.puede("reportes.ver") || s.puede("ventas.ver_todas") || s.puede("gastos.ver") || s.puede("cortes.ver");
+  // Pestañas de Analítica: aparecen en lugar del menú principal al entrar a la sección.
+  const subAnalitica: [string, string][] = [];
+  if (s.puede("reportes.ver")) subAnalitica.push(["/analitica", "Resumen"]);
+  if (s.puede("ventas.ver_todas")) subAnalitica.push(["/analitica/ventas", "Ventas"]);
+  if (s.puede("cortes.ver")) subAnalitica.push(["/analitica/cortes", "Cortes de caja"]);
+  if (s.puede("reportes.ver") || s.puede("gastos.ver")) subAnalitica.push(["/analitica/finanzas", "Finanzas"]);
 
   const items: ItemNav[] = [];
   if (rol !== "contador") items.push({ href: "/", texto: "Inicio", icono: "inicio" });
@@ -25,7 +31,6 @@ export default async function LayoutApp({ children }: { children: React.ReactNod
   if (atiende) items.push({ href: "/mis-ventas", texto: "Mis ventas", icono: "lista" });
   if (analitica) items.push({ href: "/analitica", texto: "Analítica", icono: "grafica" });
   if (rol === "contador") items.push({ href: "/libreta", texto: "Libreta", icono: "lista" });
-  if (rol === "contador") items.push({ href: "/cierres", texto: "Cierres y descargas", icono: "archivo" });
 
   return (
     <>
@@ -50,7 +55,7 @@ export default async function LayoutApp({ children }: { children: React.ReactNod
             soporte={s.usuario.esSoporte}
             formaPago={atiende ? describirRegla(copiaRegla(elegirRegla(await reglasDe(s.barberia.id), s.usuario.id, null, new Date())), formatoDinero) : null}
           />
-          <Nav items={items} />
+          <Nav items={items} sub={{ base: "/analitica", items: subAnalitica }} />
           <div className="herramientas">
             {rol === "contador" ? null : <Campana />}
             {s.puede("ideas.decidir") && <PanelIdeas />}

@@ -15,6 +15,7 @@ import { fechaLarga, fechaLocal, horaCorta } from "@/lib/fechas";
 import { formatoDinero } from "@/lib/money";
 import { leerPeriodo } from "@/lib/periodo";
 import { HistorialVentas, type DiaVentas } from "@/components/HistorialVentas";
+import { CabeceraVentas, periodoEncabezado } from "@/components/CabeceraPeriodo";
 import { Pagar } from "./Pagar";
 
 export const metadata = { title: "Ventas" };
@@ -77,13 +78,7 @@ export default async function Ventas({ searchParams }: { searchParams: Promise<Q
   return (
     <>
       <AvisoUrl aviso={q.aviso} error={q.error} />
-      <BarraFiltros p={p} hoy={hoy} personas={equipo} persona={persona} buscar={f.buscar} sinPeriodo="Todo"
-        descarga={s.puede("reportes.exportar") ? urlDescarga("ventas", f) : undefined} />
-      <div className="subir">
-        <span className="lab">{p ? p.etiqueta : "Todo el historial"}{f.buscar ? `, con "${f.buscar}"` : ""}</span>
-        <h1 className="titulo" style={{ marginTop: 8 }}>{resumen.ventas} {resumen.ventas === 1 ? "venta" : "ventas"}, {formatoDinero(resumen.monto)}</h1>
-      </div>
-
+      <CabeceraVentas barberiaId={s.barberia.id} zona={zona} hoy={hoy} persona={persona || undefined} {...periodoEncabezado(p, hoy)} />
       {elegida && cuenta && (
         <section className="glass panel subir">
           <div className="entre">
@@ -109,7 +104,12 @@ export default async function Ventas({ searchParams }: { searchParams: Promise<Q
         </section>
       )}
 
-      <HistorialVentas dias={historial} regreso={regreso} opciones={opciones} />
+      <div className="tit-fuera subir d1"><span className="lab">Historial de ventas</span><span className="muted">{resumen.ventas} {resumen.ventas === 1 ? "venta" : "ventas"}, {formatoDinero(resumen.monto)}</span></div>
+      <section className="glass panel-hist subir d1">
+        <BarraFiltros p={p} hoy={hoy} personas={equipo} persona={persona} buscar={f.buscar} sinPeriodo="Todas las fechas" textoBuscar="Buscar folio, servicio o barbero"
+          descarga={s.puede("reportes.exportar") ? urlDescarga("ventas", f) : undefined} />
+        {historial.length ? <HistorialVentas dias={historial} regreso={regreso} opciones={opciones} sinMarco /> : <p className="muted" style={{ padding: "8px 4px" }}>No hay ventas con esos filtros.</p>}
+      </section>
       <Paginacion ruta="/analitica/ventas" params={q as Record<string, string | undefined>} pagina={r.pagina} paginas={r.paginas}
         texto={resumen.dias.length ? `${resumen.dias.length} ${resumen.dias.length === 1 ? "día" : "días"} con ventas${r.paginas > 1 ? `, página ${r.pagina} de ${r.paginas}` : ""}` : ""} />
     </>

@@ -17,11 +17,11 @@ export type FilaVenta = {
 export type DiaVentas = { fecha: string; titulo: string; total: number; filas: FilaVenta[] };
 
 /** Historial agrupado por día: una fila por folio; al tocarla se ven los detalles. */
-export function HistorialVentas({ dias, regreso, opciones }: { dias: DiaVentas[]; regreso: string; opciones?: Opciones }) {
+export function HistorialVentas({ dias, regreso, opciones, sinMarco }: { dias: DiaVentas[]; regreso: string; opciones?: Opciones; sinMarco?: boolean }) {
   const [abierta, setAbierta] = useState<string | null>(null);
   if (dias.length === 0) return <p className="muted">No hay ventas en estas fechas.</p>;
   return (
-    <div className="glass historial">
+    <div className={`historial ${sinMarco ? "sin-marco" : "glass"}`}>
       <div className="hist-scroll">
         {dias.map((d) => (
           <div key={d.fecha}>
