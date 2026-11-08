@@ -14,6 +14,7 @@ export async function solicitudes(f: { estado?: string; q?: string; limite?: num
   const resp = alias(t.usuarios, "resp");
   const w: SQL[] = [];
   if (f.estado === "abiertas") w.push(ne(t.solicitudesSoporte.estado, "resuelto"));
+  else if (f.estado === "demoradas") w.push(sql`${t.solicitudesSoporte.estado} in ('pendiente', 'revision') and coalesce((select m.de_soporte from mensajes_soporte m where m.solicitud_id = ${t.solicitudesSoporte.id} order by m.creado_en desc limit 1), false) = false and coalesce((select max(m.creado_en) from mensajes_soporte m where m.solicitud_id = ${t.solicitudesSoporte.id}), ${t.solicitudesSoporte.creadoEn}) < now() - interval '24 hours'`);
   else if (f.estado) w.push(eq(t.solicitudesSoporte.estado, f.estado));
   if (f.negocioId) w.push(eq(t.solicitudesSoporte.barberiaId, f.negocioId));
   if (f.tipo) w.push(eq(t.solicitudesSoporte.tipo, f.tipo));
@@ -44,6 +45,9 @@ export async function indicadores() {
     pendientes: sql<number>`(select count(*) from solicitudes_soporte where estado = 'pendiente')::int`,
     abiertas: sql<number>`(select count(*) from solicitudes_soporte where estado <> 'resuelto')::int`,
     errores: sql<number>`(select count(*) from errores_sistema where creado_en > now() - interval '24 hours')::int`,
+    incidencias: sql<number>`(select count(*) from solicitudes_soporte where tipo = 'problema' and estado <> 'resuelto')::int`,
+    // Esperan a soporte y el último mensaje de la persona tiene más de 24 horas sin respuesta.
+    demoradas: sql<number>`(select count(*) from solicitudes_soporte s where s.estado in ('pendiente', 'revision') and coalesce((select m.de_soporte from mensajes_soporte m where m.solicitud_id = s.id order by m.creado_en desc limit 1), false) = false and coalesce((select max(m.creado_en) from mensajes_soporte m where m.solicitud_id = s.id), s.creado_en) < now() - interval '24 hours')::int`,
   }).from(sql`(select 1) x`);
   return r;
 }

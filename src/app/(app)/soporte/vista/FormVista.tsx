@@ -7,13 +7,13 @@ import { PAGINAS } from "./paginas";
 
 type Op = { valor: string; texto: string };
 
-/** Puesto, negocio de referencia, página y dispositivo. Abre la vista previa sin salir del Centro de soporte. */
+/** Puesto, negocio de referencia, página y dispositivo. Abre la vista previa a pantalla completa. */
 export function FormVista({ puestos, negocios, inicial }: { puestos: Op[]; negocios: Op[]; inicial?: { como?: string; negocio?: string; pagina?: string; disp?: string } }) {
   const [como, setComo] = useState(inicial?.como ?? puestos[0]?.valor ?? "duena");
   const [negocio, setNegocio] = useState(inicial?.negocio ?? "");
   const [pagina, setPagina] = useState(inicial?.pagina ?? "/");
   const [disp, setDisp] = useState(inicial?.disp ?? "escritorio");
-  const volver = `/soporte/vista?pagina=${encodeURIComponent(pagina)}&disp=${disp}`;
+  const volver = disp === "movil" ? `/soporte/vista?pagina=${encodeURIComponent(pagina)}&disp=movil` : pagina;
   const href = `/api/vista?como=${encodeURIComponent(como)}&negocio=${negocio}&volver=${encodeURIComponent(volver)}`;
   return (
     <div className="form-vista">

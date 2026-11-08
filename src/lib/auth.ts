@@ -12,6 +12,8 @@ const COOKIE = "crabs_sesion";
 export const COOKIE_VISTA = "crabs_vista";
 /** Negocio de prueba que se usa como referencia en la vista previa. */
 export const COOKIE_VISTA_NEGOCIO = "crabs_vista_negocio";
+/** Marca que la vista previa está en un negocio de prueba: ahí sí se permiten acciones reales. */
+export const COOKIE_VISTA_PRUEBA = "crabs_vista_prueba";
 const DURACION_MS = 12 * 60 * 60 * 1000; // 12 horas
 export const INTENTOS_MAXIMOS = 5;
 export const BLOQUEO_MS = 15 * 60 * 1000;
@@ -53,6 +55,7 @@ export async function cerrarSesion() {
   jar.delete(COOKIE);
   jar.delete(COOKIE_VISTA);
   jar.delete(COOKIE_VISTA_NEGOCIO);
+  jar.delete(COOKIE_VISTA_PRUEBA);
 }
 
 /** Cierra todas las sesiones de una persona (al restablecer contraseña o desactivarla). */
@@ -97,6 +100,8 @@ export const obtenerSesion = cache(async (): Promise<Sesion | null> => {
     const [b] = await db.select().from(schema.barberias).where(and(eq(schema.barberias.id, otro), eq(schema.barberias.esPrueba, true))).limit(1);
     if (b) barberia = b;
   }
+  // Si alguien marca "negocio de prueba" a mano sin estar en uno, no se le deja seguir: las acciones irían a un negocio real.
+  if (vista && jar.get(COOKIE_VISTA_PRUEBA)?.value && !barberia.esPrueba) return null;
   return {
     usuario: { id: fila.u.id, nombre: fila.u.nombre, usuario: fila.u.usuario, rol, debeCambiar: fila.u.debeCambiar, avatar: fila.u.avatar, esSoporte: fila.u.esSoporte, puestoId: fila.u.puestoId, puesto },
     barberia,

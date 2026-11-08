@@ -1,14 +1,23 @@
-import { and, desc, eq, ilike, inArray, sql, type SQL } from "drizzle-orm";
+import { and, desc, eq, ilike, sql, type SQL } from "drizzle-orm";
 import Link from "next/link";
 import { db, schema as t } from "@/lib/db";
 import { solicitudes } from "@/lib/plataforma";
 import { hace } from "@/lib/soporte";
+import { NOVEDADES } from "@/lib/novedades";
+import { ocultarSensibles } from "@/lib/sensibles";
+import { fechaLarga } from "@/lib/fechas";
 import { Icono } from "@/components/Icono";
 import { CabezaSoporte, ListaSolicitudes } from "../Comunes";
 
 export const metadata = { title: "Actividad e incidencias" };
 
-const VISTAS: [string, string][] = [["actividad", "Registro de actividad"], ["errores", "Errores del sistema"], ["incidencias", "Incidencias"], ["servicios", "Estado de servicios"], ["cambios", "Historial de cambios"]];
+const VISTAS: [string, string, string][] = [
+  ["actividad", "Registro de actividad", "Qué hicieron las personas: ventas, cajas, servicios, usuarios y permisos."],
+  ["errores", "Errores del sistema", "Qué falló técnicamente: al guardar, al cargar una página o al conectarse con la base de datos. Toca uno para ver su detalle."],
+  ["incidencias", "Incidencias", "Problemas reportados que necesitan seguimiento hasta resolverse."],
+  ["servicios", "Estado de servicios", "Si cada parte técnica de la plataforma funciona en este momento."],
+  ["cambios", "Historial de cambios", "Qué actualizaciones se publicaron en la plataforma."],
+];
 
 export default async function Actividad({ searchParams }: { searchParams: Promise<{ ver?: string; q?: string; negocio?: string }> }) {
   const q = await searchParams;
@@ -20,15 +29,16 @@ export default async function Actividad({ searchParams }: { searchParams: Promis
     <>
       <CabezaSoporte titulo="Actividad e incidencias" sub="Para diagnosticar y resolver problemas sin investigar a mano" />
       <nav className="chips-s grande" aria-label="Herramienta">{VISTAS.map(([k, v]) => <Link key={k} href={url(k)} aria-current={ver === k ? "page" : undefined}>{v}</Link>)}</nav>
+      <p className="muted desc-s">{VISTAS.find(([k]) => k === ver)![2]}</p>
       <section className="glass panel-s">
-        {(ver === "actividad" || ver === "cambios" || ver === "errores") && (
+        {(ver === "actividad" || ver === "errores") && (
           <form className="buscar-s chico" action="/soporte/actividad"><input type="hidden" name="ver" value={ver} />{negocio && <input type="hidden" name="negocio" value={negocio} />}<Icono n="buscar" />
             <input name="q" className="input" defaultValue={buscar} placeholder={ver === "errores" ? "Buscar en el mensaje o la página" : "Buscar acción, persona o negocio"} aria-label="Buscar" /></form>
         )}
         {ver === "actividad" && <Registro buscar={buscar} negocio={negocio} />}
-        {ver === "cambios" && <Registro buscar={buscar} negocio={negocio} tipos={["ajuste", "precio", "usuario"]} />}
+        {ver === "cambios" && <Actualizaciones />}
         {ver === "errores" && <Errores buscar={buscar} negocio={negocio} />}
-        {ver === "incidencias" && <ListaSolicitudes filas={await solicitudes({ tipo: "problema", negocioId: negocio || undefined })} vacio="No hay problemas reportados." />}
+        {ver === "incidencias" && <ListaSolicitudes filas={await solicitudes({ tipo: "problema", estado: "abiertas", negocioId: negocio || undefined })} vacio="No hay incidencias abiertas." />}
         {ver === "servicios" && <Servicios />}
       </section>
     </>
@@ -36,10 +46,9 @@ export default async function Actividad({ searchParams }: { searchParams: Promis
 }
 
 /** Qué acciones hicieron las personas, en todos los negocios. */
-async function Registro({ buscar, negocio, tipos }: { buscar: string; negocio: string; tipos?: string[] }) {
+async function Registro({ buscar, negocio }: { buscar: string; negocio: string }) {
   const w: SQL[] = [];
   if (negocio) w.push(eq(t.historial.barberiaId, negocio));
-  if (tipos) w.push(inArray(t.historial.tipo, tipos));
   if (buscar) w.push(sql`(${ilike(t.historial.accion, `%${buscar}%`)} or ${ilike(t.usuarios.nombre, `%${buscar}%`)} or ${ilike(t.barberias.nombre, `%${buscar}%`)})`);
   const filas = await db.select({ h: t.historial, quien: t.usuarios.nombre, negocio: t.barberias.nombre, negocioId: t.barberias.id }).from(t.historial)
     .innerJoin(t.barberias, eq(t.barberias.id, t.historial.barberiaId)).leftJoin(t.usuarios, eq(t.usuarios.id, t.historial.usuarioId))
@@ -57,45 +66,76 @@ async function Registro({ buscar, negocio, tipos }: { buscar: string; negocio: s
   );
 }
 
+/** Errores agrupados: el mismo fallo en la misma página cuenta como uno, con sus repeticiones. */
 async function Errores({ buscar, negocio }: { buscar: string; negocio: string }) {
   const w: SQL[] = [];
   if (negocio) w.push(eq(t.erroresSistema.barberiaId, negocio));
   if (buscar) w.push(sql`(${ilike(t.erroresSistema.mensaje, `%${buscar}%`)} or ${ilike(t.erroresSistema.ruta, `%${buscar}%`)})`);
-  const filas = await db.select({ e: t.erroresSistema, quien: t.usuarios.nombre, negocio: t.barberias.nombre }).from(t.erroresSistema)
-    .leftJoin(t.usuarios, eq(t.usuarios.id, t.erroresSistema.usuarioId)).leftJoin(t.barberias, eq(t.barberias.id, t.erroresSistema.barberiaId))
-    .where(w.length ? and(...w) : undefined).orderBy(desc(t.erroresSistema.creadoEn)).limit(100);
-  if (!filas.length) return <p className="muted vacio-s">No hay errores registrados.</p>;
+  const grupos = await db.select({
+    id: sql<string>`(array_agg(${t.erroresSistema.id} order by ${t.erroresSistema.creadoEn} desc))[1]`,
+    mensaje: t.erroresSistema.mensaje, ruta: t.erroresSistema.ruta, origen: t.erroresSistema.origen,
+    veces: sql<number>`count(*)::int`, negocios: sql<number>`count(distinct ${t.erroresSistema.barberiaId})::int`, ultima: sql<Date>`max(${t.erroresSistema.creadoEn})`,
+  }).from(t.erroresSistema).where(w.length ? and(...w) : undefined)
+    .groupBy(t.erroresSistema.mensaje, t.erroresSistema.ruta, t.erroresSistema.origen).orderBy(sql`max(${t.erroresSistema.creadoEn}) desc`).limit(60);
+  if (!grupos.length) return <p className="muted vacio-s">No hay errores registrados.</p>;
   return (
     <div className="lista-s">
-      {filas.map(({ e, quien, negocio: n }) => (
-        <div key={e.id} className="error-s fila-err">
-          <small>{hace(e.creadoEn)}, {e.origen === "servidor" ? "servidor" : "navegador"}, {e.ruta || "sin página"}{n ? `, ${n}` : ""}{quien ? `, ${quien}` : ""}{e.digest ? `, código ${e.digest}` : ""}</small>
-          <code>{e.mensaje}</code>
+      {grupos.map((g) => (
+        <Link key={g.id} href={`/soporte/actividad/error/${g.id}`} className="fila-s">
+          <span className="t-s"><b className="mono-t">{ocultarSensibles(g.mensaje)}</b><small>{g.ruta || "Sin página"}, {g.origen}{g.negocios > 1 ? `, ${g.negocios} negocios` : ""}</small></span>
+          <span className="meta-s">{g.veces > 1 && <span className="chip-p alerta">{g.veces} veces</span>}<small>{hace(g.ultima)}</small><Icono n="derecha" /></span>
+        </Link>
+      ))}
+    </div>
+  );
+}
+
+/** Actualizaciones publicadas de la plataforma. */
+function Actualizaciones() {
+  const porFecha = new Map<string, string[]>();
+  for (const n of NOVEDADES) porFecha.set(n.fecha, [...(porFecha.get(n.fecha) ?? []), n.texto]);
+  return (
+    <div className="lista-s">
+      {[...porFecha].map(([f, xs]) => (
+        <div key={f} className="novedad-s">
+          <b>{fechaLarga(f)}</b>
+          <ul>{xs.map((x) => <li key={x}>{x}</li>)}</ul>
         </div>
       ))}
     </div>
   );
 }
 
-/** Comprueba que la base de datos responde y muestra la versión publicada. */
+/** Comprueba cada parte de la plataforma con una consulta real y mide cuánto tarda. */
 async function Servicios() {
-  const t0 = performance.now();
-  let base = true, ms = 0, migracion = "";
-  try {
-    const [r] = await db.execute<{ m: string | null }>(sql`select to_char(to_timestamp(max(created_at) / 1000), 'YYYY-MM-DD HH24:MI') as m from drizzle.__drizzle_migrations`);
-    ms = Math.round(performance.now() - t0);
-    migracion = r?.m ?? "";
-  } catch { base = false; }
-  const [e] = await db.select({ hora: sql<number>`count(*) filter (where ${t.erroresSistema.creadoEn} > now() - interval '1 hour')::int`, dia: sql<number>`count(*) filter (where ${t.erroresSistema.creadoEn} > now() - interval '24 hours')::int` }).from(t.erroresSistema);
-  const commit = process.env.VERCEL_GIT_COMMIT_SHA?.slice(0, 7);
-  const filas: [string, React.ReactNode][] = [
-    ["Aplicación", <span key="a" className="chip-p">Funcionando</span>],
-    ["Base de datos", base ? <span key="b" className="chip-p">Responde en {ms} ms</span> : <span key="b" className="chip-p alerta">No responde</span>],
-    ["Errores en la última hora", e.hora ? <span key="c" className="chip-p alerta">{e.hora}</span> : <span key="c" className="chip-p">Ninguno</span>],
-    ["Errores en 24 horas", <b key="d">{e.dia}</b>],
-    ["Última actualización de la base", <b key="e">{migracion || "Sin dato"}</b>],
-    ["Versión publicada", <b key="f" className="mono">{commit ?? "Local"}{process.env.VERCEL_ENV ? `, ${process.env.VERCEL_ENV}` : ""}</b>],
-    ["Región", <b key="g">{process.env.VERCEL_REGION ?? "Local"}</b>],
+  const medir = async (f: () => Promise<unknown>) => {
+    const t0 = performance.now();
+    try { await f(); return { ok: true, ms: Math.round(performance.now() - t0) }; } catch { return { ok: false, ms: 0 }; }
+  };
+  const [base, sesiones, cobros, adjuntos, avisos] = await Promise.all([
+    medir(() => db.execute(sql`select 1`)),
+    medir(() => db.select({ n: sql`count(*)` }).from(t.sesiones).where(sql`${t.sesiones.expiraEn} > now()`)),
+    medir(() => db.select({ id: t.ventas.id }).from(t.ventas).orderBy(desc(t.ventas.creadoEn)).limit(1)),
+    medir(() => db.select({ id: t.comprobantes.id }).from(t.comprobantes).limit(1)),
+    medir(() => db.select({ id: t.historial.id }).from(t.historial).orderBy(desc(t.historial.creadoEn)).limit(1)),
+  ]);
+  const [e] = await db.select({ hora: sql<number>`count(*) filter (where ${t.erroresSistema.creadoEn} > now() - interval '1 hour')::int` }).from(t.erroresSistema);
+  const [m] = await db.execute<{ m: string | null }>(sql`select to_char(to_timestamp(max(created_at) / 1000), 'YYYY-MM-DD HH24:MI') as m from drizzle.__drizzle_migrations`).catch(() => [{ m: null }]);
+  const estado = (r: { ok: boolean; ms: number }) => r.ok ? <span className={`chip-p ${r.ms > 800 ? "alerta" : "si"}`}>{r.ms > 800 ? `Lento, ${r.ms} ms` : `Funciona, ${r.ms} ms`}</span> : <span className="chip-p alerta">No responde</span>;
+  const filas: [string, string, React.ReactNode][] = [
+    ["Aplicación", "Páginas y acciones", <span key="a" className="chip-p si">Funciona</span>],
+    ["Base de datos", "Conexión y consultas", estado(base)],
+    ["Inicio de sesión", "Sesiones de las personas", estado(sesiones)],
+    ["Cobros y ventas", "Registro de ventas", estado(cobros)],
+    ["Comprobantes y adjuntos", "Archivos de egresos y solicitudes", estado(adjuntos)],
+    ["Notificaciones", "Historial y avisos en vivo", estado(avisos)],
+    ["Errores en la última hora", "Registrados automáticamente", e.hora ? <span key="e" className="chip-p alerta">{e.hora}</span> : <span key="e" className="chip-p si">Ninguno</span>],
   ];
-  return <div className="lista-s">{filas.map(([k, v]) => <div key={k} className="fila-d"><span>{k}</span>{v}</div>)}</div>;
+  const commit = process.env.VERCEL_GIT_COMMIT_SHA?.slice(0, 7);
+  return (
+    <div className="lista-s">
+      {filas.map(([k, d, v]) => <div key={k} className="fila-s plana"><span className="t-s"><b>{k}</b><small>{d}</small></span>{v}</div>)}
+      <p className="muted chico-t" style={{ margin: "8px 8px 0" }}>Versión publicada {commit ?? "local"}{process.env.VERCEL_REGION ? `, región ${process.env.VERCEL_REGION}` : ""}. Última actualización de la base: {m?.m ?? "sin dato"}.</p>
+    </div>
+  );
 }

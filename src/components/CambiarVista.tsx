@@ -23,6 +23,8 @@ export function CambiarVista({ opciones, actual }: { opciones: OpcionVista[]; ac
   const q = params.toString();
   const volver = encodeURIComponent(q ? `${ruta}?${q}` : ruta);
   return (
+    <>
+    <a className="bt chico sec solo" href={`/soporte/vista?pagina=${volver}&disp=movil`}>Ver en móvil</a>
     <div className="cambiar-v" ref={caja}>
       <button type="button" className="bt chico sec solo" aria-haspopup="menu" aria-expanded={abierto} onClick={() => setAbierto((x) => !x)}>
         Cambiar experiencia<Icono n="abajo" />
@@ -37,5 +39,6 @@ export function CambiarVista({ opciones, actual }: { opciones: OpcionVista[]; ac
         </div>
       )}
     </div>
+    </>
   );
 }

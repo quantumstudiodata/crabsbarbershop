@@ -1,34 +1,40 @@
-import Link from "next/link";
+import { Suspense } from "react";
+import { SelectorUrl } from "@/components/SelectorUrl";
 import { solicitudes } from "@/lib/plataforma";
 import { ESTADOS_SOLICITUD, TIPOS_SOLICITUD } from "@/lib/soporte";
+import { Icono } from "@/components/Icono";
 import { CabezaSoporte, ListaSolicitudes } from "../Comunes";
 
 export const metadata = { title: "Solicitudes de soporte" };
 
-const FILTROS: [string, string][] = [["abiertas", "Abiertas"], ...Object.entries(ESTADOS_SOLICITUD), ["todas", "Todas"]];
+// "Abiertas" agrupa los estados sin resolver; los estados sueltos quedan dentro del desplegable.
+const ESTADOS: { valor: string; texto: string }[] = [
+  { valor: "", texto: "Abiertas" }, { valor: "demoradas", texto: "Sin respuesta en más de 24 h" },
+  ...Object.entries(ESTADOS_SOLICITUD).map(([valor, texto]) => ({ valor, texto })), { valor: "todas", texto: "Todas" },
+];
+const MOTIVOS = [{ valor: "", texto: "Todos los motivos" }, ...Object.entries(TIPOS_SOLICITUD).map(([valor, v]) => ({ valor, texto: v.corto }))];
 
 export default async function Solicitudes({ searchParams }: { searchParams: Promise<{ estado?: string; q?: string; tipo?: string }> }) {
   const q = await searchParams;
-  const estado = FILTROS.some(([k]) => k === q.estado) ? q.estado! : "abiertas";
+  const estado = ESTADOS.some((e) => e.valor === q.estado) ? q.estado! : "";
   const tipo = q.tipo && q.tipo in TIPOS_SOLICITUD ? q.tipo : "";
-  const filas = await solicitudes({ estado: estado === "todas" ? "" : estado, q: q.q?.trim().slice(0, 60), tipo });
-  const url = (e: string, t = tipo) => `/soporte/solicitudes?estado=${e}${t ? `&tipo=${t}` : ""}${q.q ? `&q=${encodeURIComponent(q.q)}` : ""}`;
+  const filas = await solicitudes({ estado: estado === "todas" ? "" : estado || "abiertas", q: q.q?.trim().slice(0, 60), tipo });
+  const pendientes = filas.filter((f) => f.estado === "pendiente").length;
   return (
     <>
-      <CabezaSoporte titulo="Solicitudes de soporte" sub={`${filas.filter((f) => f.estado === "pendiente").length} pendientes en esta lista`} />
+      <CabezaSoporte titulo="Solicitudes de soporte" sub={pendientes ? `${pendientes} ${pendientes === 1 ? "pendiente" : "pendientes"} en esta lista` : "Nada pendiente en esta lista"} />
       <section className="glass panel-s">
         <div className="filtro-c">
-          <form className="buscar-c" action="/soporte/solicitudes">
-            <input type="hidden" name="estado" value={estado} />
+          <form className="con-icono buscar-c" action="/soporte/solicitudes">
+            {estado && <input type="hidden" name="estado" value={estado} />}
+            {tipo && <input type="hidden" name="tipo" value={tipo} />}
+            <Icono n="buscar" />
             <input name="q" className="input" defaultValue={q.q} placeholder="Buscar solicitudes..." aria-label="Buscar solicitudes" />
           </form>
-          <nav className="chips-s" aria-label="Estado">
-            {FILTROS.map(([k, t]) => <Link key={k} href={url(k)} aria-current={estado === k ? "page" : undefined}>{t}</Link>)}
-          </nav>
-          <nav className="chips-s" aria-label="Motivo">
-            <Link href={url(estado, "")} aria-current={!tipo ? "page" : undefined}>Todos los motivos</Link>
-            {Object.entries(TIPOS_SOLICITUD).map(([k, v]) => <Link key={k} href={url(estado, k)} aria-current={tipo === k ? "page" : undefined}>{v.corto}</Link>)}
-          </nav>
+          <Suspense fallback={null}>
+            <SelectorUrl nombre="estado" valor={estado} opciones={ESTADOS} etiqueta="Estado" />
+            <SelectorUrl nombre="tipo" valor={tipo} opciones={MOTIVOS} etiqueta="Motivo" />
+          </Suspense>
         </div>
         <ListaSolicitudes filas={filas} vacio="No hay solicitudes con esos filtros." />
       </section>

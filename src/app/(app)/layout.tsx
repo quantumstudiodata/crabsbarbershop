@@ -5,7 +5,8 @@ import { CambiarVista } from "@/components/CambiarVista";
 import { CentroAyuda } from "@/components/CentroAyuda";
 import { conteoAyuda } from "@/lib/ayuda";
 import { MenuUsuario } from "@/components/MenuUsuario";
-import { Nav, type ItemNav } from "@/components/Nav";
+import { Nav } from "@/components/Nav";
+import { menuDe } from "@/lib/menu";
 import { Campana } from "@/components/Campana";
 import { Icono } from "@/components/Icono";
 import { PanelIdeas } from "@/components/PanelIdeas";
@@ -22,23 +23,7 @@ export const dynamic = "force-dynamic";
 export default async function LayoutApp({ children }: { children: React.ReactNode }) {
   const s = await requerirSesion();
   const rol = s.usuario.rol;
-  const atiende = rol === "barbera" || rol === "encargada";
-  const cobra = s.puede("ventas.registrar") || s.puede("ventas.registrar_otros");
-  const analitica = s.puede("reportes.ver") || s.puede("ventas.ver_todas") || s.puede("gastos.ver") || s.puede("cortes.ver");
-  // Pestañas de Analítica: aparecen en lugar del menú principal al entrar a la sección.
-  const subAnalitica: [string, string][] = [];
-  if (s.puede("reportes.ver")) subAnalitica.push(["/analitica", "Resumen"]);
-  if (s.puede("ventas.ver_todas")) subAnalitica.push(["/analitica/ventas", "Ventas"]);
-  if (s.puede("cortes.ver")) subAnalitica.push(["/analitica/cortes", "Cortes de caja"]);
-  if (s.puede("reportes.ver") || s.puede("gastos.ver")) subAnalitica.push(["/analitica/finanzas", "Finanzas"]);
-
-  const items: ItemNav[] = [];
-  if (rol !== "contador") items.push({ href: "/", texto: "Inicio", icono: "inicio" });
-  if (cobra) items.push({ href: "/cobrar", texto: "Cobro", icono: "cobro" });
-  if (atiende) items.push({ href: "/mis-ventas", texto: "Mis ventas", icono: "lista" });
-  if (analitica) items.push({ href: "/analitica", texto: "Analítica", icono: "grafica" });
-  if (rol === "contador") items.push({ href: "/libreta", texto: "Libreta", icono: "lista" });
-
+  const { items, sub: subAnalitica, atiende } = menuDe(rol, s.puede);
   const soporte = s.usuario.esSoporte;
   const experiencias = soporte ? [
     ...PLANTILLAS.map((r) => ({ como: r, texto: NOMBRE_ROL[r] })),
@@ -50,7 +35,7 @@ export default async function LayoutApp({ children }: { children: React.ReactNod
     <>
       {s.vista && (await headers()).get("sec-fetch-dest") !== "iframe" && (
         <div className="banda-vista" role="status">
-          <span><Icono n="ojo" /><b>Modo de visualización:</b> {s.vista}. Así lo ve este puesto; no se guarda ningún cambio.</span>
+          <span><Icono n="ojo" /><b>Modo de visualización:</b> {s.vista}{s.barberia.esPrueba ? ` en ${s.barberia.nombre}, negocio de prueba: las acciones sí se guardan ahí.` : ". Así lo ve este puesto; no se guarda ningún cambio."}</span>
           <span className="fila" style={{ gap: 8 }}>
             <CambiarVista opciones={experiencias} actual={s.vista} />
             <a className="bt chico" href="/api/vista?salir=1">Salir</a>
