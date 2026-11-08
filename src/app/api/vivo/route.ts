@@ -161,7 +161,7 @@ async function avisosPara(se: Sesion): Promise<AvisoVivo[]> {
       detalle: `Lo cerró ${primer(c.nombre)}`, href: "/analitica/cortes", nombre: c.nombre ?? "", avatar: c.avatar ?? "cangrejo", icono: "caja",
     });
     for (const v of canceladas) if (v.t && v.por !== yo) avisos.push({ id: `x${v.id}`, t: v.t.toISOString(), titulo: `${primer(v.nombre)} canceló la venta ${v.folio}`, detalle: `${formatoDinero(v.total)}${v.motivo ? `, ${v.motivo}` : ""}`, href: `/analitica/ventas?q=${v.folio}`, nombre: v.nombre ?? "", avatar: v.avatar ?? "cangrejo" });
-    for (const g of egresos) if (g.por !== yo) avisos.push({ id: `g${g.id}`, t: g.t.toISOString(), titulo: `${primer(g.nombre)} registró un egreso de ${formatoDinero(g.monto)}`, detalle: g.concepto, href: "/analitica/gastos", nombre: g.nombre, avatar: g.avatar });
+    for (const g of egresos) if (g.por !== yo) avisos.push({ id: `g${g.id}`, t: g.t.toISOString(), titulo: `${primer(g.nombre)} registró un egreso de ${formatoDinero(g.monto)}`, detalle: g.concepto, href: "/analitica/finanzas?tipo=egresos", nombre: g.nombre, avatar: g.avatar });
   }
   return avisos.sort((a, b) => b.t.localeCompare(a.t)).slice(0, 25);
 }

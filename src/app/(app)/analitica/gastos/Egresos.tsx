@@ -8,7 +8,7 @@ import { Interruptor, Modal, Selector } from "@/components/ui";
 import { formatoDinero } from "@/lib/money";
 import { cancelarEgreso, type EstadoGasto, registrarEgreso } from "./actions";
 
-type FilaEgreso = { id: string; concepto: string; categoria: string; metodo: string; monto: number; cancelado: boolean; puedeCancelar: boolean; detalle: [string, string][]; comprobante?: { id: string; nombre: string } };
+export type FilaEgreso = { id: string; concepto: string; categoria: string; metodo: string; monto: number; cancelado: boolean; puedeCancelar: boolean; detalle: [string, string][]; comprobante?: { id: string; nombre: string } };
 export type DiaEgresos = { fecha: string; titulo: string; total: number; filas: FilaEgreso[] };
 type Categoria = { id: string; nombre: string; activo: boolean };
 
@@ -110,7 +110,7 @@ async function prepararArchivo(f: File): Promise<string> {
   return c.toDataURL("image/jpeg", 0.8);
 }
 
-function Nuevo({ hoy, cajaAbierta, categorias, cerrar, otro, opciones }: { hoy: string; cajaAbierta: boolean; categorias: Categoria[]; cerrar: () => void; otro: () => void; opciones: OpcionesEgreso }) {
+export function Nuevo({ hoy, cajaAbierta, categorias, cerrar, otro, opciones }: { hoy: string; cajaAbierta: boolean; categorias: Categoria[]; cerrar: () => void; otro: () => void; opciones: OpcionesEgreso }) {
   const [e, accion, guardando] = useActionState<EstadoGasto, FormData>(registrarEgreso, {});
   const [metodo, setMetodo] = useState<"efectivo" | "transferencia" | "tarjeta">((opciones.metodos[0] ?? "efectivo") as "efectivo");
   const [concepto, setConcepto] = useState("");
@@ -193,7 +193,7 @@ function Nuevo({ hoy, cajaAbierta, categorias, cerrar, otro, opciones }: { hoy: 
   );
 }
 
-function Cancelar({ f, cerrar }: { f: FilaEgreso; cerrar: () => void }) {
+export function Cancelar({ f, cerrar }: { f: FilaEgreso; cerrar: () => void }) {
   const [e, accion, guardando] = useActionState<EstadoGasto, FormData>(cancelarEgreso, {});
   useEffect(() => { if (e.ok) cerrar(); }, [e.ok, e.n, cerrar]);
   return (

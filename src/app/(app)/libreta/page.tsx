@@ -120,7 +120,7 @@ async function Mes({ barberiaId, mes, hoy, zona, puedeEgresos }: { barberiaId: s
             {!m.historico && m.comisionesGeneradas > 0 && <p className="ayuda-txt">Comisiones generadas en el mes: {$(m.comisionesGeneradas)}. Cuentan como egreso cuando se pagan al equipo.</p>}
           </div>
           <div className="glass panel">
-            <div className="entre"><span className="lab">Egresos</span>{puedeEgresos && <Link className="enlace" href={`/analitica/gastos?periodo=mes&mes=${m.mes}`}>Registrar o ver detalle</Link>}</div>
+            <div className="entre"><span className="lab">Egresos</span>{puedeEgresos && <Link className="enlace" href={`/analitica/finanzas?tipo=egresos&periodo=mes&mes=${m.mes}`}>Registrar o ver detalle</Link>}</div>
             <div className="datos">
               {m.egresos.length ? m.egresos.map((e) => <div key={e.concepto}><span>{e.concepto}</span><b className="num">{$(e.monto)}</b></div>) : <div><span className="muted">Sin egresos registrados</span><b>-</b></div>}
               <div className="fuerte-l"><span>Total</span><b className="num">{$(m.egresosTotal)}</b></div>
