@@ -10,6 +10,8 @@ import { NOMBRE_ROL, permisosDe, PLANTILLAS, type Permiso, type Rol } from "./pe
 const COOKIE = "crabs_sesion";
 /** Modo de visualización del soporte de la plataforma: muestra el sistema como lo vería otro puesto, sin poder guardar. */
 export const COOKIE_VISTA = "crabs_vista";
+/** Negocio de prueba que se usa como referencia en la vista previa. */
+export const COOKIE_VISTA_NEGOCIO = "crabs_vista_negocio";
 const DURACION_MS = 12 * 60 * 60 * 1000; // 12 horas
 export const INTENTOS_MAXIMOS = 5;
 export const BLOQUEO_MS = 15 * 60 * 1000;
@@ -50,6 +52,7 @@ export async function cerrarSesion() {
   if (token) await db.delete(schema.sesiones).where(eq(schema.sesiones.id, sha256(token)));
   jar.delete(COOKIE);
   jar.delete(COOKIE_VISTA);
+  jar.delete(COOKIE_VISTA_NEGOCIO);
 }
 
 /** Cierra todas las sesiones de una persona (al restablecer contraseña o desactivarla). */
@@ -87,9 +90,16 @@ export const obtenerSesion = cache(async (): Promise<Sesion | null> => {
     const [p] = await db.select().from(schema.puestos).where(and(eq(schema.puestos.id, pedido.slice(7)), eq(schema.puestos.barberiaId, fila.b.id))).limit(1).catch(() => []);
     if (p) { rol = p.plantilla; permisos = permisosDe(rol, [], [], p.permisos); vista = puesto = p.nombre; }
   }
+  // En la vista previa se puede mirar un negocio de prueba; nunca uno real que no sea el propio.
+  let barberia = fila.b;
+  const otro = vista ? jar.get(COOKIE_VISTA_NEGOCIO)?.value : undefined;
+  if (otro && /^[0-9a-f-]{36}$/.test(otro) && otro !== fila.b.id) {
+    const [b] = await db.select().from(schema.barberias).where(and(eq(schema.barberias.id, otro), eq(schema.barberias.esPrueba, true))).limit(1);
+    if (b) barberia = b;
+  }
   return {
     usuario: { id: fila.u.id, nombre: fila.u.nombre, usuario: fila.u.usuario, rol, debeCambiar: fila.u.debeCambiar, avatar: fila.u.avatar, esSoporte: fila.u.esSoporte, puestoId: fila.u.puestoId, puesto },
-    barberia: fila.b,
+    barberia,
     permisos,
     puede: (p) => permisos.has(p),
     vista,

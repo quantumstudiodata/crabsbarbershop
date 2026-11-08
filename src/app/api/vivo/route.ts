@@ -114,6 +114,16 @@ async function avisosPara(se: Sesion): Promise<AvisoVivo[]> {
   const atiende = se.usuario.rol === "barbera" || se.usuario.rol === "encargada";
   const registro = alias(s.usuarios, "registro");
 
+  // Respuestas de soporte a las solicitudes que envió esta persona.
+  const respuestas = await db.select({ id: s.mensajesSoporte.id, t: s.mensajesSoporte.creadoEn, texto: s.mensajesSoporte.texto, solicitud: s.solicitudesSoporte.id, asunto: s.solicitudesSoporte.asunto })
+    .from(s.mensajesSoporte).innerJoin(s.solicitudesSoporte, eq(s.solicitudesSoporte.id, s.mensajesSoporte.solicitudId))
+    .where(and(eq(s.solicitudesSoporte.usuarioId, yo), eq(s.mensajesSoporte.deSoporte, true), gte(s.mensajesSoporte.creadoEn, desde))).orderBy(desc(s.mensajesSoporte.creadoEn)).limit(10);
+  for (const r of respuestas) avisos.push({ id: `s${r.id}`, t: r.t.toISOString(), titulo: `Soporte respondió: ${r.asunto}`, detalle: r.texto.slice(0, 120), href: `?ayuda=${r.solicitud}`, nombre: "Soporte", avatar: "cangrejo", icono: "ayuda" });
+  const resueltas = await db.select({ id: s.eventosSoporte.id, t: s.eventosSoporte.creadoEn, solicitud: s.solicitudesSoporte.id, asunto: s.solicitudesSoporte.asunto })
+    .from(s.eventosSoporte).innerJoin(s.solicitudesSoporte, eq(s.solicitudesSoporte.id, s.eventosSoporte.solicitudId))
+    .where(and(eq(s.solicitudesSoporte.usuarioId, yo), eq(s.eventosSoporte.accion, "Marcó la solicitud como resuelta"), gte(s.eventosSoporte.creadoEn, desde))).limit(10);
+  for (const r of resueltas) avisos.push({ id: `r${r.id}`, t: r.t.toISOString(), titulo: `Se resolvió tu solicitud: ${r.asunto}`, href: `?ayuda=${r.solicitud}`, nombre: "Soporte", avatar: "cangrejo", icono: "palomita" });
+
   if (atiende) {
     const mios = await db
       .select({ id: s.ventas.id, t: s.ventas.creadoEn, estado: s.ventas.estado, canceladaEn: s.ventas.canceladaEn, canceladaPor: s.ventas.canceladaPor, motivo: s.ventas.motivoCancelacion,

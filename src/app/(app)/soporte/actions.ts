@@ -1,51 +1,115 @@
 "use server";
 
-import { and, eq, inArray, like, sql } from "drizzle-orm";
+import { and, eq } from "drizzle-orm";
 import { revalidatePath } from "next/cache";
 import { requerirSesion } from "@/lib/auth";
+import { MAX_ADJUNTO, TIPOS_ADJUNTO } from "@/lib/archivo";
 import { db, schema as t } from "@/lib/db";
+import { crearPrueba, datosDemostracion, eliminarPrueba, limpiarTemporales, negocioDePrueba, restablecerPrueba } from "@/lib/pruebas";
+import { ESTADOS_SOLICITUD, type EstadoSolicitud, PRIORIDADES, type Prioridad } from "@/lib/soporte";
+import { texto } from "@/lib/volver";
 
-export type EstadoLimpieza = { ok?: boolean; error?: string; resumen?: string };
+export type EstadoSoporte = { ok?: boolean; error?: string; mensaje?: string; cuentas?: { puesto: string; usuario: string; clave: string }[] };
 
-/**
- * Deja el negocio como recién instalado: borra ventas, cobros, cortes, egresos, pagos al equipo, ideas e historial,
- * y las cuentas que ya estaban eliminadas. Conserva la configuración (servicios, precios, formas de pago, ajustes),
- * las cuentas activas y los meses que se capturaron del Excel. Solo la cuenta de soporte puede hacerlo.
- */
-export async function limpiarDatosDePrueba(_: EstadoLimpieza, form: FormData): Promise<EstadoLimpieza> {
+async function soporte() {
   const s = await requerirSesion();
-  if (!s.usuario.esSoporte) return { error: "Esta herramienta es solo para la cuenta de soporte." };
-  if (String(form.get("confirmar") ?? "").trim().toUpperCase() !== "BORRAR") return { error: "Escribe BORRAR para confirmar." };
-  const b = s.barberia.id;
-  const cuenta = async (tabla: typeof t.ventas | typeof t.gastos | typeof t.turnosCaja) =>
-    (await db.select({ n: sql<number>`count(*)::int` }).from(tabla).where(eq(tabla.barberiaId, b)))[0].n;
-  const [ventas, gastos, cortes] = await Promise.all([cuenta(t.ventas), cuenta(t.gastos), cuenta(t.turnosCaja)]);
+  if (!s.usuario.esSoporte) throw new Error("Solo para el soporte de la plataforma.");
+  return s;
+}
+
+/** Respuesta de soporte dentro de la solicitud. La persona recibe una notificación. */
+export async function responderComoSoporte(_: EstadoSoporte, form: FormData): Promise<EstadoSoporte> {
+  const s = await soporte();
+  const id = texto(form, "solicitudId", 40);
+  const msg = texto(form, "texto", 4000);
+  const despues = texto(form, "despues") as EstadoSolicitud;
+  const adjunto = String(form.get("adjunto") ?? "");
+  if (adjunto && (!TIPOS_ADJUNTO.test(adjunto) || adjunto.length > MAX_ADJUNTO)) return { error: "El archivo debe ser una foto o un PDF de máximo 2 MB." };
+  if (!msg) return { error: "Escribe la respuesta." };
+  const [x] = await db.select().from(t.solicitudesSoporte).where(eq(t.solicitudesSoporte.id, id)).limit(1);
+  if (!x) return { error: "No se encontró la solicitud." };
+  const estado = despues in ESTADOS_SOLICITUD ? despues : "esperando";
+  const yo = s.usuario.nombre.split(" ")[0];
   await db.transaction(async (tx) => {
-    // Permite borrar ventas e historial solo dentro de esta transacción.
-    await tx.execute(sql`select set_config('crabs.limpieza', 'si', true)`);
-    await tx.delete(t.comprobantes).where(eq(t.comprobantes.barberiaId, b));
-    await tx.delete(t.gastos).where(eq(t.gastos.barberiaId, b));
-    await tx.delete(t.propinas).where(eq(t.propinas.barberiaId, b));
-    await tx.delete(t.pagos).where(eq(t.pagos.barberiaId, b));
-    await tx.delete(t.conceptos).where(eq(t.conceptos.barberiaId, b));
-    await tx.delete(t.movimientosCaja).where(eq(t.movimientosCaja.barberiaId, b));
-    await tx.delete(t.ventas).where(eq(t.ventas.barberiaId, b));
-    await tx.delete(t.ajustesCierre).where(eq(t.ajustesCierre.barberiaId, b));
-    await tx.delete(t.turnosCaja).where(eq(t.turnosCaja.barberiaId, b));
-    await tx.delete(t.pagosComision).where(eq(t.pagosComision.barberiaId, b));
-    await tx.delete(t.ideas).where(eq(t.ideas.barberiaId, b));
-    await tx.delete(t.solicitudesClave).where(eq(t.solicitudesClave.barberiaId, b));
-    await tx.delete(t.historial).where(eq(t.historial.barberiaId, b));
-    // Cuentas que ya se habían eliminado ("Persona eliminada"): sin movimientos, ya no hace falta conservarlas.
-    const borradas = await tx.select({ id: t.usuarios.id }).from(t.usuarios).where(and(eq(t.usuarios.barberiaId, b), like(t.usuarios.usuario, "BORRADO-%")));
-    if (borradas.length) {
-      const ids = borradas.map((x) => x.id);
-      await tx.delete(t.sesiones).where(inArray(t.sesiones.usuarioId, ids));
-      await tx.delete(t.reglasComision).where(inArray(t.reglasComision.barberoId, ids));
-      await tx.delete(t.usuarios).where(inArray(t.usuarios.id, ids));
-    }
-    await tx.update(t.barberias).set({ siguienteFolio: 1 }).where(eq(t.barberias.id, b));
+    await tx.insert(t.mensajesSoporte).values({
+      solicitudId: id, autorId: s.usuario.id, deSoporte: true, texto: msg,
+      ...(adjunto ? { adjuntoNombre: texto(form, "adjuntoNombre", 120) || "archivo", adjuntoTipo: adjunto.slice(5, adjunto.indexOf(";")), adjuntoDatos: adjunto } : {}),
+    });
+    await tx.update(t.solicitudesSoporte).set({ estado, actualizadoEn: new Date(), ...(x.responsableId ? {} : { responsableId: s.usuario.id }) }).where(eq(t.solicitudesSoporte.id, id));
+    await tx.insert(t.eventosSoporte).values({ solicitudId: id, autorId: s.usuario.id, accion: `${yo} respondió` });
+    if (!x.responsableId) await tx.insert(t.eventosSoporte).values({ solicitudId: id, autorId: s.usuario.id, accion: `${yo} quedó como responsable` });
+    if (estado !== x.estado) await tx.insert(t.eventosSoporte).values({ solicitudId: id, autorId: s.usuario.id, accion: estado === "resuelto" ? "Marcó la solicitud como resuelta" : `Cambió el estado a ${ESTADOS_SOLICITUD[estado]}` });
   });
-  revalidatePath("/", "layout");
-  return { ok: true, resumen: `Se borraron ${ventas} ventas, ${gastos} egresos y ${cortes} cortes de caja. Los folios empiezan otra vez en 1.` };
+  revalidatePath(`/soporte/solicitudes/${id}`);
+  return { ok: true };
+}
+
+/** Cambia estado, prioridad o responsable. Cada cambio queda en el historial de la solicitud. */
+export async function actualizarSolicitud(form: FormData) {
+  const s = await soporte();
+  const id = texto(form, "solicitudId", 40);
+  const campo = texto(form, "campo");
+  const valor = texto(form, "valor", 40);
+  const [x] = await db.select().from(t.solicitudesSoporte).where(eq(t.solicitudesSoporte.id, id)).limit(1);
+  if (!x) return;
+  let accion = "";
+  if (campo === "estado" && valor in ESTADOS_SOLICITUD && valor !== x.estado) {
+    await db.update(t.solicitudesSoporte).set({ estado: valor, actualizadoEn: new Date() }).where(eq(t.solicitudesSoporte.id, id));
+    accion = valor === "resuelto" ? "Marcó la solicitud como resuelta" : `Cambió el estado a ${ESTADOS_SOLICITUD[valor as EstadoSolicitud]}`;
+  } else if (campo === "prioridad" && valor in PRIORIDADES && valor !== x.prioridad) {
+    await db.update(t.solicitudesSoporte).set({ prioridad: valor }).where(eq(t.solicitudesSoporte.id, id));
+    accion = `Cambió la prioridad a ${PRIORIDADES[valor as Prioridad]}`;
+  } else if (campo === "responsable") {
+    const [r] = valor ? await db.select().from(t.usuarios).where(and(eq(t.usuarios.id, valor), eq(t.usuarios.esSoporte, true))).limit(1) : [null];
+    if (valor && !r) return;
+    await db.update(t.solicitudesSoporte).set({ responsableId: r?.id ?? null }).where(eq(t.solicitudesSoporte.id, id));
+    accion = r ? `Asignó a ${r.nombre.split(" ")[0]} como responsable` : "Quitó al responsable";
+  }
+  if (accion) await db.insert(t.eventosSoporte).values({ solicitudId: id, autorId: s.usuario.id, accion: `${accion}` });
+  revalidatePath(`/soporte/solicitudes/${id}`);
+}
+
+export async function crearNegocioPrueba(_: EstadoSoporte, form: FormData): Promise<EstadoSoporte> {
+  await soporte();
+  const nombre = texto(form, "nombre", 60);
+  if (nombre.length < 3) return { error: "Escribe el nombre del negocio de prueba." };
+  const r = await crearPrueba(nombre);
+  revalidatePath("/soporte/pruebas");
+  return { ok: true, mensaje: `Se creó ${nombre}. Guarda estas contraseñas: no se vuelven a mostrar.`, cuentas: r.cuentas };
+}
+
+/** Restablecer, eliminar o cargar datos. Para borrar hay que escribir el nombre exacto del negocio. */
+export async function mantenimientoPrueba(_: EstadoSoporte, form: FormData): Promise<EstadoSoporte> {
+  await soporte();
+  const id = texto(form, "negocioId", 40);
+  const accion = texto(form, "accion");
+  const b = await negocioDePrueba(id);
+  if (!b) return { error: "Esta operación solo es para negocios de prueba. Los negocios reales están excluidos." };
+  try {
+    if (accion === "demo") {
+      const r = await datosDemostracion(id);
+      revalidatePath("/soporte/pruebas");
+      return { ok: true, mensaje: `Se agregaron ${r.ventas} ventas de demostración a ${r.nombre}.` };
+    }
+    if (texto(form, "confirmar", 80) !== b.nombre) return { error: `Escribe ${b.nombre} para confirmar.` };
+    if (accion === "restablecer") {
+      const r = await restablecerPrueba(id);
+      revalidatePath("/soporte/pruebas");
+      return { ok: true, mensaje: `${r.nombre} quedó sin movimientos: se borraron ${r.ventas} ventas, ${r.egresos} egresos y ${r.cortes} cortes.` };
+    }
+    if (accion === "eliminar") {
+      const r = await eliminarPrueba(id);
+      revalidatePath("/soporte/pruebas");
+      return { ok: true, mensaje: `Se eliminó ${r.nombre} con sus ${r.usuarios} cuentas.` };
+    }
+  } catch (e) {
+    return { error: e instanceof Error ? e.message : "No se pudo completar." };
+  }
+  return { error: "Operación no válida." };
+}
+
+export async function limpiarRegistros(_: EstadoSoporte): Promise<EstadoSoporte> {
+  await soporte();
+  const r = await limpiarTemporales();
+  return { ok: true, mensaje: `Se borraron ${r.sesiones} sesiones vencidas y ${r.errores} errores de hace más de 90 días.` };
 }

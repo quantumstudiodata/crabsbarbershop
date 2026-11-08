@@ -1,6 +1,7 @@
 "use client";
 
 import Link from "next/link";
+import { prepararArchivo } from "@/lib/archivo";
 import { useActionState, useEffect, useState, useTransition } from "react";
 import { Calendario } from "@/components/Calendario";
 import { Fl, Icono } from "@/components/Icono";
@@ -97,18 +98,6 @@ const pct = (a: number, b: number) => (b ? `${Math.round((a / b) * 100)}%` : "0%
 export type Frecuente = { id: string; concepto: string; categoria: string; monto: number; metodo: string; periodicidad: string };
 export type OpcionesEgreso = { periodicidad: boolean; comprobantes: boolean; frecuentes: Frecuente[]; metodos: string[] };
 const PERIODOS: [string, string][] = [["unica", "Una vez"], ["semanal", "Semanal"], ["quincenal", "Quincenal"], ["mensual", "Mensual"]];
-
-/** Reduce una foto a 1600 px de lado y la convierte a JPEG, para que pese poco. Los PDF pasan tal cual. */
-async function prepararArchivo(f: File): Promise<string> {
-  const leer = (b: Blob) => new Promise<string>((ok, mal) => { const r = new FileReader(); r.onload = () => ok(String(r.result)); r.onerror = mal; r.readAsDataURL(b); });
-  if (f.type === "application/pdf") return leer(f);
-  const img = await createImageBitmap(f);
-  const k = Math.min(1, 1600 / Math.max(img.width, img.height));
-  const c = document.createElement("canvas");
-  c.width = Math.round(img.width * k); c.height = Math.round(img.height * k);
-  c.getContext("2d")!.drawImage(img, 0, 0, c.width, c.height);
-  return c.toDataURL("image/jpeg", 0.8);
-}
 
 export function Nuevo({ hoy, cajaAbierta, categorias, cerrar, otro, opciones }: { hoy: string; cajaAbierta: boolean; categorias: Categoria[]; cerrar: () => void; otro: () => void; opciones: OpcionesEgreso }) {
   const [e, accion, guardando] = useActionState<EstadoGasto, FormData>(registrarEgreso, {});

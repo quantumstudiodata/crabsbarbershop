@@ -11,13 +11,18 @@ export type SubNav = { base: string; items: [string, string][] };
  * Menú principal. Dentro de una sección con submenú (Analítica), el menú principal sale hacia la izquierda
  * y entran las pestañas de la sección con un botón para volver.
  */
-export function Nav({ items, sub }: { items: ItemNav[]; sub?: SubNav }) {
+export function Nav({ items, sub, destacado }: { items: ItemNav[]; sub?: SubNav; destacado?: ItemNav }) {
   const ruta = usePathname();
   const activo = (href: string) => (href === "/" ? ruta === "/" : ruta.startsWith(href));
   const dentro = !!sub && sub.items.length > 1 && ruta.startsWith(sub.base);
   return (
     <nav className={`nav glass desliza-n ${dentro ? "dentro" : ""}`} aria-label="Secciones">
       <div className="capa-n pri" aria-hidden={dentro || undefined}>
+        {destacado && (
+          <Link href={destacado.href} className="destacado-n" tabIndex={dentro ? -1 : undefined} aria-current={activo(destacado.href) ? "page" : undefined}>
+            <Icono n={destacado.icono} /><span>{destacado.texto}</span>
+          </Link>
+        )}
         {items.map((i) => (
           <Link key={i.href} href={i.href} tabIndex={dentro ? -1 : undefined} aria-current={activo(i.href) ? "page" : undefined}>
             <Icono n={i.icono} />

@@ -3,9 +3,14 @@
 import { useEffect, useState } from "react";
 
 /** Si algo falla al guardar. En el modo de visualización explica por qué no se guardó. */
-export default function Error({ reset }: { error: Error; reset: () => void }) {
+export default function Error({ error, reset }: { error: Error & { digest?: string }; reset: () => void }) {
   const [vista, setVista] = useState(false);
-  useEffect(() => setVista(document.cookie.includes("crabs_vista=")), []);
+  useEffect(() => {
+    const v = document.cookie.includes("crabs_vista=");
+    setVista(v);
+    // Se registra para Soporte; los bloqueos de la vista previa no son fallos.
+    if (!v) fetch("/api/errores", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ mensaje: error.message || "Error sin mensaje", digest: error.digest, ruta: location.pathname }) }).catch(() => {});
+  }, [error]);
   return (
     <section className="glass panel" style={{ justifyItems: "start", gap: 10 }}>
       <span className="lab">{vista ? "Modo de visualización" : "Algo no salió bien"}</span>

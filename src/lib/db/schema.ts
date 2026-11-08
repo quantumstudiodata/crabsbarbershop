@@ -8,6 +8,7 @@ import {
   jsonb,
   pgEnum,
   pgTable,
+  serial,
   text,
   timestamp,
   uniqueIndex,
@@ -65,6 +66,8 @@ export const barberias = pgTable("barberias", {
   // Preparado para suscripciones: el plan y su estado son de cada negocio.
   plan: text("plan").notNull().default("inicial"),
   estadoCuenta: text("estado_cuenta").notNull().default("activa"),
+  // Negocio de pruebas: solo estos se pueden restablecer o eliminar desde Soporte.
+  esPrueba: boolean("es_prueba").notNull().default(false),
   creadoEn: creadoEn(),
 });
 
@@ -475,4 +478,75 @@ export const categoriasServicio = pgTable(
     creadoEn: creadoEn(),
   },
   (t) => [uniqueIndex("categorias_servicio_uq").on(t.barberiaId, t.nombre)],
+);
+
+// Centro de ayuda: solicitudes que el equipo de un negocio envía al soporte de la plataforma.
+export const solicitudesSoporte = pgTable(
+  "solicitudes_soporte",
+  {
+    id: id(),
+    barberiaId: barberiaId(),
+    folio: serial("folio").notNull(),
+    usuarioId: uuid("usuario_id").notNull().references(() => usuarios.id),
+    // problema, duda o mejora
+    tipo: text("tipo").notNull(),
+    categoria: text("categoria"),
+    asunto: text("asunto").notNull(),
+    // pendiente, revision, esperando, resuelto
+    estado: text("estado").notNull().default("pendiente"),
+    // baja, normal, alta, urgente
+    prioridad: text("prioridad").notNull().default("normal"),
+    responsableId: uuid("responsable_id").references(() => usuarios.id),
+    // Página, puesto y errores recientes al momento de enviar: ayudan a diagnosticar sin preguntar.
+    contexto: jsonb("contexto").notNull().default(sql`'{}'::jsonb`),
+    creadoEn: creadoEn(),
+    actualizadoEn: timestamp("actualizado_en", { withTimezone: true }).notNull().defaultNow(),
+    vistoUsuarioEn: timestamp("visto_usuario_en", { withTimezone: true }).notNull().defaultNow(),
+  },
+  (t) => [index("solicitudes_soporte_estado_idx").on(t.estado, t.actualizadoEn), index("solicitudes_soporte_usuario_idx").on(t.usuarioId)],
+);
+
+export const mensajesSoporte = pgTable(
+  "mensajes_soporte",
+  {
+    id: id(),
+    solicitudId: uuid("solicitud_id").notNull().references(() => solicitudesSoporte.id, { onDelete: "cascade" }),
+    autorId: uuid("autor_id").notNull().references(() => usuarios.id),
+    deSoporte: boolean("de_soporte").notNull().default(false),
+    texto: text("texto").notNull(),
+    adjuntoNombre: text("adjunto_nombre"),
+    adjuntoTipo: text("adjunto_tipo"),
+    adjuntoDatos: text("adjunto_datos"),
+    creadoEn: creadoEn(),
+  },
+  (t) => [index("mensajes_soporte_solicitud_idx").on(t.solicitudId, t.creadoEn)],
+);
+
+// Lo que pasó con cada solicitud: cambios de estado, prioridad y responsable.
+export const eventosSoporte = pgTable(
+  "eventos_soporte",
+  {
+    id: id(),
+    solicitudId: uuid("solicitud_id").notNull().references(() => solicitudesSoporte.id, { onDelete: "cascade" }),
+    autorId: uuid("autor_id").references(() => usuarios.id),
+    accion: text("accion").notNull(),
+    creadoEn: creadoEn(),
+  },
+  (t) => [index("eventos_soporte_solicitud_idx").on(t.solicitudId)],
+);
+
+// Fallos de la aplicación, del servidor o del navegador, para que soporte los vea sin investigar a mano.
+export const erroresSistema = pgTable(
+  "errores_sistema",
+  {
+    id: id(),
+    barberiaId: uuid("barberia_id").references(() => barberias.id, { onDelete: "set null" }),
+    usuarioId: uuid("usuario_id").references(() => usuarios.id, { onDelete: "set null" }),
+    origen: text("origen").notNull(),
+    ruta: text("ruta").notNull().default(""),
+    mensaje: text("mensaje").notNull(),
+    digest: text("digest"),
+    creadoEn: creadoEn(),
+  },
+  (t) => [index("errores_sistema_fecha_idx").on(t.creadoEn)],
 );
