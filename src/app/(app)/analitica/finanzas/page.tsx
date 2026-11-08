@@ -156,7 +156,7 @@ export default async function Finanzas({ searchParams }: { searchParams: Promise
     <>
       {verTodo && (
         <>
-          <section className="cab-v glass subir" style={{ gridTemplateColumns: "auto minmax(0, 1fr)" }}>
+          <section className="cab-v cab-fin glass subir">
             <div className="cv-num">
               <span className="lab">Lo que quedó en {nombreP}</span>
               <b className="num">{firma(quedo)}</b>

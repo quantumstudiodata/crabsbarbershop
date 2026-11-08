@@ -2,10 +2,9 @@
 
 import { useRouter } from "next/navigation";
 import { MenuAnio, MenuMes } from "@/components/Calendario";
-import { Icono } from "@/components/Icono";
 
-/** Mes, Año o Por barbero, con su selector y el botón de descarga. */
-export function NavLibreta({ vista, mes, anio, hoy, descarga, conDatos }: { vista: "mes" | "anio" | "barberos"; mes: string; anio: string; hoy: string; descarga: string; conDatos: string[] }) {
+/** Mes, Año o Por barbero, con su selector y las descargas. */
+export function NavLibreta({ vista, mes, anio, hoy, descargas, conDatos }: { vista: "mes" | "anio" | "barberos"; mes: string; anio: string; hoy: string; descargas: React.ReactNode; conDatos: string[] }) {
   const router = useRouter();
   const ir = (q: string) => router.push(`/libreta?${q}`);
   return (
@@ -22,7 +21,7 @@ export function NavLibreta({ vista, mes, anio, hoy, descarga, conDatos }: { vist
             : <MenuAnio anio={anio} activo hoy={hoy} elegir={(y) => ir(`vista=${vista}&anio=${y}`)} />}
         </div>
       </div>
-      <a className="chipf" href={descarga}><Icono n="descargar" />Descargar Excel</a>
+      {descargas}
     </div>
   );
 }
