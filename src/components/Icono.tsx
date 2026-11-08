@@ -1,6 +1,7 @@
 // Iconos de trazo. Un solo lugar para todos.
 
 const P: Record<string, React.ReactNode> = {
+  imprimir: <><path d="M7 9V4h10v5" /><rect x="3.5" y="9" width="17" height="8" rx="2" /><path d="M7 14h10v6H7z" /></>,
   inicio: <path d="M3 11 12 4l9 7v9h-6v-6H9v6H3z" />,
   cobro: <><rect x="3" y="6" width="18" height="12" rx="2.5" /><circle cx="12" cy="12" r="2.6" /><path d="M6.5 9.5v.01M17.5 14.5v.01" /></>,
   grafica: <path d="M4 20V11M10 20V5M16 20v-8M21 20H3" />,

@@ -313,6 +313,7 @@ export async function turnosCerrados(barberiaId: string, limite = 30, rango?: { 
       fondoInicial: s.turnosCaja.fondoInicial, efectivoEsperado: s.turnosCaja.efectivoEsperado, efectivoContado: s.turnosCaja.efectivoContado,
       diferencia: s.turnosCaja.diferencia, notasCierre: s.turnosCaja.notasCierre, cerradoPor: s.usuarios.nombre,
       verificacion: s.turnosCaja.verificacion, abiertoPor: s.turnosCaja.abiertoPor, cerradoPorId: s.turnosCaja.cerradoPor,
+      revisadoEn: s.turnosCaja.revisadoEn,
     })
     .from(s.turnosCaja)
     .leftJoin(s.usuarios, eq(s.usuarios.id, s.turnosCaja.cerradoPor))

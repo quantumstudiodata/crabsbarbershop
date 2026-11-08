@@ -1,13 +1,15 @@
 "use client";
 
-import { useState } from "react";
+import { useState, useTransition } from "react";
 import { Avatar } from "@/components/Avatar";
+import { Cajon } from "@/components/Cajon";
 import { Icono } from "@/components/Icono";
 import { formatoDinero } from "@/lib/money";
+import { marcarRevisado } from "../../caja/actions";
 import { Corregir } from "./Corregir";
 
 export type Corte = {
-  id: string; folio: string; horario: string; dia: string;
+  id: string; folio: string; horario: string; dia: string; fechaCorta: string;
   abrio: { nombre: string; avatar: string }; cerro: { nombre: string; avatar: string };
   metodos: { metodo: string; total: number }[]; total: number; ventas: number;
   fondo: number; ventasEfectivo: number; propinasEfectivo: number; entradas: number; retiros: number; gastos: number;
@@ -15,67 +17,106 @@ export type Corte = {
   movimientos: { hora: string; titulo: string; detalle: string; monto: number }[];
   ajustes: string[];
 };
-export type DiaCortes = { fecha: string; titulo: string; total: number; diferencia: number; cortes: Corte[] };
 
-export function HistorialCortes({ dias, corregir }: { dias: DiaCortes[]; corregir: boolean }) {
-  const [abierto, setAbierto] = useState<string | null>(null);
-  if (dias.length === 0) return <p className="muted">No hay cortes en estas fechas.</p>;
+const $ = formatoDinero;
+const primer = (n: string) => n.split(" ")[0];
+
+function Estado({ d }: { d: number }) {
+  if (d === 0) return <span className="chip-p">Cuadró</span>;
+  return <span className={`chip-p ${d < 0 ? "alerta" : ""}`}>{d < 0 ? "Faltaron" : "Sobraron"} {$(Math.abs(d))}</span>;
+}
+
+/** Cortes con faltante que nadie ha revisado. Solo aquí se marcan como revisados. */
+export function NecesitaRevision({ cortes, puede }: { cortes: Corte[]; puede: boolean }) {
+  const [ver, setVer] = useState<Corte | null>(null);
+  const [pendiente, iniciar] = useTransition();
+  const [todos, setTodos] = useState(false);
+  if (!cortes.length) return null;
+  const visibles = todos ? cortes : cortes.slice(0, 3);
   return (
-    <div className="glass historial">
-      <div className="hist-scroll" style={{ maxHeight: 680 }}>
-        {dias.map((d) => (
-          <div key={d.fecha}>
-            <div className="hist-dia">
-              <span>{d.titulo} - {d.cortes.length} {d.cortes.length === 1 ? "corte" : "cortes"}</span>
-              <span className="fila" style={{ gap: 12 }}>
-                {d.diferencia !== 0 && <span className="pill warn" style={{ padding: "2px 8px" }}>{d.diferencia > 0 ? "Sobraron" : "Faltaron"} {formatoDinero(Math.abs(d.diferencia))}</span>}
-                <b className="num">{formatoDinero(d.total)}</b>
-              </span>
-            </div>
-            {d.cortes.map((c) => (
-              <div key={c.id} className={`hist-fila ${abierto === c.id ? "abierta" : ""}`}>
-                <button type="button" className="hist-linea corte-l" aria-expanded={abierto === c.id} onClick={() => setAbierto(abierto === c.id ? null : c.id)}>
-                  <span className="folio">{c.folio}</span>
-                  <span className="t">{c.horario}</span>
-                  <span className="quien"><Avatar avatar={c.cerro.avatar} nombre={c.cerro.nombre} t={24} />{c.cerro.nombre.split(" ")[0]}</span>
-                  <span className="est-c">{c.diferencia === 0 ? <span className="cubierto"><i>✓</i>Coincidió</span> : <span className="est temp"><span className="d" style={{ background: "var(--warn)", boxShadow: "0 0 0 3px var(--warn-soft)" }} />{c.diferencia > 0 ? "Sobraron" : "Faltaron"} {formatoDinero(Math.abs(c.diferencia))}</span>}</span>
-                  <span className="num">{formatoDinero(c.total)}</span>
-                  <Icono n="abajo" />
-                </button>
-                {abierto === c.id && (
-                  <div className="corte-det">
-                    <div className="resumen-c chico">
-                      <span className="lab">Cobros del turno</span>
-                      {c.metodos.map((m) => <div key={m.metodo}><span>{m.metodo}</span><span className="num">{formatoDinero(m.total)}</span></div>)}
-                      <div className="total-c"><span>Total vendido, {c.ventas} {c.ventas === 1 ? "venta" : "ventas"}</span><b>{formatoDinero(c.total)}</b></div>
-                    </div>
-                    <div className="resumen-c chico">
-                      <span className="lab">Conciliación de efectivo</span>
-                      <div><span>Fondo inicial</span><span className="num">{formatoDinero(c.fondo)}</span></div>
-                      <div><span>Ventas en efectivo</span><span className="num">+{formatoDinero(c.ventasEfectivo)}</span></div>
-                      {c.propinasEfectivo > 0 && <div><span>Propinas en efectivo</span><span className="num">+{formatoDinero(c.propinasEfectivo)}</span></div>}
-                      {c.entradas > 0 && <div><span>Entradas</span><span className="num">+{formatoDinero(c.entradas)}</span></div>}
-                      <div><span>Retiros y gastos</span><span className="num">−{formatoDinero(c.retiros + c.gastos)}</span></div>
-                      <div><span>Debía haber</span><span className="num">{formatoDinero(c.esperado)}</span></div>
-                      <div className="total-c"><span>Se contó</span><b>{formatoDinero(c.contado)}</b></div>
-                    </div>
-                    <div className="pila-chica">
-                      <span className="lab">Turno</span>
-                      <span className="persona" style={{ fontSize: 13 }}><Avatar avatar={c.abrio.avatar} nombre={c.abrio.nombre} t={24} />Abrió {c.abrio.nombre.split(" ")[0]}</span>
-                      <span className="persona" style={{ fontSize: 13 }}><Avatar avatar={c.cerro.avatar} nombre={c.cerro.nombre} t={24} />Cerró {c.cerro.nombre.split(" ")[0]}</span>
-                      {c.movimientos.length > 0 && <span className="lab" style={{ marginTop: 8 }}>Movimientos</span>}
-                      {c.movimientos.map((m, i) => <span key={i} className="mov-c"><span className="t">{m.hora}</span>{m.titulo}<small>{m.detalle}</small><b className="num">{formatoDinero(m.monto)}</b></span>)}
-                      {c.notas && <><span className="lab" style={{ marginTop: 8 }}>Observaciones</span><p className="nota-c">{c.notas}</p></>}
-                      {c.ajustes.map((a, i) => <p key={i} className="nota-c">{a}</p>)}
-                      {corregir && <Corregir id={c.id} dia={c.dia} />}
-                    </div>
-                  </div>
-                )}
-              </div>
+    <section className="glass revision-c subir">
+      <div className="entre"><span className="lab">Necesita revisión</span><span className="muted chico-t">{cortes.length} {cortes.length === 1 ? "corte con faltante" : "cortes con faltante"}</span></div>
+      {visibles.map((c) => (
+        <div key={c.id} className="fila-rev">
+          <button type="button" className="rev-l" onClick={() => setVer(c)}>
+            <span className="folio">{c.folio}</span><span>{c.fechaCorta}</span>
+            <span className="quien"><Avatar avatar={c.cerro.avatar} nombre={c.cerro.nombre} t={24} />{primer(c.cerro.nombre)}</span>
+            <Estado d={c.diferencia} />
+          </button>
+          {puede && (
+            <button type="button" className="bt sec chico" disabled={pendiente}
+              onClick={() => iniciar(async () => { const f = new FormData(); f.set("turnoId", c.id); await marcarRevisado(f); })}>Marcar como revisado</button>
+          )}
+        </div>
+      ))}
+      {cortes.length > 3 && <button type="button" className="link-c ver-mas" onClick={() => setTodos(!todos)}>{todos ? "Ver menos" : `Ver los ${cortes.length}`}</button>}
+      <Detalle c={ver} cerrar={() => setVer(null)} corregir={false} />
+    </section>
+  );
+}
+
+/** Todos los cortes en una tabla. Al tocar uno se abre su comprobante a un lado. */
+export function TablaCortes({ cortes, corregir }: { cortes: Corte[]; corregir: boolean }) {
+  const [ver, setVer] = useState<Corte | null>(null);
+  if (!cortes.length) return <p className="muted" style={{ padding: "8px 4px" }}>No hay cortes con esos filtros.</p>;
+  return (
+    <>
+      <div className="hist-scroll tabla-c-scroll">
+        <table className="tabla-c">
+          <thead><tr><th>Folio</th><th>Día</th><th>Horario</th><th>Cerró</th><th>Estado</th><th className="der">Vendido</th></tr></thead>
+          <tbody>
+            {cortes.map((c) => (
+              <tr key={c.id} className={ver?.id === c.id ? "activa" : ""} onClick={() => setVer(c)} tabIndex={0} onKeyDown={(e) => { if (e.key === "Enter") setVer(c); }}>
+                <td><span className="folio">{c.folio}</span></td>
+                <td>{c.fechaCorta}</td>
+                <td className="muted">{c.horario}</td>
+                <td>{c.cerro.nombre && <span className="quien"><Avatar avatar={c.cerro.avatar} nombre={c.cerro.nombre} t={24} />{primer(c.cerro.nombre)}</span>}</td>
+                <td><Estado d={c.diferencia} /></td>
+                <td className="der num">{$(c.total)}</td>
+              </tr>
             ))}
-          </div>
-        ))}
+          </tbody>
+        </table>
       </div>
-    </div>
+      <Detalle c={ver} cerrar={() => setVer(null)} corregir={corregir} />
+    </>
+  );
+}
+
+function Detalle({ c, cerrar, corregir }: { c: Corte | null; cerrar: () => void; corregir: boolean }) {
+  return (
+    <Cajon abierto={!!c} cerrar={cerrar} titulo={c ? `Corte ${c.folio}` : ""}
+      pie={c && <>{corregir && <Corregir id={c.id} dia={c.dia} />}<button type="button" className="bt chico" onClick={() => window.print()}><Icono n="imprimir" />Imprimir</button></>}>
+      {c && (
+        <div className="recibo-c">
+          <div className="rc-cab"><b>{c.dia}</b><small>{c.horario}</small><small>Abrió {primer(c.abrio.nombre)}, cerró {primer(c.cerro.nombre)}</small></div>
+          <div className="rc-sec"><span className="lab">Cobros</span>
+            {c.metodos.map((m) => <div key={m.metodo}><span>{m.metodo}</span><span className="num">{$(m.total)}</span></div>)}
+            <div className="rc-tot"><span>Total vendido, {c.ventas} {c.ventas === 1 ? "venta" : "ventas"}</span><b className="num">{$(c.total)}</b></div>
+          </div>
+          <div className="rc-sec"><span className="lab">Efectivo</span>
+            <div><span>Fondo inicial</span><span className="num">{$(c.fondo)}</span></div>
+            <div><span>Ventas en efectivo</span><span className="num">+{$(c.ventasEfectivo)}</span></div>
+            {c.propinasEfectivo > 0 && <div><span>Propinas en efectivo</span><span className="num">+{$(c.propinasEfectivo)}</span></div>}
+            {c.entradas > 0 && <div><span>Entradas</span><span className="num">+{$(c.entradas)}</span></div>}
+            {c.retiros + c.gastos > 0 && <div><span>Retiros y gastos</span><span className="num">−{$(c.retiros + c.gastos)}</span></div>}
+            <div><span>Debía haber</span><span className="num">{$(c.esperado)}</span></div>
+            <div><span>Se contó</span><span className="num">{$(c.contado)}</span></div>
+            <div className="rc-tot"><span>Diferencia</span><Estado d={c.diferencia} /></div>
+          </div>
+          {c.movimientos.length > 0 && (
+            <div className="rc-sec"><span className="lab">Movimientos de caja</span>
+              {c.movimientos.map((m, i) => <div key={i}><span>{m.hora} {m.titulo}<small>{m.detalle}</small></span><span className="num">{m.monto < 0 ? `−${$(-m.monto)}` : $(m.monto)}</span></div>)}
+            </div>
+          )}
+          {(c.notas || c.ajustes.length > 0) && (
+            <div className="rc-sec"><span className="lab">Observaciones</span>
+              {c.notas && <p>{c.notas}</p>}
+              {c.ajustes.map((a, i) => <p key={i}>{a}</p>)}
+            </div>
+          )}
+        </div>
+      )}
+    </Cajon>
   );
 }

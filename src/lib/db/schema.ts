@@ -157,6 +157,9 @@ export const turnosCaja = pgTable(
     verificacion: jsonb("verificacion").notNull().default(sql`'{}'::jsonb`),
     // Con caja individual, de quién es esta caja. Vacío = caja compartida.
     responsableId: uuid("responsable_id").references(() => usuarios.id),
+    // Un corte con faltante queda pendiente hasta que alguien lo marca como revisado.
+    revisadoPor: uuid("revisado_por").references(() => usuarios.id),
+    revisadoEn: timestamp("revisado_en", { withTimezone: true }),
   },
   (t) => [
     index("turnos_barberia_fecha_idx").on(t.barberiaId, t.fechaOperativa),

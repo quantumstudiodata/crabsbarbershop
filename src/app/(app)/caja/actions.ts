@@ -6,7 +6,7 @@ import { requerirSesion } from "@/lib/auth";
 import { compararConteo, requiereExplicacion } from "@/lib/caja";
 import { cajaDe, categoriasGasto, folioCorte, movimientosDeTurno } from "@/lib/datos";
 import { db, schema } from "@/lib/db";
-import { fechaLocal } from "@/lib/fechas";
+import { fechaLarga, fechaLocal } from "@/lib/fechas";
 import { registrar } from "@/lib/historial";
 import { formatoDinero, leerPesos } from "@/lib/money";
 import { texto, volver } from "@/lib/volver";
@@ -145,4 +145,17 @@ export async function corregirCierre(form: FormData) {
   });
   revalidatePath(R);
   volver(R, { aviso: "guardado" });
+}
+
+/** Marca como revisado un corte en el que faltó dinero. */
+export async function marcarRevisado(form: FormData) {
+  const s = await requerirSesion("caja.corregir");
+  const R = "/analitica/cortes";
+  const turnoId = texto(form, "turnoId", 40);
+  const [t] = await db.update(schema.turnosCaja).set({ revisadoPor: s.usuario.id, revisadoEn: new Date() })
+    .where(and(eq(schema.turnosCaja.id, turnoId), eq(schema.turnosCaja.barberiaId, s.barberia.id), eq(schema.turnosCaja.estado, "cerrado")))
+    .returning({ fecha: schema.turnosCaja.fechaOperativa });
+  if (!t) volver(R, { error: "No se encontró ese corte." });
+  await registrar(db, { barberiaId: s.barberia.id, usuarioId: s.usuario.id, tipo: "caja", accion: `${s.usuario.nombre} marcó como revisado el corte del ${fechaLarga(t.fecha).toLowerCase()}` });
+  revalidatePath(R);
 }
