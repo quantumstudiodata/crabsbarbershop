@@ -38,7 +38,7 @@ export async function CabeceraVentas({ barberiaId, zona, hoy, p, anterior, perso
         <div className="cv-num">
           <span className="lab">Ventas {p.tipo === "mes" ? `de ${p.etiqueta.split(" ")[0].toLowerCase()}` : p.tipo === "dia" ? `del ${fechaCorta(p.desde)}` : p.etiqueta.toLowerCase()}</span>
           <b className="num">{formatoDinero(r.netas)}</b>
-          {v !== null && <span className="chip-p si">{Math.abs(v)}% {v >= 0 ? "más" : "menos"} que {textoComp}</span>}
+          {v !== null && <span className="chip-p si">{v === 0 ? "Igual" : `${Math.abs(v)}% ${v > 0 ? "más" : "menos"}`} que {textoComp}</span>}
         </div>
         {largo > 1 && largo <= 62 && (
           <div className="cv-graf">
