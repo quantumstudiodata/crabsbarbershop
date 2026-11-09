@@ -2490,3 +2490,21 @@ html:has(.capa) body, html:has(.velo-c) body, html:has(.velo-hoja) body, html:ha
 }
 .explica-p { display: block; margin-top: 2px; color: #4b6274 !important; }
 @media (max-width: 760px) { .tipos-p { gap: 6px; } .tipo-p { padding: 8px 12px; } }
+/* Decidir faltante */
+.reparto-f { display: flex; flex-wrap: wrap; gap: 4px 12px; margin-top: 4px; font-size: 12.5px; color: var(--muted); }
+.reparto-f > span { display: inline-flex; align-items: center; gap: 5px; }
+.reparto-f b { color: var(--fg); font-weight: 600; }
+.tipo-p:disabled { opacity: .5; cursor: default; }
+.manual-f label { grid-template-columns: minmax(0, 1fr) 120px; }
+.manual-f .persona { display: inline-flex; align-items: center; gap: 8px; font-weight: 500; }
+.manual-f .input { height: 38px; min-height: 38px; text-align: right; }
+.suma-f { display: flex; justify-content: space-between; padding: 10px 14px; border-top: 1px solid var(--line); font-size: 13px; color: var(--muted); }
+.suma-f.ok b { color: #2b3a47; }
+@media (max-width: 760px) {
+  .rev-l { grid-template-columns: auto auto minmax(0, 1fr); gap: 6px; }
+  .rev-l > span:nth-child(2) { overflow: hidden; text-overflow: ellipsis; }
+  .rev-l > span:nth-child(2) { white-space: nowrap; }
+  .rev-l .chip-p { justify-self: end; font-size: 11px; padding: 3px 8px; white-space: nowrap; }
+  .rev-l .folio { font-size: 11.5px; padding: 3px 6px; }
+  .fila-rev .bt.chico { padding: 7px 10px; font-size: 12px; }
+}

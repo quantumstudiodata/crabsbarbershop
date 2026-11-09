@@ -206,6 +206,7 @@ export function CajaModal({ inicial, turno, limiteDiferencia, categorias, eviden
           <span>Observaciones</span>
           <textarea className="input" name="notas" placeholder={dif !== null && Math.abs(dif) > limiteDiferencia ? "Hay diferencia. Escribe qué pasó." : "Opcional"} />
         </label>
+        {dif !== null && dif < 0 && <p className="ayuda-txt" style={{ margin: 0 }}>Si falta dinero, la encargada decide en Cortes de caja quién lo cubre.</p>}
         {eCerrar.error && <p className="aviso error">{eCerrar.error}</p>}
         <div className="acciones"><button className="bt" disabled={cerrando}>{cerrando ? "Cerrando…" : "Cerrar caja"}<Fl /></button></div>
       </form>

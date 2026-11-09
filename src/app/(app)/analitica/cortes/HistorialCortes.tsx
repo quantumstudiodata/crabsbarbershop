@@ -1,11 +1,11 @@
 "use client";
 
-import { useState, useTransition } from "react";
+import { useState } from "react";
 import { Avatar } from "@/components/Avatar";
 import { Cajon } from "@/components/Cajon";
 import { Icono } from "@/components/Icono";
 import { formatoDinero } from "@/lib/money";
-import { marcarRevisado } from "../../caja/actions";
+import { DecidirFaltante } from "./DecidirFaltante";
 import { Corregir } from "./Corregir";
 
 export type Corte = {
@@ -17,6 +17,9 @@ export type Corte = {
   movimientos: { hora: string; titulo: string; detalle: string; monto: number }[];
   ajustes: string[];
   evidencias: { id: string; etiqueta: string; nombre: string; tipo: string }[];
+  abrioId?: string;
+  cobradores?: { id: string; nombre: string; avatar: string; efectivo: number }[];
+  equipo?: { id: string; nombre: string; avatar: string }[];
 };
 
 const $ = formatoDinero;
@@ -30,7 +33,7 @@ function Estado({ d }: { d: number }) {
 /** Cortes con faltante que nadie ha revisado. Solo aquí se marcan como revisados. */
 export function NecesitaRevision({ cortes, puede }: { cortes: Corte[]; puede: boolean }) {
   const [ver, setVer] = useState<Corte | null>(null);
-  const [pendiente, iniciar] = useTransition();
+  const [decidir, setDecidir] = useState<Corte | null>(null);
   const [todos, setTodos] = useState(false);
   if (!cortes.length) return null;
   const visibles = todos ? cortes : cortes.slice(0, 3);
@@ -40,18 +43,16 @@ export function NecesitaRevision({ cortes, puede }: { cortes: Corte[]; puede: bo
       {visibles.map((c) => (
         <div key={c.id} className="fila-rev">
           <button type="button" className="rev-l" onClick={() => setVer(c)}>
-            <span className="folio">{c.folio}</span><span>{c.fechaCorta}</span>
+            <span className="folio">{c.folio}</span><span>{c.fechaCorta.replace(/ de (\p{L}{3})\p{L}*/u, " $1")}</span>
             <span className="quien"><Avatar avatar={c.cerro.avatar} nombre={c.cerro.nombre} t={24} />{primer(c.cerro.nombre)}</span>
             <Estado d={c.diferencia} />
           </button>
-          {puede && (
-            <button type="button" className="bt sec chico" disabled={pendiente}
-              onClick={() => iniciar(async () => { const f = new FormData(); f.set("turnoId", c.id); await marcarRevisado(f); })}>Marcar como revisado</button>
-          )}
+          {puede && <button type="button" className="bt sec chico" onClick={() => setDecidir(c)}>Decidir faltante</button>}
         </div>
       ))}
       {cortes.length > 3 && <button type="button" className="link-c ver-mas" onClick={() => setTodos(!todos)}>{todos ? "Ver menos" : `Ver los ${cortes.length}`}</button>}
       <Detalle c={ver} cerrar={() => setVer(null)} />
+      {decidir && <DecidirFaltante c={decidir} cerrar={() => setDecidir(null)} />}
     </section>
   );
 }

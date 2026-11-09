@@ -166,6 +166,8 @@ export const turnosCaja = pgTable(
     // Un corte con faltante queda pendiente hasta que alguien lo marca como revisado.
     revisadoPor: uuid("revisado_por").references(() => usuarios.id),
     revisadoEn: timestamp("revisado_en", { withTimezone: true }),
+    // Cómo se cubrió un faltante: abrio, iguales, proporcional, manual o negocio.
+    faltanteRegla: text("faltante_regla"),
   },
   (t) => [
     index("turnos_barberia_fecha_idx").on(t.barberiaId, t.fechaOperativa),
@@ -629,4 +631,22 @@ export const promociones = pgTable(
     creadoEn: creadoEn(),
   },
   (t) => [index("promociones_barberia_idx").on(t.barberiaId)],
+);
+
+// Faltante de un corte de caja asignado a una persona; se resta de lo que se le paga.
+export const faltantesCaja = pgTable(
+  "faltantes_caja",
+  {
+    id: id(),
+    barberiaId: barberiaId(),
+    turnoId: uuid("turno_id").notNull().references(() => turnosCaja.id),
+    usuarioId: uuid("usuario_id").notNull().references(() => usuarios.id),
+    monto: integer("monto").notNull(),
+    // abrio | iguales | proporcional | manual
+    regla: text("regla").notNull(),
+    fecha: date("fecha").notNull(),
+    asignadoPor: uuid("asignado_por").references(() => usuarios.id),
+    creadoEn: creadoEn(),
+  },
+  (t) => [index("faltantes_caja_usuario_idx").on(t.usuarioId, t.fecha), index("faltantes_caja_turno_idx").on(t.turnoId)],
 );

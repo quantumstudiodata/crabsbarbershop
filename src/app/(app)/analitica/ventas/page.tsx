@@ -20,6 +20,7 @@ import { HistorialVentas, type DiaVentas } from "@/components/HistorialVentas";
 import { CabeceraVentas, periodoEncabezado } from "@/components/CabeceraPeriodo";
 import { Pagar } from "./Pagar";
 import { ConteoCortes } from "./ConteoCortes";
+import { faltantesDe } from "@/lib/faltantes";
 
 export const metadata = { title: "Ventas" };
 
@@ -123,6 +124,7 @@ export default async function Ventas({ searchParams }: { searchParams: Promise<Q
               <>
                 <div><span className="lab">Le corresponde<Ayuda titulo="Le corresponde">Su comisión en estas fechas, más su sueldo si tiene uno.</Ayuda></span><b>{formatoDinero(cuenta.corresponde)}</b></div>
                 <div><span className="lab">Pagado</span><b>{formatoDinero(cuenta.pagado)}</b></div>
+                {cuenta.faltantes > 0 && <div><span className="lab">Faltantes de caja<Ayuda titulo="Faltantes de caja">Lo que se le asignó de faltantes en cortes de caja. Se resta de lo que se le paga.</Ayuda></span><b>−{formatoDinero(cuenta.faltantes)}</b></div>}
                 <div><span className="lab">Por pagar</span>{cuenta.saldo > 0 ? <b>{formatoDinero(cuenta.saldo)}</b> : <span className="cubierto"><i>✓</i>Al corriente</span>}</div>
               </>
             )}
@@ -144,10 +146,12 @@ export default async function Ventas({ searchParams }: { searchParams: Promise<Q
 
 /** Cuenta de una persona en el periodo: lo que le corresponde, lo pagado y su renta. */
 async function cuentaDe(barberiaId: string, id: string, desde: string, hasta: string, pagadas: Awaited<ReturnType<typeof ventasEntre>>["ventas"]) {
-  const [reglas, pagos] = await Promise.all([
+  const [reglas, pagos, falt] = await Promise.all([
     reglasDe(barberiaId),
     db.select().from(schema.pagosComision).where(and(eq(schema.pagosComision.barberiaId, barberiaId), eq(schema.pagosComision.barberoId, id), gte(schema.pagosComision.semana, lunesDe(desde)), lte(schema.pagosComision.semana, hasta))),
+    faltantesDe(barberiaId, desde, hasta),
   ]);
+  const faltantes = falt.find((x) => x.usuarioId === id)?.monto ?? 0;
   const cs = pagadas.flatMap((v) => v.conceptos.filter((c) => c.barberoId === id));
   const regla = copiaRegla(elegirRegla(reglas, id, null, new Date()));
   const semanas = Math.max(1, Math.ceil((diasEntre(lunesDe(desde), hasta) + 1) / 7));
@@ -158,7 +162,7 @@ async function cuentaDe(barberiaId: string, id: string, desde: string, hasta: st
   const rentaPagada = pagos.filter((x) => x.tipo === "renta").reduce((a, x) => a + x.monto, 0);
   return {
     forma: describirRegla(regla, formatoDinero), vendido: cs.reduce((a, c) => a + c.precioCobrado, 0),
-    corresponde: comision + sueldo, pagado, saldo: Math.max(comision + sueldo - pagado, 0),
+    corresponde: comision + sueldo, pagado, faltantes, saldo: Math.max(comision + sueldo - pagado - faltantes, 0),
     renta, rentaPagada, rentaPendiente: Math.max(renta - rentaPagada, 0),
   };
 }

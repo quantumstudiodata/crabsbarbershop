@@ -7,6 +7,7 @@ import { periodoEncabezado } from "@/components/CabeceraPeriodo";
 import { Grafica } from "@/components/Grafica";
 import { Icono } from "@/components/Icono";
 import { requerirSesion } from "@/lib/auth";
+import { faltantesDe } from "@/lib/faltantes";
 import { equipoConVentas, resumenPeriodo, turnosCerrados } from "@/lib/datos";
 import { db, schema as t } from "@/lib/db";
 import { diasEntre, fechaCorta, fechaLocal, inicioDeMes, sumarDias } from "@/lib/fechas";
@@ -58,7 +59,9 @@ export default async function Resumen({ searchParams }: { searchParams: Promise<
   const rentas = pagos.filter((x) => x.tipo === "renta").reduce((a, x) => a + x.monto, 0);
   const egresos = gastos[0]?.monto ?? 0;
   const quedo = r.netas + rentas - egresos - pagadoEquipo;
-  const porPagar = generadas.filter((g) => !esSueldo(g.id)).reduce((a, g) => a + Math.max(g.comision - pagadoA(g.id), 0), 0);
+  const falt = await faltantesDe(bId, p.desde, p.hasta);
+  const faltA = (id: string) => falt.find((x) => x.usuarioId === id)?.monto ?? 0;
+  const porPagar = generadas.filter((g) => !esSueldo(g.id)).reduce((a, g) => a + Math.max(g.comision - pagadoA(g.id) - faltA(g.id), 0), 0);
   const conDif = cortes.filter((c) => (c.diferencia ?? 0) !== 0);
   const v = cambio(r.netas, prev.netas);
 

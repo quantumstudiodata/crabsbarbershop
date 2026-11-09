@@ -134,6 +134,13 @@
       "when": 1794216618112,
       "tag": "0018_promociones",
       "breakpoints": true
+    },
+    {
+      "idx": 19,
+      "version": "7",
+      "when": 1794218507957,
+      "tag": "0019_faltantes_caja",
+      "breakpoints": true
     }
   ]
 }

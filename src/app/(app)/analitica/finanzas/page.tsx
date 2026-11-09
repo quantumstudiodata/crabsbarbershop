@@ -8,6 +8,7 @@ import { Icono } from "@/components/Icono";
 import { Paginacion } from "@/components/Paginacion";
 import { SelectorUrl } from "@/components/SelectorUrl";
 import { requerirSesion } from "@/lib/auth";
+import { faltantesDe } from "@/lib/faltantes";
 import { cajaDe, categoriasGasto, resumenPeriodo } from "@/lib/datos";
 import { db, schema as t } from "@/lib/db";
 import { fechaLarga, fechaLocal, horaCorta } from "@/lib/fechas";
@@ -141,7 +142,8 @@ export default async function Finanzas({ searchParams }: { searchParams: Promise
   const entro = ventasP + rentas, salio = egresos + pagadoEquipo, quedo = entro - salio;
   const esSueldo = (id: string) => SUELDO.has(reglas.find((x) => x.id === id)?.tipo ?? "");
   const comisionesMes = generadas.filter((g) => !esSueldo(g.id));
-  const porPagar = comisionesMes.reduce((a, g) => a + Math.max(g.comision - pagosP.filter((x) => x.id === g.id && x.tipo === "pago").reduce((b, x) => b + x.monto, 0), 0), 0);
+  const falt = await faltantesDe(bId, p.desde, p.hasta);
+  const porPagar = comisionesMes.reduce((a, g) => a + Math.max(g.comision - pagosP.filter((x) => x.id === g.id && x.tipo === "pago").reduce((b, x) => b + x.monto, 0) - (falt.find((x) => x.usuarioId === g.id)?.monto ?? 0), 0), 0);
   const nombreP = p.tipo === "mes" ? p.etiqueta.split(" ")[0].toLowerCase() : p.etiqueta.toLowerCase();
   const maxB = Math.max(entro, salio, 1);
   const firma = (c: number) => (c < 0 ? `−${$(-c)}` : $(c));

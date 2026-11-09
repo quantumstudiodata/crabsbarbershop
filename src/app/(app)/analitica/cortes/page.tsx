@@ -3,6 +3,7 @@ import { AvisoUrl } from "@/components/Encabezado";
 import { BarraFiltros } from "@/components/BarraFiltros";
 import { Paginacion } from "@/components/Paginacion";
 import { requerirSesion } from "@/lib/auth";
+import { cobradoresDe } from "@/lib/faltantes";
 import { and, eq, inArray } from "drizzle-orm";
 import { ajustesDeTurnos, detalleCortes, foliosCorte, metodosActivos, turnosCerrados } from "@/lib/datos";
 import { db, schema } from "@/lib/db";
@@ -77,7 +78,11 @@ export default async function Cortes({ searchParams }: { searchParams: Promise<C
   return (
     <>
       <AvisoUrl aviso={q.aviso} error={q.error} />
-      <NecesitaRevision cortes={revisar.map(aCorte)} puede={s.puede("caja.corregir")} />
+      <NecesitaRevision cortes={await Promise.all(revisar.map(async (c) => ({
+        ...aCorte(c), abrioId: c.abiertoPor,
+        cobradores: (await cobradoresDe(s.barberia.id, c.id)).map((x) => ({ ...x, nombre: persona(x.id).nombre, avatar: persona(x.id).avatar })),
+        equipo: gente.filter((g) => g.activo).map(({ id, nombre, avatar }) => ({ id, nombre, avatar })),
+      })))} puede={s.puede("caja.corregir")} />
       <div className="tit-fuera"><span className="lab">Cortes de caja</span></div>
       <section className="glass panel-hist subir d1">
         <BarraFiltros p={p} hoy={hoy} personas={personas} persona={f.persona} buscar={f.buscar} sinPeriodo="Todas las fechas"
