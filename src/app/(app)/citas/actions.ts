@@ -22,6 +22,15 @@ export async function horariosAgenda(fecha: string, servicioIds: string[], perso
   return disponibilidadDia(s.barberia, fecha, svc.duracion, persona, db, { sinAnticipacion: true });
 }
 
+/** Horarios libres para mover una cita (no choca consigo misma). */
+export async function horariosCita(id: string, fecha: string, persona: string) {
+  const s = await requerirSesion("citas.modificar");
+  if (!FECHA.test(fecha)) return [];
+  const [c] = await db.select({ duracion: schema.citas.duracionMin }).from(schema.citas).where(and(eq(schema.citas.id, id), eq(schema.citas.barberiaId, s.barberia.id))).limit(1);
+  if (!c) return [];
+  return disponibilidadDia(s.barberia, fecha, c.duracion, persona || null, db, { ignorarCita: id, sinAnticipacion: true });
+}
+
 export async function agendarCita(d: { servicioIds: string[]; persona: string | null; fecha: string; minuto: number; nombre: string; telefono: string; observaciones: string }): Promise<Res> {
   const s = await requerirSesion("citas.modificar");
   if (s.vista) return { error: "En la vista previa no se guardan cambios." };

@@ -10,7 +10,7 @@ import { ModoFoco } from "./ModoFoco";
 
 export const metadata = { title: "Cobro" };
 
-export default async function Cobrar({ searchParams }: { searchParams: Promise<{ caja?: string }> }) {
+export default async function Cobrar({ searchParams }: { searchParams: Promise<{ caja?: string; cita?: string }> }) {
   const s = await requerirSesion();
   if (!s.puede("ventas.registrar") && !s.puede("ventas.registrar_otros")) return <p className="aviso error">No tienes permiso para cobrar.</p>;
   const q = await searchParams;
@@ -23,6 +23,13 @@ export default async function Cobrar({ searchParams }: { searchParams: Promise<{
     ? (await db.select().from(schema.promociones).where(eq(schema.promociones.barberiaId, s.barberia.id))).filter((x) => x.enCobro && !x.pausada && (!x.hasta || x.hasta >= fechaLocal(new Date(), zona)))
     : [];
   const opera = s.puede("caja.operar");
+  // Cobrar una cita: llega con sus servicios y su barbero; la venta queda ligada a la cita.
+  const [cita] = q.cita && /^[0-9a-f-]{36}$/.test(q.cita)
+    ? await db.select().from(schema.citas).where(and(eq(schema.citas.id, q.cita), eq(schema.citas.barberiaId, s.barberia.id))).limit(1)
+    : [];
+  const desdeCita = cita && !cita.ventaId && !["cancelada", "no_asistio", "expirada"].includes(cita.estado)
+    ? { id: cita.id, folio: cita.folio, cliente: cita.clienteNombre, barberoId: cita.barberoId, servicioIds: cita.servicios.map((x) => x.servicioId) }
+    : null;
   let turno: Turno | null = null;
   if (t) {
     const [datos, [abrio], folio] = await Promise.all([
@@ -54,6 +61,7 @@ export default async function Cobrar({ searchParams }: { searchParams: Promise<{
                 yo={s.usuario.id}
                 puedeOtros={s.puede("ventas.registrar_otros")}
                 limiteDescuento={s.barberia.limiteDescuentoPct}
+                desdeCita={desdeCita}
                 promos={promos.map(({ creadoEn: _c, creadoPor: _p, barberiaId: _b, ...x }) => x) as unknown as Promo[]} zona={zona}
                 usa={{ propinas: s.barberia.usaPropinas, descuentos: s.barberia.usaDescuentos, dividir: s.barberia.usaDividirPago }}
               />

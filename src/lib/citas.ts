@@ -154,3 +154,21 @@ export async function avisosDeConfirmacion(conn: Conn, b: Barberia, c: typeof sc
   const cuando = new Date(c.inicio.getTime() - antes);
   if (cuando.getTime() > Date.now()) await encolarAviso(conn, { barberiaId: b.id, citaId: c.id, tipo: "recordatorio", para: "cliente", destino: c.clienteTelefono, mensaje: `Te recordamos tu cita en ${b.nombre}: ${txt}`, programadaPara: cuando });
 }
+
+/** Qué días (de una lista) tienen al menos un horario libre. Carga todo de una vez. */
+export async function diasConLugar(b: Barberia, fechas: string[], duracion: number, persona: string | null): Promise<Record<string, boolean>> {
+  if (!fechas.length) return {};
+  const config = leerConfig(b.citasConfig);
+  const zona = b.zonaHoraria;
+  const [equipo, rots, ocupados] = await Promise.all([
+    equipoAgenda(b.id), rotacionesDe(b.id),
+    ocupadosEntre(b.id, instante(fechas[0], 0, zona), instante(fechas[fechas.length - 1], 24 * 60, zona)),
+  ]);
+  const ahora = Date.now();
+  const r: Record<string, boolean> = {};
+  for (const fecha of fechas) {
+    r[fecha] = equipo.some((e) => (!persona || e.id === persona)
+      && horariosLibres({ fecha, zona, ahora, duracion, config, ventana: ventanaDelDia(fecha, b.horario as Horario, b.diasCerrados, e.horario as Horario | null, rots, e.id), persona: e.id, ocupados }).length > 0);
+  }
+  return r;
+}

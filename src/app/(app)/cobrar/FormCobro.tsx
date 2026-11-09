@@ -21,11 +21,13 @@ const iconoMetodo = (m: Metodo) => (m.esEfectivo ? "efectivo" : /tarjeta/i.test(
 export function FormCobro(p: {
   servicios: Servicio[]; equipo: Persona[]; metodos: Metodo[]; yo: string; puedeOtros: boolean; limiteDescuento: number;
   usa: { propinas: boolean; descuentos: boolean; dividir: boolean }; promos?: Promo[]; zona?: string;
+  desdeCita?: { id: string; folio: string; cliente: string; barberoId: string; servicioIds: string[] } | null;
 }) {
   const promos = p.promos ?? [];
   const [estado, accion, enviando] = useActionState<EstadoCobro, FormData>(registrarVenta, {});
   const [clave, setClave] = useState(nuevaClave);
-  const [lineas, setLineas] = useState<Linea[]>([]);
+  const [cita, setCita] = useState(p.desdeCita ?? null);
+  const [lineas, setLineas] = useState<Linea[]>(() => (p.desdeCita ? p.desdeCita.servicioIds.filter((id) => p.servicios.some((x) => x.id === id)).map((id) => ({ key: nuevaClave(), servicioId: id, barberoId: p.desdeCita!.barberoId, cantidad: 1 })) : []));
   // Quien inició sesión atiende por defecto; se puede cambiar porque la computadora es compartida.
   const [barbero, setBarbero] = useState(p.equipo.some((e) => e.id === p.yo) ? p.yo : p.equipo[0]?.id ?? "");
   const [buscar, setBuscar] = useState("");
@@ -48,7 +50,7 @@ export function FormCobro(p: {
 
   const limpiar = () => {
     setClave(nuevaClave()); setLineas([]); setDividir(false); setMonto1(""); setRecibido(""); setBuscar("");
-    setPanel(null); setDescuento(null); setMotivo(""); setPropina(null); setCodigo(""); setCodigoTxt("");
+    setPanel(null); setDescuento(null); setMotivo(""); setPropina(null); setCodigo(""); setCodigoTxt(""); setCita(null);
   };
 
   // Después de cobrar: limpiar todo y preparar una venta nueva (una sola vez por folio).
@@ -155,7 +157,8 @@ export function FormCobro(p: {
     propina: { monto: prop, barberoId: conServicio[0]?.barberoId ?? barbero, efectivo: propinaEfectivo },
     observaciones: "",
     codigo,
-  }), [clave, conServicio, desc, motivo, dividir, metodo, m1, metodo2, total, prop, barbero, propinaEfectivo, codigo]);
+    citaId: cita?.id ?? "",
+  }), [clave, conServicio, desc, motivo, dividir, metodo, m1, metodo2, total, prop, barbero, propinaEfectivo, codigo, cita]);
 
   const alternar = (id: string) => {
     setUltima(null);
@@ -230,6 +233,7 @@ export function FormCobro(p: {
       {hoja && <div className="velo-hoja" onClick={() => setHoja(false)} aria-hidden="true" />}
 
       <aside className={`glass ticket ${hoja ? "hoja-abierta" : ""}`} aria-label="Esta venta">
+        {cita && <p className="aviso-cita"><Icono n="calendario" />Cita {cita.folio} de <b>{cita.cliente}</b></p>}
         <div className="entre cab-hoja"><h2 className="titulo">Esta venta</h2><button type="button" className="icb cerrar-hoja" onClick={() => setHoja(false)} aria-label="Cerrar"><Icono n="cerrar" /></button></div>
         {ultima && lineas.length === 0 && (
           <p className="aviso ok" role="status">Venta <b>{ultima.folio}</b> cobrada por <b>{formatoDinero(ultima.total)}</b>.</p>

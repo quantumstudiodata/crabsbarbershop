@@ -1,0 +1,59 @@
+import { and, asc, eq } from "drizzle-orm";
+import type { Metadata } from "next";
+import { notFound } from "next/navigation";
+import { leerConfig, montoAPagar } from "@/lib/agenda";
+import { equipoAgenda } from "@/lib/citas";
+import { db, schema } from "@/lib/db";
+import { fechaLocal } from "@/lib/fechas";
+import { aplicarPromos, momentoEn, type Promo } from "@/lib/promociones";
+import { Reservar } from "./Reservar";
+
+async function cargar(slug: string) {
+  const [b] = await db.select().from(schema.barberias).where(eq(schema.barberias.slug, slug.slice(0, 40))).limit(1);
+  return b ?? null;
+}
+
+export async function generateMetadata({ params }: { params: Promise<{ slug: string }> }): Promise<Metadata> {
+  const b = await cargar((await params).slug);
+  return { title: b ? `Reservar en ${b.nombre}` : "Reservaciones", description: b ? `Agenda tu cita en ${b.nombre} en línea.` : undefined };
+}
+
+export default async function PaginaReservar({ params }: { params: Promise<{ slug: string }> }) {
+  const b = await cargar((await params).slug);
+  if (!b) notFound();
+  const config = leerConfig(b.citasConfig);
+  if (!b.usaCitas || !config.enLinea || b.estadoCuenta !== "activa") {
+    return (
+      <main className="reserva">
+        <header className="rv-cab"><b>{b.nombre}</b></header>
+        <section className="rv-tarjeta"><h1>Las reservaciones en línea no están disponibles</h1><p className="muted">Comunícate directamente con el negocio para agendar tu cita.</p></section>
+      </main>
+    );
+  }
+  const [servicios, cats, equipo, promos] = await Promise.all([
+    db.select().from(schema.servicios).where(and(eq(schema.servicios.barberiaId, b.id), eq(schema.servicios.activo, true))).orderBy(asc(schema.servicios.orden), asc(schema.servicios.nombre)),
+    db.select().from(schema.categoriasServicio).where(eq(schema.categoriasServicio.barberiaId, b.id)).orderBy(asc(schema.categoriasServicio.orden)),
+    equipoAgenda(b.id),
+    b.usaPromociones ? db.select().from(schema.promociones).where(eq(schema.promociones.barberiaId, b.id)) : Promise.resolve([]),
+  ]);
+  const ocultas = new Set(cats.filter((c) => !c.activo).map((c) => c.nombre));
+  const visibles = servicios.filter((s) => !ocultas.has(s.categoria));
+  const orden = cats.map((c) => c.nombre);
+  // Precio con promoción automática en línea, como referencia (el precio final se calcula con el día y la hora).
+  const m = momentoEn(b.zonaHoraria);
+  const conPromo = visibles.map((s) => {
+    const ap = aplicarPromos(promos as unknown as Promo[], [{ servicioId: s.id, categoria: s.categoria, precio: s.precio }], { ...m, hora: "12:00" }, "", "linea");
+    const d = ap.porLinea[0]?.descuento ?? 0;
+    const promo = d ? (promos as unknown as Promo[]).find((x) => x.id === ap.porLinea[0]!.promocionId) : null;
+    return { id: s.id, nombre: s.nombre, descripcion: s.descripcion, categoria: s.categoria, precio: s.precio, duracionMin: s.duracionMin || 30, promo: promo ? { nombre: promo.nombre, precio: s.precio - d } : null };
+  });
+  return (
+    <Reservar
+      slug={b.slug!} negocio={b.nombre} hoy={fechaLocal(new Date(), b.zonaHoraria)}
+      servicios={conPromo.sort((a, c) => orden.indexOf(a.categoria) - orden.indexOf(c.categoria))}
+      equipo={equipo.map((e) => ({ id: e.id, nombre: e.nombre.split(" ")[0], avatar: e.avatar }))}
+      opciones={{ elegir: config.elegirBarbero, cualquiera: config.cualquierBarbero, varios: config.variosServicios, maxDias: config.anticipacionMaxDias }}
+      pago={{ modo: config.pago.modo, ejemplo: montoAPagar(10000, config.pago), politica: config.politicaCancelacion, reembolso: config.politicaReembolso }}
+    />
+  );
+}

@@ -22,6 +22,7 @@ type Entrada = {
   propina: { monto: number; barberoId: string; efectivo: boolean };
   observaciones: string;
   codigo: string;
+  citaId: string;
 };
 
 const entero = (v: unknown) => (typeof v === "number" && Number.isSafeInteger(v) && v >= 0 ? v : null);
@@ -38,6 +39,7 @@ function leer(form: FormData): Entrada | null {
       propina: { monto: entero(d.propina?.monto) ?? -1, barberoId: String(d.propina?.barberoId ?? ""), efectivo: d.propina?.efectivo !== false },
       observaciones: String(d.observaciones ?? "").trim().slice(0, 300),
       codigo: String(d.codigo ?? "").trim().slice(0, 30),
+      citaId: /^[0-9a-f-]{36}$/.test(String(d.citaId ?? "")) ? String(d.citaId) : "",
     };
     if (!e.clave || e.descuento < 0 || e.propina.monto < 0 || e.pagos.some((p) => p.monto < 0)) return null;
     return e;
@@ -137,6 +139,12 @@ export async function registrarVenta(_: EstadoCobro, form: FormData): Promise<Es
         observaciones: e.observaciones, claveUnica: e.clave,
       }).returning({ id: schema.ventas.id });
       await tx.insert(schema.conceptos).values(conceptos.map((c) => ({ ...c, ventaId: v.id })));
+      // Si viene de una cita, queda ligada a la venta y completada (una cita no se cobra dos veces).
+      if (e.citaId) {
+        const r = await tx.update(schema.citas).set({ ventaId: v.id, estado: "completada", estadoPago: "pagada", actualizadoEn: new Date() })
+          .where(and(eq(schema.citas.id, e.citaId), eq(schema.citas.barberiaId, bId), sql`${schema.citas.ventaId} is null`)).returning({ id: schema.citas.id });
+        if (!r.length) throw new Error("cita_cobrada");
+      }
       // Cada promoción usada cuenta una vez por venta; si tiene límite y ya se agotó, no se cobra.
       for (const pid of ap.usadas) {
         const r = await tx.update(schema.promociones).set({ usos: sql`${schema.promociones.usos} + 1` })
@@ -160,6 +168,7 @@ export async function registrarVenta(_: EstadoCobro, form: FormData): Promise<Es
     return { ok: true, folio, total };
   } catch (err) {
     const msg = String((err as Error)?.message ?? "");
+    if (msg.includes("cita_cobrada")) return { error: "Esa cita ya se cobró." };
     if (msg.includes("promo_agotada")) return { error: "Una promoción llegó a su límite de usos. Recarga la página para cobrar sin ella." };
     if (msg.includes("ventas_clave_uq")) {
       const [v] = await db.select().from(schema.ventas).where(and(eq(schema.ventas.barberiaId, bId), eq(schema.ventas.claveUnica, e.clave))).limit(1);
