@@ -2298,3 +2298,15 @@ html:has(.capa) body, html:has(.velo-c) body, html:has(.velo-hoja) body, html:ha
 @media (max-width: 760px) {
   .modal .acciones { background: linear-gradient(to bottom, rgba(238,241,245,0), rgba(238,241,245,.96) 30%); padding-top: 14px; margin-top: 4px; }
 }
+@media (max-width: 760px) {
+  /* Todas las ventanas emergentes centradas (en navegador la barra inferior tapa lo que queda abajo). */
+  @keyframes centro-in { from { opacity: 0; transform: scale(.96); } }
+  .capa { align-items: center; place-items: center; }
+  .pop-cal { top: 0 !important; bottom: 0 !important; margin: auto 0 !important; height: fit-content; max-height: calc(100dvh - 32px); overflow-y: auto; transform: none !important; animation: centro-in .2s ease both !important; }
+  .cobro .ticket.hoja-abierta, .hoja-sem { left: 12px; right: 12px; top: 0; bottom: 0; margin: auto 0; height: fit-content; max-height: calc(100dvh - 32px); border-radius: 22px; padding-bottom: 16px; animation: centro-in .22s ease both; }
+}
+@media (max-width: 760px) {
+  /* Lo que contiene una ventana emergente no debe atraparla (el desenfoque y las animaciones crean un marco propio). */
+  :where(main, main *):has(.pop-cal, .velo-cal, .ticket.hoja-abierta, .hoja-semana-m, .capa) { -webkit-backdrop-filter: none !important; backdrop-filter: none !important; transform: none !important; filter: none !important; animation: none !important; contain: none !important; will-change: auto !important; }
+  .pop-cal { margin: auto 0 !important; }
+}
