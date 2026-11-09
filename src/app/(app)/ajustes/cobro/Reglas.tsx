@@ -74,7 +74,7 @@ export function ReglasCobro({ descuento, autorizan, funciones }: { descuento: nu
  * Caja: apertura, cierre obligatorio, fondo inicial y diferencia permitida.
  * El fondo sugerido solo hace falta cuando la caja se abre sola; la diferencia se elige con botones de sugerencia.
  */
-export function CajaConfig({ apertura, corte, fondo, diferencia }: { apertura: boolean; corte: boolean; fondo: number; diferencia: number }) {
+export function CajaConfig({ apertura, corte, fondo, diferencia, evidencia }: { apertura: boolean; corte: boolean; fondo: number; diferencia: number; evidencia: boolean }) {
   const [manual, setManual] = useState(apertura);
   const [obligatorio, setObligatorio] = useState(corte);
   const [conTolerancia, setConTolerancia] = useState(diferencia > 0);
@@ -82,6 +82,7 @@ export function CajaConfig({ apertura, corte, fondo, diferencia }: { apertura: b
     <div className="pila">
       <Funciones alCambiar={(k, v) => { if (k === "apertura") setManual(v); if (k === "corte") setObligatorio(v); }} funciones={[
         { clave: "apertura", nombre: "Apertura de caja", activa: apertura, encendida: "Alguien abre la caja contando el fondo inicial.", apagada: "La caja se abre sola con el fondo inicial sugerido al primer cobro del día." },
+        { clave: "evidencia", nombre: "Evidencias del corte de caja", activa: evidencia, encendida: "Al cerrar la caja se pueden adjuntar fotos o archivos de las transferencias y los pagos con tarjeta.", apagada: "El corte se hace sin adjuntar evidencias." },
         { clave: "corte", nombre: "Cierre de caja obligatorio", activa: corte, encendida: "No se puede cobrar con la caja de un día anterior abierta: primero se hace el corte.", apagada: "Se puede seguir cobrando sin cerrar la caja del día anterior." },
       ]} />
       {!obligatorio && <p className="aviso-riesgo">Sin cierre obligatorio, las ventas de varios días pueden quedar en un mismo corte y es más difícil saber cuándo faltó o sobró dinero.</p>}

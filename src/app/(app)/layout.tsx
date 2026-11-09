@@ -56,13 +56,13 @@ export default async function LayoutApp({ children }: { children: React.ReactNod
           <Nav items={items} sub={{ base: "/analitica", items: subAnalitica }} destacado={soporte && !s.vista ? { href: "/soporte", texto: "Soporte", icono: "llave" } : undefined} />
           <div className="herramientas">
             {!soporte && <Suspense fallback={null}><CentroAyuda {...await conteoAyuda(s.usuario.id)} /></Suspense>}
-            {rol === "contador" ? null : <Campana />}
+            <Campana />
             {s.puede("ideas.decidir") && <PanelIdeas />}
           </div>
         </div>
       </header>
       <main className="contenedor">{children}</main>
-      {rol !== "contador" && <VentanaVivo />}
+      <VentanaVivo />
     </>
   );
 }

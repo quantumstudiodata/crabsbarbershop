@@ -46,6 +46,7 @@ export async function CabeceraVentas({ barberiaId, zona, hoy, p, anterior, perso
           </div>
         )}
         <div className="cv-concl">
+          {r.servicios > 0 && <span><b>{r.servicios} {r.servicios === 1 ? "servicio" : "servicios"}</b>, {formatoDinero(Math.round(r.netas / r.servicios / 100) * 100)} en promedio</span>}
           {masPedido && <span><b>{masPedido[0]}</b> lo más pedido</span>}
           {largo > 1 && r.netas > 0 && <span><b>{DIA[new Date(`${mejor}T12:00:00Z`).getUTCDay()]} {Number(mejor.slice(8))}</b> el mejor día</span>}
           {largo > 1 && sinVentas > 0 && <span><b>{sinVentas} {sinVentas === 1 ? "día" : "días"}</b> sin ventas</span>}

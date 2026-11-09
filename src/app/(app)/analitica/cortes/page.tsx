@@ -3,7 +3,7 @@ import { AvisoUrl } from "@/components/Encabezado";
 import { BarraFiltros } from "@/components/BarraFiltros";
 import { Paginacion } from "@/components/Paginacion";
 import { requerirSesion } from "@/lib/auth";
-import { eq } from "drizzle-orm";
+import { and, eq, inArray } from "drizzle-orm";
 import { ajustesDeTurnos, detalleCortes, foliosCorte, metodosActivos, turnosCerrados } from "@/lib/datos";
 import { db, schema } from "@/lib/db";
 import { NecesitaRevision, TablaCortes, type Corte } from "./HistorialCortes";
@@ -38,7 +38,11 @@ export default async function Cortes({ searchParams }: { searchParams: Promise<C
   const hace30 = fechaLocal(new Date(Date.now() - 30 * 864e5), zona);
   const revisar = todos.filter((c) => (c.diferencia ?? 0) < 0 && !c.revisadoEn && c.fechaOperativa >= hace30);
   const ids = [...new Set([...cortes, ...revisar].map((c) => c.id))];
-  const [ajustes, det] = await Promise.all([ajustesDeTurnos(s.barberia.id, ids), detalleCortes(s.barberia.id, ids)]);
+  const [ajustes, det, evid] = await Promise.all([
+    ajustesDeTurnos(s.barberia.id, ids), detalleCortes(s.barberia.id, ids),
+    ids.length ? db.select({ id: schema.evidenciasCorte.id, turnoId: schema.evidenciasCorte.turnoId, etiqueta: schema.evidenciasCorte.etiqueta, nombre: schema.evidenciasCorte.nombre, tipo: schema.evidenciasCorte.tipo })
+      .from(schema.evidenciasCorte).where(and(eq(schema.evidenciasCorte.barberiaId, s.barberia.id), inArray(schema.evidenciasCorte.turnoId, ids))) : Promise.resolve([]),
+  ]);
   const persona = (id: string | null) => gente.find((g) => g.id === id) ?? { nombre: "", avatar: "iniciales" };
   const aCorte = (c: (typeof todos)[number]): Corte => {
     const cobros = det.cobros.filter((x) => x.turnoId === c.id);
@@ -61,6 +65,7 @@ export default async function Cortes({ searchParams }: { searchParams: Promise<C
         ...movs.map((m) => ({ t: m.creadoEn.getTime(), hora: horaCorta(m.creadoEn, zona), titulo: m.tipo === "retiro" ? "Retiro" : m.tipo === "entrada" ? "Entrada" : "Devolución", detalle: `${m.concepto}, ${m.usuario.split(" ")[0]}`, monto: m.tipo === "entrada" ? m.monto : -m.monto })),
         ...gastos.map((g) => ({ t: g.creadoEn.getTime(), hora: horaCorta(g.creadoEn, zona), titulo: "Gasto", detalle: `${g.concepto}, ${g.usuario.split(" ")[0]}`, monto: -g.monto })),
       ].sort((a, b) => a.t - b.t),
+      evidencias: evid.filter((x) => x.turnoId === c.id).map((x) => ({ id: x.id, etiqueta: x.etiqueta, nombre: x.nombre, tipo: x.tipo })),
       ajustes: ajustes.filter((x) => x.turnoId === c.id).map((x) => `Ajuste de ${formatoDinero(x.monto)} por ${x.usuario.split(" ")[0]}: ${x.motivo}`),
     };
   };

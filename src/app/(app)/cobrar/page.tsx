@@ -54,7 +54,7 @@ export default async function Cobrar({ searchParams }: { searchParams: Promise<{
             )}
           </>
         )}
-      {opera && <CajaModal inicial={q.caja === "cerrar" ? "corte" : null} turno={turno} limiteDiferencia={s.barberia.limiteDiferenciaCaja} categorias={cats.map((c) => c.nombre)} />}
+      {opera && <CajaModal inicial={q.caja === "cerrar" ? "corte" : null} turno={turno} limiteDiferencia={s.barberia.limiteDiferenciaCaja} categorias={cats.map((c) => c.nombre)} evidencias={s.barberia.usaEvidenciaCorte} />}
     </>
   );
 }

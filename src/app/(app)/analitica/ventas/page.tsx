@@ -7,7 +7,8 @@ import { and, eq, gte, lte } from "drizzle-orm";
 import { Avatar } from "@/components/Avatar";
 import { Ayuda } from "@/components/Ayuda";
 import { describirRegla, elegirRegla, porSemana } from "@/lib/comisiones";
-import { copiaRegla, diasYTotalVentas, equipoConVentas, metodosActivos, reglasDe, ventasEntre } from "@/lib/datos";
+import { MINUTOS_CORRECCION } from "@/lib/caja";
+import { cajaDe, copiaRegla, diasYTotalVentas, equipoConVentas, metodosActivos, reglasDe, ventasEntre } from "@/lib/datos";
 import { condicionVentas, type ConsultaFiltros, leerFiltros, rangoDePagina, urlDescarga } from "@/lib/filtros";
 import { db, schema } from "@/lib/db";
 import { diasEntre, lunesDe } from "@/lib/fechas";
@@ -24,11 +25,14 @@ type Q = ConsultaFiltros & { aviso?: string; error?: string };
 
 export default async function Ventas({ searchParams }: { searchParams: Promise<Q> }) {
   const s = await requerirSesion();
-  if (!s.puede("ventas.ver_todas")) redirect("/mis-ventas");
-  const q = await searchParams;
+  // La misma pantalla para todos: quien no ve al equipo completo ve lo suyo, con los mismos filtros.
+  const verTodas = s.puede("ventas.ver_todas");
+  const atiende = s.usuario.rol === "barbera" || s.usuario.rol === "encargada";
+  if (!verTodas && !atiende) redirect("/");
+  const q = { ...(await searchParams), ...(verTodas ? {} : { persona: s.usuario.id }) };
   const zona = s.barberia.zonaHoraria;
   const hoy = fechaLocal(new Date(), zona);
-  const equipo = await equipoConVentas(s.barberia.id);
+  const equipo = (await equipoConVentas(s.barberia.id)).filter((e) => verTodas || e.id === s.usuario.id);
   const f = leerFiltros(q, hoy, equipo.map((e) => e.id));
   const p = f.periodo;
   const persona = f.persona;
@@ -39,6 +43,9 @@ export default async function Ventas({ searchParams }: { searchParams: Promise<Q
   const { ventas } = r.dias.length ? await ventasEntre(s.barberia.id, r.desde, r.hasta, { zona, condiciones }) : { ventas: [] };
   const dias = r.dias;
   const puedeCancelar = s.puede("ventas.cancelar");
+  // El barbero puede anular sus propios cobros durante los primeros minutos, mientras la caja sigue abierta.
+  const turno = verTodas ? null : await cajaDe(s);
+  const ahora = Date.now();
   const puedeModificar = s.puede("ventas.modificar");
   const opciones = puedeModificar ? {
     equipo: equipo.map((e) => ({ id: e.id, nombre: e.nombre })),
@@ -47,20 +54,24 @@ export default async function Ventas({ searchParams }: { searchParams: Promise<Q
   const historial: DiaVentas[] = dias.map((d) => {
     const delDia = ventas.filter((v) => v.fecha === d);
     const monto = (v: (typeof ventas)[number]) => (persona ? v.conceptos.filter((c) => c.barberoId === persona).reduce((a, c) => a + c.precioCobrado, 0) : v.total);
+    // Con una persona elegida, de cada venta se ven solo sus servicios.
+    const propios = (v: (typeof ventas)[number]) => (persona ? v.conceptos.filter((c) => c.barberoId === persona) : v.conceptos);
     return {
       fecha: d, titulo: d === hoy ? "Hoy" : fechaLarga(d), total: delDia.filter((v) => v.estado === "pagada").reduce((a, v) => a + monto(v), 0),
       filas: delDia.map((v) => ({
         id: v.id, folio: v.folio, hora: horaCorta(v.creadoEn, zona), monto: monto(v), cancelada: v.estado === "cancelada",
-        servicios: v.conceptos.map((c) => c.nombre).join(", "),
+        servicios: propios(v).map((c) => c.nombre).join(", "),
         detalle: [
-          ["Servicios", v.conceptos.map((c) => `${c.nombre} con ${c.barbero.split(" ")[0]}, ${formatoDinero(c.precioCobrado)}`).join("; ")],
+          ["Servicios", propios(v).map((c) => `${c.nombre} con ${c.barbero.split(" ")[0]}, ${formatoDinero(c.precioCobrado)}`).join("; ")],
           ...(v.conceptos.some((c) => c.descuento) ? [["Descuento", v.conceptos.filter((c) => c.descuento).map((c) => `${formatoDinero(c.descuento)} en ${c.nombre}`).join("; ")] as [string, string]] : []),
           ...(v.propinas.length ? [["Propina", v.propinas.map((x) => `${formatoDinero(x.monto)}${x.esEfectivo ? " en efectivo" : ""}`).join(" y ")] as [string, string]] : []),
           ["Pago", v.pagos.map((pg) => `${pg.metodo} ${formatoDinero(pg.monto)}`).join(" y ") || "Sin pago"],
           ["Registró", v.registradaPor.split(" ")[0]],
           ...(v.estado === "cancelada" ? [["Cancelada", v.motivoCancelacion ?? ""] as [string, string]] : []),
         ] as [string, string][],
-        accion: puedeCancelar && v.estado === "pagada" ? { tipo: "cancelar" as const } : undefined,
+        accion: puedeCancelar && v.estado === "pagada" ? { tipo: "cancelar" as const }
+          : !verTodas && v.estado === "pagada" && v.registradaPorId === s.usuario.id && turno?.id === v.turnoId && ahora < v.creadoEn.getTime() + MINUTOS_CORRECCION * 60000
+            ? { tipo: "anular" as const, hasta: horaCorta(new Date(v.creadoEn.getTime() + MINUTOS_CORRECCION * 60000), zona) } : undefined,
         edicion: puedeModificar && v.estado === "pagada" ? {
           conceptos: v.conceptos.map((c) => ({ id: c.id, nombre: c.nombre, barberoId: c.barberoId, precio: c.precioCobrado })),
           pagos: v.pagos.filter((pg) => pg.metodoId).map((pg) => ({ metodoId: pg.metodoId!, monto: pg.monto })),
@@ -79,7 +90,7 @@ export default async function Ventas({ searchParams }: { searchParams: Promise<Q
     <>
       <AvisoUrl aviso={q.aviso} error={q.error} />
       <CabeceraVentas barberiaId={s.barberia.id} zona={zona} hoy={hoy} persona={persona || undefined} {...periodoEncabezado(p, hoy)} />
-      {elegida && cuenta && (
+      {verTodas && elegida && cuenta && (
         <section className="glass panel subir">
           <div className="entre">
             <span className="persona"><Avatar avatar={elegida.avatar} nombre={elegida.nombre} t={44} /><span><b>{elegida.nombre}</b><small className="muted" style={{ display: "block" }}>{cuenta.forma}</small></span></span>

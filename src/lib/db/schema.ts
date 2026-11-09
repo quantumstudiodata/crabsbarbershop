@@ -59,6 +59,8 @@ export const barberias = pgTable("barberias", {
   modeloCaja: text("modelo_caja").notNull().default("compartida"),
   // Si es obligatorio, no se puede cobrar con la caja de un día anterior abierta: primero se hace el corte.
   corteObligatorio: boolean("corte_obligatorio").notNull().default(true),
+  // Al cerrar la caja se pueden adjuntar fotos o archivos (comprobantes de transferencias, vouchers de tarjeta).
+  usaEvidenciaCorte: boolean("usa_evidencia_corte").notNull().default(false),
   usaComprobantes: boolean("usa_comprobantes").notNull().default(true),
   usaPeriodicidad: boolean("usa_periodicidad").notNull().default(true),
   // Formas de pago que se pueden usar al registrar un egreso.
@@ -572,4 +574,22 @@ export const remuneraciones = pgTable(
     creadoEn: creadoEn(),
   },
   (t) => [index("remuneraciones_usuario_idx").on(t.usuarioId, t.vigenteHasta)],
+);
+
+// Evidencias de un corte de caja: fotos o PDF de transferencias, vouchers de tarjeta, etc.
+export const evidenciasCorte = pgTable(
+  "evidencias_corte",
+  {
+    id: id(),
+    barberiaId: barberiaId(),
+    turnoId: uuid("turno_id").notNull().references(() => turnosCaja.id),
+    // Forma de pago a la que corresponde (Transferencia, Tarjeta...) o vacío si es general.
+    etiqueta: text("etiqueta").notNull().default(""),
+    nombre: text("nombre").notNull(),
+    tipo: text("tipo").notNull(),
+    datos: text("datos").notNull(),
+    subidoPor: uuid("subido_por").references(() => usuarios.id),
+    creadoEn: creadoEn(),
+  },
+  (t) => [index("evidencias_corte_turno_idx").on(t.turnoId)],
 );

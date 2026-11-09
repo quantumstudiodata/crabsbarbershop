@@ -1,6 +1,6 @@
 import type { Permiso, Rol } from "./permisos";
 
-export type ItemMenuApp = { href: string; texto: string; icono: string };
+export type ItemMenuApp = { href: string; texto: string; icono: string; resalta?: boolean };
 
 /** Secciones del menú principal y pestañas de Analítica según el puesto y sus permisos. */
 export function menuDe(rol: Rol, puede: (p: Permiso) => boolean) {
@@ -8,11 +8,11 @@ export function menuDe(rol: Rol, puede: (p: Permiso) => boolean) {
   const cobra = puede("ventas.registrar") || puede("ventas.registrar_otros");
   const analitica = puede("reportes.ver") || puede("ventas.ver_todas") || puede("gastos.ver") || puede("cortes.ver");
   const items: ItemMenuApp[] = [];
-  if (rol !== "contador") items.push({ href: "/", texto: "Inicio", icono: "inicio" });
+  items.push({ href: "/", texto: "Inicio", icono: "inicio" });
   if (cobra) items.push({ href: "/cobrar", texto: "Cobro", icono: "cobro" });
-  if (atiende) items.push({ href: "/mis-ventas", texto: "Mis ventas", icono: "lista" });
+  if (atiende && !puede("ventas.ver_todas")) items.push({ href: "/analitica/ventas", texto: "Ventas", icono: "lista" });
   if (analitica) items.push({ href: "/analitica", texto: "Analítica", icono: "grafica" });
-  if (rol === "contador") items.push({ href: "/libreta", texto: "Libreta", icono: "lista" });
+  if (rol === "contador") items.push({ href: "/libreta", texto: "Datos", icono: "lista", resalta: true });
   const sub: [string, string][] = [];
   if (puede("reportes.ver")) sub.push(["/analitica", "Resumen"]);
   if (puede("ventas.ver_todas")) sub.push(["/analitica/ventas", "Ventas"]);

@@ -1,6 +1,7 @@
 // Iconos de trazo. Un solo lugar para todos.
 
 const P: Record<string, React.ReactNode> = {
+  camara: <><path d="M4 8h3l1.5-2h7L17 8h3v11H4z" /><circle cx="12" cy="13" r="3.2" /></>,
   ayuda: <><circle cx="12" cy="12" r="9" /><path d="M9.6 9.3a2.5 2.5 0 0 1 4.8.9c0 1.7-2.4 2.2-2.4 3.6M12 17h.01" /></>,
   clip: <path d="M20 11.5 12.2 19.3a5 5 0 0 1-7-7l8-8a3.3 3.3 0 0 1 4.7 4.7l-8 8a1.7 1.7 0 0 1-2.4-2.4l7.3-7.3" />,
   enviar: <path d="M4 12 20 4l-6 16-3-7z" />,

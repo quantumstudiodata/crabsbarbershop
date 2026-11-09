@@ -54,7 +54,7 @@ export async function GET() {
       id: `v${c.id}${c.estado}`, t: c.t.toISOString(),
       titulo: c.estado === "cancelada" ? `Se canceló ${lista}` : `${(quien?.barbero ?? c.nombre).split(" ")[0]} atendió ${lista}`,
       detalle: `${formatoDinero(c.total)}${metodos ? ` con ${metodos}` : ""}`,
-      href: verTodas ? "/analitica/ventas" : "/mis-ventas", nombre: quien?.barbero ?? c.nombre, avatar: quien?.avatar ?? c.avatar,
+      href: "/analitica/ventas", nombre: quien?.barbero ?? c.nombre, avatar: quien?.avatar ?? c.avatar,
     });
   }
 
@@ -134,15 +134,15 @@ async function avisosPara(se: Sesion): Promise<AvisoVivo[]> {
       .where(and(eq(s.ventas.barberiaId, bId), eq(s.conceptos.barberoId, yo), gte(s.ventas.creadoEn, desde)))
       .orderBy(desc(s.ventas.creadoEn)).limit(30);
     for (const v of mios) {
-      if (v.registradaPor !== yo) avisos.push({ id: `c${v.id}${v.servicio}`, t: v.t.toISOString(), titulo: `${primer(v.quien)} cobró tu ${v.servicio}`, detalle: formatoDinero(v.monto), href: "/mis-ventas", nombre: v.quien, avatar: v.avatar });
-      if (v.estado === "cancelada" && v.canceladaPor !== yo && v.canceladaEn) avisos.push({ id: `x${v.id}${v.servicio}`, t: v.canceladaEn.toISOString(), titulo: `Se canceló tu ${v.servicio}`, detalle: v.motivo ?? undefined, href: "/mis-ventas", nombre: "Cancelación", avatar: "cangrejo", icono: "basura" });
+      if (v.registradaPor !== yo) avisos.push({ id: `c${v.id}${v.servicio}`, t: v.t.toISOString(), titulo: `${primer(v.quien)} cobró tu ${v.servicio}`, detalle: formatoDinero(v.monto), href: "/analitica/ventas", nombre: v.quien, avatar: v.avatar });
+      if (v.estado === "cancelada" && v.canceladaPor !== yo && v.canceladaEn) avisos.push({ id: `x${v.id}${v.servicio}`, t: v.canceladaEn.toISOString(), titulo: `Se canceló tu ${v.servicio}`, detalle: v.motivo ?? undefined, href: "/analitica/ventas", nombre: "Cancelación", avatar: "cangrejo", icono: "basura" });
     }
     const pagos = await db.select({ id: s.pagosComision.id, t: s.pagosComision.creadoEn, tipo: s.pagosComision.tipo, monto: s.pagosComision.monto, nombre: s.usuarios.nombre, avatar: s.usuarios.avatar })
       .from(s.pagosComision).innerJoin(s.usuarios, eq(s.usuarios.id, s.pagosComision.usuarioId))
       .where(and(eq(s.pagosComision.barberiaId, bId), eq(s.pagosComision.barberoId, yo), gte(s.pagosComision.creadoEn, desde)));
     for (const p of pagos) avisos.push({
       id: `p${p.id}`, t: p.t.toISOString(), titulo: p.tipo === "pago" ? `Recibiste un pago de ${formatoDinero(p.monto)}` : `Se registró tu renta de ${formatoDinero(p.monto)}`,
-      detalle: `Lo registró ${primer(p.nombre)}`, href: "/mis-ventas", nombre: p.nombre, avatar: p.avatar, icono: "efectivo",
+      detalle: `Lo registró ${primer(p.nombre)}`, href: "/analitica/ventas", nombre: p.nombre, avatar: p.avatar, icono: "efectivo",
     });
     const cambios = await db.select({ id: s.historial.id, t: s.historial.creadoEn, tipo: s.historial.tipo, accion: s.historial.accion, detalle: s.historial.detalle, nombre: s.usuarios.nombre, avatar: s.usuarios.avatar })
       .from(s.historial).leftJoin(s.usuarios, eq(s.usuarios.id, s.historial.usuarioId))

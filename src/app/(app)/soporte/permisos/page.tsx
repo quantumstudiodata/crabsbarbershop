@@ -23,12 +23,12 @@ export default async function Simulacion() {
   const secciones: [string, (i: number) => boolean][] = [
     ["Inicio", (i) => menus[i].items.some((x) => x.href === "/")],
     ["Cobro", (i) => menus[i].items.some((x) => x.href === "/cobrar")],
-    ["Mis ventas", (i) => menus[i].items.some((x) => x.href === "/mis-ventas")],
+    ["Ventas del barbero", (i) => menus[i].items.some((x) => x.href === "/analitica/ventas")],
     ["Analítica, resumen", (i) => menus[i].sub.some(([h]) => h === "/analitica")],
     ["Analítica, ventas", (i) => menus[i].sub.some(([h]) => h === "/analitica/ventas")],
     ["Analítica, cortes de caja", (i) => menus[i].sub.some(([h]) => h === "/analitica/cortes")],
     ["Analítica, finanzas", (i) => menus[i].sub.some(([h]) => h === "/analitica/finanzas")],
-    ["Libreta", (i) => menus[i].items.some((x) => x.href === "/libreta")],
+    ["Datos", (i) => menus[i].items.some((x) => x.href === "/libreta")],
     ["Ajustes", (i) => ajustes[i]],
   ];
   const celda = (si: boolean) => <td className="c-sim">{si ? <span className="chip-p si">Disponible</span> : <span className="chip-p">Restringido</span>}</td>;

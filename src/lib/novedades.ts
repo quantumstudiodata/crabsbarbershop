@@ -1,5 +1,6 @@
 // Actualizaciones publicadas de la plataforma, la más reciente primero. Se agrega una línea con cada publicación.
 export const NOVEDADES: { fecha: string; texto: string }[] = [
+  { fecha: "2026-11-09", texto: "Ventas igual para todos los puestos, Inicio del barbero con Ventas por barbero y Últimos servicios, Datos para el Administrador, evidencias en el corte de caja y ajustes en caja e impresión" },
   { fecha: "2026-11-09", texto: "Metas: la meta mensual se reparte en partes iguales entre los barberos" },
   { fecha: "2026-11-09", texto: "Remuneración para todos los puestos: paso 2 de 2 en el alta, interruptor al editar y sueldos en la meta calculada" },
   { fecha: "2026-11-09", texto: "Meta mensual calculada con gastos frecuentes y esquemas de pago; comprobante de corte con formato de ticket; correcciones en ventanas emergentes, vista previa móvil e interruptores" },

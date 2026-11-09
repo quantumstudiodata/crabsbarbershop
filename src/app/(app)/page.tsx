@@ -6,7 +6,7 @@ import { Ayuda } from "@/components/Ayuda";
 import { Aviso, AvisoUrl } from "@/components/Encabezado";
 import { Grafica } from "@/components/Grafica";
 import { Icono } from "@/components/Icono";
-import { ActividadBarbero } from "./ActividadBarbero";
+import { VentasPorBarbero } from "./VentasPorBarbero";
 import { UltimosServicios } from "./UltimosServicios";
 import { AvisoCajaEmergente } from "./AvisoCaja";
 import { Cuenta } from "@/components/ui";
@@ -50,7 +50,6 @@ function SelectorGrafica({ modo, conMes }: { modo: "hoy" | "semana" | "mes"; con
 
 export default async function Inicio({ searchParams }: { searchParams: Promise<Q> }) {
   const s = await requerirSesion();
-  if (s.usuario.rol === "contador") redirect("/libreta");
   const q = await searchParams;
   const zona = s.barberia.zonaHoraria;
   const hoy = fechaLocal(new Date(), zona);
@@ -206,16 +205,12 @@ async function InicioBarbero({ s, hoy, zona, q, avisos }: { s: Sesion; hoy: stri
   const movs: Movimiento[] = mios.map((c) => ({ creadoEn: c.creadoEn, fecha: c.fecha, monto: c.precioCobrado }));
   const deHoy = mios.filter((c) => c.fecha === hoy);
   const recientes = [...mios].sort((a, b) => b.creadoEn.getTime() - a.creadoEn.getTime()).slice(0, 10);
-  // También lo del equipo y los cortes de caja recientes, para que el barbero vea qué ha pasado.
-  const [{ ventas: todas }, cortes, folios, gente] = await Promise.all([
-    ventasEntre(s.barberia.id, sumarDias(hoy, -14), hoy, { zona }),
-    turnosCerrados(s.barberia.id, 8),
-    foliosCorte(s.barberia.id),
+  // Las ventas de todo el equipo en el periodo de la gráfica, para ver cuánto lleva cada barbero.
+  const inicioMesEq = inicioDeMes(hoy);
+  const [{ ventas: todas }, gente] = await Promise.all([
+    ventasEntre(s.barberia.id, inicioMesEq < lunes ? inicioMesEq : lunes, hoy, { zona }),
     equipoQueAtiende(s.barberia.id),
   ]);
-  const delEquipo = todas.slice(0, 10);
-  const avatarDe = (id?: string) => gente.find((g) => g.id === id)?.avatar ?? "iniciales";
-  const cuando = (fecha: string, d: Date) => (fecha === hoy ? horaCorta(d, zona) : fecha === sumarDias(hoy, -1) ? "Ayer" : `${fecha.slice(8)}/${fecha.slice(5, 7)}`);
   const totalHoy = deHoy.reduce((a, c) => a + c.precioCobrado, 0);
   const semana = mios.filter((c) => c.fecha >= lunes).reduce((a, c) => a + c.precioCobrado, 0);
   const limite = Date.now() - 7 * 86400000;
@@ -242,6 +237,32 @@ async function InicioBarbero({ s, hoy, zona, q, avisos }: { s: Sesion; hoy: stri
   const enHoy = true;
   const avance = Math.min((enHoy ? totalHoy : semana) / (enHoy ? Math.max(metaHoy, 1) : meta.monto), 1);
   const dia = nombreDia(new Date(`${hoy}T12:00:00Z`).getUTCDay());
+  // Ventas por barbero en el periodo de la gráfica (datos del equipo, visibles para todos).
+  const desdeEq = modo === "hoy" ? hoy : modo === "semana" ? lunes : inicioMes;
+  const delPeriodo = todas.filter((v) => v.estado === "pagada" && v.fecha >= desdeEq).flatMap((v) => v.conceptos);
+  const porBarbero = gente.map((g) => {
+    const cs = delPeriodo.filter((c) => c.barberoId === g.id);
+    return { id: g.id, nombre: g.nombre, avatar: g.avatar, servicios: cs.length, monto: cs.reduce((a, c) => a + c.precioCobrado, 0) };
+  }).sort((a, b) => b.monto - a.monto);
+  // Últimos servicios: los suyos, con el mismo formato que ven los demás puestos.
+  const ultimosPropios = ventas.slice(0, 10).map((v) => {
+    const cs = v.conceptos.filter((c) => c.barberoId === yo);
+    const propio = (cs.length ? cs : v.conceptos);
+    return {
+      id: v.id, folio: v.folio, cancelada: v.estado === "cancelada", monto: formatoDinero(propio.reduce((a, c) => a + c.precioCobrado, 0)),
+      t: v.fecha === hoy ? horaCorta(v.creadoEn, zona) : v.fecha === sumarDias(hoy, -1) ? "Ayer" : `${v.fecha.slice(8)}/${v.fecha.slice(5, 7)}`,
+      servicios: propio.map((c) => c.nombre).join(", "), quien: s.usuario.nombre, avatar: s.usuario.avatar,
+      metodo: v.pagos.map((pg) => pg.metodo).join(" y ").toLowerCase() || "sin pago",
+      detalle: [
+        ["Servicios", propio.map((c) => `${c.nombre}, ${formatoDinero(c.precioCobrado)}`).join("; ")],
+        ...(propio.some((c) => c.descuento) ? [["Descuento", propio.filter((c) => c.descuento).map((c) => `${formatoDinero(c.descuento)} en ${c.nombre}`).join("; ")] as [string, string]] : []),
+        ["Pago", v.pagos.map((pg) => `${pg.metodo} ${formatoDinero(pg.monto)}`).join(" y ") || "Sin pago"],
+        ["Registró", v.registradaPor.split(" ")[0]],
+        ["Cuándo", `${fechaLarga(v.fecha)}, ${horaCorta(v.creadoEn, zona)}`],
+        ...(v.estado === "cancelada" ? [["Cancelada", v.motivoCancelacion ?? ""] as [string, string]] : []),
+      ] as [string, string][],
+    };
+  });
 
   return (
     <>
@@ -272,15 +293,19 @@ async function InicioBarbero({ s, hoy, zona, q, avisos }: { s: Sesion; hoy: stri
         </div>
         <div className="glass panel subir d2">
           <div className="entre">
-            <span className="lab">Actividad reciente</span>
-            <Link className="bt solo chico" href="/cobrar"><Icono n="mas" />Registrar</Link>
+            <span className="lab">Ventas por barbero</span>
+            <span className="muted" style={{ fontSize: 12 }}>{modo === "hoy" ? "Hoy" : modo === "semana" ? "Esta semana" : "Este mes"}</span>
           </div>
-          <ActividadBarbero
-            mios={recientes.map((c, i) => ({ id: `m${i}`, t: cuando(c.fecha, c.creadoEn), titulo: c.nombre, detalle: [...new Set(c.metodos)].join(" y "), monto: formatoDinero(c.precioCobrado) }))}
-            equipo={delEquipo.map((v) => ({ id: v.id, t: cuando(v.fecha, v.creadoEn), titulo: v.conceptos.map((c) => c.nombre).join(", "), detalle: v.conceptos[0]?.barbero.split(" ")[0] ?? "", monto: formatoDinero(v.total), nombre: v.conceptos[0]?.barbero, avatar: avatarDe(v.conceptos[0]?.barberoId), tachada: v.estado === "cancelada" }))}
-            cortes={cortes.map((c) => ({ id: c.id, t: cuando(c.fechaOperativa, c.cerradoEn ?? new Date()), titulo: `Cerró ${(c.cerradoPor ?? "").split(" ")[0]}`, detalle: c.diferencia ? `${c.diferencia < 0 ? "Faltaron" : "Sobraron"} ${formatoDinero(Math.abs(c.diferencia))}` : "Sin diferencias", chip: folios.get(c.id) }))}
-          />
+          <VentasPorBarbero filas={porBarbero} yo={yo} />
         </div>
+      </section>
+
+      <section className="ultimos-s subir d3">
+        <div className="entre">
+          <h2 className="sub-t">Últimos servicios</h2>
+          <Link className="bt-ver" href="/analitica/ventas">Ver todas las ventas<span><Icono n="derecha" /></span></Link>
+        </div>
+        <UltimosServicios filas={ultimosPropios} />
       </section>
     </>
   );

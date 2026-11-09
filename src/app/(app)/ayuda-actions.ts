@@ -48,7 +48,7 @@ export async function verSolicitud(id: string): Promise<DetalleSolicitud | null>
 function leerAdjunto(form: FormData): { datos: string; nombre: string; tipo: string } | { error: string } | null {
   const datos = String(form.get("adjunto") ?? "");
   if (!datos) return null;
-  if (!TIPOS_ADJUNTO.test(datos) || datos.length > MAX_ADJUNTO) return { error: "La evidencia debe ser una foto o un PDF de máximo 2 MB." };
+  if (!TIPOS_ADJUNTO.test(datos) || datos.length > MAX_ADJUNTO) return { error: "La evidencia debe ser una foto o un PDF de máximo 1 MB." };
   return { datos, nombre: texto(form, "adjuntoNombre", 120) || "evidencia", tipo: datos.slice(5, datos.indexOf(";")) };
 }
 

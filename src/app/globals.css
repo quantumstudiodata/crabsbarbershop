@@ -1615,18 +1615,20 @@ button.paso-v:hover { background: rgba(255,255,255,.8); }
   .tabla-c th:nth-child(3), .tabla-c td:nth-child(3) { display: none; }
 }
 .rc-tit { display: none; }
-/* Impresión del comprobante: ancho de ticket (80 mm), letra legible, sin nada más de la página. */
+/* Impresión del comprobante: una hoja normal con el comprobante centrado y de buen tamaño, como un recibo. */
 @media print {
-  @page { size: 80mm auto; margin: 4mm; }
+  @page { size: letter; margin: 18mm; }
   body.imprimiendo-ticket { background: #fff !important; }
   body.imprimiendo-ticket > *:not(.velo-c) { display: none !important; }
-  body.imprimiendo-ticket .velo-c { position: static; background: none; animation: none; }
-  body.imprimiendo-ticket .cajon-c { position: static; width: 72mm; border: 0; box-shadow: none; animation: none; background: #fff; }
+  body.imprimiendo-ticket .velo-c { position: static; background: none; animation: none; display: block; }
+  body.imprimiendo-ticket .cajon-c { position: static; width: 100%; border: 0; box-shadow: none; animation: none; background: #fff; display: block; }
   body.imprimiendo-ticket .cajon-cab, body.imprimiendo-ticket .cajon-pie { display: none !important; }
   body.imprimiendo-ticket .cajon-cuerpo { padding: 0; overflow: visible; }
-  body.imprimiendo-ticket .recibo-c { width: 72mm; padding: 0; border: 0; background: #fff; font-size: 11pt; color: #000; gap: 3mm; }
-  body.imprimiendo-ticket .rc-tit { display: block; font-weight: 700; font-size: 12pt; }
-  body.imprimiendo-ticket .rc-cab small, body.imprimiendo-ticket .lab, body.imprimiendo-ticket .chip-p { color: #000; background: none; padding: 0; font-size: 10pt; }
+  body.imprimiendo-ticket .recibo-c { width: 125mm; margin: 0 auto; padding: 8mm; border: 1.5px dashed #000; border-radius: 0; background: #fff; font-size: 14pt; line-height: 1.4; color: #000; gap: 6mm; }
+  body.imprimiendo-ticket .rc-tit { display: block; font-weight: 700; font-size: 17pt; margin-bottom: 2mm; }
+  body.imprimiendo-ticket .rc-cab b { font-size: 15pt; }
+  body.imprimiendo-ticket .rc-cab small, body.imprimiendo-ticket .lab, body.imprimiendo-ticket .chip-p { color: #000; background: none; padding: 0; font-size: 12pt; }
+  body.imprimiendo-ticket .rc-sec small { font-size: 11pt; }
   body.imprimiendo-ticket .rc-cab, body.imprimiendo-ticket .rc-tot { border-color: #000; }
 }
 
@@ -1873,3 +1875,24 @@ a.fila-s:hover, .herr-s:hover { background: rgba(0,0,0,.025); }
 .interruptor-r { display: flex; justify-content: space-between; align-items: center; gap: 16px; padding: 12px 14px; border-radius: 14px; background: rgba(255,255,255,.7); border: 1px solid var(--line); cursor: pointer; }
 .interruptor-r > span:first-child { display: grid; gap: 2px; }
 .interruptor-r small { color: var(--muted); font-size: 12.5px; }
+
+/* Secciones resaltadas del menú: Resumen (azul) y Datos del Administrador (arena) */
+.nav .resalta-resumen:not([aria-current="page"]) { background: rgba(94,129,160,.16); color: #2b4a66; font-weight: 600; box-shadow: inset 0 0 0 1px rgba(94,129,160,.28); }
+.nav .resalta-resumen:not([aria-current="page"]):hover { background: rgba(94,129,160,.26); }
+.nav .resalta-datos:not([aria-current="page"]) { background: rgba(197,163,122,.2); color: #6b4f2a; font-weight: 600; box-shadow: inset 0 0 0 1px rgba(197,163,122,.4); }
+.nav .resalta-datos:not([aria-current="page"]):hover { background: rgba(197,163,122,.32); }
+.nav .resalta-datos[aria-current="page"] { background: #6b4f2a; color: #fff; }
+
+/* Ventas por barbero (Inicio del barbero) */
+.vpb { display: grid; gap: 10px; }
+.vpb-f { display: grid; grid-template-columns: 34px minmax(0, 1fr) minmax(48px, 90px) auto; align-items: center; gap: 12px; }
+.vpb-n { display: grid; min-width: 0; }
+.vpb-n b { font-weight: 600; font-size: 14px; }
+.vpb-n small { font-size: 12px; }
+.vpb-b { height: 6px; border-radius: 99px; background: rgba(43,58,71,.08); overflow: hidden; }
+.vpb-b i { display: block; height: 100%; border-radius: inherit; background: linear-gradient(90deg, #8ea5b8, #2b3a47); transition: width .6s cubic-bezier(.2,.8,.2,1); }
+.vpb-f.yo .vpb-n b { color: #2b3a47; }
+.evid-c { display: grid; gap: 8px; }
+.evid-f { justify-self: start; max-width: 100%; }
+@media print { body.imprimiendo-ticket .rc-evid { display: none; } }
+.nav .resalta-resumen[aria-current="page"] { background: #2b4a66; color: #fff; }

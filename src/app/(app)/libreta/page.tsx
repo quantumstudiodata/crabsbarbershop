@@ -10,7 +10,7 @@ import { libretaAnio, libretaBarberos, libretaMes, mesesConDatos } from "@/lib/l
 import { formatoDinero } from "@/lib/money";
 import { NavLibreta } from "./NavLibreta";
 
-export const metadata = { title: "Libreta" };
+export const metadata = { title: "Datos" };
 
 const $ = (c: number) => formatoDinero(c);
 

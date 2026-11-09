@@ -397,7 +397,7 @@ export async function diasYTotalVentas(barberiaId: string, zona: string, f: { de
     ...f.condiciones,
   );
   const monto = f.persona
-    ? sql<number>`coalesce(sum(case when ${s.ventas.estado} = 'pagada' then (select coalesce(sum(c.precio_cobrado),0) from ${s.conceptos} c where c.venta_id = ${s.ventas.id} and c.barbero_id = ${f.persona}) else 0 end),0)::int`
+    ? sql<number>`coalesce(sum(case when ${s.ventas.estado} = 'pagada' then (select coalesce(sum(c.precio_cobrado),0) from ${s.conceptos} c where c.venta_id = ${sql.raw('"ventas"."id"')} and c.barbero_id = ${f.persona}) else 0 end),0)::int`
     : sql<number>`coalesce(sum(case when ${s.ventas.estado} = 'pagada' then ${s.ventas.total} else 0 end),0)::int`;
   const [dias, [t]] = await Promise.all([
     db.select({ d: dia }).from(s.ventas).where(cond).groupBy(sql`1`).orderBy(sql`1 desc`),

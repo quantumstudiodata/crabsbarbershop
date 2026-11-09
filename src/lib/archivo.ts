@@ -12,4 +12,4 @@ export async function prepararArchivo(f: File): Promise<string> {
 
 /** Fotos o PDF en formato data URL, de máximo 2 MB. */
 export const TIPOS_ADJUNTO = /^data:(image\/(jpeg|png|webp)|application\/pdf);base64,[A-Za-z0-9+/=]+$/;
-export const MAX_ADJUNTO = 2_800_000;
+export const MAX_ADJUNTO = 1_300_000;

@@ -62,10 +62,11 @@ export default async function ConfigurarNegocio({ searchParams }: { searchParams
           ["Modelo de caja", b.modeloCaja === "individual" ? "Individual por trabajador" : "Compartida"],
           ["Apertura", b.aperturaManual ? "Manual, contando el fondo" : "Automática al primer cobro"],
           ["Cierre de caja", b.corteObligatorio ? "Obligatorio cada día" : "No obligatorio"],
+          ["Evidencias del corte", b.usaEvidenciaCorte ? "Se pueden adjuntar al cerrar" : "No se piden"],
           ...(b.aperturaManual ? [] : [["Fondo inicial sugerido", $(b.fondoPredeterminado)] as [string, string]]),
           ["Diferencia permitida", b.limiteDiferenciaCaja ? $(b.limiteDiferenciaCaja) : "Ninguna, toda diferencia se explica"],
         ]} />}>
-        <CajaConfig apertura={b.aperturaManual} corte={b.corteObligatorio} fondo={Math.round(b.fondoPredeterminado / 100)} diferencia={Math.round(b.limiteDiferenciaCaja / 100)} />
+        <CajaConfig apertura={b.aperturaManual} corte={b.corteObligatorio} fondo={Math.round(b.fondoPredeterminado / 100)} diferencia={Math.round(b.limiteDiferenciaCaja / 100)} evidencia={b.usaEvidenciaCorte} />
         <ModeloCaja actual={b.modeloCaja} />
       </Bloque>
 

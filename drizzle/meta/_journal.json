@@ -120,6 +120,13 @@
       "when": 1794190746014,
       "tag": "0016_remuneraciones",
       "breakpoints": true
+    },
+    {
+      "idx": 17,
+      "version": "7",
+      "when": 1794192040848,
+      "tag": "0017_evidencias_corte",
+      "breakpoints": true
     }
   ]
 }

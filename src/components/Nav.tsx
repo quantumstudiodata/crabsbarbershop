@@ -4,7 +4,7 @@ import Link from "next/link";
 import { usePathname } from "next/navigation";
 import { Icono } from "./Icono";
 
-export type ItemNav = { href: string; texto: string; icono: string };
+export type ItemNav = { href: string; texto: string; icono: string; /** Función propia del puesto: se muestra con otro color. */ resalta?: boolean };
 export type SubNav = { base: string; items: [string, string][] };
 
 /**
@@ -24,7 +24,7 @@ export function Nav({ items, sub, destacado }: { items: ItemNav[]; sub?: SubNav;
           </Link>
         )}
         {items.map((i) => (
-          <Link key={i.href} href={i.href} tabIndex={dentro ? -1 : undefined} aria-current={activo(i.href) ? "page" : undefined}>
+          <Link key={i.href} href={i.href} className={i.resalta ? "resalta-datos" : undefined} tabIndex={dentro ? -1 : undefined} aria-current={activo(i.href) ? "page" : undefined}>
             <Icono n={i.icono} />
             <span>{i.texto}</span>
           </Link>
@@ -34,7 +34,7 @@ export function Nav({ items, sub, destacado }: { items: ItemNav[]; sub?: SubNav;
         <div className="capa-n sub" aria-hidden={!dentro || undefined}>
           <Link href="/" className="volver-n" tabIndex={dentro ? undefined : -1} aria-label="Volver al menú principal"><Icono n="izquierda" /><span>Volver</span></Link>
           {sub.items.map(([h, t]) => (
-            <Link key={h} href={h} tabIndex={dentro ? undefined : -1} aria-current={(h === sub.base ? ruta === h : ruta.startsWith(h)) ? "page" : undefined}>{t}</Link>
+            <Link key={h} href={h} className={h === sub.base ? "resalta-resumen" : undefined} tabIndex={dentro ? undefined : -1} aria-current={(h === sub.base ? ruta === h : ruta.startsWith(h)) ? "page" : undefined}>{t}</Link>
           ))}
         </div>
       )}

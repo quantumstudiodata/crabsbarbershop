@@ -10,6 +10,7 @@ import { fechaLarga, fechaLocal } from "@/lib/fechas";
 import { registrar } from "@/lib/historial";
 import { formatoDinero, leerPesos } from "@/lib/money";
 import { texto, volver } from "@/lib/volver";
+import { MAX_ADJUNTO, TIPOS_ADJUNTO } from "@/lib/archivo";
 
 export type ResumenCorte = {
   folio: string; desde: string; hasta: string; metodos: { metodo: string; total: number }[]; total: number; ventas: number;
@@ -94,6 +95,17 @@ export async function cerrarCaja(_: EstadoCaja, form: FormData): Promise<EstadoC
   if (contado === null) return { error: "Escribe cuánto efectivo contaste." };
   const turno = await cajaDe(s);
   if (!turno) return { error: "La caja ya está cerrada." };
+  // Evidencias opcionales (solo si el negocio las tiene activadas): fotos o PDF de transferencias, tarjetas, etc.
+  const evidencias: { etiqueta: string; nombre: string; tipo: string; datos: string }[] = [];
+  if (s.barberia.usaEvidenciaCorte) {
+    const datosE = form.getAll("evidencia").map(String), nombres = form.getAll("evidenciaNombre").map(String), etiquetas = form.getAll("evidenciaEtiqueta").map(String);
+    if (datosE.length > 6) return { error: "Se pueden adjuntar hasta 6 archivos." };
+    for (let i = 0; i < datosE.length; i++) {
+      if (!datosE[i]) continue;
+      if (!TIPOS_ADJUNTO.test(datosE[i]) || datosE[i].length > MAX_ADJUNTO) return { error: "Cada evidencia debe ser una foto o un PDF de máximo 1 MB." };
+      evidencias.push({ etiqueta: (etiquetas[i] ?? "").slice(0, 60), nombre: (nombres[i] ?? "evidencia").slice(0, 120), tipo: datosE[i].slice(5, datosE[i].indexOf(";")), datos: datosE[i] });
+    }
+  }
   const datos = await movimientosDeTurno(s.barberia.id, turno.id, turno.fondoInicial);
   const r = compararConteo(datos.esperado, contado, formatoDinero);
   if (requiereExplicacion(r.diferencia, s.barberia.limiteDiferenciaCaja) && !notas) return { error: `${r.texto} Escribe en observaciones qué pasó.` };
@@ -106,9 +118,10 @@ export async function cerrarCaja(_: EstadoCaja, form: FormData): Promise<EstadoC
       .where(and(eq(schema.turnosCaja.id, turno.id), eq(schema.turnosCaja.estado, "abierto")))
       .returning({ id: schema.turnosCaja.id });
     if (filas.length === 0) return;
+    if (evidencias.length) await tx.insert(schema.evidenciasCorte).values(evidencias.map((e) => ({ ...e, barberiaId: s.barberia.id, turnoId: turno.id, subidoPor: s.usuario.id })));
     await registrar(tx, {
       barberiaId: s.barberia.id, usuarioId: s.usuario.id, tipo: "caja",
-      accion: `${s.usuario.nombre} hizo el corte de caja. ${r.texto}`, detalle: { esperado: datos.esperado, contado, diferencia: r.diferencia, notas, verificacion },
+      accion: `${s.usuario.nombre} hizo el corte de caja. ${r.texto}`, detalle: { esperado: datos.esperado, contado, diferencia: r.diferencia, notas, verificacion, evidencias: evidencias.length || undefined },
     });
   });
   const zona = s.barberia.zonaHoraria;

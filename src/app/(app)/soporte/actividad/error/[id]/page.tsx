@@ -10,7 +10,7 @@ export const metadata = { title: "Detalle del error" };
 
 const OPERACION: [RegExp, string][] = [
   [/^\/cobrar/, "Cobro o caja"], [/^\/analitica\/ventas/, "Ventas"], [/^\/analitica\/cortes/, "Cortes de caja"], [/^\/analitica\/finanzas/, "Finanzas y egresos"],
-  [/^\/analitica/, "Analítica"], [/^\/libreta/, "Libreta"], [/^\/ajustes/, "Ajustes"], [/^\/mis-ventas/, "Mis ventas"], [/^\/api\/exportar|^\/api\/libreta/, "Descarga de reportes"],
+  [/^\/analitica/, "Analítica"], [/^\/libreta/, "Datos"], [/^\/ajustes/, "Ajustes"], [/^\/mis-ventas/, "Mis ventas"], [/^\/api\/exportar|^\/api\/libreta/, "Descarga de reportes"],
   [/^\/soporte/, "Centro de soporte"], [/^\/$/, "Inicio"],
 ];
 

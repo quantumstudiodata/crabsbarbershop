@@ -24,7 +24,7 @@ export async function responderComoSoporte(_: EstadoSoporte, form: FormData): Pr
   const msg = texto(form, "texto", 4000);
   const despues = texto(form, "despues") as EstadoSolicitud;
   const adjunto = String(form.get("adjunto") ?? "");
-  if (adjunto && (!TIPOS_ADJUNTO.test(adjunto) || adjunto.length > MAX_ADJUNTO)) return { error: "El archivo debe ser una foto o un PDF de máximo 2 MB." };
+  if (adjunto && (!TIPOS_ADJUNTO.test(adjunto) || adjunto.length > MAX_ADJUNTO)) return { error: "El archivo debe ser una foto o un PDF de máximo 1 MB." };
   if (!msg) return { error: "Escribe la respuesta." };
   const [x] = await db.select().from(t.solicitudesSoporte).where(eq(t.solicitudesSoporte.id, id)).limit(1);
   if (!x) return { error: "No se encontró la solicitud." };

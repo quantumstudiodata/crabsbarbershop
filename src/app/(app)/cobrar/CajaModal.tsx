@@ -2,6 +2,7 @@
 
 import { useActionState, useEffect, useState } from "react";
 import { Avatar } from "@/components/Avatar";
+import { EvidenciasCorte } from "./EvidenciasCorte";
 import { Fl, Icono } from "@/components/Icono";
 import { Modal } from "@/components/ui";
 import type { MovimientosTurno } from "@/lib/caja";
@@ -99,7 +100,7 @@ function Resumen({ r, cerrar }: { r: ResumenCorte; cerrar: () => void }) {
   );
 }
 
-export function CajaModal({ inicial, turno, limiteDiferencia, categorias }: { inicial: Vista | null; turno: Turno | null; limiteDiferencia: number; categorias: string[] }) {
+export function CajaModal({ inicial, turno, limiteDiferencia, categorias, evidencias = false }: { inicial: Vista | null; turno: Turno | null; limiteDiferencia: number; categorias: string[]; evidencias?: boolean }) {
   const [vista, setVista] = useState<Vista | null>(inicial);
   const [eMov, accMov, guardandoMov] = useActionState<EstadoCaja, FormData>(registrarMovimiento, {});
   const [eGasto, accGasto, guardandoGasto] = useActionState<EstadoCaja, FormData>(registrarGasto, {});
@@ -107,6 +108,9 @@ export function CajaModal({ inicial, turno, limiteDiferencia, categorias }: { in
   const [tipoMov, setTipoMov] = useState<"retiro" | "entrada">("retiro");
   const [concepto, setConcepto] = useState("");
   const [categoria, setCategoria] = useState(categorias[0] ?? "Otros");
+  const [gasto, setGasto] = useState("");
+  // Al elegir una categoría se llena "En qué se gastó" con su nombre, salvo que la persona ya haya escrito algo propio.
+  const elegirCategoria = (c: string) => { setCategoria(c); setGasto((g) => (g === "" || categorias.includes(g) ? c : g)); };
   const [contado, setContado] = useState("");
   const [resumen, setResumen] = useState<ResumenCorte | null>(null);
 
@@ -119,12 +123,12 @@ export function CajaModal({ inicial, turno, limiteDiferencia, categorias }: { in
   useEffect(() => { if (eGasto.ok) setVista(null); }, [eGasto.n, eGasto.ok]);
   useEffect(() => { if (eCerrar.ok && eCerrar.resumen) { setResumen(eCerrar.resumen); setVista(null); setContado(""); } }, [eCerrar.n, eCerrar.ok, eCerrar.resumen]);
 
-  const cerrar = () => setVista(null);
+  const cerrar = () => { setVista(null); setGasto(""); };
   if (resumen) return <Resumen r={resumen} cerrar={() => setResumen(null)} />;
   if (!vista || !turno) return null;
 
   if (vista === "retiro") {
-    const sugeridos = tipoMov === "retiro" ? ["Depósito al banco", "Propinas entregadas", "Lo llevó el titular"] : ["Más cambio", "Reposición del fondo"];
+    const sugeridos = tipoMov === "retiro" ? ["Depósito al banco", "Pago de comisiones", "Pago de servicios"] : ["Más cambio", "Reposición del fondo"];
     return (
       <Modal abierto cerrar={cerrar} etiqueta="Caja" titulo={tipoMov === "retiro" ? "Sacar efectivo" : "Meter efectivo"}>
         <form action={accMov} className="pila">
@@ -151,8 +155,8 @@ export function CajaModal({ inicial, turno, limiteDiferencia, categorias }: { in
         <form action={accGasto} className="pila">
           <input type="hidden" name="categoria" value={categoria} />
           <input className="input grande" name="monto" inputMode="decimal" placeholder="$0" required autoFocus aria-label="Monto" />
-          <input className="input" name="concepto" placeholder="En qué se gastó" required aria-label="En qué se gastó" />
-          <div className="billetes">{categorias.map((c) => <button type="button" key={c} className={categoria === c ? "on" : ""} onClick={() => setCategoria(c)}>{c}</button>)}</div>
+          <input className="input" name="concepto" value={gasto} onChange={(e) => setGasto(e.target.value)} placeholder="En qué se gastó" required aria-label="En qué se gastó" />
+          <div className="billetes">{categorias.map((c) => <button type="button" key={c} className={categoria === c ? "on" : ""} onClick={() => elegirCategoria(c)}>{c}</button>)}</div>
           {eGasto.error && <p className="aviso error">{eGasto.error}</p>}
           <div className="acciones"><button className="bt" disabled={guardandoGasto}>{guardandoGasto ? "Guardando…" : "Guardar"}<Fl /></button></div>
         </form>
@@ -197,6 +201,7 @@ export function CajaModal({ inicial, turno, limiteDiferencia, categorias }: { in
             <div className="total-c"><span>Efectivo esperado</span><b>{formatoDinero(turno.esperado)}</b></div>
           </div>
         </details>
+        {evidencias && <EvidenciasCorte metodos={turno.otros.map((o) => o.metodo)} />}
         <label className="campo">
           <span>Observaciones</span>
           <textarea className="input" name="notas" placeholder={dif !== null && Math.abs(dif) > limiteDiferencia ? "Hay diferencia. Escribe qué pasó." : "Opcional"} />

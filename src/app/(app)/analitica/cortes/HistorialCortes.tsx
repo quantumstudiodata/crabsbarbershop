@@ -16,6 +16,7 @@ export type Corte = {
   esperado: number; contado: number; diferencia: number; notas: string | null;
   movimientos: { hora: string; titulo: string; detalle: string; monto: number }[];
   ajustes: string[];
+  evidencias: { id: string; etiqueta: string; nombre: string; tipo: string }[];
 };
 
 const $ = formatoDinero;
@@ -120,6 +121,11 @@ function Detalle({ c, cerrar, ajustar }: { c: Corte | null; cerrar: () => void; 
           {c.movimientos.length > 0 && (
             <div className="rc-sec"><span className="lab">Movimientos de caja</span>
               {c.movimientos.map((m, i) => <div key={i}><span>{m.hora} {m.titulo}<small>{m.detalle}</small></span><span className="num">{m.monto < 0 ? `−${$(-m.monto)}` : $(m.monto)}</span></div>)}
+            </div>
+          )}
+          {c.evidencias.length > 0 && (
+            <div className="rc-sec rc-evid"><span className="lab">Evidencias</span>
+              {c.evidencias.map((e) => <div key={e.id}><span>{e.etiqueta || "General"}<small>{e.nombre}</small></span><a className="enlace" href={`/api/evidencia/${e.id}`} target="_blank" rel="noreferrer">Ver</a></div>)}
             </div>
           )}
           {(c.notas || c.ajustes.length > 0) && (

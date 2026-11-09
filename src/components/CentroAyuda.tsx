@@ -3,7 +3,7 @@
 import { usePathname, useRouter, useSearchParams } from "next/navigation";
 import { useActionState, useEffect, useRef, useState, useTransition } from "react";
 import { type DetalleSolicitud, enviarSolicitud, type EstadoEnvio, misSolicitudes, responderSolicitud, type ResumenSolicitud, verSolicitud } from "@/app/(app)/ayuda-actions";
-import { prepararArchivo } from "@/lib/archivo";
+import { MAX_ADJUNTO, prepararArchivo } from "@/lib/archivo";
 import { CATEGORIAS_PROBLEMA, ESTADOS_SOLICITUD, hace, TIPOS_SOLICITUD, type TipoSolicitud } from "@/lib/soporte";
 import { Cajon } from "./Cajon";
 import { Icono } from "./Icono";
@@ -91,7 +91,7 @@ function Adjunto({ chico }: { chico?: boolean }) {
     if (!/^(image\/(jpeg|png|webp)|application\/pdf)$/.test(f.type)) { setError("Solo fotos o PDF."); return; }
     try {
       const datos = await prepararArchivo(f);
-      if (datos.length > 2_800_000) { setError("El archivo pesa más de 2 MB."); return; }
+      if (datos.length > MAX_ADJUNTO) { setError("El archivo pesa más de 1 MB."); return; }
       setArchivo({ datos, nombre: f.name.slice(0, 120) });
     } catch { setError("No se pudo leer el archivo."); }
   };
