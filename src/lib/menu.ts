@@ -9,6 +9,8 @@ export function menuDe(rol: Rol, puede: (p: Permiso) => boolean) {
   const analitica = puede("reportes.ver") || puede("ventas.ver_todas") || puede("gastos.ver") || puede("cortes.ver");
   const items: ItemMenuApp[] = [];
   items.push({ href: "/", texto: "Inicio", icono: "inicio" });
+  // Las citas son visibles para todo el equipo, también para las barberas.
+  items.push({ href: "/citas", texto: "Citas y agenda", icono: "calendario" });
   if (cobra) items.push({ href: "/cobrar", texto: "Cobro", icono: "cobro" });
   if (atiende && !puede("ventas.ver_todas")) items.push({ href: "/analitica/ventas", texto: "Ventas", icono: "lista" });
   if (analitica) items.push({ href: "/analitica", texto: "Analítica", icono: "grafica" });

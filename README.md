@@ -79,8 +79,9 @@ npm run db:seed      # crea la barbería, la dueña, tu usuario, servicios y for
 1. Entra a <https://vercel.com> con tu cuenta de GitHub.
 2. Ve a **Add New**, luego **Project**, e importa `quantumstudiodata/crabsbarbershop`.
 3. En **Environment Variables** agrega `DATABASE_URL` con la cadena del **Transaction pooler** (puerto 6543).
-4. Presiona **Deploy**. Vercel te da una dirección como `crabs-xxxx.vercel.app`.
-5. Opcional: conecta un dominio propio en **Settings**, luego **Domains**.
+4. Para pagos de citas, agrega en Vercel `STRIPE_SECRET_KEY`, `NEXT_PUBLIC_STRIPE_PUBLISHABLE_KEY` y `STRIPE_WEBHOOK_SECRET`. En Stripe registra el webhook `https://TU-DOMINIO/api/stripe/webhook` para `checkout.session.completed`, `checkout.session.async_payment_succeeded`, `checkout.session.async_payment_failed` y `checkout.session.expired`.
+5. Presiona **Deploy**. Vercel te da una dirección como `crabs-xxxx.vercel.app`.
+6. Opcional: conecta un dominio propio en **Settings**, luego **Domains**.
 
 Cada vez que se suba un cambio a la rama `main`, Vercel publica la nueva versión sola.
 
@@ -91,6 +92,7 @@ Cada vez que se suba un cambio a la rama `main`, Vercel publica la nueva versió
 3. Da de alta a las barberas y a la encargada en **Ajustes**, luego **Personas**.
 4. En **Ajustes**, luego **Formas de pago del equipo**, configura cómo se le paga a cada una.
 5. Abre la caja y empieza a cobrar.
+6. Para citas, ve a **Ajustes → Citas y agenda**, configura los horarios y activa las reservas. Copia el enlace para compartirlo con clientes.
 
 ### Instalarla como aplicación
 
@@ -137,6 +139,6 @@ npm run db:generate  # crea una migración nueva después de cambiar src/lib/db/
 
 ## Qué sigue
 
-- Fase 2: PIN rápido para cambiar de barbera en la tableta, modo sin conexión y descarga directa en `.xlsx`.
-- Fase 3: clientes y tarjeta de lealtad, recibo por WhatsApp, citas en línea.
+- Fase 2 (en curso): citas en línea con pago opcional integrado y agenda para el equipo; PIN rápido, modo sin conexión y descarga directa en `.xlsx`.
+- Fase 3: clientes y tarjeta de lealtad, recibo por WhatsApp.
 - Fase 4: suscripciones para otras barberías y facturación CFDI.

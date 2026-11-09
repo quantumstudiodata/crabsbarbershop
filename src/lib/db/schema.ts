@@ -61,6 +61,9 @@ export const barberias = pgTable("barberias", {
   corteObligatorio: boolean("corte_obligatorio").notNull().default(true),
   // Al cerrar la caja se pueden adjuntar fotos o archivos (comprobantes de transferencias, vouchers de tarjeta).
   usaEvidenciaCorte: boolean("usa_evidencia_corte").notNull().default(false),
+  // Agenda pública: el enlace permanece desactivado hasta que el negocio configure sus horarios.
+  agendaActiva: boolean("agenda_activa").notNull().default(false),
+  horarioAgenda: jsonb("horario_agenda").notNull().default(sql`'{}'::jsonb`),
   usaComprobantes: boolean("usa_comprobantes").notNull().default(true),
   usaPeriodicidad: boolean("usa_periodicidad").notNull().default(true),
   // Formas de pago que se pueden usar al registrar un egreso.
@@ -592,4 +595,36 @@ export const evidenciasCorte = pgTable(
     creadoEn: creadoEn(),
   },
   (t) => [index("evidencias_corte_turno_idx").on(t.turnoId)],
+);
+
+// Citas creadas desde el enlace público. Se conserva el precio y el nombre del servicio como estaban al reservar.
+export const citas = pgTable(
+  "citas",
+  {
+    id: id(),
+    barberiaId: barberiaId(),
+    servicioId: uuid("servicio_id").references(() => servicios.id),
+    barberoId: uuid("barbero_id").notNull().references(() => usuarios.id),
+    tokenPublico: uuid("token_publico").notNull().default(sql`gen_random_uuid()`),
+    clienteNombre: text("cliente_nombre").notNull(),
+    clienteTelefono: text("cliente_telefono").notNull(),
+    clienteEmail: text("cliente_email"),
+    servicioNombre: text("servicio_nombre").notNull(),
+    duracionMin: integer("duracion_min").notNull(),
+    precio: integer("precio").notNull(),
+    iniciaEn: timestamp("inicia_en", { withTimezone: true }).notNull(),
+    terminaEn: timestamp("termina_en", { withTimezone: true }).notNull(),
+    estado: text("estado").notNull().default("reservada"),
+    estadoPago: text("estado_pago").notNull().default("sin_pagar"),
+    stripeCheckoutSessionId: text("stripe_checkout_session_id"),
+    stripePaymentIntentId: text("stripe_payment_intent_id"),
+    creadaPor: uuid("creada_por").references(() => usuarios.id),
+    creadoEn: creadoEn(),
+  },
+  (t) => [
+    uniqueIndex("citas_token_publico_uq").on(t.tokenPublico),
+    uniqueIndex("citas_stripe_session_uq").on(t.stripeCheckoutSessionId),
+    index("citas_barberia_inicio_idx").on(t.barberiaId, t.iniciaEn),
+    index("citas_barbero_inicio_idx").on(t.barberoId, t.iniciaEn),
+  ],
 );
