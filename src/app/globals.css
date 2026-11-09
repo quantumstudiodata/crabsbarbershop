@@ -2341,3 +2341,33 @@ html:has(.capa) body, html:has(.velo-c) body, html:has(.velo-hoja) body, html:ha
 @media (max-width: 760px) {
   .historial .hist-linea.ultimo-l { padding-top: 6px; padding-bottom: 6px; }
 }
+@media (max-width: 760px) {
+  /* Notificaciones abiertas: el fondo no se mueve. */
+  html:has(.menu.avisos) { overflow: hidden; }
+  html:has(.menu.avisos) body { overflow: hidden; touch-action: none; }
+
+  /* Cobro: las categorías en el azul de la marca, distintas de los servicios. */
+  .cat-btn { background: linear-gradient(135deg, #4b6274, #2b3a47); border-color: rgba(43,58,71,.4); color: #fff; box-shadow: 0 8px 16px -10px rgba(20,35,50,.6); }
+  .cat-btn small, .cat-btn > svg { color: rgba(255,255,255,.75); }
+  .cat-cobro .servicios-g { padding-left: 8px; }
+
+  /* Inicio (todos los puestos): encabezado compacto en una sola línea. */
+  .inicio-b .hero-sin { display: grid; gap: 8px !important; padding-top: 0; }
+  .inicio-b .big-ini { font-size: 48px; margin-top: 2px; }
+  .inicio-b .hero-sin > .entre:first-child { align-items: flex-end !important; }
+  .inicio-b .hero-sin .fig { font-size: 26px !important; }
+  .im-top { flex-wrap: nowrap; }
+  .im-datos { display: flex; gap: 14px; text-align: right; }
+  .im-datos span { display: grid; gap: 2px; }
+  .im-datos b { font-size: 20px; font-weight: 700; }
+  .im-datos .lab { font-size: 10px; }
+  .inicio-b .hero-sin > .entre:nth-child(2), .im-ctrl { flex-wrap: nowrap !important; gap: 8px; align-items: center; }
+  .inicio-b .hero-sin > .entre:nth-child(2) .pill, .im-ctrl .pill { white-space: normal; line-height: 1.25; font-size: 11px; padding: 5px 10px; min-width: 0; flex: 1 1 auto; }
+  .inicio-b .hero-sin .seg.chico { flex: none; padding: 3px; }
+  .inicio-b .hero-sin .seg.chico a { padding: 5px 9px; font-size: 12px; }
+  .inicio-b .grafica .ejes { font-size: 10px; }
+  .inicio-m.inicio-b { display: grid; gap: 12px; }
+  .inicio-m .ultimos-s { gap: 8px; }
+  .inicio-b .meta.grande { height: 10px; }
+}
+@media (max-width: 760px) { .cat-btn .punto-cat { background: #fff; } }
