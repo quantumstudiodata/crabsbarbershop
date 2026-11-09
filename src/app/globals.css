@@ -1896,3 +1896,51 @@ a.fila-s:hover, .herr-s:hover { background: rgba(0,0,0,.025); }
 .evid-f { justify-self: start; max-width: 100%; }
 @media print { body.imprimiendo-ticket .rc-evid { display: none; } }
 .nav .resalta-resumen[aria-current="page"] { background: #2b4a66; color: #fff; }
+
+/* Reservas públicas y agenda interna */
+.agendar-publico { max-width: 760px; padding-top: 34px; padding-bottom: 48px; }
+.agendar-marca { display: flex; align-items: center; justify-content: space-between; gap: 12px; padding-bottom: 32px; }
+.agendar-hero { display: grid; gap: 8px; margin-bottom: 22px; }
+.agendar-hero h1 { margin: 0; font-size: clamp(34px, 6vw, 52px); }
+.agendar-hero p { margin: 0; color: var(--muted); max-width: 580px; line-height: 1.55; }
+.agendar-form { display: grid; gap: 18px; padding: clamp(18px, 4vw, 28px); }
+.agendar-dos { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 14px; }
+.agendar-horas { margin: 0; padding: 14px; border: 1px solid var(--line); border-radius: 14px; min-width: 0; }
+.agendar-slots { display: grid; grid-template-columns: repeat(auto-fill, minmax(84px, 1fr)); gap: 8px; }
+.slot-cita { border: 1px solid var(--line); background: rgba(255,255,255,.7); color: var(--fg); border-radius: 10px; padding: 10px 8px; cursor: pointer; font: inherit; }
+.slot-cita:hover, .slot-cita.seleccionado { border-color: var(--accent); background: var(--accent); color: white; }
+.agendar-resumen { display: flex; justify-content: space-between; gap: 12px; align-items: center; padding: 13px 15px; border-radius: 12px; background: var(--accent-soft); }
+.agendar-resumen b { font-size: 18px; }
+.agendar-pie { padding: 18px 4px; color: var(--muted); font-size: 12px; text-align: center; }
+.cita-confirmada { display: grid; gap: 18px; padding: clamp(22px, 5vw, 36px); }
+.cita-confirmada h1 { margin: 0; font-size: clamp(30px, 5vw, 44px); }
+.cita-detalle { display: grid; grid-template-columns: minmax(90px, .7fr) minmax(0, 1.3fr); gap: 11px 16px; padding: 16px; border-radius: 14px; background: rgba(255,255,255,.45); }
+.cita-detalle span { color: var(--muted); }
+.cita-overlay { position: fixed; inset: 0; z-index: 500; display: grid; place-items: center; overflow: auto; padding: 18px; background: rgba(13,20,27,.58); backdrop-filter: blur(8px); }
+.cita-pago { width: min(100%, 540px); max-height: calc(100vh - 36px); overflow: auto; }
+.stripe-element { min-height: 80px; }
+.agenda-config { display: grid; gap: 8px; }
+.agenda-config-dia { display: grid; grid-template-columns: minmax(120px, 1fr) minmax(110px, .6fr) minmax(110px, .6fr); align-items: center; gap: 12px; padding: 10px 12px; border: 1px solid var(--line); border-radius: 12px; }
+.agenda-config-dia label:not(.check) { display: grid; grid-template-columns: auto minmax(90px, 1fr); align-items: center; gap: 8px; font-size: 13px; color: var(--muted); }
+.agenda-config-dia input[type="time"] { min-width: 0; width: 100%; padding: 7px 8px; border: 1px solid var(--line); border-radius: 8px; background: white; color: var(--fg); font: inherit; }
+.siguiente-cita { display: grid; grid-template-columns: minmax(0, 1fr) minmax(140px, .7fr) auto; align-items: center; gap: 18px; padding: 22px; border-radius: 18px; background: linear-gradient(120deg, rgba(75,98,116,.16), rgba(255,255,255,.84)); border: 1px solid var(--glass-border); }
+.siguiente-cita h2 { margin: 5px 0; font-size: 24px; }
+.siguiente-cita p, .siguiente-cita small { display: block; margin: 0; color: var(--muted); }
+.siguiente-cita > div:nth-child(2) { display: grid; gap: 4px; }
+.citas-lista { display: grid; }
+.cita-fila { display: grid; grid-template-columns: minmax(130px, .7fr) minmax(160px, 1.2fr) minmax(150px, 1fr) auto; align-items: center; gap: 16px; padding: 15px 4px; border-top: 1px solid var(--line); }
+.cita-hora, .cita-cliente, .cita-servicio, .cita-precio { display: grid; gap: 4px; min-width: 0; }
+.cita-hora small, .cita-cliente small, .cita-servicio small { color: var(--muted); font-size: 12px; overflow-wrap: anywhere; }
+.cita-precio { justify-items: end; }
+.etiqueta.verde { background: var(--ok-soft); color: var(--ok); }
+.etiqueta.ambar { background: var(--warn-soft); color: var(--warn); }
+@media (max-width: 680px) {
+  .agendar-dos { grid-template-columns: minmax(0, 1fr); }
+  .agenda-config-dia { grid-template-columns: 1fr 1fr; }
+  .agenda-config-dia .check { grid-column: 1 / -1; }
+  .siguiente-cita { grid-template-columns: 1fr auto; }
+  .siguiente-cita > div:nth-child(2) { grid-column: 1 / 2; }
+  .siguiente-cita > .etiqueta { grid-column: 2; grid-row: 1 / span 2; }
+  .cita-fila { grid-template-columns: 1fr auto; gap: 10px 12px; }
+  .cita-precio { grid-column: 2; grid-row: 1 / span 2; }
+}
