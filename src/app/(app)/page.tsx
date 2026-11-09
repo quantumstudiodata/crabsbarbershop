@@ -120,6 +120,11 @@ export default async function Inicio({ searchParams }: { searchParams: Promise<Q
           <span className="lab">Ventas de hoy</span>
           <b className="im-total num"><Cuenta valor={netas} /></b>
           <small className="muted">{deHoy.length} {deHoy.length === 1 ? "cliente" : "clientes"}, {servicios} {servicios === 1 ? "servicio" : "servicios"}</small>
+          {(() => { const sh = serieHoy(movs, hoy, zona); return (
+            <div className="im-graf">
+              <Grafica id="inicio-movil" actual={sh.actual} previo={sh.previo} etiquetas={sh.etiquetas} cadaEtiqueta={sh.cada} alto={70} enCurso={sh.enCurso} descripcion="Ventas acumuladas de hoy por hora" vacio="Se dibuja con la primera venta" />
+            </div>
+          ); })()}
           <span className="im-comp">{previoMismaHora || netas ? <>{netas - previoMismaHora >= 0 ? "+" : "−"}{formatoDinero(Math.abs(netas - previoMismaHora))} contra el {dia} pasado a esta hora</> : `El ${dia} pasado no había ventas a esta hora`}</span>
         </div>
         <div className="glass im-rend subir d2">
@@ -151,7 +156,8 @@ export default async function Inicio({ searchParams }: { searchParams: Promise<Q
           <div className="entre"><span className="lab">Últimos servicios</span>{s.puede("ventas.ver_todas") && <Link className="im-ver" href="/analitica/ventas">Ver todos</Link>}</div>
           {recientes.length === 0 && <small className="muted">Todavía no hay servicios cobrados.</small>}
           {recientes.slice(0, 5).map((v) => (
-            <div key={v.id} className={`im-fila ${v.estado === "cancelada" ? "tachada" : ""}`}>
+            <div key={v.id} className={`im-fila im-ult ${v.estado === "cancelada" ? "tachada" : ""}`}>
+              <Avatar avatar={equipo.find((e) => e.id === v.conceptos[0]?.barberoId)?.avatar ?? "iniciales"} nombre={v.conceptos[0]?.barbero ?? ""} t={26} />
               <span className="im-srv">{v.conceptos.map((c) => c.nombre).join(", ")}<small className="muted">{v.fecha === hoy ? horaCorta(v.creadoEn, zona) : fechaLarga(v.fecha)}, {v.conceptos[0]?.barbero.split(" ")[0]}</small></span>
               <b className="num">{formatoDinero(v.total)}</b>
             </div>
@@ -256,7 +262,7 @@ async function InicioBarbero({ s, hoy, zona, q, avisos }: { s: Sesion; hoy: stri
   // Las ventas de todo el equipo en el periodo de la gráfica, para ver cuánto lleva cada barbero.
   const inicioMesEq = inicioDeMes(hoy);
   const [{ ventas: todas }, gente] = await Promise.all([
-    ventasEntre(s.barberia.id, inicioMesEq < lunes ? inicioMesEq : lunes, hoy, { zona }),
+    ventasEntre(s.barberia.id, [inicioMesEq, lunes, sumarDias(hoy, -14)].sort()[0], hoy, { zona }),
     equipoQueAtiende(s.barberia.id),
   ]);
   const totalHoy = deHoy.reduce((a, c) => a + c.precioCobrado, 0);
@@ -292,18 +298,16 @@ async function InicioBarbero({ s, hoy, zona, q, avisos }: { s: Sesion; hoy: stri
     const cs = delPeriodo.filter((c) => c.barberoId === g.id);
     return { id: g.id, nombre: g.nombre, avatar: g.avatar, servicios: cs.length, monto: cs.reduce((a, c) => a + c.precioCobrado, 0) };
   }).sort((a, b) => b.monto - a.monto);
-  // Últimos servicios: los suyos, con el mismo formato que ven los demás puestos.
-  const ultimosPropios = ventas.slice(0, 10).map((v) => {
-    const cs = v.conceptos.filter((c) => c.barberoId === yo);
-    const propio = (cs.length ? cs : v.conceptos);
+  // Últimos servicios: los de todo el equipo, con el mismo formato que ven los demás puestos.
+  const ultimosPropios = todas.slice(0, 10).map((v) => {
+    const quien = gente.find((g) => g.id === v.conceptos[0]?.barberoId);
     return {
-      id: v.id, folio: v.folio, cancelada: v.estado === "cancelada", monto: formatoDinero(propio.reduce((a, c) => a + c.precioCobrado, 0)),
+      id: v.id, folio: v.folio, cancelada: v.estado === "cancelada", monto: formatoDinero(v.total),
       t: v.fecha === hoy ? horaCorta(v.creadoEn, zona) : v.fecha === sumarDias(hoy, -1) ? "Ayer" : `${v.fecha.slice(8)}/${v.fecha.slice(5, 7)}`,
-      servicios: propio.map((c) => c.nombre).join(", "), quien: s.usuario.nombre, avatar: s.usuario.avatar,
+      servicios: v.conceptos.map((c) => c.nombre).join(", "), quien: v.conceptos[0]?.barbero ?? "", avatar: quien?.avatar ?? "iniciales",
       metodo: v.pagos.map((pg) => pg.metodo).join(" y ").toLowerCase() || "sin pago",
       detalle: [
-        ["Servicios", propio.map((c) => `${c.nombre}, ${formatoDinero(c.precioCobrado)}`).join("; ")],
-        ...(propio.some((c) => c.descuento) ? [["Descuento", propio.filter((c) => c.descuento).map((c) => `${formatoDinero(c.descuento)} en ${c.nombre}`).join("; ")] as [string, string]] : []),
+        ["Servicios", v.conceptos.map((c) => `${c.nombre} con ${c.barbero.split(" ")[0]}, ${formatoDinero(c.precioCobrado)}`).join("; ")],
         ["Pago", v.pagos.map((pg) => `${pg.metodo} ${formatoDinero(pg.monto)}`).join(" y ") || "Sin pago"],
         ["Registró", v.registradaPor.split(" ")[0]],
         ["Cuándo", `${fechaLarga(v.fecha)}, ${horaCorta(v.creadoEn, zona)}`],
