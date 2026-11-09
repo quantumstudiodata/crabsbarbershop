@@ -1,5 +1,6 @@
 // Actualizaciones publicadas de la plataforma, la más reciente primero. Se agrega una línea con cada publicación.
 export const NOVEDADES: { fecha: string; texto: string }[] = [
+  { fecha: "2026-11-09", texto: "Metas: la meta mensual se reparte en partes iguales entre los barberos" },
   { fecha: "2026-11-09", texto: "Remuneración para todos los puestos: paso 2 de 2 en el alta, interruptor al editar y sueldos en la meta calculada" },
   { fecha: "2026-11-09", texto: "Meta mensual calculada con gastos frecuentes y esquemas de pago; comprobante de corte con formato de ticket; correcciones en ventanas emergentes, vista previa móvil e interruptores" },
   { fecha: "2026-11-08", texto: "Centro de soporte simplificado, vista previa a pantalla completa, simulación de permisos, ficha de negocio y errores agrupados con detalle" },

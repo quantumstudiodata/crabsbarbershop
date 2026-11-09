@@ -46,20 +46,21 @@ export function metaDelNegocio(metaMensual: number, egresosMes: number, barberos
   void egresosMes;
   const cubrir = Math.max(0, metaMensual + sueldos - rentas);
   const conMeta = barberos.filter((b) => b.tipo !== "renta");
-  const pesoTotal = conMeta.reduce((a, b) => a + b.peso, 0);
   const parte = (b: BarberoMeta) => {
     if (b.tipo === "porcentaje" || b.tipo === "mixto") return Math.max(0.05, 1 - b.porcentaje / 10000);
     if (b.tipo === "fijo") return b.ticket > 0 ? Math.max(0.05, 1 - b.montoFijo / b.ticket) : 0.5;
     return 1;
   };
   const dias = Math.max(1, diasHabiles);
+  // En partes iguales: cada barbero carga la misma parte del objetivo, sin importar cuánto haya vendido antes.
+  // Lo que cada uno debe cobrar se ajusta a cómo se le paga (con comisión hay que cobrar más para que el negocio conserve lo mismo);
+  // después se promedia para que todos tengan la misma meta.
+  const n = Math.max(1, conMeta.length);
+  const totalMensual = conMeta.reduce((a, b) => a + (cubrir / n) / parte(b), 0);
+  const mensualCadaUno = Math.round(totalMensual / n);
   const porBarbero: MetaDiaria[] = barberos.map((b) => {
     if (b.tipo === "renta") return { id: b.id, nombre: b.nombre, diaria: 0, mensual: 0, parteNegocio: 0, aplica: false };
-    const peso = pesoTotal > 0 ? b.peso / pesoTotal : 1 / Math.max(1, conMeta.length);
-    const r = parte(b);
-    // Al peso, sin redondear hacia arriba: así las metas suman exactamente el objetivo.
-    const mensual = Math.round((cubrir * peso) / r);
-    return { id: b.id, nombre: b.nombre, mensual, diaria: Math.round(mensual / dias / 100) * 100, parteNegocio: Math.round(r * 100), aplica: true };
+    return { id: b.id, nombre: b.nombre, mensual: mensualCadaUno, diaria: Math.round(mensualCadaUno / dias / 100) * 100, parteNegocio: Math.round(parte(b) * 100), aplica: true };
   });
   return { cubrir, sueldos, rentas, egresos: 0, porBarbero, diaria: porBarbero.reduce((a, b) => a + b.diaria, 0) };
 }

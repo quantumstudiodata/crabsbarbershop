@@ -150,12 +150,12 @@ function VistaMeta({ meta, datos, calculada }: { meta: number; datos: DatosMeta;
       <span><b style={{ fontSize: 15 }}>Objetivo mensual: {formatoDinero(meta * 100)}</b><br />
         El equipo deberá generar suficientes ventas para que el negocio conserve {formatoDinero(meta * 100)} después de pagar las comisiones{r.sueldos ? " y los sueldos" : ""}.
         {meta === calculada ? " Con esto se cubren los gastos frecuentes del negocio." : " Esta cifra todavía no descuenta renta, luz, agua y demás gastos."}</span>
-      <span className="lab" style={{ marginTop: 4 }}>Meta diaria de ventas de cada barbero</span>
+      <span className="lab" style={{ marginTop: 4 }}>Meta diaria de ventas por barbero, en partes iguales</span>
       <div className="metas-b">
         {r.porBarbero.map((b) => (
           <div key={b.id}>
             <b>{b.nombre.split(" ")[0]}</b>
-            {b.aplica ? <><span className="num">{formatoDinero(b.diaria)}</span><small>en ventas cada día. No es su comisión: es lo que debe cobrar a clientes.</small></> : <><span className="muted">Sin meta</span><small>Paga renta de silla</small></>}
+            {b.aplica ? <><span className="num">{formatoDinero(b.diaria)}</span><small>en ventas cada día. Es lo que debe cobrar a clientes, no su comisión.</small></> : <><span className="muted">Sin meta</span><small>Paga renta de silla</small></>}
           </div>
         ))}
       </div>
