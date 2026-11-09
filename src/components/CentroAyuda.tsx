@@ -1,10 +1,11 @@
 "use client";
 
 import { usePathname, useRouter, useSearchParams } from "next/navigation";
-import { useActionState, useEffect, useRef, useState, useTransition } from "react";
+import { useActionState, useCallback, useEffect, useRef, useState, useTransition } from "react";
 import { type DetalleSolicitud, enviarSolicitud, type EstadoEnvio, misSolicitudes, responderSolicitud, type ResumenSolicitud, verSolicitud } from "@/app/(app)/ayuda-actions";
 import { MAX_ADJUNTO, prepararArchivo } from "@/lib/archivo";
 import { CATEGORIAS_PROBLEMA, ESTADOS_SOLICITUD, hace, TIPOS_SOLICITUD, type TipoSolicitud } from "@/lib/soporte";
+import { useAbrirPanel } from "./BarraMovil";
 import { Cajon } from "./Cajon";
 import { Icono } from "./Icono";
 import { Selector } from "./ui";
@@ -34,6 +35,7 @@ export function CentroAyuda({ abiertas, nuevas }: { abiertas: number; nuevas: nu
     n.delete("ayuda");
     router.replace(n.toString() ? `${ruta}?${n}` : ruta, { scroll: false });
   }, [pedida, params, router, ruta]);
+  useAbrirPanel("ayuda", useCallback(() => setAbierto(true), []));
   const cerrar = () => { setAbierto(false); setVista({ v: "inicio" }); router.refresh(); };
   const atras = vista.v === "nuevo" || vista.v === "lista" ? () => setVista({ v: "inicio" }) : vista.v === "detalle" || vista.v === "enviado" ? () => setVista({ v: "lista" }) : null;
   return (

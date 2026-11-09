@@ -37,7 +37,7 @@ export function MenuUsuario(p: { nombre: string; usuario: string; rol: string; a
   const nombreCorto = p.nombre.split(" ").slice(0, 2).join(" ");
 
   return (
-    <div ref={caja} style={{ position: "relative", justifySelf: "start" }}>
+    <div ref={caja} className="u-menu" style={{ position: "relative", justifySelf: "start" }}>
       <button type="button" className="uchip" aria-haspopup="menu" aria-expanded={abierto} onClick={() => setAbierto((a) => !a)}>
         <Avatar avatar={avatar} nombre={p.nombre} t={34} />
         <span className="txt"><b>{nombreCorto}</b><small>{p.rol}</small></span>
@@ -50,8 +50,8 @@ export function MenuUsuario(p: { nombre: string; usuario: string; rol: string; a
             <span className="etiqueta" style={{ width: "max-content" }}>{p.rol}</span>
           </div>
           <button type="button" role="menuitem" className="it" onClick={() => { setPerfil(true); setAbierto(false); }}><Icono n="usuario" />Mi perfil</button>
-          {p.ajustes && <Link role="menuitem" className="it" href="/ajustes" onClick={() => setAbierto(false)}><Icono n="ajustes" />Ajustes</Link>}
-          {p.historial && <Link role="menuitem" className="it" href="/historial" onClick={() => setAbierto(false)}><Icono n="historial" />Historial</Link>}
+          {p.ajustes && <Link role="menuitem" className="it solo-esc-m" href="/ajustes" onClick={() => setAbierto(false)}><Icono n="ajustes" />Ajustes</Link>}
+          {p.historial && <Link role="menuitem" className="it solo-esc-m" href="/historial" onClick={() => setAbierto(false)}><Icono n="historial" />Historial</Link>}
           <div className="separador" style={{ margin: "4px 0" }} />
           <form action={salir}><button role="menuitem" className="it salir"><Icono n="salir" />Salir</button></form>
         </div>

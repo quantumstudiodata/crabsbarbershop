@@ -1,10 +1,11 @@
 "use client";
 
-import { useEffect, useState } from "react";
+import { useCallback, useEffect, useState } from "react";
 import { createPortal } from "react-dom";
 import { decidirIdea } from "@/app/(app)/acciones-ideas";
 import type { Propuesta } from "@/lib/propuestas";
 import { Ayuda } from "./Ayuda";
+import { useAbrirPanel } from "./BarraMovil";
 import { Icono } from "./Icono";
 
 type Datos = {
@@ -21,6 +22,7 @@ export function PanelIdeas() {
   const [abierto, setAbierto] = useState(false);
   const [d, setD] = useState<Datos | null>(null);
   const [error, setError] = useState(false);
+  useAbrirPanel("ideas", useCallback(() => setAbierto(true), []));
 
   useEffect(() => {
     if (!abierto) return;

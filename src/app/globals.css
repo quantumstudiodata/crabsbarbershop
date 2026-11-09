@@ -1905,7 +1905,7 @@ a.fila-s:hover, .herr-s:hover { background: rgba(0,0,0,.025); }
   /* Sin barras de desplazamiento visibles: se desliza con el dedo. */
   html, body, * { scrollbar-width: none; }
   *::-webkit-scrollbar { display: none; width: 0; height: 0; }
-  html, body { overflow-x: hidden; overscroll-behavior-x: none; }
+  html, body { overflow-x: hidden; overflow-x: clip; overscroll-behavior-x: none; }
   body { -webkit-tap-highlight-color: transparent; }
 
   /* Menú superior: dentro de Analítica las pestañas se deslizan con el dedo. */
@@ -2718,3 +2718,78 @@ html:has(.capa) body, html:has(.velo-c) body, html:has(.velo-hoja) body, html:ha
   .blq-c.mini small { display: none; }
 }
 .ctl-citas .seg { flex-wrap: nowrap; }
+
+/* =====================================================================
+   NAVEGACIÓN MÓVIL: saludo arriba, secciones abajo con Cobrar al centro.
+   En escritorio no se muestra nada de esto.
+   ===================================================================== */
+.titulo-m, .barra-inf, .hoja-m, .velo-hoja-m { display: none; }
+@media (max-width: 760px) {
+  .barra { padding-top: 8px; }
+  .barra-in { display: flex; align-items: center; gap: 8px; border-radius: 22px; transition: background .25s, box-shadow .25s, padding .25s; }
+  .barra .nav, .herramientas .ayuda-b, .herramientas .orbe, .menu .solo-esc-m, .saludo-i { display: none !important; }
+  .barra-in { flex-wrap: wrap; row-gap: 8px; }
+  .titulo-m { display: contents; }
+  .fila-tm { order: 0; flex: 1; }
+  .sub-m { order: 3; flex-basis: 100%; }
+  .herramientas { order: 1; gap: 8px; }
+  .u-menu { order: 2; }
+  .u-menu .menu { right: 0; left: auto; }
+  .herramientas .icb { width: 40px; height: 40px; border-radius: 50%; }
+  .fila-tm { display: flex; align-items: center; gap: 8px; min-width: 0; }
+  .saludo-m { display: grid; gap: 2px; min-width: 0; padding-left: 4px; }
+  .saludo-m small { font: 500 9.5px var(--f-mono); letter-spacing: .14em; text-transform: uppercase; color: var(--faint); }
+  .saludo-m b { font-size: 22px; font-weight: 700; letter-spacing: -.02em; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+  .saludo-m em { font-style: normal; font-weight: 600; color: #6f8494; }
+  .cerrar-m { width: 38px; height: 38px; border-radius: 50%; flex: none; }
+  .sub-m { display: flex; gap: 6px; overflow-x: auto; scroll-snap-type: x proximity; padding: 2px 0 4px; }
+  .sub-m a { flex: none; scroll-snap-align: start; padding: 7px 13px; border-radius: 999px; font-size: 13px; font-weight: 600; text-decoration: none; color: var(--muted);
+    background: var(--surface); border: 1px solid var(--glass-border); box-shadow: var(--hi); }
+  .sub-m a[aria-current="page"] { background: var(--ink); color: #fff; border-color: var(--ink); }
+
+  /* Al desplazar: la barra se recoge en una franja de cristal. */
+  .barra.compacta-m .barra-in { background: rgba(255,255,255,.78); -webkit-backdrop-filter: blur(18px); backdrop-filter: blur(18px); border: 1px solid rgba(255,255,255,.9); box-shadow: var(--sh1), var(--hi); padding: 4px 4px 4px 10px; }
+  .barra.compacta-m .saludo-m b { font-size: 16px; }
+  .barra.compacta-m .herramientas .icb { width: 36px; height: 36px; background: transparent; box-shadow: none; border: 0; }
+
+  /* En Cobro la barra superior queda fija y visible; la de abajo se cambia por la barra de pago. */
+  body.foco .barra { transform: none; opacity: 1; pointer-events: auto; }
+  body.foco .barra-inf { display: none; }
+
+  /* Barra inferior */
+  .barra-inf { display: grid; grid-template-columns: repeat(var(--cols), minmax(0, 1fr)); align-items: center; position: fixed; z-index: 45;
+    left: max(10px, env(safe-area-inset-left, 0px)); right: max(10px, env(safe-area-inset-right, 0px)); bottom: calc(10px + env(safe-area-inset-bottom, 0px));
+    height: 64px; padding: 0 4px; border-radius: 26px; background: rgba(255,255,255,.86); -webkit-backdrop-filter: blur(20px) saturate(1.3); backdrop-filter: blur(20px) saturate(1.3);
+    border: 1px solid rgba(255,255,255,.9); box-shadow: inset 0 1px 0 rgba(255,255,255,.95), 0 18px 34px -16px rgba(20,35,50,.5); }
+  .barra-inf.con-cobro { grid-template-columns: repeat(calc(var(--cols) + 1), minmax(0, 1fr)); }
+  .tab-m { display: flex; flex-direction: column; align-items: center; gap: 3px; height: 100%; justify-content: center; font: 600 10.5px var(--f-body); color: #6a7782; text-decoration: none;
+    background: none; border: 0; padding: 0; cursor: pointer; min-width: 0; white-space: nowrap; }
+  .tab-m .ic-m { width: 44px; height: 28px; border-radius: 11px; display: grid; place-items: center; transition: background .2s, color .2s; }
+  .tab-m .ic-m .ic { width: 19px; height: 19px; }
+  .tab-m[aria-current="page"] { color: var(--ink); }
+  .tab-m[aria-current="page"] .ic-m { background: linear-gradient(180deg, #2b3138, #13171c); color: #fff; box-shadow: 0 6px 12px -6px rgba(10,15,20,.6); }
+  .cobrar-m { color: var(--ink); justify-content: flex-end; padding-bottom: 9px; gap: 4px; }
+  .fab-m { width: 58px; height: 58px; margin-top: -30px; border-radius: 21px; display: grid; place-items: center; color: #fff; background: linear-gradient(180deg, #2b3138, #13171c);
+    box-shadow: 0 14px 24px -10px rgba(10,20,30,.75), 0 0 0 4px rgba(238,242,245,.95), inset 0 1px 0 rgba(255,255,255,.16); transition: transform .15s; }
+  .fab-m .ic { width: 25px; height: 25px; }
+  .cobrar-m:active .fab-m { transform: scale(.94); }
+
+  /* Hoja Más */
+  .velo-hoja-m { display: block; position: fixed; inset: 0; z-index: 64; background: rgba(15,22,30,.3); -webkit-backdrop-filter: blur(4px); backdrop-filter: blur(4px); animation: aparecer .2s ease both; }
+  .hoja-m { display: grid; gap: 12px; position: fixed; z-index: 65; left: 8px; right: 8px; bottom: calc(8px + env(safe-area-inset-bottom, 0px)); padding: 10px 16px 20px; border-radius: 28px;
+    background: rgba(247,249,251,.98); border: 1px solid #fff; box-shadow: 0 -10px 40px -14px rgba(10,20,30,.5); animation: hoja-sube .3s cubic-bezier(.2,.8,.2,1) both; }
+  .asa-m { width: 38px; height: 4px; border-radius: 2px; background: rgba(30,45,60,.2); justify-self: center; }
+  .cab-hoja-m { display: flex; justify-content: space-between; align-items: center; }
+  .cab-hoja-m b { font-size: 17px; }
+  .mosaico-m { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 8px; }
+  .mosaico-m a, .mosaico-m button { display: grid; justify-items: center; gap: 7px; padding: 14px 6px 12px; border-radius: 18px; background: #fff; border: 1px solid rgba(30,45,60,.07);
+    font: 600 12.5px var(--f-body); color: var(--fg); text-decoration: none; cursor: pointer; }
+  .mosaico-m .ic { width: 22px; height: 22px; color: var(--accent); }
+  .mosaico-m [aria-current="page"] { border-color: var(--ink); }
+
+  /* Lo que va pegado abajo sube por encima de la barra. */
+  .contenedor { padding-bottom: calc(104px + env(safe-area-inset-bottom, 0px)); }
+  .vivo-pila { bottom: calc(86px + env(safe-area-inset-bottom, 0px)); }
+  .barra-guardar { bottom: calc(84px + env(safe-area-inset-bottom, 0px)); }
+  .menu.avisos { top: calc(env(safe-area-inset-top, 0px) + 60px); }
+}

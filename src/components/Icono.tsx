@@ -25,6 +25,7 @@ const P: Record<string, React.ReactNode> = {
   derecha: <path d="M9 6l6 6-6 6" />,
   flechaDiag: <path d="M7 17 17 7M9 7h8v8" />,
   mas: <path d="M12 5v14M5 12h14" />,
+  puntos: <path d="M5 12h.01M12 12h.01M19 12h.01" strokeWidth="3.2" />,
   candado: <><rect x="5" y="11" width="14" height="10" rx="2.5" /><path d="M8 11V8a4 4 0 0 1 8 0v3" /></>,
   usuario: <><circle cx="12" cy="8" r="4" /><path d="M4 21c0-4.4 3.6-8 8-8s8 3.6 8 8" /></>,
   copiar: <><rect x="8" y="8" width="12" height="12" rx="2.5" /><path d="M16 8V5.5A1.5 1.5 0 0 0 14.5 4h-9A1.5 1.5 0 0 0 4 5.5v9A1.5 1.5 0 0 0 5.5 16H8" /></>,

@@ -6,6 +6,8 @@ import { CentroAyuda } from "@/components/CentroAyuda";
 import { conteoAyuda } from "@/lib/ayuda";
 import { MenuUsuario } from "@/components/MenuUsuario";
 import { Nav } from "@/components/Nav";
+import { BarraInferior, TituloMovil } from "@/components/BarraMovil";
+import { fechaLarga, fechaLocal } from "@/lib/fechas";
 import { menuDe } from "@/lib/menu";
 import { Campana } from "@/components/Campana";
 import { Icono } from "@/components/Icono";
@@ -53,6 +55,7 @@ export default async function LayoutApp({ children }: { children: React.ReactNod
             historial={s.puede("ventas.ver_todas") || atiende}
             formaPago={atiende ? describirRegla(copiaRegla(elegirRegla(await reglasDe(s.barberia.id), s.usuario.id, null, new Date())), formatoDinero) : null}
           />
+          <TituloMovil nombre={s.usuario.nombre.split(" ")[0]} fecha={fechaLarga(fechaLocal(new Date(), s.barberia.zonaHoraria))} items={items} sub={{ base: "/analitica", items: subAnalitica }} />
           <Nav items={items} sub={{ base: "/analitica", items: subAnalitica }} destacado={soporte && !s.vista ? { href: "/soporte", texto: "Soporte", icono: "llave" } : undefined} />
           <div className="herramientas">
             {!soporte && <Suspense fallback={null}><CentroAyuda {...await conteoAyuda(s.usuario.id)} /></Suspense>}
@@ -62,6 +65,11 @@ export default async function LayoutApp({ children }: { children: React.ReactNod
         </div>
       </header>
       <main className="contenedor">{children}</main>
+      <BarraInferior items={items} mas={{
+        historial: s.puede("ventas.ver_todas") || atiende,
+        ajustes: s.puede("usuarios.ver") || s.puede("servicios.ver") || PERMISOS_CONFIG.some((p) => s.puede(p)),
+        ideas: s.puede("ideas.decidir"), ayuda: !soporte, soporte: soporte && !s.vista,
+      }} />
       <VentanaVivo />
     </>
   );

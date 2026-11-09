@@ -317,7 +317,7 @@ async function InicioBarbero({ s, hoy, zona, q, avisos }: { s: Sesion; hoy: stri
   return (
     <>
       {avisos}
-      <div className="subir">
+      <div className="subir saludo-i">
         <span className="lab">{fechaLarga(hoy)}</span>
         <h1 className="titulo brillo" style={{ fontSize: 30, marginTop: 8 }}>Hola, {s.usuario.nombre.split(" ")[0]}</h1>
       </div>
