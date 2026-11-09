@@ -10,6 +10,8 @@ import {
   alternarCategoria, alternarServicio, eliminarCategoria, eliminarServicio, guardarCategoria, guardarServicio,
   ordenarCategorias, ordenarServicios, revisarCategoria, type Resultado,
 } from "./actions";
+import { ListaPromociones } from "./Promociones";
+import type { Promo } from "@/lib/promociones";
 
 type Servicio = { id: string; nombre: string; categoria: string; precio: number; duracionMin: number; activo: boolean; comision: number | null; descripcion: string };
 type Categoria = { id: string; nombre: string; descripcion: string; activo: boolean };
@@ -225,19 +227,30 @@ export function TablaServicios({ servicios: inicialS, categorias: inicialC, pued
   );
 }
 
-/** Encabezado con el botón principal y la lista. */
-export function PantallaServicios(props: { servicios: Servicio[]; categorias: Categoria[]; puedeEditar: boolean }) {
+/** Encabezado con pestañas Servicios y Promociones, y el botón principal de cada una. */
+export function PantallaServicios(props: { servicios: Servicio[]; categorias: Categoria[]; puedeEditar: boolean; promos: Promo[]; hoy: string; usaPromociones: boolean; pestana: "servicios" | "promociones" }) {
   const [nueva, setNueva] = useState(0);
+  const [crear, setCrear] = useState(0);
+  const [tab, setTab] = useState(props.pestana);
+  const cambiar = (t: "servicios" | "promociones") => { setTab(t); window.history.replaceState(null, "", t === "promociones" ? "?pestana=promociones" : window.location.pathname); };
   return (
     <>
-      <div className="entre" style={{ flexWrap: "wrap", gap: 12 }}>
+      <div className="entre cab-servicios" style={{ flexWrap: "wrap", gap: 12 }}>
         <div>
           <h1 className="titulo">Servicios</h1>
-          <p className="sub">El precio de aquí es el que se cobra.</p>
+          <p className="sub">{tab === "servicios" ? "El precio de aquí es el que se cobra." : "Precios especiales, descuentos y paquetes."}</p>
         </div>
-        {props.puedeEditar && <button type="button" className="bt" onClick={() => setNueva((n) => n + 1)}>Agregar categoría<span className="fl" aria-hidden="true"><Icono n="mas" /></span></button>}
+        {props.puedeEditar && (tab === "servicios"
+          ? <button type="button" className="bt" onClick={() => setNueva((n) => n + 1)}>Agregar categoría<span className="fl" aria-hidden="true"><Icono n="mas" /></span></button>
+          : props.usaPromociones && <button type="button" className="bt" onClick={() => setCrear((n) => n + 1)}>Crear promoción<span className="fl" aria-hidden="true"><Icono n="mas" /></span></button>)}
       </div>
-      <TablaServicios {...props} nuevaCategoria={nueva} />
+      <nav className="seg pestanas-s" aria-label="Servicios o promociones">
+        <button type="button" aria-current={tab === "servicios" ? "page" : undefined} onClick={() => cambiar("servicios")}>Servicios</button>
+        <button type="button" aria-current={tab === "promociones" ? "page" : undefined} onClick={() => cambiar("promociones")}>Promociones{props.promos.length ? <small className="cuenta-p">{props.promos.length}</small> : null}</button>
+      </nav>
+      {tab === "servicios"
+        ? <TablaServicios servicios={props.servicios} categorias={props.categorias} puedeEditar={props.puedeEditar} nuevaCategoria={nueva} />
+        : <ListaPromociones promos={props.promos} servicios={props.servicios} hoy={props.hoy} activas={props.usaPromociones} puedeEditar={props.puedeEditar} crear={crear} />}
     </>
   );
 }

@@ -61,6 +61,7 @@ export const barberias = pgTable("barberias", {
   corteObligatorio: boolean("corte_obligatorio").notNull().default(true),
   // Al cerrar la caja se pueden adjuntar fotos o archivos (comprobantes de transferencias, vouchers de tarjeta).
   usaEvidenciaCorte: boolean("usa_evidencia_corte").notNull().default(false),
+  usaPromociones: boolean("usa_promociones").notNull().default(false),
   usaComprobantes: boolean("usa_comprobantes").notNull().default(true),
   usaPeriodicidad: boolean("usa_periodicidad").notNull().default(true),
   // Formas de pago que se pueden usar al registrar un egreso.
@@ -239,6 +240,8 @@ export const conceptos = pgTable(
     // Copia de la regla vigente al cobrar: cambiar la regla después no altera el pasado.
     reglaComision: jsonb("regla_comision"),
     comision: integer("comision").notNull().default(0),
+    // Promoción que se aplicó a este servicio, si hubo.
+    promocionId: uuid("promocion_id"),
   },
   (t) => [index("conceptos_venta_idx").on(t.ventaId), index("conceptos_barbero_idx").on(t.barberoId)],
 );
@@ -592,4 +595,38 @@ export const evidenciasCorte = pgTable(
     creadoEn: creadoEn(),
   },
   (t) => [index("evidencias_corte_turno_idx").on(t.turnoId)],
+);
+
+// Promociones del negocio: precio especial, descuento fijo o porcentual, paquete o por horario.
+export const promociones = pgTable(
+  "promociones",
+  {
+    id: id(),
+    barberiaId: barberiaId(),
+    nombre: text("nombre").notNull(),
+    descripcion: text("descripcion").notNull().default(""),
+    // precio | fijo | porcentaje | paquete | horario
+    tipo: text("tipo").notNull(),
+    // precio y paquete: precio final en centavos; fijo: centavos de descuento; porcentaje y horario: puntos base (20% = 2000).
+    valor: integer("valor").notNull(),
+    servicioIds: jsonb("servicio_ids").$type<string[]>().notNull().default([]),
+    categorias: jsonb("categorias").$type<string[]>().notNull().default([]),
+    desde: date("desde").notNull(),
+    hasta: date("hasta"),
+    // 0 = domingo ... 6 = sábado
+    dias: jsonb("dias").$type<number[]>().notNull().default([0, 1, 2, 3, 4, 5, 6]),
+    horaDesde: text("hora_desde"),
+    horaHasta: text("hora_hasta"),
+    // auto | codigo
+    aplicacion: text("aplicacion").notNull().default("auto"),
+    codigo: text("codigo"),
+    enCobro: boolean("en_cobro").notNull().default(true),
+    enLinea: boolean("en_linea").notNull().default(true),
+    limiteUsos: integer("limite_usos"),
+    usos: integer("usos").notNull().default(0),
+    pausada: boolean("pausada").notNull().default(false),
+    creadoPor: uuid("creado_por").references(() => usuarios.id),
+    creadoEn: creadoEn(),
+  },
+  (t) => [index("promociones_barberia_idx").on(t.barberiaId)],
 );

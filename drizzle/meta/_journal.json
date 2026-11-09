@@ -127,6 +127,13 @@
       "when": 1794192040848,
       "tag": "0017_evidencias_corte",
       "breakpoints": true
+    },
+    {
+      "idx": 18,
+      "version": "7",
+      "when": 1794216618112,
+      "tag": "0018_promociones",
+      "breakpoints": true
     }
   ]
 }

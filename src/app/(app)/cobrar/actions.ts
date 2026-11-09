@@ -9,6 +9,7 @@ import { db, schema } from "@/lib/db";
 import { registrar } from "@/lib/historial";
 import { fechaLocal } from "@/lib/fechas";
 import { formatoDinero } from "@/lib/money";
+import { aplicarPromos, momentoEn, type Promo } from "@/lib/promociones";
 
 export type EstadoCobro = { ok?: boolean; error?: string; folio?: string; total?: number };
 
@@ -20,6 +21,7 @@ type Entrada = {
   pagos: { metodoId: string; monto: number }[];
   propina: { monto: number; barberoId: string; efectivo: boolean };
   observaciones: string;
+  codigo: string;
 };
 
 const entero = (v: unknown) => (typeof v === "number" && Number.isSafeInteger(v) && v >= 0 ? v : null);
@@ -35,6 +37,7 @@ function leer(form: FormData): Entrada | null {
       pagos: Array.isArray(d.pagos) ? d.pagos.slice(0, 3).map((p: { metodoId: unknown; monto: unknown }) => ({ metodoId: String(p.metodoId), monto: entero(p.monto) ?? -1 })) : [],
       propina: { monto: entero(d.propina?.monto) ?? -1, barberoId: String(d.propina?.barberoId ?? ""), efectivo: d.propina?.efectivo !== false },
       observaciones: String(d.observaciones ?? "").trim().slice(0, 300),
+      codigo: String(d.codigo ?? "").trim().slice(0, 30),
     };
     if (!e.clave || e.descuento < 0 || e.propina.monto < 0 || e.pagos.some((p) => p.monto < 0)) return null;
     return e;
@@ -73,16 +76,26 @@ export async function registrarVenta(_: EstadoCobro, form: FormData): Promise<Es
 
   const lineas = e.lineas.map((l) => ({ ...l, s: svc.find((x) => x.id === l.servicioId)! }));
   const subtotal = lineas.reduce((a, l) => a + l.s.precio, 0);
+  // Promociones: se recalculan aquí con la hora del negocio; lo que mande el navegador no cuenta.
+  const promos = s.barberia.usaPromociones
+    ? (await db.select().from(schema.promociones).where(eq(schema.promociones.barberiaId, bId))) as unknown as Promo[]
+    : [];
+  const ap = aplicarPromos(promos, lineas.map((l) => ({ servicioId: l.servicioId, categoria: l.s.categoria, precio: l.s.precio })), momentoEn(s.barberia.zonaHoraria), e.codigo);
+  if (e.codigo && !ap.codigoValido) return { error: "Ese código promocional no es válido o ya no está vigente." };
+  const promoDe = (i: number) => ap.porLinea[i]?.descuento ?? 0;
+  const descPromo = lineas.reduce((a, _, i) => a + promoDe(i), 0);
+  const neto = subtotal - descPromo;
   if (e.descuento > 0 && !s.barberia.usaDescuentos) return { error: "Los descuentos están apagados en Ajustes." };
   if (e.propina.monto > 0 && !s.barberia.usaPropinas) return { error: "Las propinas están apagadas en Ajustes." };
   if (e.pagos.filter((x) => x.monto > 0).length > 1 && !s.barberia.usaDividirPago) return { error: "Dividir el pago está apagado en Ajustes." };
-  if (e.descuento > subtotal) return { error: "El descuento no puede ser mayor que la venta." };
+  if (e.descuento > neto) return { error: "El descuento no puede ser mayor que la venta." };
   if (e.descuento > 0 && !e.motivoDescuento) return { error: "Escribe el motivo del descuento." };
-  const limite = Math.floor((subtotal * s.barberia.limiteDescuentoPct) / 100);
+  const limite = Math.floor((neto * s.barberia.limiteDescuentoPct) / 100);
   if (e.descuento > limite && !s.puede("ventas.descuento")) {
     return { error: `Ese descuento pasa del ${s.barberia.limiteDescuentoPct}% permitido. Pide a quien tenga permiso de aplicar descuentos mayores que lo registre.` };
   }
-  const total = subtotal - e.descuento;
+  const total = neto - e.descuento;
+  const nombrePromo = (id?: string) => promos.find((x) => x.id === id)?.nombre ?? "";
 
   const metodos = await db.select().from(schema.metodosPago).where(and(eq(schema.metodosPago.barberiaId, bId), eq(schema.metodosPago.activo, true)));
   const pagos = e.pagos.filter((p) => p.monto > 0).map((p) => ({ ...p, m: metodos.find((m) => m.id === p.metodoId) }));
@@ -92,21 +105,25 @@ export async function registrarVenta(_: EstadoCobro, form: FormData): Promise<Es
   if (pagado !== total) return { error: `Los pagos suman ${formatoDinero(pagado)} y la venta es de ${formatoDinero(total)}.` };
   if (e.propina.monto > 0 && !equipo.has(e.propina.barberoId)) return { error: "Elige para quién es la propina." };
 
-  // Reparte el descuento entre los servicios en proporción a su precio.
+  // Reparte el descuento manual entre los servicios en proporción a lo que queda después de la promoción.
   let restante = e.descuento;
   const reglas = await reglasDe(bId);
   const ahora = new Date();
   const conceptos = lineas.map((l, i) => {
-    const desc = i === lineas.length - 1 ? restante : Math.floor((e.descuento * l.s.precio) / Math.max(subtotal, 1));
-    restante -= desc;
+    const promo = promoDe(i);
+    const manual = i === lineas.length - 1 ? restante : Math.floor((e.descuento * (l.s.precio - promo)) / Math.max(neto, 1));
+    restante -= manual;
+    const desc = promo + manual;
     const cobrado = l.s.precio - desc;
+    const promocionId = promo > 0 ? ap.porLinea[i]!.promocionId : null;
+    const motivo = [promo > 0 ? `Promoción: ${nombrePromo(promocionId ?? undefined)}` : "", manual > 0 ? e.motivoDescuento : ""].filter(Boolean).join(". ");
     const base = copiaRegla(elegirRegla(reglas, l.barberoId, l.servicioId, ahora));
     // Si el servicio tiene comisión especial, sustituye al porcentaje de quien cobra comisión.
     const regla = base && l.s.comision !== null && (base.tipo === "porcentaje" || base.tipo === "mixto") ? { ...base, porcentaje: l.s.comision } : base;
     return {
       barberiaId: bId, servicioId: l.servicioId, nombreServicio: l.s.nombre, barberoId: l.barberoId, precioLista: l.s.precio,
-      descuento: desc, motivoDescuento: desc > 0 ? e.motivoDescuento : null, autorizadoPor: desc > 0 ? s.usuario.id : null,
-      precioCobrado: cobrado, reglaComision: regla, comision: comisionDeServicio(regla, cobrado),
+      descuento: desc, motivoDescuento: desc > 0 ? motivo : null, autorizadoPor: desc > 0 ? s.usuario.id : null,
+      precioCobrado: cobrado, reglaComision: regla, comision: comisionDeServicio(regla, cobrado), promocionId,
     };
   });
 
@@ -116,10 +133,16 @@ export async function registrarVenta(_: EstadoCobro, form: FormData): Promise<Es
         .where(eq(schema.barberias.id, bId)).returning({ n: sql<number>`${schema.barberias.siguienteFolio} - 1` });
       const folio = `${s.barberia.folioPrefijo}-${String(n).padStart(6, "0")}`;
       const [v] = await tx.insert(schema.ventas).values({
-        barberiaId: bId, folio, turnoId: turno.id, registradaPor: s.usuario.id, total, descuentoTotal: e.descuento,
+        barberiaId: bId, folio, turnoId: turno.id, registradaPor: s.usuario.id, total, descuentoTotal: descPromo + e.descuento,
         observaciones: e.observaciones, claveUnica: e.clave,
       }).returning({ id: schema.ventas.id });
       await tx.insert(schema.conceptos).values(conceptos.map((c) => ({ ...c, ventaId: v.id })));
+      // Cada promoción usada cuenta una vez por venta; si tiene límite y ya se agotó, no se cobra.
+      for (const pid of ap.usadas) {
+        const r = await tx.update(schema.promociones).set({ usos: sql`${schema.promociones.usos} + 1` })
+          .where(and(eq(schema.promociones.id, pid), sql`(${schema.promociones.limiteUsos} is null or ${schema.promociones.usos} < ${schema.promociones.limiteUsos})`)).returning({ id: schema.promociones.id });
+        if (!r.length) throw new Error("promo_agotada");
+      }
       if (pagos.length) {
         await tx.insert(schema.pagos).values(pagos.map((p) => ({ barberiaId: bId, ventaId: v.id, metodoPagoId: p.m!.id, nombreMetodo: p.m!.nombre, esEfectivo: p.m!.esEfectivo, monto: p.monto })));
       }
@@ -129,7 +152,7 @@ export async function registrarVenta(_: EstadoCobro, form: FormData): Promise<Es
       await registrar(tx, {
         barberiaId: bId, usuarioId: s.usuario.id, tipo: "venta",
         accion: `${s.usuario.nombre} cobró la venta ${folio}`,
-        detalle: { folio, total, descuento: e.descuento, motivoDescuento: e.motivoDescuento || undefined },
+        detalle: { folio, total, descuento: e.descuento, motivoDescuento: e.motivoDescuento || undefined, promociones: ap.usadas.map((x) => nombrePromo(x)).join(", ") || undefined },
       });
       return folio;
     });
@@ -137,6 +160,7 @@ export async function registrarVenta(_: EstadoCobro, form: FormData): Promise<Es
     return { ok: true, folio, total };
   } catch (err) {
     const msg = String((err as Error)?.message ?? "");
+    if (msg.includes("promo_agotada")) return { error: "Una promoción llegó a su límite de usos. Recarga la página para cobrar sin ella." };
     if (msg.includes("ventas_clave_uq")) {
       const [v] = await db.select().from(schema.ventas).where(and(eq(schema.ventas.barberiaId, bId), eq(schema.ventas.claveUnica, e.clave))).limit(1);
       if (v) return { ok: true, folio: v.folio, total: v.total };

@@ -6,6 +6,7 @@ import { Fl, Icono } from "@/components/Icono";
 import { Selector } from "@/components/ui";
 import { formatoDinero, leerPesos } from "@/lib/money";
 import { registrarVenta, type EstadoCobro } from "./actions";
+import { aplicarPromos, descuentoDe, momentoEn, participa, vigente, type Promo } from "@/lib/promociones";
 
 type Servicio = { id: string; nombre: string; duracionMin: number; precio: number; categoria: string };
 type Persona = { id: string; nombre: string; avatar: string };
@@ -19,8 +20,9 @@ const iconoMetodo = (m: Metodo) => (m.esEfectivo ? "efectivo" : /tarjeta/i.test(
 
 export function FormCobro(p: {
   servicios: Servicio[]; equipo: Persona[]; metodos: Metodo[]; yo: string; puedeOtros: boolean; limiteDescuento: number;
-  usa: { propinas: boolean; descuentos: boolean; dividir: boolean };
+  usa: { propinas: boolean; descuentos: boolean; dividir: boolean }; promos?: Promo[]; zona?: string;
 }) {
+  const promos = p.promos ?? [];
   const [estado, accion, enviando] = useActionState<EstadoCobro, FormData>(registrarVenta, {});
   const [clave, setClave] = useState(nuevaClave);
   const [lineas, setLineas] = useState<Linea[]>([]);
@@ -32,7 +34,9 @@ export function FormCobro(p: {
   const [metodo2, setMetodo2] = useState(p.metodos[1]?.id ?? "");
   const [monto1, setMonto1] = useState("");
   const [recibido, setRecibido] = useState("");
-  const [panel, setPanel] = useState<"descuento" | "propina" | null>(null);
+  const [panel, setPanel] = useState<"descuento" | "propina" | "codigo" | null>(null);
+  const [codigo, setCodigo] = useState("");
+  const [codigoTxt, setCodigoTxt] = useState("");
   const [descuento, setDescuento] = useState<{ tipo: "pct" | "fijo"; valor: string } | null>(null);
   const [motivo, setMotivo] = useState("");
   const [propina, setPropina] = useState<{ tipo: "pct" | "fijo"; valor: string } | null>(null);
@@ -44,7 +48,7 @@ export function FormCobro(p: {
 
   const limpiar = () => {
     setClave(nuevaClave()); setLineas([]); setDividir(false); setMonto1(""); setRecibido(""); setBuscar("");
-    setPanel(null); setDescuento(null); setMotivo(""); setPropina(null);
+    setPanel(null); setDescuento(null); setMotivo(""); setPropina(null); setCodigo(""); setCodigoTxt("");
   };
 
   // Después de cobrar: limpiar todo y preparar una venta nueva (una sola vez por folio).
@@ -112,7 +116,21 @@ export function FormCobro(p: {
   }, []);
 
   const conServicio = lineas.map((l) => ({ ...l, s: p.servicios.find((x) => x.id === l.servicioId)! })).filter((l) => l.s);
-  const subtotal = conServicio.reduce((a, l) => a + l.s.precio * l.cantidad, 0);
+  const lista = conServicio.reduce((a, l) => a + l.s.precio * l.cantidad, 0);
+  // Promociones: cada unidad cuenta como un servicio; el servidor vuelve a calcular todo al cobrar.
+  const momento = momentoEn(p.zona ?? "America/Monterrey");
+  const unidades = conServicio.flatMap((l) => Array.from({ length: l.cantidad }, () => ({ key: l.key, servicioId: l.servicioId, categoria: l.s.categoria, precio: l.s.precio })));
+  const ap = aplicarPromos(promos, unidades, momento, codigo);
+  const promoPorKey = (key: string) => unidades.reduce((a, u, i) => a + (u.key === key ? ap.porLinea[i]?.descuento ?? 0 : 0), 0);
+  const nombrePromoKey = (key: string) => { const i = unidades.findIndex((u, k) => u.key === key && ap.porLinea[k]); return i < 0 ? "" : promos.find((x) => x.id === ap.porLinea[i]!.promocionId)?.nombre ?? ""; };
+  const descPromo = ap.porLinea.reduce((a, r) => a + (r?.descuento ?? 0), 0);
+  const subtotal = lista - descPromo;
+  const hayCodigos = promos.some((x) => x.aplicacion === "codigo" && vigente(x, momento));
+  const precioPromo = (sv: Servicio) => {
+    const ds = promos.filter((x) => x.aplicacion === "auto" && x.tipo !== "paquete" && vigente(x, momento) && participa(x, { servicioId: sv.id, categoria: sv.categoria })).map((x) => descuentoDe(x, sv.precio));
+    const d = ds.length ? Math.max(...ds) : 0;
+    return d > 0 ? sv.precio - d : null;
+  };
   const calc = (x: { tipo: "pct" | "fijo"; valor: string } | null, base: number) =>
     !x ? 0 : x.tipo === "pct" ? Math.round((base * (Number(x.valor) || 0)) / 100) : leerPesos(x.valor) ?? 0;
   const desc = Math.min(calc(descuento, subtotal), subtotal);
@@ -136,7 +154,8 @@ export function FormCobro(p: {
     pagos: dividir ? [{ metodoId: metodo, monto: m1 }, { metodoId: metodo2, monto: total - m1 }] : [{ metodoId: metodo, monto: total }],
     propina: { monto: prop, barberoId: conServicio[0]?.barberoId ?? barbero, efectivo: propinaEfectivo },
     observaciones: "",
-  }), [clave, conServicio, desc, motivo, dividir, metodo, m1, metodo2, total, prop, barbero, propinaEfectivo]);
+    codigo,
+  }), [clave, conServicio, desc, motivo, dividir, metodo, m1, metodo2, total, prop, barbero, propinaEfectivo, codigo]);
 
   const alternar = (id: string) => {
     setUltima(null);
@@ -177,7 +196,9 @@ export function FormCobro(p: {
                 return (
                   <button type="button" key={s.id} data-paso="" className="svc" aria-pressed={!!l} onClick={() => alternar(s.id)}>
                     <span><b style={{ fontWeight: 600 }}>{s.nombre}</b><small>{s.duracionMin} min</small></span>
-                    {l ? <span className="q">{l.cantidad > 1 ? `x${l.cantidad}` : <Icono n="palomita" className="ic" />}</span> : <span className="num">{formatoDinero(s.precio)}</span>}
+                    {l ? <span className="q">{l.cantidad > 1 ? `x${l.cantidad}` : <Icono n="palomita" className="ic" />}</span>
+                      : precioPromo(s) !== null ? <span className="num precio-promo"><s>{formatoDinero(s.precio)}</s>{formatoDinero(precioPromo(s)!)}</span>
+                      : <span className="num">{formatoDinero(s.precio)}</span>}
                   </button>
                 );
               })}
@@ -223,6 +244,7 @@ export function FormCobro(p: {
                     <Selector className="mini" etiqueta={`Quién hizo ${l.s.nombre}`} valor={l.barberoId} onChange={(v) => quien(l.key, v)}
                       opciones={personas.map((e) => ({ valor: e.id, texto: primerNombre(e.nombre), icono: <Avatar avatar={e.avatar} nombre={e.nombre} t={18} /> }))} />
                   ) : <small>{nombreDe(l.barberoId)}</small>}
+                  {promoPorKey(l.key) > 0 && <small className="promo-l"><Icono n="etiqueta" />{nombrePromoKey(l.key)} −{formatoDinero(promoPorKey(l.key))}</small>}
                 </span>
                 <span className="cant" aria-label={`Cantidad de ${l.s.nombre}`}>
                   <button type="button" onClick={() => cantidad(l.key, -1)} aria-label="Uno menos">−</button>
@@ -236,6 +258,9 @@ export function FormCobro(p: {
         )}
 
         <div className="extras">
+          {hayCodigos && <button type="button" data-paso="" className={`chipf ${panel === "codigo" || codigo ? "on" : ""}`} aria-expanded={panel === "codigo"} onClick={() => setPanel((x) => (x === "codigo" ? null : "codigo"))}>
+            <Icono n="etiqueta" />{codigo ? `Código ${codigo}` : "Código promocional"}
+          </button>}
           {p.usa.descuentos && <button type="button" data-paso="" className={`chipf ${panel === "descuento" || desc ? "on" : ""}`} aria-expanded={panel === "descuento"} onClick={() => setPanel((x) => (x === "descuento" ? null : "descuento"))}>
             <Icono n="etiqueta" />{desc ? `Descuento −${formatoDinero(desc)}` : "Descuento"}
           </button>}
@@ -268,6 +293,17 @@ export function FormCobro(p: {
               </div>
             )}
             {pasaLimite && <small className="muted">Pasa del {p.limiteDescuento}% permitido. Solo el titular o el administrador pueden registrarlo.</small>}
+          </div>
+        )}
+        {panel === "codigo" && (
+          <div className="panel-rapido subir">
+            <div className="billetes">
+              <span className="otra"><input data-paso="" autoFocus value={codigoTxt} onChange={(e) => setCodigoTxt(e.target.value.toUpperCase())} placeholder="Escribe el código" aria-label="Código promocional" style={{ width: 150 }} /></span>
+              <button type="button" data-paso="" onClick={() => setCodigo(codigoTxt.trim())}>Aplicar</button>
+              {codigo && <button type="button" data-paso="" className="quitar" onClick={() => { setCodigo(""); setCodigoTxt(""); }}>Quitar</button>}
+            </div>
+            {codigo && !ap.codigoValido && <small className="muted">Ese código no es válido o no aplica en este horario.</small>}
+            {codigo && ap.codigoValido && descPromo === 0 && <small className="muted">El código es válido, pero no aplica a los servicios elegidos.</small>}
           </div>
         )}
         {panel === "propina" && (
@@ -316,6 +352,7 @@ export function FormCobro(p: {
         )}
 
         <div className="separador" />
+        {descPromo > 0 && <div className="renglon promo-t"><span className="muted">Ahorro por promociones</span><b className="num">−{formatoDinero(descPromo)}</b></div>}
         <div className="renglon" style={{ alignItems: "center" }}>
           <span className="lab">Total{prop > 0 ? ` más ${formatoDinero(prop)} de propina` : ""}</span>
           <span className="big">{formatoDinero(total)}</span>

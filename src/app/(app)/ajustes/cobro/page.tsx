@@ -28,6 +28,9 @@ export default async function ConfigurarNegocio({ searchParams }: { searchParams
   ]);
   // Quiénes pueden autorizar descuentos mayores al límite.
   const autorizan = [...new Set(gente.filter((u) => permisosDe(u.rol, u.extra, u.quitados, u.puesto).has("ventas.descuento")).map((u) => (u.rol === "duena" || u.rol === "admin" ? NOMBRE_ROL[u.rol].toLowerCase() : u.nombre.split(" ")[0])))].join(", ") || "el titular";
+  const hoyN = fechaLocal(new Date(), b.zonaHoraria);
+  const nPromos = (await db.select({ hasta: schema.promociones.hasta, pausada: schema.promociones.pausada, desde: schema.promociones.desde }).from(schema.promociones).where(eq(schema.promociones.barberiaId, b.id)))
+    .filter((x) => !x.pausada && x.desde <= hoyN && (!x.hasta || x.hasta >= hoyN)).length;
   const $ = (c: number) => formatoDinero(c);
   const si = (v: boolean) => (v ? "Activo" : "Apagado");
   const activos = metodos.filter((m) => m.activo);
@@ -79,7 +82,18 @@ export default async function ConfigurarNegocio({ searchParams }: { searchParams
         <MetaMensual metaMensual={Math.round(b.metaMensual / 100)} datosMeta={await datosParaMeta(b.id, b.zonaHoraria, fechaLocal(new Date(), b.zonaHoraria))} />
       </Bloque>
 
-      <Bloque numero={4} titulo="Egresos y finanzas" puedeEditar={edita("egresos")}
+      <Bloque numero={4} titulo="Promociones" puedeEditar={edita("cobros")}
+        resumen={b.usaPromociones ? `Permitidas, ${nPromos} ${nPromos === 1 ? "promoción activa" : "promociones activas"}` : "Apagadas"}
+        detalle={<>
+          <p className="muted" style={{ margin: 0, fontSize: 13 }}>Permite ofrecer descuentos y promociones en los servicios del negocio. Se crean en Servicios, en la pestaña Promociones.</p>
+          <Resumen filas={[["Permitir promociones", si(b.usaPromociones)], ["Promociones activas", String(nPromos)]]} />
+        </>}>
+        <Funciones funciones={[
+          { clave: "promociones", nombre: "Permitir promociones", activa: b.usaPromociones, encendida: "Se pueden crear promociones en Servicios y se aplican al cobrar.", apagada: "No se aplican promociones al cobrar." },
+        ]} />
+      </Bloque>
+
+      <Bloque numero={5} titulo="Egresos y finanzas" puedeEditar={edita("egresos")}
         resumen={`${cats.filter((c) => c.activo).length} categorías, ${conceptos.length} ${conceptos.length === 1 ? "gasto frecuente" : "gastos frecuentes"}, pagos con ${b.metodosEgreso.map((m) => NOMBRE_MET[m].toLowerCase()).join(", ")}`}
         detalle={
           <div className="pila">

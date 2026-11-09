@@ -1,11 +1,14 @@
-import { asc, eq, sql } from "drizzle-orm";
+import { asc, desc, eq, sql } from "drizzle-orm";
+import { fechaLocal } from "@/lib/fechas";
+import type { Promo } from "@/lib/promociones";
 import { requerirSesion } from "@/lib/auth";
 import { db, schema } from "@/lib/db";
 import { PantallaServicios } from "./TablaServicios";
 
 export const metadata = { title: "Servicios" };
 
-export default async function Servicios() {
+export default async function Servicios({ searchParams }: { searchParams: Promise<{ pestana?: string }> }) {
+  const q = await searchParams;
   const s = await requerirSesion("servicios.ver");
   const b = s.barberia.id;
   const servicios = await db.select().from(schema.servicios).where(eq(schema.servicios.barberiaId, b)).orderBy(asc(schema.servicios.orden), asc(schema.servicios.nombre));
@@ -17,8 +20,11 @@ export default async function Servicios() {
     await db.insert(schema.categoriasServicio).values(faltan.map((nombre, i) => ({ barberiaId: b, nombre, orden: max + (i + 1) * 10 }))).onConflictDoNothing();
     categorias = await db.select().from(schema.categoriasServicio).where(eq(schema.categoriasServicio.barberiaId, b)).orderBy(asc(schema.categoriasServicio.orden), asc(sql`creado_en`));
   }
+  const promos = await db.select().from(schema.promociones).where(eq(schema.promociones.barberiaId, b)).orderBy(desc(schema.promociones.creadoEn));
   return (
     <PantallaServicios
+      promos={promos.map(({ creadoEn: _c, creadoPor: _p, barberiaId: _b, ...x }) => x) as unknown as Promo[]}
+      hoy={fechaLocal(new Date(), s.barberia.zonaHoraria)} usaPromociones={s.barberia.usaPromociones} pestana={q.pestana === "promociones" ? "promociones" : "servicios"}
       servicios={servicios.map(({ id, nombre, categoria, precio, duracionMin, activo, comision, descripcion }) => ({ id, nombre, categoria, precio, duracionMin, activo, comision, descripcion }))}
       categorias={categorias.map(({ id, nombre, descripcion, activo }) => ({ id, nombre, descripcion, activo }))}
       puedeEditar={s.puede("servicios.editar") && !s.vista}
