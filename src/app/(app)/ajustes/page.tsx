@@ -3,6 +3,7 @@ import { redirect } from "next/navigation";
 import { requerirSesion } from "@/lib/auth";
 import { describirRegla } from "@/lib/comisiones";
 import { formatoDinero } from "@/lib/money";
+import { describirRemuneracion, type Modalidad } from "@/lib/remuneracion";
 import { db, schema } from "@/lib/db";
 import { DESCRIPCION_ROL, DETALLE_PERMISO, expandirPermisos, GRUPOS_PERMISOS, NOMBRE_ROL, ORDEN_ROL, PERMISOS, PERMISOS_POR_ROL, permisosDe, PLANTILLAS, rolesAsignables } from "@/lib/permisos";
 import { esTotal, puedeEditarA, puedeManejar } from "@/lib/puestos";
@@ -14,10 +15,11 @@ export default async function PaginaPersonas({ searchParams }: { searchParams: P
   const s = await requerirSesion();
   if (!s.puede("usuarios.ver")) redirect(s.puede("servicios.ver") ? "/ajustes/servicios" : "/ajustes/cobro");
   const q = await searchParams;
-  const [gente, solicitudes, reglas, puestos] = await Promise.all([
+  const [gente, solicitudes, reglas, rems, puestos] = await Promise.all([
     db.select().from(schema.usuarios).where(and(eq(schema.usuarios.barberiaId, s.barberia.id), notLike(schema.usuarios.usuario, "BORRADO-%"))).orderBy(asc(schema.usuarios.nombre)),
     db.select({ usuarioId: schema.solicitudesClave.usuarioId }).from(schema.solicitudesClave).where(and(eq(schema.solicitudesClave.barberiaId, s.barberia.id), eq(schema.solicitudesClave.atendida, false))),
     db.select().from(schema.reglasComision).where(and(eq(schema.reglasComision.barberiaId, s.barberia.id), isNull(schema.reglasComision.vigenteHasta), isNull(schema.reglasComision.servicioId))),
+    db.select().from(schema.remuneraciones).where(and(eq(schema.remuneraciones.barberiaId, s.barberia.id), isNull(schema.remuneraciones.vigenteHasta))),
     db.select().from(schema.puestos).where(eq(schema.puestos.barberiaId, s.barberia.id)).orderBy(asc(schema.puestos.creadoEn)),
   ]);
   const asignables = rolesAsignables(s.usuario.rol, !!s.usuario.puestoId);
@@ -34,6 +36,8 @@ export default async function PaginaPersonas({ searchParams }: { searchParams: P
       yo: u.id === s.usuario.id, editable: s.puede("usuarios.editar") && !s.vista && puedeEditarA(s, u, permisosDe(u.rol, u.permisosExtra, u.permisosQuitados, puestoDe(u.puestoId)?.permisos ?? null)),
       forma: (() => { const r = reglas.find((x) => x.barberoId === u.id); return r ? { tipo: r.tipo, porcentaje: r.porcentaje, montoFijo: r.montoFijo, montoSemanal: r.montoSemanal, periodo: r.periodo } : null; })(),
       formaTexto: (() => { const r = reglas.find((x) => x.barberoId === u.id); return r ? describirRegla(r, formatoDinero) : ""; })(),
+      remuneracion: (() => { const r = rems.find((x) => x.usuarioId === u.id); return r ? { modalidad: r.modalidad as Modalidad, monto: r.monto, periodo: r.periodo, porcentaje: r.porcentaje, horasSemana: r.horasSemana, descripcion: r.descripcion } : null; })(),
+      remuneracionTexto: (() => { const r = rems.find((x) => x.usuarioId === u.id); return r ? describirRemuneracion({ ...r, modalidad: r.modalidad as Modalidad }, formatoDinero) : ""; })(),
     }));
   return (
     <Personas

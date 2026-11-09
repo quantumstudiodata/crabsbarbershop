@@ -113,13 +113,12 @@ export function MetaMensual({ metaMensual, datosMeta }: { metaMensual: number; d
   // Meta calculada: lo que cuestan al mes los gastos frecuentes, redondeado a miles. Los sueldos y las rentas
   // de silla ya entran en la meta de cada barbero. Sin gastos frecuentes ni sueldos, no se propone nada.
   const fijos = datosMeta.fijos.reduce((a, f) => a + f.mensual, 0);
-  const hayEsquemas = datosMeta.barberos.some((b) => b.tipo);
   const calculada = fijos > 0 ? Math.ceil(fijos / 100 / 1000) * 1000 : 0;
   return (
     <FormGuardar className="pila">
       <Ajuste name="metaMensual" titulo="Meta mensual del negocio" ayuda="Establece cuánto deseas obtener mensualmente después de pagar al equipo. El sistema calculará las metas diarias de venta necesarias para alcanzar ese objetivo."
         inicial={metaMensual} opciones={[0, 10000, 20000, 40000]} max={150000} paso={1000} formato={(v) => (v ? formatoDinero(v * 100) : "Sin meta")}
-        sugerido={calculada && hayEsquemas ? { valor: calculada, texto: `Calculada, ${formatoDinero(calculada * 100)}` } : undefined}
+        sugerido={calculada ? { valor: calculada, texto: `Calculada, ${formatoDinero(calculada * 100)}` } : undefined}
         vista={(v) => <VistaMeta meta={v} datos={datosMeta} calculada={calculada} />} />
     </FormGuardar>
   );

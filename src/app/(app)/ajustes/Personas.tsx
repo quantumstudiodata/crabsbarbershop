@@ -8,13 +8,15 @@ import { Interruptor, Modal, Selector } from "@/components/ui";
 import { formatoDinero } from "@/lib/money";
 import type { Rol } from "@/lib/permisos";
 import { CamposFormaPago, type FormaActual } from "./CamposFormaPago";
+import { CamposRemuneracion } from "./CamposRemuneracion";
+import type { Remuneracion } from "@/lib/remuneracion";
 import { actualizarPersona, darDeAlta, darDeBaja, desactivar, reactivar, restablecer, verClave, type ClaveVisible, type EstadoPersona } from "./actions";
 import { EditorPermisos, SelectorPuesto, type GrupoPermisos, type OpcionPuesto } from "./Permisos";
 import { Puestos, type PuestoNegocio } from "./Puestos";
 
 type Persona = {
   id: string; nombre: string; usuario: string; rol: Rol; avatar: string; activo: boolean; metaSemanal: number; permisos: string[]; puestoId: string | null; puesto: string;
-  debeCambiar: boolean; pide: boolean; claveHasta: number | null; yo: boolean; editable: boolean; forma: FormaActual; formaTexto: string;
+  debeCambiar: boolean; pide: boolean; claveHasta: number | null; yo: boolean; editable: boolean; forma: FormaActual; formaTexto: string; remuneracion: Remuneracion | null; remuneracionTexto: string;
 };
 type Props = {
   personas: Persona[]; plantillas: OpcionPuesto[]; puestos: PuestoNegocio[]; grupos: GrupoPermisos[]; editoTotal: boolean;
@@ -96,7 +98,8 @@ function Ficha({ p, props, cerrar, editar }: { p: Persona; props: Props; cerrar:
         <div className="perfil-datos">
           <div><small>Usuario</small><span className="mono">{p.usuario}</span></div>
           <div><small>Puesto</small><span>{p.puesto}</span></div>
-          {p.formaTexto && <div><small>Forma de pago</small><span>{p.formaTexto}</span></div>}
+          {esBarbero(p.rol) ? p.formaTexto && <div><small>Forma de pago</small><span>{p.formaTexto}</span></div>
+            : <div><small>Remuneración</small><span>{p.remuneracionTexto || "Sin remuneración registrada"}</span></div>}
           {esBarbero(p.rol) && <div><small>Meta individual</small><span>{p.metaSemanal ? `${formatoDinero(p.metaSemanal)} a la semana` : "Se calcula sola"}</span></div>}
           <div><small>Permisos</small><span>{p.permisos.length} de {total(props.grupos)}</span></div>
         </div>
@@ -142,6 +145,23 @@ function MenuAcciones({ p, acciones }: { p: Persona; acciones: { clave: () => vo
   );
 }
 
+/** Remuneración al editar: un interruptor para llevar o no el control de sus pagos. */
+function Remuneracion({ p }: { p: Persona }) {
+  const [activa, setActiva] = useState(!!p.remuneracion);
+  return (
+    <>
+      <input type="hidden" name="conRemuneracion" value="1" />
+      <div className="pregunta-r"><span className="paso-t">Remuneración</span><small className="muted">Configura cómo se remunera a esta persona, si corresponde.</small></div>
+      <label className="interruptor-r">
+        <span><b>Registrar esquema de remuneración</b><small>Actívalo si deseas llevar el control de sus pagos.</small></span>
+        <Interruptor name="remActiva" etiqueta="Registrar esquema de remuneración" checked={activa} onChange={setActiva} />
+      </label>
+      {activa ? <CamposRemuneracion actual={p.remuneracion} conNinguna={false} />
+        : p.remuneracion && <p className="ayuda-txt">Al guardar quedará sin remuneración registrada. La anterior se conserva en el historial.</p>}
+    </>
+  );
+}
+
 function EditarPersona({ p, props, cerrar }: { p: Persona; props: Props; cerrar: () => void }) {
   const [e, accion, guardando] = useActionState<EstadoPersona, FormData>(actualizarPersona, {});
   const opciones = [...props.plantillas, ...props.puestos];
@@ -172,6 +192,7 @@ function EditarPersona({ p, props, cerrar }: { p: Persona; props: Props; cerrar:
             </label>
           </>
         )}
+        {!esBarbero(rol) && <Remuneracion p={p} />}
         {e.error && <p className="aviso error">{e.error}</p>}
         <div className="acciones">
           <button className="bt" disabled={guardando}>{guardando ? "Guardando…" : "Guardar cambios"}<Fl /></button>
@@ -190,9 +211,11 @@ function AltaUsuario({ props, cerrar, alGuardar }: { props: Props; cerrar: () =>
   const rol = opciones.find((o) => o.valor === puesto)?.rol ?? "barbera";
   const [nombre, setNombre] = useState("");
   useEffect(() => { if (e.ok && e.clave) alGuardar(e.clave); }, [e.ok, e.n, e.clave, alGuardar]);
-  const dosPasos = esBarbero(rol);
+  // Todos los puestos tienen paso 2: Barbero elige cómo se le paga; los demás, si tienen remuneración.
+  const barbero = esBarbero(rol);
+  const primerNombre = nombre.trim().split(/\s+/)[0] ?? "";
   return (
-    <Modal abierto cerrar={cerrar} etiqueta={dosPasos ? `Paso ${paso} de 2` : "Nuevo usuario"} titulo={paso === 1 ? "Agregar usuario" : "Cómo se le paga"} ancho>
+    <Modal abierto cerrar={cerrar} etiqueta={`Paso ${paso} de 2`} titulo={paso === 1 ? "Agregar usuario" : barbero ? "Cómo se le paga" : `Remuneración de ${primerNombre}`} ancho>
       <form action={accion} className="pila">
         <div className="pila" style={{ display: paso === 1 ? undefined : "none" }}>
           <label className="campo"><span>Nombre completo</span><input className="input" name="nombre" value={nombre} onChange={(x) => setNombre(x.target.value)} placeholder="Ejemplo: Ana Martínez López" required /></label>
@@ -200,11 +223,17 @@ function AltaUsuario({ props, cerrar, alGuardar }: { props: Props; cerrar: () =>
           <details className="revisar-p"><summary>Revisar permisos del puesto (opcional)</summary><EditorPermisos grupos={props.grupos} marcados={marcados} cambiar={setMarcados} descuentoLibre={props.descuentoLibre} /></details>
           <p className="ayuda-txt">El usuario se arma con las iniciales y el primer apellido. La contraseña temporal se verá 30 minutos.</p>
         </div>
-        {dosPasos && <div style={{ display: paso === 2 ? undefined : "none" }}><CamposFormaPago actual={null} /><p className="ayuda-txt" style={{ marginTop: 8 }}>Se puede cambiar después.</p></div>}
+        {barbero && <div style={{ display: paso === 2 ? undefined : "none" }}><CamposFormaPago actual={null} /><p className="ayuda-txt" style={{ marginTop: 8 }}>Se puede cambiar después.</p></div>}
+        {!barbero && (
+          <div className="pila" style={{ display: paso === 2 ? undefined : "none" }}>
+            <div className="pregunta-r"><b>¿Tiene una remuneración?</b><small>Puedes configurar cómo se le paga a esta persona o darla de alta sin registrar remuneración.</small></div>
+            <CamposRemuneracion key={rol} actual={null} />
+          </div>
+        )}
         {e.error && <p className="aviso error">{e.error}</p>}
         <div className="acciones">
           {paso === 2 && <button type="button" className="bt sec solo" onClick={() => setPaso(1)}>Paso anterior</button>}
-          {dosPasos && paso === 1
+          {paso === 1
             ? <button key="sig" type="button" className="bt" disabled={nombre.trim().split(/\s+/).length < 2} onClick={() => setPaso(2)}>Siguiente<Fl /></button>
             : <button key="alta" className="bt" disabled={guardando}>{guardando ? "Guardando…" : "Dar de alta"}<Fl /></button>}
         </div>

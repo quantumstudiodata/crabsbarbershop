@@ -550,3 +550,26 @@ export const erroresSistema = pgTable(
   },
   (t) => [index("errores_sistema_fecha_idx").on(t.creadoEn)],
 );
+
+// Remuneración de quienes no son barberos (los barberos usan reglas_comision). Es solo para llevar el control:
+// no genera pagos ni egresos. Cambiarla cierra la anterior (vigente_hasta) para conservar el historial.
+export const remuneraciones = pgTable(
+  "remuneraciones",
+  {
+    id: id(),
+    barberiaId: barberiaId(),
+    usuarioId: uuid("usuario_id").notNull().references(() => usuarios.id),
+    // sueldo, hora, dia, comision, mixto, trabajo
+    modalidad: text("modalidad").notNull(),
+    monto: integer("monto").notNull().default(0),
+    periodo: text("periodo").notNull().default("mes"),
+    // Centésimas de porcentaje, sobre los servicios que realiza la persona.
+    porcentaje: integer("porcentaje").notNull().default(0),
+    horasSemana: integer("horas_semana").notNull().default(0),
+    descripcion: text("descripcion").notNull().default(""),
+    vigenteDesde: timestamp("vigente_desde", { withTimezone: true }).notNull().defaultNow(),
+    vigenteHasta: timestamp("vigente_hasta", { withTimezone: true }),
+    creadoEn: creadoEn(),
+  },
+  (t) => [index("remuneraciones_usuario_idx").on(t.usuarioId, t.vigenteHasta)],
+);

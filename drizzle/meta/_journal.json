@@ -113,6 +113,13 @@
       "when": 1794173255961,
       "tag": "0015_centro_soporte",
       "breakpoints": true
+    },
+    {
+      "idx": 16,
+      "version": "7",
+      "when": 1794190746014,
+      "tag": "0016_remuneraciones",
+      "breakpoints": true
     }
   ]
 }

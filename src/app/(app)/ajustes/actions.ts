@@ -15,6 +15,7 @@ import { expandirPermisos, NOMBRE_ROL, PERMISOS, PERMISOS_POR_ROL, type Permiso,
 import { esTotal, puedeEditarA, puedeManejar } from "@/lib/puestos";
 import type { Sesion } from "@/lib/auth";
 import { texto } from "@/lib/volver";
+import { describirRemuneracion, type Modalidad, type Remuneracion } from "@/lib/remuneracion";
 
 export type ClaveVisible = { nombre: string; usuario: string; clave: string; expira: number };
 export type EstadoPersona = { ok?: boolean; error?: string; mensaje?: string; clave?: ClaveVisible; n?: number; conMovimientos?: boolean };
@@ -64,6 +65,38 @@ async function guardarForma(tx: Tx, barberiaId: string, usuarioId: string, r: Re
   return true;
 }
 
+/**
+ * Remuneración de quien no es barbero. null = sin remuneración registrada; texto si falta un dato.
+ * Nunca se asigna sola por el puesto: solo si se eligió una modalidad.
+ */
+function leerRemuneracion(form: FormData, rol: Rol): Remuneracion | null | string {
+  if (rol === "barbera" || rol === "encargada") return null;
+  const m = texto(form, "remModalidad") as Modalidad;
+  if (!["sueldo", "hora", "dia", "comision", "mixto", "trabajo"].includes(m)) return null;
+  const monto = leerPesos(texto(form, "remMonto")) ?? 0;
+  const pct = Number(texto(form, "remPorcentaje", 6) || "0");
+  const periodo = ["semana", "quincena", "mes"].includes(texto(form, "remPeriodo")) ? texto(form, "remPeriodo") : "mes";
+  const horas = Math.max(0, Math.min(168, Math.round(Number(texto(form, "remHoras", 4) || "0")) || 0));
+  if (m !== "comision" && monto <= 0) return { sueldo: "Escribe el sueldo.", mixto: "Escribe el sueldo base.", hora: "Escribe cuánto gana por hora.", dia: "Escribe cuánto gana por día.", trabajo: "Escribe cuánto gana por cada trabajo." }[m]!;
+  if ((m === "comision" || m === "mixto") && (!(pct > 0) || pct >= 100)) return "Escribe el porcentaje, de 1 a 99.";
+  return {
+    modalidad: m, monto: m === "comision" ? 0 : monto, periodo: m === "sueldo" || m === "mixto" ? periodo : "mes",
+    porcentaje: m === "comision" || m === "mixto" ? Math.round(pct * 100) : 0, horasSemana: m === "hora" ? horas : 0,
+    descripcion: m === "trabajo" ? texto(form, "remDescripcion", 80) : "",
+  };
+}
+
+/** Guarda la remuneración; la anterior deja de aplicar desde ahora y se conserva. Devuelve si cambió algo. */
+async function guardarRemuneracion(tx: Tx, barberiaId: string, usuarioId: string, r: Remuneracion | null) {
+  const [actual] = await tx.select().from(schema.remuneraciones).where(and(eq(schema.remuneraciones.usuarioId, usuarioId), isNull(schema.remuneraciones.vigenteHasta))).limit(1);
+  const igual = actual && r && actual.modalidad === r.modalidad && actual.monto === r.monto && actual.periodo === r.periodo && actual.porcentaje === r.porcentaje && actual.horasSemana === r.horasSemana && actual.descripcion === r.descripcion;
+  if (igual || (!actual && !r)) return false;
+  const ahora = new Date();
+  if (actual) await tx.update(schema.remuneraciones).set({ vigenteHasta: ahora }).where(eq(schema.remuneraciones.id, actual.id));
+  if (r) await tx.insert(schema.remuneraciones).values({ barberiaId, usuarioId, ...r, vigenteDesde: ahora });
+  return true;
+}
+
 /** Lee el puesto elegido: una plantilla ("rol:barbera") o un puesto del negocio ("puesto:id"). */
 async function leerPuesto(s: Sesion, form: FormData): Promise<{ rol: Rol; puestoId: string | null; nombre: string; base: Set<string> } | string> {
   const v = texto(form, "puesto", 60);
@@ -106,6 +139,8 @@ export async function darDeAlta(_: EstadoPersona, form: FormData): Promise<Estad
   const { extra, quitados } = ajustesDePermisos(s, form, puesto.base);
   const forma = leerForma(form, rol);
   if (typeof forma === "string") return { error: forma };
+  const rem = leerRemuneracion(form, rol);
+  if (typeof rem === "string") return { error: rem };
   const existentes = (await db.select({ u: schema.usuarios.usuario }).from(schema.usuarios)).map((x) => x.u);
   const usuario = sugerirUsuario(nombre, existentes);
   const clave = contrasenaTemporal(nombre);
@@ -113,7 +148,8 @@ export async function darDeAlta(_: EstadoPersona, form: FormData): Promise<Estad
   await db.transaction(async (tx) => {
     const [nuevo] = await tx.insert(schema.usuarios).values({ barberiaId: s.barberia.id, nombre, usuario, rol, puestoId, permisosExtra: extra, permisosQuitados: quitados, hash: await hashContrasena(clave), debeCambiar: true, claveTemporal: cifrar(clave), claveTemporalExpira: expira }).returning({ id: schema.usuarios.id });
     if (forma) await guardarForma(tx, s.barberia.id, nuevo.id, forma);
-    await registrar(tx, { barberiaId: s.barberia.id, usuarioId: s.usuario.id, tipo: "usuario", accion: `${s.usuario.nombre} dio de alta a ${nombre} como ${puesto.nombre}`, detalle: { usuario, formaDePago: forma ? describirRegla(forma, formatoDinero) : undefined } });
+    if (rem) await guardarRemuneracion(tx, s.barberia.id, nuevo.id, rem);
+    await registrar(tx, { barberiaId: s.barberia.id, usuarioId: s.usuario.id, tipo: "usuario", accion: `${s.usuario.nombre} dio de alta a ${nombre} como ${puesto.nombre}`, detalle: { usuario, formaDePago: forma ? describirRegla(forma, formatoDinero) : undefined, remuneracion: rem ? describirRemuneracion(rem, formatoDinero) : undefined } });
   });
   revalidatePath("/ajustes");
   return { ok: true, clave: { nombre, usuario, clave, expira: expira.getTime() }, n: Date.now() };
@@ -162,6 +198,10 @@ export async function actualizarPersona(_: EstadoPersona, form: FormData): Promi
   const nombre = texto(form, "nombre", 80).replace(/\s+/g, " ") || u.nombre;
   const forma = leerForma(form, rol);
   if (typeof forma === "string") return { error: forma };
+  // Con el interruptor apagado, queda sin remuneración (la anterior se conserva en el historial).
+  const conRem = form.has("conRemuneracion");
+  const rem = conRem ? (form.get("remActiva") ? leerRemuneracion(form, rol) : null) : undefined;
+  if (typeof rem === "string") return { error: rem };
   const { extra, quitados } = ajustesDePermisos(s, form, puesto.base);
   const meta = leerPesos(texto(form, "meta")) ?? 0;
   const antes = permisosDe(u.rol, u.permisosExtra, u.permisosQuitados, pActual?.permisos ?? null);
@@ -173,6 +213,7 @@ export async function actualizarPersona(_: EstadoPersona, form: FormData): Promi
     if (nombre !== u.nombre) cambios.push(`nombre a ${nombre}`);
     if (rol !== u.rol || puestoId !== u.puestoId) cambios.push(`puesto a ${puesto.nombre}`);
     if (forma && (await guardarForma(tx, s.barberia.id, u.id, forma))) cambios.push(`forma de pago a ${describirRegla(forma, formatoDinero)}`);
+    if (rem !== undefined && (await guardarRemuneracion(tx, s.barberia.id, u.id, rem))) cambios.push(rem ? `remuneración a ${describirRemuneracion(rem, formatoDinero)}` : "quitó la remuneración registrada");
     if ([...antes].sort().join() !== [...ahora].sort().join()) cambios.push("permisos");
     if (meta !== u.metaSemanal) cambios.push("meta semanal");
     if (cambios.length) await registrar(tx, {
@@ -205,6 +246,7 @@ export async function darDeBaja(id: string, borrarDatos = false): Promise<Estado
       await tx.delete(schema.solicitudesClave).where(eq(schema.solicitudesClave.usuarioId, u.id));
       await tx.delete(schema.sesiones).where(eq(schema.sesiones.usuarioId, u.id));
       await tx.delete(schema.reglasComision).where(eq(schema.reglasComision.barberoId, u.id));
+      await tx.delete(schema.remuneraciones).where(eq(schema.remuneraciones.usuarioId, u.id));
       await tx.delete(schema.usuarios).where(eq(schema.usuarios.id, u.id));
     });
   } catch {
@@ -218,6 +260,7 @@ export async function darDeBaja(id: string, borrarDatos = false): Promise<Estado
       await tx.delete(schema.sesiones).where(eq(schema.sesiones.usuarioId, u.id));
       await tx.delete(schema.solicitudesClave).where(eq(schema.solicitudesClave.usuarioId, u.id));
       await tx.update(schema.reglasComision).set({ vigenteHasta: ahora }).where(and(eq(schema.reglasComision.barberoId, u.id), isNull(schema.reglasComision.vigenteHasta)));
+      await tx.update(schema.remuneraciones).set({ vigenteHasta: ahora }).where(and(eq(schema.remuneraciones.usuarioId, u.id), isNull(schema.remuneraciones.vigenteHasta)));
       await registrar(tx, { barberiaId: s.barberia.id, usuarioId: s.usuario.id, tipo: "usuario", accion: `${s.usuario.nombre} eliminó a ${u.nombre}`, detalle: { usuario: u.usuario, datosBorrados: true } });
     });
     revalidatePath("/", "layout");

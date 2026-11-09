@@ -58,6 +58,7 @@ export async function restablecerPrueba(id: string) {
       const ids = borradas.map((x) => x.id);
       await tx.delete(t.sesiones).where(inArray(t.sesiones.usuarioId, ids));
       await tx.delete(t.reglasComision).where(inArray(t.reglasComision.barberoId, ids));
+      await tx.delete(t.remuneraciones).where(inArray(t.remuneraciones.usuarioId, ids));
       await tx.delete(t.usuarios).where(inArray(t.usuarios.id, ids));
     }
   });
@@ -77,6 +78,7 @@ export async function eliminarPrueba(id: string) {
     await tx.delete(t.categoriasGasto).where(eq(t.categoriasGasto.barberiaId, id));
     await tx.delete(t.historicoMensual).where(eq(t.historicoMensual.barberiaId, id));
     await tx.delete(t.reglasComision).where(eq(t.reglasComision.barberiaId, id));
+    await tx.delete(t.remuneraciones).where(eq(t.remuneraciones.barberiaId, id));
     await tx.delete(t.servicios).where(eq(t.servicios.barberiaId, id));
     await tx.delete(t.categoriasServicio).where(eq(t.categoriasServicio.barberiaId, id));
     await tx.delete(t.metodosPago).where(eq(t.metodosPago.barberiaId, id));

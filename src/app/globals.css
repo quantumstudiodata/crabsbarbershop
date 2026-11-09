@@ -1864,3 +1864,12 @@ a.fila-s:hover, .herr-s:hover { background: rgba(0,0,0,.025); }
 .calculo-m > div { display: flex; justify-content: space-between; gap: 12px; }
 .calculo-m .tot-m { border-top: 1px solid var(--line); margin-top: 4px; padding-top: 8px; font-size: 14px; }
 .calculo-m small { color: var(--muted); line-height: 1.45; margin-top: 4px; }
+.radios.dos { grid-template-columns: repeat(2, minmax(0, 1fr)); }
+.radios.dos .radio-f.ancha { grid-column: 1 / -1; }
+@media (max-width: 560px) { .radios.dos { grid-template-columns: minmax(0, 1fr); } }
+.pregunta-r { display: grid; gap: 2px; }
+.pregunta-r b { font-size: 15px; }
+.pregunta-r small { color: var(--muted); font-size: 13px; }
+.interruptor-r { display: flex; justify-content: space-between; align-items: center; gap: 16px; padding: 12px 14px; border-radius: 14px; background: rgba(255,255,255,.7); border: 1px solid var(--line); cursor: pointer; }
+.interruptor-r > span:first-child { display: grid; gap: 2px; }
+.interruptor-r small { color: var(--muted); font-size: 12.5px; }
