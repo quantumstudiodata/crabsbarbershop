@@ -173,5 +173,17 @@ async function avisosPara(se: Sesion): Promise<AvisoVivo[]> {
     for (const v of canceladas) if (v.t && v.por !== yo) avisos.push({ id: `x${v.id}`, t: v.t.toISOString(), titulo: `${primer(v.nombre)} canceló la venta ${v.folio}`, detalle: `${formatoDinero(v.total)}${v.motivo ? `, ${v.motivo}` : ""}`, href: `/analitica/ventas?q=${v.folio}`, nombre: v.nombre ?? "", avatar: v.avatar ?? "cangrejo" });
     for (const g of egresos) if (g.por !== yo) avisos.push({ id: `g${g.id}`, t: g.t.toISOString(), titulo: `${primer(g.nombre)} registró un egreso de ${formatoDinero(g.monto)}`, detalle: g.concepto, href: "/analitica/finanzas?tipo=egresos", nombre: g.nombre, avatar: g.avatar });
   }
+  // Citas: nuevas reservaciones en línea, cambios y cancelaciones hechas por clientes.
+  // El barbero solo ve las suyas; quien consulta todas las citas, las de todo el equipo.
+  if (se.barberia.usaCitas && se.puede("citas.ver")) {
+    const cn = await db.select({ id: s.notificacionesCita.id, t: s.notificacionesCita.creadoEn, tipo: s.notificacionesCita.tipo, mensaje: s.notificacionesCita.mensaje, barbero: s.citas.barberoId, cliente: s.citas.clienteNombre })
+      .from(s.notificacionesCita).innerJoin(s.citas, eq(s.citas.id, s.notificacionesCita.citaId))
+      .where(and(eq(s.notificacionesCita.barberiaId, bId), eq(s.notificacionesCita.para, "negocio"), gte(s.notificacionesCita.creadoEn, desde)))
+      .orderBy(desc(s.notificacionesCita.creadoEn)).limit(15);
+    for (const n of cn) {
+      if (atiende && !se.puede("ventas.ver_todas") && n.barbero !== yo) continue;
+      avisos.push({ id: `n${n.id}`, t: n.t.toISOString(), titulo: n.tipo === "nueva_reserva" ? `Nueva reservación de ${n.cliente}` : n.tipo === "cita_cancelada" ? `${n.cliente} canceló su cita` : `${n.cliente} cambió su cita`, detalle: n.mensaje.replace(/^[^:]*: /, "").slice(0, 120), href: "/citas", nombre: n.cliente, avatar: "cangrejo", icono: "calendario" });
+    }
+  }
   return avisos.sort((a, b) => b.t.localeCompare(a.t)).slice(0, 25);
 }

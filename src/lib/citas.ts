@@ -2,7 +2,7 @@
 // Módulo de servidor (no son acciones): lo usan las páginas y las acciones.
 
 import { randomBytes } from "node:crypto";
-import { and, asc, eq, gt, inArray, lt, or, sql } from "drizzle-orm";
+import { and, asc, eq, gt, gte, inArray, lt, or, sql } from "drizzle-orm";
 import { db, schema, type Tx } from "./db";
 import { aplicarPromos, type Promo } from "./promociones";
 import { diaSemana, horariosLibres, instante, leerConfig, type Ocupado, type Rotacion, ventanaDelDia, type Horario } from "./agenda";
@@ -126,7 +126,7 @@ export async function crearCita(b: Barberia, d: NuevaCita): Promise<{ error: str
     let persona = d.persona ?? slot.personas[0];
     if (!d.persona && slot.personas.length > 1) {
       const cuentas = await tx.select({ id: schema.citas.barberoId, n: sql<number>`count(*)::int` }).from(schema.citas)
-        .where(and(eq(schema.citas.barberiaId, b.id), inArray(schema.citas.estado, [...ESTADOS_ACTIVOS]), sql`${schema.citas.inicio} >= ${new Date(instante(d.fecha, 0, b.zonaHoraria))} and ${schema.citas.inicio} < ${new Date(instante(d.fecha, 1440, b.zonaHoraria))}`))
+        .where(and(eq(schema.citas.barberiaId, b.id), inArray(schema.citas.estado, [...ESTADOS_ACTIVOS]), gte(schema.citas.inicio, new Date(instante(d.fecha, 0, b.zonaHoraria))), lt(schema.citas.inicio, new Date(instante(d.fecha, 1440, b.zonaHoraria)))))
         .groupBy(schema.citas.barberoId);
       persona = [...slot.personas].sort((x, y) => (cuentas.find((c) => c.id === x)?.n ?? 0) - (cuentas.find((c) => c.id === y)?.n ?? 0))[0];
     }

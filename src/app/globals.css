@@ -2699,8 +2699,22 @@ html:has(.capa) body, html:has(.velo-c) body, html:has(.velo-hoja) body, html:ha
 .rv-ticket.inactiva { background: linear-gradient(160deg, #6b7580, #4b5560); }
 .rv-estado { display: inline-flex; align-items: center; gap: 6px; font-size: 13px; font-weight: 600; color: #cfdbe5; }
 .rv-estado .ic { width: 16px; height: 16px; }
-.rv-cuando { font-size: 20px; text-transform: capitalize; }
+.rv-cuando { font-size: 20px; }
 .rv-hora { display: flex; align-items: baseline; gap: 8px; font-size: 34px; font-weight: 800; }
 .rv-hora small { font-size: 13px; font-weight: 500; color: rgba(238,242,245,.65); }
 .rv-con { display: flex; align-items: center; gap: 8px; font-size: 14px; }
 .rv-guarda { margin: 0; font-size: 13px; text-align: center; }
+@media (max-width: 760px) {
+  /* Menú con cuatro secciones (con Citas): botones más angostos para que todo quepa. */
+  .nav .capa-n.pri:has(> a:nth-of-type(4)) > a { padding: 7px 9px; }
+  /* Citas: controles en una sola línea. */
+  .ctl-citas .seg { flex-wrap: nowrap; flex: none; }
+  .ctl-citas .seg.chico > * { padding: 5px 8px; font-size: 12px; }
+  .ctl-citas .sel-equipo { flex: 1 1 auto; min-width: 0; }
+  .ctl-citas .sel-equipo .selector > button { min-height: 36px; height: 36px; font-size: 12.5px; padding: 0 10px; }
+  .fila-h .t-c small { white-space: normal; }
+  .blq-c.mini { padding: 1px 2px; }
+  .blq-c.mini b { font-size: 9.5px; text-overflow: clip; }
+  .blq-c.mini small { display: none; }
+}
+.ctl-citas .seg { flex-wrap: nowrap; }

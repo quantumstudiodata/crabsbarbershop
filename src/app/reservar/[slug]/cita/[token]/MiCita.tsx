@@ -32,7 +32,7 @@ export function MiCita({ slug, token, negocio, hoy, maxDias, cita, politica, hor
       <section className="rv-cuerpo">
         <div className={`rv-ticket ${activa ? "" : "inactiva"}`}>
           <span className="rv-estado">{activa ? <><Icono n="palomita" />Cita confirmada</> : cita.estadoTxt}</span>
-          <b className="rv-cuando">{fechaTxt(cita.fecha)}</b>
+          <b className="rv-cuando">{fechaTxt(cita.fecha).replace(/^./, (x) => x.toUpperCase())}</b>
           <span className="rv-hora">{cita.hora}<small>{cita.duracion} min</small></span>
           <span className="rv-con"><Avatar avatar={cita.avatar} nombre={cita.barbero} t={28} />Te atiende {cita.barbero}</span>
           <div className="rv-resumen">

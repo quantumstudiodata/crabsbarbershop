@@ -90,7 +90,7 @@ CREATE UNIQUE INDEX "citas_folio_uq" ON "citas" USING btree ("barberia_id","foli
 CREATE INDEX "notificaciones_cita_idx" ON "notificaciones_cita" USING btree ("barberia_id","estado","programada_para");--> statement-breakpoint
 UPDATE barberias b SET slug = x.s FROM (
   SELECT id, CASE WHEN count(*) OVER (PARTITION BY base) > 1 THEN base || '-' || left(id::text, 4) ELSE base END AS s
-  FROM (SELECT id, nullif(trim(both '-' from regexp_replace(lower(nombre), '[^a-z0-9]+', '-', 'g')), '') AS base FROM barberias) y
+  FROM (SELECT id, nullif(trim(both '-' from regexp_replace(translate(lower(nombre), 'áéíóúüñàèìòù', 'aeiouunaeiou'), '[^a-z0-9]+', '-', 'g')), '') AS base FROM barberias) y
 ) x WHERE x.id = b.id AND b.slug IS NULL AND x.s IS NOT NULL;
 --> statement-breakpoint
 CREATE UNIQUE INDEX IF NOT EXISTS barberias_slug_uq ON barberias (slug) WHERE slug IS NOT NULL;

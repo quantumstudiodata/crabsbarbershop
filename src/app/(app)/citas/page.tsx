@@ -1,4 +1,4 @@
-import { and, asc, eq, gt, lt, ne, notInArray, or, sql } from "drizzle-orm";
+import { and, asc, eq, gt, gte, lt, ne, notInArray, or, sql } from "drizzle-orm";
 import { redirect } from "next/navigation";
 import { requerirSesion } from "@/lib/auth";
 import { descansosDeSemana, instante, leerConfig, type Horario } from "@/lib/agenda";
@@ -27,7 +27,7 @@ export default async function Citas({ searchParams }: { searchParams: Promise<Q>
     equipoAgenda(b.id),
     rotacionesDe(b.id),
     db.select().from(schema.citas).where(and(eq(schema.citas.barberiaId, b.id),
-      sql`${schema.citas.inicio} >= ${new Date(instante(desde, 0, zona))} and ${schema.citas.inicio} < ${new Date(instante(hasta, 0, zona))}`,
+      gte(schema.citas.inicio, new Date(instante(desde, 0, zona))), lt(schema.citas.inicio, new Date(instante(hasta, 0, zona))),
       notInArray(schema.citas.estado, ["expirada"]),
       or(ne(schema.citas.estado, "apartada"), gt(schema.citas.expiraEn, new Date())))).orderBy(asc(schema.citas.inicio)),
     db.select().from(schema.bloqueosAgenda).where(and(eq(schema.bloqueosAgenda.barberiaId, b.id), gt(schema.bloqueosAgenda.fin, new Date()))).orderBy(asc(schema.bloqueosAgenda.inicio)).limit(40),
