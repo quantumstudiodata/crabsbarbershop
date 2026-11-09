@@ -8,7 +8,7 @@ export function NavLibreta({ vista, mes, anio, hoy, descargas, conDatos }: { vis
   const router = useRouter();
   const ir = (q: string) => router.push(`/libreta?${q}`);
   return (
-    <div className="entre" style={{ flexWrap: "wrap", gap: 12 }}>
+    <div className="entre nav-lib" style={{ flexWrap: "wrap", gap: 12 }}>
       <div className="fila selector-p">
         <nav className="seg" aria-label="Vista">
           <button type="button" aria-current={vista === "mes" ? "page" : undefined} onClick={() => ir(`vista=mes&mes=${mes}`)}>Mes</button>

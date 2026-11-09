@@ -24,6 +24,8 @@ export function TablaServicios({ servicios: inicialS, categorias: inicialC, pued
   useEffect(() => setServicios(inicialS), [inicialS]);
   useEffect(() => setCats(inicialC), [inicialC]);
   const [cerradas, setCerradas] = useState<Set<string>>(new Set());
+  // En el teléfono las categorías empiezan cerradas: cada quien abre la que necesita.
+  useEffect(() => { if (window.matchMedia("(max-width: 760px)").matches) setCerradas(new Set(inicialC.map((c) => c.id))); }, []); // eslint-disable-line react-hooks/exhaustive-deps
   const [nuevos, setNuevos] = useState<Set<string>>(new Set());
   const [edit, setEdit] = useState<Borrador | null>(null);
   const [editCat, setEditCat] = useState<{ id?: string; nombre: string; descripcion: string } | null>(null);

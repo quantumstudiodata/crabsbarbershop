@@ -9,7 +9,7 @@ export function SelectorUrl({ nombre, valor, opciones, etiqueta }: { nombre: str
   const ruta = usePathname();
   const params = useSearchParams();
   return (
-    <div className="sel-equipo">
+    <div className="sel-equipo sel-tipo">
       <Selector etiqueta={etiqueta} valor={valor} opciones={opciones} onChange={(v) => {
         const n = new URLSearchParams(params.toString());
         if (v) n.set(nombre, v); else n.delete(nombre);
