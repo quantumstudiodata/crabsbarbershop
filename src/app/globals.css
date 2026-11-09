@@ -1858,3 +1858,9 @@ a.fila-s:hover, .herr-s:hover { background: rgba(0,0,0,.025); }
 .sim-s table { table-layout: fixed; } .sim-s th:first-child { width: 32%; }
 .calendario.flotante { position: fixed; top: auto; z-index: 310; }
 .fila-mod > * { min-width: 0; } .fila-mod .otra input { min-width: 0; width: 100%; }
+.billetes .sugerido { display: inline-flex; align-items: center; gap: 6px; }
+.billetes .sugerido svg { width: 14px; height: 14px; }
+.calculo-m { display: grid; gap: 4px; padding: 12px 14px; border-radius: 12px; background: rgba(43,58,71,.05); font-size: 13px; }
+.calculo-m > div { display: flex; justify-content: space-between; gap: 12px; }
+.calculo-m .tot-m { border-top: 1px solid var(--line); margin-top: 4px; padding-top: 8px; font-size: 14px; }
+.calculo-m small { color: var(--muted); line-height: 1.45; margin-top: 4px; }

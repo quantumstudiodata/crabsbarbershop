@@ -428,7 +428,7 @@ export async function datosParaMeta(barberiaId: string, zona: string, hoy: strin
   const desde60 = sumarDias(hoy, -60);
   const inicioMes = `${hoy.slice(0, 7)}-01`;
   const hace3 = `${sumarDias(inicioMes, -85).slice(0, 7)}-01`;
-  const [equipo, reglas, ventas, [g], hist] = await Promise.all([
+  const [equipo, reglas, ventas, [g], hist, frecuentes] = await Promise.all([
     equipoQueAtiende(barberiaId),
     db.select().from(s.reglasComision).where(and(eq(s.reglasComision.barberiaId, barberiaId), isNull(s.reglasComision.vigenteHasta), isNull(s.reglasComision.servicioId))),
     db.select({ id: s.conceptos.barberoId, monto: sql<number>`sum(${s.conceptos.precioCobrado})::int`, n: sql<number>`count(*)::int` })
@@ -438,7 +438,11 @@ export async function datosParaMeta(barberiaId: string, zona: string, hoy: strin
     db.select({ total: sql<number>`coalesce(sum(${s.gastos.monto}),0)::int`, meses: sql<number>`count(distinct to_char(${s.gastos.fecha}, 'YYYY-MM'))::int` })
       .from(s.gastos).where(and(eq(s.gastos.barberiaId, barberiaId), gte(s.gastos.fecha, hace3), lte(s.gastos.fecha, sumarDias(inicioMes, -1)), isNull(s.gastos.canceladoEn))),
     db.select({ egresos: s.historicoMensual.egresos }).from(s.historicoMensual).where(eq(s.historicoMensual.barberiaId, barberiaId)).orderBy(desc(s.historicoMensual.mes)).limit(3),
+    db.select().from(s.conceptosFrecuentes).where(eq(s.conceptosFrecuentes.barberiaId, barberiaId)),
   ]);
+  // Gastos frecuentes llevados a lo que cuestan en un mes; los de una sola vez no cuentan.
+  const POR_MES: Record<string, number> = { semanal: 52 / 12, quincenal: 2, mensual: 1 };
+  const fijos = frecuentes.filter((f) => f.monto > 0 && POR_MES[f.periodicidad]).map((f) => ({ concepto: f.concepto, mensual: Math.round(f.monto * POR_MES[f.periodicidad]) }));
   // Egresos de un mes normal: el promedio de los últimos meses registrados; si aún no hay, lo del Excel.
   const egresos = g.meses > 0 ? Math.round(g.total / g.meses) : hist.length ? Math.round(hist.reduce((a, h) => a + h.egresos, 0) / hist.length) : 0;
   const barberos: BarberoMeta[] = equipo.map((e) => {
@@ -450,5 +454,5 @@ export async function datosParaMeta(barberiaId: string, zona: string, hoy: strin
       peso: v?.monto ?? 0, ticket: v && v.n ? Math.round(v.monto / v.n) : 0,
     };
   });
-  return { egresos, barberos, dias: diasHabilesDelMes(hoy.slice(0, 7)) };
+  return { egresos, barberos, dias: diasHabilesDelMes(hoy.slice(0, 7)), fijos };
 }

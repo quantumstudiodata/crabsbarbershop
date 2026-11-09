@@ -1,5 +1,6 @@
 // Actualizaciones publicadas de la plataforma, la más reciente primero. Se agrega una línea con cada publicación.
 export const NOVEDADES: { fecha: string; texto: string }[] = [
+  { fecha: "2026-11-09", texto: "Meta mensual calculada con gastos frecuentes y esquemas de pago; comprobante de corte con formato de ticket; correcciones en ventanas emergentes, vista previa móvil e interruptores" },
   { fecha: "2026-11-08", texto: "Centro de soporte simplificado, vista previa a pantalla completa, simulación de permisos, ficha de negocio y errores agrupados con detalle" },
   { fecha: "2026-11-08", texto: "Centro de ayuda y Centro de soporte: solicitudes con conversación, diagnóstico de negocios, errores del sistema, entornos de prueba y vista previa real; Soporte en el menú y cambiar experiencia sin salir de la página" },
   { fecha: "2026-11-08", texto: "Libreta: utilidad primero, por barbero y semana, descargas; ajustes de móvil" },
