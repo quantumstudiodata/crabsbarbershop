@@ -2210,3 +2210,50 @@ form > .bloque-eg:first-of-type { border-top: 0; padding-top: 0; }
   .ajustes, .pila, .contenedor { grid-template-columns: minmax(0, 1fr); }
   .ayuda-txt { white-space: normal; }
 }
+
+/* Con una ventana, panel o calendario abierto, la página de fondo no se mueve. */
+html:has(.capa), html:has(.velo-c), html:has(.velo-hoja), html:has(.hoja-semana-m), html:has(.vista-pantalla) { overflow: hidden; }
+html:has(.capa) body, html:has(.velo-c) body, html:has(.velo-hoja) body, html:has(.hoja-semana-m) body { overflow: hidden; touch-action: none; }
+.modal-c, .cajon-cuerpo, .ticket.hoja-abierta, .hoja-sem, .menu.avisos, .desplegable, .pop-cal { overscroll-behavior: contain; touch-action: pan-y; }
+@media (max-width: 760px) {
+  html:has(.velo-cal) { overflow: hidden; }
+  html:has(.velo-cal) body { overflow: hidden; touch-action: none; }
+  /* Conclusiones de Ventas en lista, una debajo de otra. */
+  .cv-concl { display: grid; gap: 3px; }
+  .cv-concl > span { white-space: normal; }
+}
+@media (max-width: 760px) {
+  /* Centro de soporte compacto */
+  .soporte-c > div:first-child .titulo { font-size: 22px; margin-top: 2px !important; }
+  .soporte-c .lab { font-size: 10px; }
+  .atencion-s { gap: 6px; }
+  .atencion-s a { padding: 8px 10px; gap: 8px; align-items: center; border-radius: 12px; line-height: 1.2; }
+  .atencion-s a b { font-size: 16px; }
+  .atencion-s a span { font-size: 11.5px; }
+  .protagonista-s { padding: 4px 10px; }
+  .vacio-s { font-size: 13px; padding: 10px 4px; }
+  .herramientas-s { padding: 4px 8px; }
+  .herramientas-s .herr-s { flex-wrap: nowrap; gap: 8px; padding: 9px 4px; border-radius: 10px; }
+  .herramientas-s .herr-s > span:first-child { display: grid; gap: 1px; flex: 1; min-width: 0; }
+  .herramientas-s .herr-s b { font-size: 14px; }
+  .herramientas-s .herr-s small { font-size: 11.5px; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+  .herramientas-s .herr-s .meta-s { flex: none; }
+  .herramientas-s .herr-s:nth-child(1) { background: none; }
+}
+@media (max-width: 760px) {
+  .hist-linea.evento-l > span:empty { display: none; }
+  .hist-linea.evento-l { grid-template-columns: 44px minmax(0, 1fr) 14px; }
+  .hist-linea.evento-l .srv { font-size: 13px; } .hist-linea.evento-l .srv small { font-size: 11.5px; }
+}
+@media (min-width: 761px) { .filtro-hist .sel-equipo { min-width: 170px; } }
+@media (max-width: 760px) {
+  /* Franja del modo de visualización en el teléfono: una sola línea. */
+  .banda-vista { flex-wrap: nowrap; padding: 6px 10px; gap: 8px; font-size: 12px; }
+  .banda-vista > span:first-child { min-width: 0; overflow: hidden; white-space: nowrap; text-overflow: ellipsis; display: block; }
+  .banda-vista > span:first-child b { display: none; }
+  .banda-vista > span:first-child svg { display: none; }
+  .banda-vista .fila { flex: none; gap: 4px !important; }
+  .banda-vista .ver-movil { display: none; }
+  .banda-vista .bt { font-size: 11.5px; padding: 5px 9px; }
+  .menu-v { right: -40px; }
+}

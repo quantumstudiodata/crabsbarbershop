@@ -74,7 +74,10 @@ export function Selector({ name, opciones, valor, inicial, onChange, etiqueta, c
     const r = boton.current?.getBoundingClientRect();
     if (!r) return;
     const arriba = window.innerHeight - r.bottom < Math.min(300, opciones.length * 44 + 20) && r.top > window.innerHeight - r.bottom;
-    setPos({ x: r.left, y: arriba ? r.top - 6 : r.bottom + 6, w: r.width, arriba });
+    // La lista nunca se sale de la pantalla: si no cabe a la derecha, se recorre hacia la izquierda.
+    const ancho = Math.min(Math.max(r.width, 200), window.innerWidth - 16);
+    const x = Math.max(8, Math.min(r.left, window.innerWidth - ancho - 8));
+    setPos({ x, y: arriba ? r.top - 6 : r.bottom + 6, w: ancho, arriba });
     setActivo(Math.max(0, opciones.findIndex((o) => o.valor === actual)));
   };
   useEffect(() => {
@@ -112,7 +115,7 @@ export function Selector({ name, opciones, valor, inicial, onChange, etiqueta, c
       </button>
       {pos && createPortal(
         <div ref={lista} className="desplegable" role="listbox" id={id} aria-label={etiqueta}
-          style={{ left: pos.x, top: pos.y, width: Math.max(pos.w, 200), transform: pos.arriba ? "translateY(-100%)" : undefined }}>
+          style={{ left: pos.x, top: pos.y, width: pos.w, transform: pos.arriba ? "translateY(-100%)" : undefined }}>
           {opciones.map((o, i) => (
             <button type="button" key={o.valor} role="option" aria-selected={o.valor === actual} className={`op ${i === activo ? "activo" : ""}`}
               onMouseEnter={() => setActivo(i)} onClick={() => elegir(o.valor)}>

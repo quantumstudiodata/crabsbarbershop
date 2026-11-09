@@ -1,6 +1,7 @@
 import { eq } from "drizzle-orm";
 import { cookies } from "next/headers";
 import { redirect } from "next/navigation";
+import { esMovil } from "@/lib/dispositivo";
 import { requerirSesion } from "@/lib/auth";
 import { db, schema } from "@/lib/db";
 import { NOMBRE_ROL, PLANTILLAS } from "@/lib/permisos";
@@ -37,7 +38,8 @@ export default async function Vista({ searchParams }: { searchParams: Promise<{ 
     );
   }
   // En escritorio la vista previa es la app misma, a pantalla completa, con la franja de aviso arriba.
-  if (disp === "escritorio") redirect(pagina);
+  // Desde un teléfono también: la pantalla ya es la de un teléfono, no hace falta un marco.
+  if (disp === "escritorio" || (await esMovil())) redirect(pagina);
   return (
     <div className="vista-pantalla movil">
       <BarraVista puestos={opPuestos} negocios={opNegocios} como={jar.get("crabs_vista")?.value ?? "duena"} negocio={jar.get("crabs_vista_negocio")?.value ?? ""}

@@ -3,7 +3,7 @@
 import { usePathname, useRouter, useSearchParams } from "next/navigation";
 import { useEffect, useRef, useState } from "react";
 import { Avatar } from "@/components/Avatar";
-import { SelectorPeriodo } from "@/components/Periodo";
+import { CalendarioFiltro } from "@/components/CalendarioFiltro";
 import { Icono } from "@/components/Icono";
 import { Selector } from "@/components/ui";
 import type { Periodo } from "@/lib/periodo";
@@ -38,17 +38,17 @@ export function Filtros({ categorias, gente, hoy, periodo }: { categorias: [stri
         opciones={[{ valor: "", texto: "Todo el equipo" }, ...gente.map((g) => ({ valor: g.id, texto: g.nombre.split(" ").slice(0, 2).join(" "), icono: <Avatar avatar={g.avatar} nombre={g.nombre} t={20} /> }))]} />
     </div>
   );
+  // El mismo filtro que en el resto de la app: buscador, calendario, equipo y categoría, en una fila.
   return (
-    <div className="filtros-h">
-      <SelectorPeriodo p={periodo} hoy={hoy} sinPeriodo="Todo" medio={empleado} />
-      <div style={{ flex: "1 1 170px", maxWidth: 220 }}>
+    <div className="filtro-c filtro-hist">
+      <label className="con-icono buscar-c"><Icono n="buscar" />
+        <input className="input" value={q} onChange={(e) => setQ(e.target.value)} placeholder="Buscar nombre, folio o acción" aria-label="Buscar en el historial" />
+      </label>
+      <CalendarioFiltro p={periodo} hoy={hoy} conTodas todas="Todas las fechas" />
+      {empleado}
+      <div className="sel-equipo sel-tipo">
         <Selector etiqueta="Categoría" valor={params.get("tipo") ?? ""} onChange={(v) => ir({ tipo: v })} opciones={categorias.map(([k, t]) => ({ valor: k, texto: t }))} />
       </div>
-      <form className="con-icono" style={{ flex: "2 1 220px" }} onSubmit={(e) => { e.preventDefault(); ir({ q: q.trim() }); }}>
-        <Icono n="buscar" />
-        <input className="input" value={q} onChange={(e) => setQ(e.target.value)} placeholder="Buscar por nombre, folio o acción" aria-label="Buscar en el historial" />
-      </form>
-      {(params.get("q") || params.get("tipo") || params.get("usuario") || periodo) && <button type="button" className="enlace" onClick={() => { setQ(""); router.push(ruta); }}>Quitar filtros</button>}
     </div>
   );
 }

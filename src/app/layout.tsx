@@ -18,6 +18,9 @@ export const viewport: Viewport = {
   themeColor: "#e4e9ee",
   width: "device-width",
   initialScale: 1,
+  // Se siente como app: sin acercar con los dedos ni al tocar un campo.
+  maximumScale: 1,
+  userScalable: false,
   viewportFit: "cover",
 };
 
