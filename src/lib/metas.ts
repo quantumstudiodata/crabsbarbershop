@@ -46,7 +46,6 @@ export function metaDelNegocio(metaMensual: number, egresosMes: number, barberos
   void egresosMes;
   const cubrir = Math.max(0, metaMensual + sueldos - rentas);
   const conMeta = barberos.filter((b) => b.tipo !== "renta");
-  const pesoTotal = conMeta.reduce((a, b) => a + b.peso, 0);
   const parte = (b: BarberoMeta) => {
     if (b.tipo === "porcentaje" || b.tipo === "mixto") return Math.max(0.05, 1 - b.porcentaje / 10000);
     if (b.tipo === "fijo") return b.ticket > 0 ? Math.max(0.05, 1 - b.montoFijo / b.ticket) : 0.5;
@@ -55,9 +54,10 @@ export function metaDelNegocio(metaMensual: number, egresosMes: number, barberos
   const dias = Math.max(1, diasHabiles);
   const porBarbero: MetaDiaria[] = barberos.map((b) => {
     if (b.tipo === "renta") return { id: b.id, nombre: b.nombre, diaria: 0, mensual: 0, parteNegocio: 0, aplica: false };
-    const peso = pesoTotal > 0 ? b.peso / pesoTotal : 1 / Math.max(1, conMeta.length);
+    // Partes iguales entre todos los que llevan meta, sin importar lo vendido antes.
+    const peso = 1 / Math.max(1, conMeta.length);
     const r = parte(b);
-    // Al peso, sin redondear hacia arriba: así las metas suman exactamente el objetivo.
+    // Sin redondear hacia arriba: así las metas suman exactamente el objetivo.
     const mensual = Math.round((cubrir * peso) / r);
     return { id: b.id, nombre: b.nombre, mensual, diaria: Math.round(mensual / dias / 100) * 100, parteNegocio: Math.round(r * 100), aplica: true };
   });
