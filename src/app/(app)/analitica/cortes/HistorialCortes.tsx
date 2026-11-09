@@ -50,7 +50,7 @@ export function NecesitaRevision({ cortes, puede }: { cortes: Corte[]; puede: bo
         </div>
       ))}
       {cortes.length > 3 && <button type="button" className="link-c ver-mas" onClick={() => setTodos(!todos)}>{todos ? "Ver menos" : `Ver los ${cortes.length}`}</button>}
-      <Detalle c={ver} cerrar={() => setVer(null)} corregir={false} />
+      <Detalle c={ver} cerrar={() => setVer(null)} />
     </section>
   );
 }
@@ -58,6 +58,7 @@ export function NecesitaRevision({ cortes, puede }: { cortes: Corte[]; puede: bo
 /** Todos los cortes en una tabla. Al tocar uno se abre su comprobante a un lado. */
 export function TablaCortes({ cortes, corregir }: { cortes: Corte[]; corregir: boolean }) {
   const [ver, setVer] = useState<Corte | null>(null);
+  const [ajuste, setAjuste] = useState<Corte | null>(null);
   if (!cortes.length) return <p className="muted" style={{ padding: "8px 4px" }}>No hay cortes con esos filtros.</p>;
   return (
     <>
@@ -78,18 +79,30 @@ export function TablaCortes({ cortes, corregir }: { cortes: Corte[]; corregir: b
           </tbody>
         </table>
       </div>
-      <Detalle c={ver} cerrar={() => setVer(null)} corregir={corregir} />
+      {/* Registrar ajuste cierra el comprobante y abre su ventana, para no encimar dos capas. */}
+      <Detalle c={ver} cerrar={() => setVer(null)} ajustar={corregir ? (c) => { setVer(null); setAjuste(c); } : undefined} />
+      {ajuste && <Corregir id={ajuste.id} dia={ajuste.dia} abierto cerrar={() => setAjuste(null)} />}
     </>
   );
 }
 
-function Detalle({ c, cerrar, corregir }: { c: Corte | null; cerrar: () => void; corregir: boolean }) {
+/** Imprime solo el comprobante, con el ancho de un ticket. El archivo se llama "Corte de caja C-000012". */
+function imprimir(folio: string) {
+  const antes = document.title;
+  document.title = `Corte de caja ${folio}`;
+  document.body.classList.add("imprimiendo-ticket");
+  const fin = () => { document.title = antes; document.body.classList.remove("imprimiendo-ticket"); window.removeEventListener("afterprint", fin); };
+  window.addEventListener("afterprint", fin);
+  window.print();
+}
+
+function Detalle({ c, cerrar, ajustar }: { c: Corte | null; cerrar: () => void; ajustar?: (c: Corte) => void }) {
   return (
     <Cajon abierto={!!c} cerrar={cerrar} titulo={c ? `Corte ${c.folio}` : ""}
-      pie={c && <>{corregir && <Corregir id={c.id} dia={c.dia} />}<button type="button" className="bt chico" onClick={() => window.print()}><Icono n="imprimir" />Imprimir</button></>}>
+      pie={c && <>{ajustar && <button type="button" className="enlace" onClick={() => ajustar(c)}>Registrar ajuste</button>}<button type="button" className="bt chico" onClick={() => imprimir(c.folio)}><Icono n="imprimir" />Imprimir</button></>}>
       {c && (
         <div className="recibo-c">
-          <div className="rc-cab"><b>{c.dia}</b><small>{c.horario}</small><small>Abrió {primer(c.abrio.nombre)}, cerró {primer(c.cerro.nombre)}</small></div>
+          <div className="rc-cab"><span className="rc-tit">Corte de caja {c.folio}</span><b>{c.dia}</b><small>{c.horario}</small><small>Abrió {primer(c.abrio.nombre)}, cerró {primer(c.cerro.nombre)}</small></div>
           <div className="rc-sec"><span className="lab">Cobros</span>
             {c.metodos.map((m) => <div key={m.metodo}><span>{m.metodo}</span><span className="num">{$(m.total)}</span></div>)}
             <div className="rc-tot"><span>Total vendido, {c.ventas} {c.ventas === 1 ? "venta" : "ventas"}</span><b className="num">{$(c.total)}</b></div>

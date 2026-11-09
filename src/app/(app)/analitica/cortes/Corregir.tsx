@@ -5,12 +5,15 @@ import { Fl } from "@/components/Icono";
 import { Modal } from "@/components/ui";
 import { corregirCierre } from "../../caja/actions";
 
-export function Corregir({ id, dia }: { id: string; dia: string }) {
-  const [abierto, setAbierto] = useState(false);
+/** Ajuste posterior a un corte. Se puede abrir con su propio botón o desde fuera (por ejemplo, desde el comprobante). */
+export function Corregir({ id, dia, abierto: controlado, cerrar: cerrarFuera }: { id: string; dia: string; abierto?: boolean; cerrar?: () => void }) {
+  const [propio, setPropio] = useState(false);
+  const abierto = controlado ?? propio;
+  const cerrar = cerrarFuera ?? (() => setPropio(false));
   return (
     <>
-      <button type="button" className="enlace" onClick={() => setAbierto(true)} aria-label={`Registrar un ajuste al corte del ${dia}`}>Registrar ajuste</button>
-      <Modal abierto={abierto} cerrar={() => setAbierto(false)} etiqueta={`Corte del ${dia}`} titulo="Ajuste posterior al corte">
+      {controlado === undefined && <button type="button" className="enlace" onClick={() => setPropio(true)} aria-label={`Registrar un ajuste al corte del ${dia}`}>Registrar ajuste</button>}
+      <Modal abierto={abierto} cerrar={cerrar} etiqueta={`Corte del ${dia}`} titulo="Ajuste posterior al corte">
         <form action={corregirCierre} className="pila">
           <input type="hidden" name="turnoId" value={id} />
           <p className="muted">Sirve cuando, después de cerrar, aparece dinero que no se contó o se descubre un faltante.<br />El corte original no cambia: se agrega este ajuste con tu nombre y el motivo.</p>

@@ -185,15 +185,20 @@ export function OpcionesRegistro({ metodos, comprobantes, periodicidad, puede }:
           <label key={k} className={`sangria ${mets.includes(k) ? "" : "apagada"}`}>
             <span><b>{t}</b></span>
             <span className={`chip-p ${mets.includes(k) ? "si" : ""}`}>{mets.includes(k) ? "Activo" : "Apagado"}</span>
-            <Interruptor etiqueta={`${t} para egresos`} checked={mets.includes(k)} disabled={!puede || pendiente}
-              onChange={() => iniciar(async () => { const r = await alternarMetodoEgreso(k); setError(r.error ?? null); if (!r.error) setMets(mets.includes(k) ? mets.filter((x) => x !== k) : [...mets, k]); })} />
+            <Interruptor etiqueta={`${t} para egresos`} checked={mets.includes(k)} disabled={!puede}
+              onChange={() => {
+                // Cambia al momento; si el servidor no lo acepta, regresa a como estaba.
+                const antes = mets;
+                setMets(mets.includes(k) ? mets.filter((x) => x !== k) : [...mets, k]);
+                iniciar(async () => { const r = await alternarMetodoEgreso(k); setError(r.error ?? null); if (r.error) setMets(antes); });
+              }} />
           </label>
         ))}
         {opciones.map(([k, t, d]) => (
           <label key={k} className={fun[k] ? "" : "apagada"}>
             <span><b>{t}</b><small>{d}</small></span>
             <span className={`chip-p ${fun[k] ? "si" : ""}`}>{fun[k] ? "Activo" : "Apagado"}</span>
-            <Interruptor etiqueta={t} checked={fun[k]} disabled={!puede || pendiente} onChange={() => iniciar(async () => { setFun({ ...fun, [k]: !fun[k] }); await alternarFuncion(k); })} />
+            <Interruptor etiqueta={t} checked={fun[k]} disabled={!puede} onChange={() => { setFun({ ...fun, [k]: !fun[k] }); iniciar(async () => { await alternarFuncion(k); }); }} />
           </label>
         ))}
       </div>

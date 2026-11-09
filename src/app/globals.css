@@ -157,7 +157,7 @@ textarea.input { min-height: 84px; resize: vertical; }
 /* Selector propio */
 .selector { position: relative; }
 .selector > button { width: 100%; display: flex; align-items: center; justify-content: space-between; gap: 10px; text-align: left; cursor: pointer; }
-.desplegable { position: fixed; z-index: 90; padding: 6px; border-radius: 16px; background: rgba(255,255,255,.97); border: 1px solid #fff; box-shadow: var(--sh-pop); display: grid; gap: 2px; max-height: 300px; overflow: auto; animation: aparecer .15s ease both; }
+.desplegable { position: fixed; z-index: 300; padding: 6px; border-radius: 16px; background: rgba(255,255,255,.97); border: 1px solid #fff; box-shadow: var(--sh-pop); display: grid; gap: 2px; max-height: 300px; overflow: auto; animation: aparecer .15s ease both; }
 .desplegable .op { padding: 9px 11px; border-radius: 10px; display: grid; gap: 1px; cursor: pointer; border: 0; background: none; text-align: left; }
 .desplegable .op small { color: var(--muted); font-size: 12px; }
 .desplegable .op:hover, .desplegable .op.activo { background: var(--accent-soft); }
@@ -226,14 +226,14 @@ table.tabla { width: 100%; border-collapse: collapse; font-size: 14px; }
 .persona { display: inline-flex; align-items: center; gap: 10px; }
 
 /* ---------- Ventanas emergentes ---------- */
-.capa { position: fixed; inset: 0; z-index: 60; background: rgba(30,42,54,.32); -webkit-backdrop-filter: blur(4px); backdrop-filter: blur(4px); display: grid; place-items: center; padding: 18px; animation: aparecer .2s ease both; }
+.capa { position: fixed; inset: 0; z-index: 95; background: rgba(30,42,54,.32); -webkit-backdrop-filter: blur(4px); backdrop-filter: blur(4px); display: grid; place-items: center; padding: 18px; animation: aparecer .2s ease both; }
 .modal { width: min(500px, 100%); max-height: calc(100vh - 36px); display: flex; flex-direction: column; border-radius: 26px; overflow: hidden;
   background: linear-gradient(170deg, rgba(248,250,252,.97), rgba(231,237,242,.97)); -webkit-backdrop-filter: blur(20px); backdrop-filter: blur(20px);
   border: 1px solid rgba(255,255,255,.9); box-shadow: 0 40px 80px -30px rgba(20,35,50,.6), inset 0 1px 0 #fff; animation: subir .3s cubic-bezier(.2,.8,.2,1) both; }
 .modal.ancho { width: min(640px, 100%); }
 .modal-h { display: flex; justify-content: space-between; align-items: flex-start; gap: 12px; padding: 22px 24px 16px; border-bottom: 1px solid var(--line); flex: none; }
 .modal-h .titulo { font-size: 19px; margin-top: 4px; }
-.modal-c { padding: 18px 24px 22px; overflow: auto; display: grid; gap: 16px; align-content: start; }
+.modal-c { padding: 18px 24px 22px; overflow-y: auto; overflow-x: hidden; display: grid; gap: 16px; align-content: start; }
 .modal-c > .acciones:last-child, .modal-c > form > .acciones:last-child { position: sticky; bottom: -22px; margin: 0 -24px -22px; padding: 14px 24px 18px; background: linear-gradient(180deg, rgba(232,238,243,0), rgba(232,238,243,.95) 35%); }
 .tarjeta-m { padding: 16px 18px; border-radius: 18px; background: rgba(255,255,255,.78); border: 1px solid #fff; box-shadow: 0 8px 20px -14px rgba(20,35,50,.4); display: grid; gap: 10px; }
 .acciones { display: flex; gap: 10px; justify-content: flex-end; flex-wrap: wrap; }
@@ -1614,13 +1614,22 @@ button.paso-v:hover { background: rgba(255,255,255,.8); }
   .rev-l { grid-template-columns: auto minmax(0, 1fr) auto; } .rev-l > span:nth-child(3) { display: none; }
   .tabla-c th:nth-child(3), .tabla-c td:nth-child(3) { display: none; }
 }
+.rc-tit { display: none; }
+/* Impresión del comprobante: ancho de ticket (80 mm), letra legible, sin nada más de la página. */
 @media print {
-  body * { visibility: hidden; }
-  .cajon-c, .cajon-c * { visibility: visible; }
-  .cajon-c { position: absolute; inset: 0; width: auto; box-shadow: none; border: 0; }
-  .cajon-cab .icb, .cajon-pie { display: none; }
-  .velo-c { background: none; }
+  @page { size: 80mm auto; margin: 4mm; }
+  body.imprimiendo-ticket { background: #fff !important; }
+  body.imprimiendo-ticket > *:not(.velo-c) { display: none !important; }
+  body.imprimiendo-ticket .velo-c { position: static; background: none; animation: none; }
+  body.imprimiendo-ticket .cajon-c { position: static; width: 72mm; border: 0; box-shadow: none; animation: none; background: #fff; }
+  body.imprimiendo-ticket .cajon-cab, body.imprimiendo-ticket .cajon-pie { display: none !important; }
+  body.imprimiendo-ticket .cajon-cuerpo { padding: 0; overflow: visible; }
+  body.imprimiendo-ticket .recibo-c { width: 72mm; padding: 0; border: 0; background: #fff; font-size: 11pt; color: #000; gap: 3mm; }
+  body.imprimiendo-ticket .rc-tit { display: block; font-weight: 700; font-size: 12pt; }
+  body.imprimiendo-ticket .rc-cab small, body.imprimiendo-ticket .lab, body.imprimiendo-ticket .chip-p { color: #000; background: none; padding: 0; font-size: 10pt; }
+  body.imprimiendo-ticket .rc-cab, body.imprimiendo-ticket .rc-tot { border-color: #000; }
 }
+
 .ver-mas { justify-self: start; padding: 8px; }
 
 /* Libreta: utilidad primero, por barbero y semana */
@@ -1847,3 +1856,5 @@ a.fila-s:hover, .herr-s:hover { background: rgba(0,0,0,.025); }
 .ficha-datos .enlace { font-size: 13px; font-weight: 500; }
 @media (max-width: 760px) { .ficha-datos { grid-template-columns: repeat(2, minmax(0, 1fr)); } }
 .sim-s table { table-layout: fixed; } .sim-s th:first-child { width: 32%; }
+.calendario.flotante { position: fixed; top: auto; z-index: 310; }
+.fila-mod > * { min-width: 0; } .fila-mod .otra input { min-width: 0; width: 100%; }

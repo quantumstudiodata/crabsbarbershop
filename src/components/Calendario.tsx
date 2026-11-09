@@ -1,6 +1,7 @@
 "use client";
 
-import { useEffect, useRef, useState } from "react";
+import { useEffect, useLayoutEffect, useRef, useState } from "react";
+import { createPortal } from "react-dom";
 import { Icono } from "./Icono";
 
 const MESES = ["enero", "febrero", "marzo", "abril", "mayo", "junio", "julio", "agosto", "septiembre", "octubre", "noviembre", "diciembre"];
@@ -17,13 +18,36 @@ function useVentana() {
   const caja = useRef<HTMLDivElement>(null);
   useEffect(() => {
     if (!abierto) return;
-    const fuera = (e: MouseEvent) => { if (!caja.current?.contains(e.target as Node)) setAbierto(false); };
+    const fuera = (e: MouseEvent) => {
+      const t = e.target as Node;
+      if (!caja.current?.contains(t) && !(t instanceof Element && t.closest("[data-flotante]"))) setAbierto(false);
+    };
     const esc = (e: KeyboardEvent) => { if (e.key === "Escape") setAbierto(false); };
     document.addEventListener("mousedown", fuera);
     document.addEventListener("keydown", esc);
     return () => { document.removeEventListener("mousedown", fuera); document.removeEventListener("keydown", esc); };
   }, [abierto]);
   return { abierto, setAbierto, caja };
+}
+
+/**
+ * Ventana que flota sobre todo, pegada a su botón. Así no la recorta ni le agrega barras
+ * una ventana emergente o un panel con desplazamiento.
+ */
+function Flotante({ ancla, className, children, label }: { ancla: React.RefObject<HTMLDivElement | null>; className: string; children: React.ReactNode; label?: string }) {
+  const [pos, setPos] = useState<{ x: number; y: number; arriba: boolean } | null>(null);
+  const ref = useRef<HTMLDivElement>(null);
+  useLayoutEffect(() => {
+    const r = ancla.current?.getBoundingClientRect();
+    if (!r) return;
+    const alto = ref.current?.offsetHeight ?? 360, ancho = ref.current?.offsetWidth ?? 310;
+    const arriba = r.bottom + 8 + alto > window.innerHeight && r.top - 8 - alto > 0;
+    setPos({ x: Math.max(8, Math.min(r.left, window.innerWidth - ancho - 8)), y: arriba ? r.top - 8 - alto : r.bottom + 8, arriba });
+  }, [ancla]);
+  return createPortal(
+    <div ref={ref} data-flotante className={`${className} flotante`} role="dialog" aria-label={label} style={{ left: pos?.x ?? -9999, top: pos?.y ?? 0 }}>{children}</div>,
+    document.body,
+  );
 }
 
 /** Un solo día. */
@@ -41,7 +65,7 @@ export function Calendario({ fecha, hoy, elegir, activo = true }: { fecha: strin
         <Icono n="calendario" />{activo ? fechaTexto(fecha) : "Elegir día"}
       </button>
       {abierto && (
-        <div className="calendario" role="dialog" aria-label="Elegir día">
+        <Flotante ancla={caja} className="calendario" label="Elegir día">
           <div className="entre">
             <button type="button" className="icb" onClick={() => setMes(mesAnt)} aria-label="Mes anterior"><Icono n="izquierda" /></button>
             <b style={{ textTransform: "capitalize" }}>{MESES[mes.m]} {mes.y}</b>
@@ -60,7 +84,7 @@ export function Calendario({ fecha, hoy, elegir, activo = true }: { fecha: strin
             })}
           </div>
           <button type="button" className="enlace" style={{ justifySelf: "start" }} onClick={() => { elegir(hoy); setAbierto(false); }}>Ir a hoy</button>
-        </div>
+        </Flotante>
       )}
     </div>
   );
@@ -74,7 +98,7 @@ function Desplegable({ texto, activo, children }: { texto: string; activo: boole
       <button type="button" className={`bp ${activo ? "on" : ""}`} aria-expanded={abierto} onClick={() => setAbierto((x) => !x)}>
         {texto}<Icono n="abajo" className={`ic flecha-bp ${abierto ? "girada" : ""}`} />
       </button>
-      {abierto && <div className="calendario menu-p" role="dialog">{children(() => setAbierto(false))}</div>}
+      {abierto && <Flotante ancla={caja} className="calendario menu-p">{children(() => setAbierto(false))}</Flotante>}
     </div>
   );
 }
