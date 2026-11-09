@@ -101,14 +101,14 @@ export default async function Resumen({ searchParams }: { searchParams: Promise<
       </section>
 
       <div className="mosaico" style={{ gridTemplateColumns: "1.7fr 1fr" }}>
-        <section className="glass bloque-m subir d1">
+        <section className="glass bloque-m subir d1 bloque-dia">
           <div className="cab-m"><span className="lab">Ventas por día</span><span className="fila" style={{ gap: 12 }}><span className="leyenda-mv"><span><i className="l-act" />{nombreP}</span><span><i className="l-prev" />Anterior</span></span>{s.puede("ventas.ver_todas") && <Ir href="/analitica/ventas" titulo="Ir a Ventas" />}</span></div>
           {largo > 1 && largo <= 62
             ? <Grafica id="resumen" actual={dias.map((d) => (d <= hoy ? r.porDia.get(d) ?? 0 : null))} previo={dias.map((_, i) => prevCompleto.porDia.get(sumarDias(prevDesde, i)) ?? 0)}
                 etiquetas={dias.map((d) => (largo <= 7 ? DIA[new Date(`${d}T12:00:00Z`).getUTCDay()] : String(Number(d.slice(8)))))} cadaEtiqueta={largo <= 7 ? 1 : 5} alto={168} descripcion="Ventas por día" vacio="Sin ventas en estas fechas" />
             : <p className="muted">Elige un mes o una semana para ver la gráfica.</p>}
         </section>
-        <section className="glass bloque-m subir d1">
+        <section className="glass bloque-m subir d1 bloque-dinero">
           <div className="cab-m"><span className="lab">Dinero del periodo</span>{s.puede("reportes.ver") && <Ir href="/analitica/finanzas" titulo="Ir a Finanzas" />}</div>
           <div className="fila-m"><span><b>Gastaste</b><small className="muted">egresos del negocio</small></span><b className="num">{$(egresos)}</b></div>
           <div className="fila-m"><span><b>Te quedó</b><small className="muted">después de gastos y pagos al equipo</small></span><b className="num grande-m">{quedo < 0 ? `−${$(-quedo)}` : $(quedo)}</b></div>
@@ -117,14 +117,14 @@ export default async function Resumen({ searchParams }: { searchParams: Promise<
 
       <div className="mosaico" style={{ gridTemplateColumns: pendientes.length ? "1fr 1.4fr" : "1fr" }}>
         {pendientes.length > 0 && (
-          <section className="glass bloque-m subir d2">
+          <section className="glass bloque-m subir d2 bloque-revisar">
             <div className="cab-m"><span className="lab">Para revisar</span><span className="chip-p alerta">{pendientes.length}</span></div>
             {pendientes.map((x) => (
               <Link key={x.titulo} href={x.href} className="fila-m clic"><span><b>{x.titulo}</b><small className="muted">{x.detalle}</small></span><Icono n="derecha" /></Link>
             ))}
           </section>
         )}
-        <section className="glass bloque-m subir d2">
+        <section className="glass bloque-m subir d2 bloque-cobro">
           <div className="cab-m"><span className="lab">Lo que cobró cada barbero</span>{s.puede("ventas.ver_todas") && <Ir href="/analitica/ventas" titulo="Ir a Ventas" />}</div>
           {r.porBarbero.length === 0 && <p className="muted">Sin ventas en estas fechas.</p>}
           {r.porBarbero.map((b) => {

@@ -57,3 +57,10 @@ export function filtrarCortes<T extends { id: string; abiertoPor: string | null;
   return cortes.filter((c) => (!f.persona || c.abiertoPor === f.persona || c.cerradoPorId === f.persona)
     && (!t || [folios.get(c.id), c.notasCierre, c.cerradoPor, nombres.get(c.abiertoPor ?? "")].some((x) => x?.toLowerCase().includes(t))));
 }
+
+/** Paginar por registros (en el teléfono): cuántas páginas hay y cuáles registros tocan en la actual. */
+export function paginaDeRegistros<T>(lista: T[], pagina: number, porPagina: number) {
+  const paginas = Math.max(1, Math.ceil(lista.length / porPagina));
+  const actual = Math.min(Math.max(1, pagina), paginas);
+  return { pagina: actual, paginas, items: lista.slice((actual - 1) * porPagina, actual * porPagina) };
+}

@@ -133,44 +133,59 @@ export function Nuevo({ hoy, cajaAbierta, categorias, cerrar, otro, opciones }: 
             <div className="chips-cat">{opciones.frecuentes.map((f) => <button key={f.id} type="button" className={`chip-cat ${concepto === f.concepto ? "on" : ""}`} onClick={() => usar(f)}>{f.concepto}{f.monto ? ` ${formatoDinero(f.monto)}` : ""}</button>)}</div>
           </div>
         )}
-        <div className="rejilla-f">
-          <label className="campo" style={{ gridColumn: "1 / -1" }}><span>Concepto</span><input className="input" name="concepto" value={concepto} onChange={(x) => setConcepto(x.target.value)} placeholder="Ejemplo: Recibo de luz de octubre" required autoFocus maxLength={120} /></label>
-          <label className="campo"><span>Cantidad</span><input className="input grande" name="monto" value={monto} onChange={(x) => setMonto(x.target.value)} inputMode="decimal" placeholder="$0" required /></label>
-          <div className="campo"><span>Categoría</span><Selector etiqueta="Categoría" valor={categoria} onChange={setCategoria} opciones={categorias.map((c) => ({ valor: c.nombre, texto: c.nombre }))} /></div>
-          <div className="campo"><span>Fecha</span><Calendario fecha={fecha} hoy={hoy} elegir={setFecha} /></div>
-          <div className="campo"><span>Cómo se pagó</span>
-            <div className="seg" role="radiogroup" aria-label="Cómo se pagó">
-              {opciones.metodos.includes("efectivo") && <button type="button" className={metodo === "efectivo" ? "on" : ""} onClick={() => setMetodo("efectivo")}><Icono n="efectivo" />Efectivo</button>}
-              {opciones.metodos.includes("transferencia") && <button type="button" className={metodo === "transferencia" ? "on" : ""} onClick={() => setMetodo("transferencia")}><Icono n="cobro" />Transferencia</button>}
-              {opciones.metodos.includes("tarjeta") && <button type="button" className={metodo === "tarjeta" ? "on" : ""} onClick={() => setMetodo("tarjeta")}><Icono n="tarjeta" />Tarjeta</button>}
-            </div>
+        {/* A. Información del egreso */}
+        <div className="bloque-eg">
+          <span className="lab">Información del egreso</span>
+          <label className="campo"><span>Concepto</span><input className="input" name="concepto" value={concepto} onChange={(x) => setConcepto(x.target.value)} placeholder="Ejemplo: Recibo de luz de octubre" required autoFocus maxLength={120} /></label>
+          <div className="fila-eg">
+            <label className="campo"><span>Cantidad</span><input className="input" name="monto" value={monto} onChange={(x) => setMonto(x.target.value)} inputMode="decimal" placeholder="$0" required /></label>
+            <div className="campo"><span>Categoría</span><Selector etiqueta="Categoría" valor={categoria} onChange={setCategoria} opciones={categorias.map((c) => ({ valor: c.nombre, texto: c.nombre }))} /></div>
+            <div className="campo"><span>Fecha</span><Calendario fecha={fecha} hoy={hoy} elegir={setFecha} /></div>
           </div>
-          {opciones.periodicidad && (
-            <div className="campo"><span>Cada cuándo se paga</span><Selector etiqueta="Periodicidad" valor={periodo} onChange={setPeriodo} opciones={PERIODOS.map(([k, t]) => ({ valor: k, texto: t }))} /></div>
-          )}
-          {opciones.comprobantes && (
-            <div className="campo"><span>Comprobante (opcional)</span>
-              <label className="subir-arch">
-                <input type="file" accept="image/*,application/pdf" capture="environment" onChange={async (x) => {
-                  const f = x.target.files?.[0]; setErrArchivo(null);
-                  if (!f) { setArchivo(null); return; }
-                  if (f.type === "application/pdf" && f.size > 2_000_000) { setErrArchivo("El PDF debe pesar menos de 2 MB."); return; }
-                  try { setArchivo({ datos: await prepararArchivo(f), nombre: f.name.slice(0, 100) }); } catch { setErrArchivo("No se pudo leer ese archivo."); }
-                }} />
-                <Icono n={archivo ? "palomita" : "archivo"} />{archivo ? archivo.nombre : "Tomar foto o elegir archivo"}
-              </label>
-              {errArchivo && <small style={{ color: "#a0525a" }}>{errArchivo}</small>}
-            </div>
-          )}
         </div>
-        {puedeCaja ? (
-          <label className="entre opcion-caja">
-            <span><b>Salió del efectivo de la caja</b><small>Se descuenta del efectivo que debe haber al hacer el corte.</small></span>
-            <Interruptor etiqueta="Salió de la caja" checked={deCaja} onChange={setDeCaja} />
-          </label>
-        ) : (
-          <p className="ayuda-txt">{metodo !== "efectivo" ? `Pagado con ${metodo}: no toca la caja.` : fecha !== hoy ? "Es de otro día: no toca la caja de hoy." : "La caja está cerrada: este gasto no toca el corte."}</p>
+        {/* B. Pago */}
+        <div className="bloque-eg">
+          <span className="lab">Método de pago</span>
+          <div className="seg metodos-eg" role="radiogroup" aria-label="Método de pago">
+            {opciones.metodos.includes("efectivo") && <button type="button" className={metodo === "efectivo" ? "on" : ""} onClick={() => setMetodo("efectivo")}><Icono n="efectivo" />Efectivo</button>}
+            {opciones.metodos.includes("transferencia") && <button type="button" className={metodo === "transferencia" ? "on" : ""} onClick={() => setMetodo("transferencia")}><Icono n="cobro" />Transferencia</button>}
+            {opciones.metodos.includes("tarjeta") && <button type="button" className={metodo === "tarjeta" ? "on" : ""} onClick={() => setMetodo("tarjeta")}><Icono n="tarjeta" />Tarjeta</button>}
+          </div>
+        </div>
+        {/* C. Periodicidad */}
+        {opciones.periodicidad && (
+          <div className="bloque-eg">
+            <div className="campo"><span>Periodicidad del gasto</span><Selector etiqueta="Periodicidad del gasto" valor={periodo} onChange={setPeriodo} opciones={PERIODOS.map(([k, t]) => ({ valor: k, texto: t }))} /></div>
+          </div>
         )}
+        {/* D. Comprobante y caja */}
+        <div className="bloque-eg">
+          <span className="lab">Comprobante y caja</span>
+          <div className="fila-eg">
+            {opciones.comprobantes && (
+              <div className="campo">
+                <label className="subir-arch">
+                  <input type="file" accept="image/*,application/pdf" capture="environment" onChange={async (x) => {
+                    const f = x.target.files?.[0]; setErrArchivo(null);
+                    if (!f) { setArchivo(null); return; }
+                    if (f.type === "application/pdf" && f.size > 2_000_000) { setErrArchivo("El PDF debe pesar menos de 2 MB."); return; }
+                    try { setArchivo({ datos: await prepararArchivo(f), nombre: f.name.slice(0, 100) }); } catch { setErrArchivo("No se pudo leer ese archivo."); }
+                  }} />
+                  <Icono n={archivo ? "palomita" : "archivo"} />{archivo ? archivo.nombre : "Adjuntar comprobante (opcional)"}
+                </label>
+                {errArchivo && <small style={{ color: "#a0525a" }}>{errArchivo}</small>}
+              </div>
+            )}
+            {puedeCaja ? (
+              <label className="entre opcion-caja">
+                <span><b>Lo pagué con el efectivo de la caja</b><small>Se resta del efectivo que debe haber al hacer el corte de hoy.</small></span>
+                <Interruptor etiqueta="Lo pagué con el efectivo de la caja" checked={deCaja} onChange={setDeCaja} />
+              </label>
+            ) : (
+              <p className="ayuda-txt" style={{ margin: 0 }}>{metodo !== "efectivo" ? `Pagado con ${metodo}: no afecta el efectivo de la caja.` : fecha !== hoy ? "Es de otro día: no afecta el corte de hoy." : "La caja está cerrada: este gasto no afecta ningún corte."}</p>
+            )}
+          </div>
+        </div>
         <label className="campo"><span>Descripción (opcional)</span><textarea className="input" name="descripcion" rows={2} maxLength={500} placeholder="Algún detalle que ayude a recordarlo" /></label>
         {e.error && <p className="aviso error">{e.error}</p>}
         <div className="acciones">

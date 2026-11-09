@@ -406,6 +406,15 @@ export async function diasYTotalVentas(barberiaId: string, zona: string, f: { de
   return { dias: dias.map((x) => x.d), ventas: t.n, monto: t.monto };
 }
 
+/** Ventas que cumplen los filtros, de la más reciente a la más vieja: sirve para paginar por registros en el teléfono. */
+export async function idsVentas(barberiaId: string, zona: string, f: { desde?: string; hasta?: string; condiciones: SQL[] }) {
+  return db.select({ id: s.ventas.id, d: sql<string>`to_char(${s.ventas.creadoEn} at time zone ${zona}, 'YYYY-MM-DD')` }).from(s.ventas)
+    .where(and(eq(s.ventas.barberiaId, barberiaId),
+      ...(f.desde && f.hasta ? [sql`(${s.ventas.creadoEn} at time zone ${zona})::date between ${f.desde}::date and ${f.hasta}::date`] : []),
+      ...f.condiciones))
+    .orderBy(desc(s.ventas.creadoEn));
+}
+
 /** Para filtrar historiales: el equipo activo más quien ya no está pero tiene ventas registradas. */
 export async function equipoConVentas(barberiaId: string) {
   return db

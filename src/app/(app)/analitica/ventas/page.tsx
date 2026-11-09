@@ -3,13 +3,14 @@ import { AvisoUrl } from "@/components/Encabezado";
 import { BarraFiltros } from "@/components/BarraFiltros";
 import { Paginacion } from "@/components/Paginacion";
 import { requerirSesion } from "@/lib/auth";
-import { and, eq, gte, lte } from "drizzle-orm";
+import { and, eq, gte, inArray, lte } from "drizzle-orm";
 import { Avatar } from "@/components/Avatar";
 import { Ayuda } from "@/components/Ayuda";
 import { describirRegla, elegirRegla, porSemana } from "@/lib/comisiones";
 import { MINUTOS_CORRECCION } from "@/lib/caja";
-import { cajaDe, copiaRegla, diasYTotalVentas, equipoConVentas, metodosActivos, reglasDe, ventasEntre } from "@/lib/datos";
-import { condicionVentas, type ConsultaFiltros, leerFiltros, rangoDePagina, urlDescarga } from "@/lib/filtros";
+import { cajaDe, copiaRegla, diasYTotalVentas, idsVentas, equipoConVentas, metodosActivos, reglasDe, ventasEntre } from "@/lib/datos";
+import { condicionVentas, type ConsultaFiltros, leerFiltros, paginaDeRegistros, rangoDePagina, urlDescarga } from "@/lib/filtros";
+import { esMovil } from "@/lib/dispositivo";
 import { db, schema } from "@/lib/db";
 import { diasEntre, lunesDe } from "@/lib/fechas";
 import { fechaLarga, fechaLocal, horaCorta } from "@/lib/fechas";
@@ -25,22 +26,33 @@ type Q = ConsultaFiltros & { aviso?: string; error?: string };
 
 export default async function Ventas({ searchParams }: { searchParams: Promise<Q> }) {
   const s = await requerirSesion();
-  // La misma pantalla para todos: quien no ve al equipo completo ve lo suyo, con los mismos filtros.
+  // La misma pantalla para todos. El barbero consulta todo el historial, pero el encabezado y las gráficas son de sus propios datos.
   const verTodas = s.puede("ventas.ver_todas");
   const atiende = s.usuario.rol === "barbera" || s.usuario.rol === "encargada";
   if (!verTodas && !atiende) redirect("/");
-  const q = { ...(await searchParams), ...(verTodas ? {} : { persona: s.usuario.id }) };
+  const q = await searchParams;
   const zona = s.barberia.zonaHoraria;
   const hoy = fechaLocal(new Date(), zona);
-  const equipo = (await equipoConVentas(s.barberia.id)).filter((e) => verTodas || e.id === s.usuario.id);
+  const equipo = await equipoConVentas(s.barberia.id);
   const f = leerFiltros(q, hoy, equipo.map((e) => e.id));
   const p = f.periodo;
   const persona = f.persona;
   const condiciones = condicionVentas(f);
   // Sin filtros se ve todo el historial, siete días por página.
   const resumen = await diasYTotalVentas(s.barberia.id, zona, { desde: p?.desde, hasta: p?.hasta, persona, condiciones });
-  const r = rangoDePagina(resumen.dias, f.pagina);
-  const { ventas } = r.dias.length ? await ventasEntre(s.barberia.id, r.desde, r.hasta, { zona, condiciones }) : { ventas: [] };
+  // En el teléfono se pagina por ventas (7 por página) y sin desplazamiento interno; en escritorio, por días.
+  const movil = await esMovil();
+  let r: { pagina: number; paginas: number; dias: string[]; desde: string; hasta: string };
+  let soloIds: string[] | null = null;
+  if (movil) {
+    const pg = paginaDeRegistros(await idsVentas(s.barberia.id, zona, { desde: p?.desde, hasta: p?.hasta, condiciones }), f.pagina, 7);
+    soloIds = pg.items.map((x) => x.id);
+    const ds = [...new Set(pg.items.map((x) => x.d))];
+    r = { pagina: pg.pagina, paginas: pg.paginas, dias: ds, desde: ds[ds.length - 1] ?? hoy, hasta: ds[0] ?? hoy };
+  } else r = rangoDePagina(resumen.dias, f.pagina);
+  const { ventas } = r.dias.length
+    ? await ventasEntre(s.barberia.id, r.desde, r.hasta, { zona, condiciones: soloIds ? [...condiciones, inArray(schema.ventas.id, soloIds.length ? soloIds : ["00000000-0000-0000-0000-000000000000"])] : condiciones })
+    : { ventas: [] };
   const dias = r.dias;
   const puedeCancelar = s.puede("ventas.cancelar");
   // El barbero puede anular sus propios cobros durante los primeros minutos, mientras la caja sigue abierta.
@@ -89,7 +101,7 @@ export default async function Ventas({ searchParams }: { searchParams: Promise<Q
   return (
     <>
       <AvisoUrl aviso={q.aviso} error={q.error} />
-      <CabeceraVentas barberiaId={s.barberia.id} zona={zona} hoy={hoy} persona={persona || undefined} {...periodoEncabezado(p, hoy)} />
+      <CabeceraVentas barberiaId={s.barberia.id} zona={zona} hoy={hoy} persona={verTodas ? persona || undefined : s.usuario.id} propias={!verTodas} {...periodoEncabezado(p, hoy)} />
       {verTodas && elegida && cuenta && (
         <section className="glass panel subir">
           <div className="entre">
@@ -122,7 +134,7 @@ export default async function Ventas({ searchParams }: { searchParams: Promise<Q
         {historial.length ? <HistorialVentas dias={historial} regreso={regreso} opciones={opciones} sinMarco /> : <p className="muted" style={{ padding: "8px 4px" }}>No hay ventas con esos filtros.</p>}
       </section>
       <Paginacion ruta="/analitica/ventas" params={q as Record<string, string | undefined>} pagina={r.pagina} paginas={r.paginas}
-        texto={resumen.dias.length ? `${resumen.dias.length} ${resumen.dias.length === 1 ? "día" : "días"} con ventas${r.paginas > 1 ? `, página ${r.pagina} de ${r.paginas}` : ""}` : ""} />
+        texto={resumen.dias.length ? (movil ? `Página ${r.pagina} de ${r.paginas}` : `${resumen.dias.length} ${resumen.dias.length === 1 ? "día" : "días"} con ventas${r.paginas > 1 ? `, página ${r.pagina} de ${r.paginas}` : ""}`) : ""} />
     </>
   );
 }

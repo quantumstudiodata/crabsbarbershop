@@ -1,3 +1,4 @@
+import { esMovil } from "@/lib/dispositivo";
 import { type ConsultaPeriodo, leerPeriodo } from "@/lib/periodo";
 import { and, asc, count, desc, eq, gte, ilike, inArray, lte, or, sql, type SQL } from "drizzle-orm";
 import { redirect } from "next/navigation";
@@ -11,7 +12,7 @@ import { Lista, type FilaHistorial } from "./Lista";
 
 export const metadata = { title: "Historial" };
 
-const POR_PAGINA = 10;
+const POR_PAGINA_ESCRITORIO = 10;
 const CATEGORIAS: [string, string][] = [["", "Todas las categorías"], ["venta", "Ventas"], ["caja", "Caja"], ["gasto", "Egresos"], ["precio", "Precios"], ["ajuste", "Configuración"], ["usuario", "Usuarios"], ["equipo", "Pagos al equipo"], ["idea", "Ideas"], ["acceso", "Accesos"]];
 const MES = ["ene", "feb", "mar", "abr", "may", "jun", "jul", "ago", "sep", "oct", "nov", "dic"];
 
@@ -46,6 +47,8 @@ export default async function Historial({ searchParams }: { searchParams: Promis
     const t = `%${texto}%`;
     cond.push(or(ilike(h.accion, t), sql`${h.detalle}::text ilike ${t}`, ilike(schema.usuarios.nombre, t), ilike(schema.usuarios.usuario, t))!);
   }
+  // En el teléfono caben 6 eventos por página.
+  const POR_PAGINA = (await esMovil()) ? 6 : POR_PAGINA_ESCRITORIO;
   const pagina = Math.max(1, Number(q.pagina) || 1);
   const [[{ total }], filas, gente] = await Promise.all([
     db.select({ total: count() }).from(h).leftJoin(schema.usuarios, eq(schema.usuarios.id, h.usuarioId)).where(and(...cond)),

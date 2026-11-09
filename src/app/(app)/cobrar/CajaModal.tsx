@@ -201,7 +201,7 @@ export function CajaModal({ inicial, turno, limiteDiferencia, categorias, eviden
             <div className="total-c"><span>Efectivo esperado</span><b>{formatoDinero(turno.esperado)}</b></div>
           </div>
         </details>
-        {evidencias && <EvidenciasCorte metodos={turno.otros.map((o) => o.metodo)} />}
+        {evidencias && <EvidenciasCorte metodos={turno.otros.map((o) => o.metodo)} requeridos={turno.otros.filter((o) => o.total > 0).map((o) => o.metodo)} />}
         <label className="campo">
           <span>Observaciones</span>
           <textarea className="input" name="notas" placeholder={dif !== null && Math.abs(dif) > limiteDiferencia ? "Hay diferencia. Escribe qué pasó." : "Opcional"} />

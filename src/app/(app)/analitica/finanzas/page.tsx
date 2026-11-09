@@ -11,7 +11,8 @@ import { requerirSesion } from "@/lib/auth";
 import { cajaDe, categoriasGasto, resumenPeriodo } from "@/lib/datos";
 import { db, schema as t } from "@/lib/db";
 import { fechaLarga, fechaLocal, horaCorta } from "@/lib/fechas";
-import { type ConsultaFiltros, leerFiltros, rangoDePagina } from "@/lib/filtros";
+import { type ConsultaFiltros, leerFiltros, paginaDeRegistros, rangoDePagina } from "@/lib/filtros";
+import { esMovil } from "@/lib/dispositivo";
 import { formatoDinero } from "@/lib/money";
 import { Movimientos, type DiaMovimientos, type Movimiento } from "./Movimientos";
 
@@ -50,7 +51,9 @@ export default async function Finanzas({ searchParams }: { searchParams: Promise
       .where(and(eq(t.pagosComision.barberiaId, bId), ...(tipo === "equipo" ? [eq(t.pagosComision.tipo, "pago")] : tipo === "ingresos" ? [eq(t.pagosComision.tipo, "renta")] : []), ...enFechas(t.pagosComision.creadoEn), ...(texto ? [ilike(t.usuarios.nombre, texto)] : []))) : [],
   ]);
   const todosDias = [...new Set([...diasV, ...diasG, ...diasP].map((x) => x.d))].sort().reverse();
-  const r = rangoDePagina(todosDias, f.pagina);
+  // En el teléfono se pagina por movimientos (7 por página); en escritorio, siete días por página.
+  const movil = await esMovil();
+  const r = movil ? { pagina: 1, paginas: 1, dias: todosDias, desde: todosDias[todosDias.length - 1] ?? hoy, hasta: todosDias[0] ?? hoy } : rangoDePagina(todosDias, f.pagina);
   const pd = r.dias.length ? r.desde : null, ph = r.dias.length ? r.hasta : null;
   const enPagina = (col: unknown): SQL[] => (pd && ph ? [sql`(${col} at time zone ${zona})::date between ${pd}::date and ${ph}::date`] : [sql`false`]);
 
@@ -74,7 +77,7 @@ export default async function Finanzas({ searchParams }: { searchParams: Promise
     .where(and(eq(t.comprobantes.barberiaId, bId), inArray(t.comprobantes.gastoId, gastos.map((x) => x.g.id)))) : [];
 
   const PER: Record<string, string> = { semanal: "semanal", quincenal: "quincenal", mensual: "mensual" };
-  const dias: DiaMovimientos[] = r.dias.map((d) => {
+  const todosLosDias: DiaMovimientos[] = r.dias.map((d) => {
     const movs: (Movimiento & { t: number })[] = [];
     const v = ventasDia.find((x) => x.d === d);
     if (v) movs.push({
@@ -107,6 +110,12 @@ export default async function Finanzas({ searchParams }: { searchParams: Promise
     movs.sort((a, b) => b.t - a.t);
     return { fecha: d, titulo: d === hoy ? "Hoy" : fechaLarga(d), neto: movs.filter((m) => !m.cancelado).reduce((a, m) => a + m.monto, 0), movs };
   });
+  let paginaMov = r.pagina, paginasMov = r.paginas, dias = todosLosDias;
+  if (movil) {
+    const pg = paginaDeRegistros(todosLosDias.flatMap((d) => d.movs.map((m) => ({ d, m }))), f.pagina, 7);
+    paginaMov = pg.pagina; paginasMov = pg.paginas;
+    dias = [...new Set(pg.items.map((x) => x.d))].map((d) => ({ ...d, movs: pg.items.filter((x) => x.d === d).map((x) => x.m) }));
+  }
 
   // Encabezado: el periodo elegido o el mes en curso (el día 1, el mes anterior).
   const { p, anterior } = periodoEncabezado(f.periodo, hoy);
@@ -175,8 +184,8 @@ export default async function Finanzas({ searchParams }: { searchParams: Promise
         filtros={<BarraFiltros p={f.periodo} hoy={hoy} personas={[]} persona="" buscar={f.buscar} sinPeriodo="Todas las fechas" textoBuscar="Buscar"
           descarga={s.puede("reportes.exportar") ? `/api/exportar?tipo=gastos${f.periodo ? `&desde=${f.periodo.desde}&hasta=${f.periodo.hasta}` : ""}` : undefined}
           extra={verTodo ? <SelectorUrl nombre="tipo" valor={tipo} opciones={TIPOS.map(([valor, texto]) => ({ valor, texto }))} etiqueta="Tipo de movimiento" /> : undefined} />} />
-      <Paginacion ruta="/analitica/finanzas" params={q as Record<string, string | undefined>} pagina={r.pagina} paginas={r.paginas}
-        texto={todosDias.length ? `${todosDias.length} ${todosDias.length === 1 ? "día" : "días"} con movimientos${r.paginas > 1 ? `, página ${r.pagina} de ${r.paginas}` : ""}` : ""} />
+      <Paginacion ruta="/analitica/finanzas" params={q as Record<string, string | undefined>} pagina={paginaMov} paginas={paginasMov}
+        texto={todosDias.length ? (movil ? `Página ${paginaMov} de ${paginasMov}` : `${todosDias.length} ${todosDias.length === 1 ? "día" : "días"} con movimientos${r.paginas > 1 ? `, página ${r.pagina} de ${r.paginas}` : ""}`) : ""} />
     </>
   );
 }

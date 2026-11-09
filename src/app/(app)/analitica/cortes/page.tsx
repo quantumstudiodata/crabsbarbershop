@@ -9,7 +9,8 @@ import { db, schema } from "@/lib/db";
 import { NecesitaRevision, TablaCortes, type Corte } from "./HistorialCortes";
 import { fechaCorta, fechaLarga, fechaLocal, horaCorta } from "@/lib/fechas";
 import { formatoDinero } from "@/lib/money";
-import { type ConsultaFiltros, filtrarCortes, leerFiltros, rangoDePagina, urlDescarga } from "@/lib/filtros";
+import { type ConsultaFiltros, filtrarCortes, leerFiltros, paginaDeRegistros, rangoDePagina, urlDescarga } from "@/lib/filtros";
+import { esMovil } from "@/lib/dispositivo";
 
 export const metadata = { title: "Cortes de caja" };
 
@@ -32,8 +33,11 @@ export default async function Cortes({ searchParams }: { searchParams: Promise<C
   const p = f.periodo;
   const filtrados = filtrarCortes(todos.filter((c) => !p || (c.fechaOperativa >= p.desde && c.fechaOperativa <= p.hasta)), f, folios, new Map(gente.map((g) => [g.id, g.nombre])));
   // Todo el historial, siete días por página.
-  const r = rangoDePagina([...new Set(filtrados.map((c) => c.fechaOperativa))].sort().reverse(), f.pagina);
-  const cortes = filtrados.filter((c) => r.dias.includes(c.fechaOperativa));
+  // En el teléfono, 10 cortes por página; en escritorio, siete días por página.
+  const movil = await esMovil();
+  const pg = movil ? paginaDeRegistros(filtrados, f.pagina, 10) : null;
+  const r = pg ?? rangoDePagina([...new Set(filtrados.map((c) => c.fechaOperativa))].sort().reverse(), f.pagina);
+  const cortes = pg ? pg.items : filtrados.filter((c) => (r as { dias: string[] }).dias.includes(c.fechaOperativa));
   // Faltantes de los últimos 30 días que nadie ha revisado.
   const hace30 = fechaLocal(new Date(Date.now() - 30 * 864e5), zona);
   const revisar = todos.filter((c) => (c.diferencia ?? 0) < 0 && !c.revisadoEn && c.fechaOperativa >= hace30);

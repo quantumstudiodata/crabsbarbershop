@@ -8,9 +8,9 @@ type Evidencia = { etiqueta: string; nombre: string; datos: string };
 
 /**
  * Evidencias del corte: fotos o archivos de las transferencias, los pagos con tarjeta u otra cosa.
- * Se puede abrir la cámara o elegir un archivo. Todo es opcional.
+ * Con la función activa son obligatorias: una por cada forma de pago (que no sea efectivo) que tuvo cobros.
  */
-export function EvidenciasCorte({ metodos }: { metodos: string[] }) {
+export function EvidenciasCorte({ metodos, requeridos }: { metodos: string[]; requeridos: string[] }) {
   const [lista, setLista] = useState<Evidencia[]>([]);
   const [error, setError] = useState<string | null>(null);
   const [etiqueta, setEtiqueta] = useState(metodos[0] ?? "Otra");
@@ -28,10 +28,14 @@ export function EvidenciasCorte({ metodos }: { metodos: string[] }) {
       setLista((l) => [...l, { etiqueta, nombre: f.name.slice(0, 120) || "foto", datos }]);
     } catch { setError("No se pudo leer el archivo."); }
   };
+  const faltan = requeridos.filter((m) => !lista.some((e) => e.etiqueta === m));
   return (
-    <div className="evid-c">
-      <span className="paso-t">Evidencias del corte (opcional)</span>
-      <small className="muted">Fotos o archivos de las transferencias, los pagos con tarjeta u otro comprobante.</small>
+    <details className="desglose evid-c">
+      <summary>Evidencias del corte
+        <span className={`chip-p ${faltan.length ? "alerta" : lista.length ? "si" : ""}`}>{faltan.length ? `Faltan ${faltan.length}` : lista.length ? `${lista.length} adjunta${lista.length === 1 ? "" : "s"}` : "Sin cobros que comprobar"}</span>
+      </summary>
+      <div className="evid-cuerpo">
+      <small className="muted">{requeridos.length ? `Adjunta una foto o archivo de: ${requeridos.join(", ").toLowerCase()}.` : "Puedes adjuntar fotos o archivos de cualquier comprobante."}</small>
       {lista.map((e, i) => (
         <span key={i} className="archivo-a evid-f">
           <input type="hidden" name="evidencia" value={e.datos} /><input type="hidden" name="evidenciaNombre" value={e.nombre} /><input type="hidden" name="evidenciaEtiqueta" value={e.etiqueta} />
@@ -49,6 +53,7 @@ export function EvidenciasCorte({ metodos }: { metodos: string[] }) {
         <button type="button" className="bt sec chico" onClick={() => archivo.current?.click()}><Icono n="clip" />Elegir archivo</button>
       </div>
       {error && <small className="error-a">{error}</small>}
-    </div>
+      </div>
+    </details>
   );
 }

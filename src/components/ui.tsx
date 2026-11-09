@@ -126,16 +126,19 @@ export function Selector({ name, opciones, valor, inicial, onChange, etiqueta, c
   );
 }
 
-/** Número que sube desde cero al aparecer. */
+/** Número que sube desde cero al aparecer y, si cambia (por ejemplo, entra una venta), pasa suave del valor anterior al nuevo. */
 export function Cuenta({ valor, formato = "dinero", duracion = 1100 }: { valor: number; formato?: "dinero" | "entero"; duracion?: number }) {
   const [v, setV] = useState(0);
+  const previo = useRef(0);
   useEffect(() => {
+    const desde = previo.current;
+    previo.current = valor;
     if (window.matchMedia?.("(prefers-reduced-motion: reduce)").matches) { setV(valor); return; }
     let raf = 0;
     const inicio = performance.now();
     const paso = (t: number) => {
       const p = Math.min((t - inicio) / duracion, 1);
-      setV(valor * (1 - Math.pow(1 - p, 3)));
+      setV(desde + (valor - desde) * (1 - Math.pow(1 - p, 3)));
       if (p < 1) raf = requestAnimationFrame(paso);
     };
     raf = requestAnimationFrame(paso);

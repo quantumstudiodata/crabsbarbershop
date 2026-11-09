@@ -17,7 +17,7 @@ export function periodoEncabezado(p: Periodo | null, hoy: string): { p: Periodo;
 const DIA = ["domingo", "lunes", "martes", "miércoles", "jueves", "viernes", "sábado"];
 
 /** Encabezado compacto de Ventas: total, una gráfica pequeña y tres conclusiones del periodo. */
-export async function CabeceraVentas({ barberiaId, zona, hoy, p, anterior, persona }: { barberiaId: string; zona: string; hoy: string; p: Periodo; anterior: boolean; persona?: string }) {
+export async function CabeceraVentas({ barberiaId, zona, hoy, p, anterior, persona, propias }: { barberiaId: string; zona: string; hoy: string; p: Periodo; anterior: boolean; persona?: string; propias?: boolean }) {
   const largo = diasEntre(p.desde, p.hasta) + 1;
   const tramo = diasEntre(p.desde, p.hasta > hoy ? hoy : p.hasta) + 1;
   const prevDesde = p.tipo === "mes" ? inicioDeMes(sumarDias(p.desde, -1)) : sumarDias(p.desde, -largo);
@@ -36,7 +36,7 @@ export async function CabeceraVentas({ barberiaId, zona, hoy, p, anterior, perso
     <>
       <section className="cab-v glass subir">
         <div className="cv-num">
-          <span className="lab">Ventas {p.tipo === "mes" ? `de ${p.etiqueta.split(" ")[0].toLowerCase()}` : p.tipo === "dia" ? `del ${fechaCorta(p.desde)}` : p.etiqueta.toLowerCase()}</span>
+          <span className="lab">{propias ? "Tus ventas" : "Ventas"} {p.tipo === "mes" ? `de ${p.etiqueta.split(" ")[0].toLowerCase()}` : p.tipo === "dia" ? `del ${fechaCorta(p.desde)}` : p.etiqueta.toLowerCase()}</span>
           <b className="num">{formatoDinero(r.netas)}</b>
           {v !== null && <span className="chip-p si">{v === 0 ? "Igual" : `${Math.abs(v)}% ${v > 0 ? "más" : "menos"}`} que {textoComp}</span>}
         </div>

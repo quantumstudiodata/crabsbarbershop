@@ -73,6 +73,8 @@ export function CalendarioFiltro({ p, hoy, todas = "Todas las fechas", conTodas 
       <button type="button" className={`campo-f ${p ? "con" : ""}`} aria-haspopup="dialog" aria-expanded={abierto} onClick={() => { setAbierto((a) => !a); setVista("dias"); }}>
         <Icono n="calendario" /><span>{p ? p.etiqueta : todas}</span><Icono n="abajo" />
       </button>
+      {/* En el teléfono el calendario es una ventana: el fondo se pone borroso y solo destaca el calendario. */}
+      {abierto && <div className="velo-cal" onClick={() => setAbierto(false)} aria-hidden="true" />}
       {abierto && (
         <div className="pop-cal" role="dialog" aria-label="Elegir fechas">
           <div className="atajos-cal">

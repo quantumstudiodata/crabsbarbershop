@@ -7,6 +7,7 @@ import { Aviso, AvisoUrl } from "@/components/Encabezado";
 import { Grafica } from "@/components/Grafica";
 import { Icono } from "@/components/Icono";
 import { VentasPorBarbero } from "./VentasPorBarbero";
+import { RefrescarConVentas } from "./RefrescarConVentas";
 import { UltimosServicios } from "./UltimosServicios";
 import { AvisoCajaEmergente } from "./AvisoCaja";
 import { Cuenta } from "@/components/ui";
@@ -107,11 +108,58 @@ export default async function Inicio({ searchParams }: { searchParams: Promise<Q
   return (
     <>
       {avisos}
-      <div className="subir">
+      <div className="subir saludo-i">
         <span className="lab">{fechaLarga(hoy)}</span>
         <h1 className="titulo brillo" style={{ fontSize: 30, marginTop: 8 }}>Hola, {s.usuario.nombre.split(" ")[0]}</h1>
       </div>
-      <section className="inicio-b">
+
+      {/* Móvil: lo esencial en una pantalla. En escritorio no se muestra. */}
+      <RefrescarConVentas />
+      <section className="solo-movil inicio-m">
+        <div className="glass im-hero subir d1">
+          <span className="lab">Ventas de hoy</span>
+          <b className="im-total num"><Cuenta valor={netas} /></b>
+          <small className="muted">{deHoy.length} {deHoy.length === 1 ? "cliente" : "clientes"}, {servicios} {servicios === 1 ? "servicio" : "servicios"}</small>
+          <span className="im-comp">{previoMismaHora || netas ? <>{netas - previoMismaHora >= 0 ? "+" : "−"}{formatoDinero(Math.abs(netas - previoMismaHora))} contra el {dia} pasado a esta hora</> : `El ${dia} pasado no había ventas a esta hora`}</span>
+        </div>
+        <div className="glass im-rend subir d2">
+          <span className="lab">Rendimiento</span>
+          <div className="im-fila"><span>Promedio por cliente</span><b className="num">{deHoy.length ? formatoDinero(Math.round(netas / deHoy.length)) : "Sin datos"}</b></div>
+          {s.barberia.usaMetas && (
+            <>
+              <div className="im-fila"><span>Meta diaria</span><b className="num">{formatoDinero(meta.monto)}</b></div>
+              <div className="im-meta"><i style={{ width: `${Math.max(Math.min(avance * 100, 100), 2)}%` }} /></div>
+              <small className="muted">{porcentaje(netas, meta.monto)}% de la meta alcanzada</small>
+            </>
+          )}
+        </div>
+        <div className="glass im-lista subir d3">
+          <div className="entre"><span className="lab">Equipo de hoy</span><Link className="im-ver" href="/analitica/ventas">Ver equipo</Link></div>
+          {equipo.length === 0 && <small className="muted">Todavía no hay barberos dados de alta.</small>}
+          {equipo.map((e) => {
+            const cs = deHoy.flatMap((v) => v.conceptos.filter((c) => c.barberoId === e.id));
+            return (
+              <div key={e.id} className="im-fila">
+                <span className="persona"><Avatar avatar={e.avatar} nombre={e.nombre} t={26} />{e.nombre.split(" ")[0]}</span>
+                <span className="muted">{cs.length} {cs.length === 1 ? "servicio" : "servicios"}</span>
+                <b className="num">{formatoDinero(cs.reduce((a, c) => a + c.precioCobrado, 0))}</b>
+              </div>
+            );
+          })}
+        </div>
+        <div className="glass im-lista subir d4">
+          <div className="entre"><span className="lab">Últimos servicios</span>{s.puede("ventas.ver_todas") && <Link className="im-ver" href="/analitica/ventas">Ver todos</Link>}</div>
+          {recientes.length === 0 && <small className="muted">Todavía no hay servicios cobrados.</small>}
+          {recientes.slice(0, 5).map((v) => (
+            <div key={v.id} className={`im-fila ${v.estado === "cancelada" ? "tachada" : ""}`}>
+              <span className="im-srv">{v.conceptos.map((c) => c.nombre).join(", ")}<small className="muted">{v.fecha === hoy ? horaCorta(v.creadoEn, zona) : fechaLarga(v.fecha)}, {v.conceptos[0]?.barbero.split(" ")[0]}</small></span>
+              <b className="num">{formatoDinero(v.total)}</b>
+            </div>
+          ))}
+        </div>
+      </section>
+
+      <section className="inicio-b solo-escritorio">
         <div className="hero-sin subir d1">
           <span className="lab">{modo === "hoy" ? "Ventas de hoy" : modo === "semana" ? "Ventas de la semana" : "Ventas del mes"}</span>
           <div className="big big-ini"><Cuenta valor={totalPeriodo} /></div>
@@ -149,7 +197,7 @@ export default async function Inicio({ searchParams }: { searchParams: Promise<Q
         </div>
       </section>
 
-      <section className="tira subir d3">
+      <section className="tira subir d3 solo-escritorio">
         <span className="lab">Equipo hoy</span>
         {equipo.length === 0 && <span className="muted">Todavía no hay barberos dados de alta.</span>}
         {equipo.map((e) => {
@@ -164,7 +212,7 @@ export default async function Inicio({ searchParams }: { searchParams: Promise<Q
         })}
       </section>
 
-      <section className="ultimos-s subir d3">
+      <section className="ultimos-s subir d3 solo-escritorio">
         <div className="entre">
           <h2 className="sub-t">Últimos servicios</h2>
           {s.puede("ventas.ver_todas") && <Link className="bt-ver" href="/analitica/ventas">Ver todas las ventas<span><Icono n="derecha" /></span></Link>}
@@ -282,14 +330,7 @@ async function InicioBarbero({ s, hoy, zona, q, avisos }: { s: Sesion; hoy: stri
             enCurso={"enCurso" in serie ? (serie.enCurso as number | undefined) : undefined}
             globos={serie.actual.map((v, i) => (v === null ? null : [modo === "hoy" ? `A las ${serie.etiquetas[i]}` : modo === "semana" ? nombreDia(new Date(`${sumarDias(lunes, i)}T12:00:00Z`).getUTCDay()) : `${serie.etiquetas[i]} de ${fechaLarga(hoy).split(" ").pop()}`, formatoDinero(v), modo === "hoy" ? "acumulado" : ""] as [string, string, string]))}
             descripcion={modo === "hoy" ? "Tus ventas de hoy por hora" : modo === "semana" ? "Tus ventas de la semana" : "Tus ventas del mes"} puntos={modo !== "hoy"} key={modo} vacio="Tu gráfica se dibuja con tu primer servicio" />
-          {s.barberia.usaMetas ? <div className="pila-chica">
-            <div className="entre">
-              <span className="muted" style={{ fontSize: 13 }}>{enHoy ? "Meta de hoy" : "Meta de la semana"}: <b style={{ color: "var(--fg)" }}>{formatoDinero(enHoy ? metaHoy : meta.monto)}</b><Ayuda titulo={enHoy ? "Meta de hoy" : "Meta de la semana"}>{mia?.aplica ? "Sale de la meta mensual del negocio y de tu forma de pago." : "Refleja tu meta de ventas y cuánto llevas de ella."}</Ayuda></span>
-              <b className="num">{porcentaje(enHoy ? totalHoy : semana, enHoy ? Math.max(metaHoy, 1) : meta.monto)}%</b>
-            </div>
-            <div className="meta grande"><i style={{ width: `${Math.max(avance * 100, 3)}%` }} /></div>
-            <small className="muted">Llevas {formatoDinero(enHoy ? totalHoy : semana)} {enHoy ? "hoy" : "esta semana"}.</small>
-          </div> : <small className="muted">Llevas {formatoDinero(semana)} esta semana.</small>}
+
         </div>
         <div className="glass panel subir d2">
           <div className="entre">
@@ -297,6 +338,14 @@ async function InicioBarbero({ s, hoy, zona, q, avisos }: { s: Sesion; hoy: stri
             <span className="muted" style={{ fontSize: 12 }}>{modo === "hoy" ? "Hoy" : modo === "semana" ? "Esta semana" : "Este mes"}</span>
           </div>
           <VentasPorBarbero filas={porBarbero} yo={yo} />
+          {s.barberia.usaMetas ? <div className="pila-chica meta-lado">
+            <div className="entre">
+              <span className="muted" style={{ fontSize: 13 }}>{enHoy ? "Meta de hoy" : "Meta de la semana"}: <b style={{ color: "var(--fg)" }}>{formatoDinero(enHoy ? metaHoy : meta.monto)}</b><Ayuda titulo={enHoy ? "Meta de hoy" : "Meta de la semana"}>{mia?.aplica ? "Sale de la meta mensual del negocio y de tu forma de pago." : "Refleja tu meta de ventas y cuánto llevas de ella."}</Ayuda></span>
+              <b className="num">{porcentaje(enHoy ? totalHoy : semana, enHoy ? Math.max(metaHoy, 1) : meta.monto)}%</b>
+            </div>
+            <div className="meta grande"><i style={{ width: `${Math.max(avance * 100, 3)}%` }} /></div>
+            <small className="muted">Llevas {formatoDinero(enHoy ? totalHoy : semana)} {enHoy ? "hoy" : "esta semana"}.</small>
+          </div> : <small className="muted meta-lado">Llevas {formatoDinero(semana)} esta semana.</small>}
         </div>
       </section>
 

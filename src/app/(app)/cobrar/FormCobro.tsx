@@ -37,6 +37,9 @@ export function FormCobro(p: {
   const [motivo, setMotivo] = useState("");
   const [propina, setPropina] = useState<{ tipo: "pct" | "fijo"; valor: string } | null>(null);
   const [ultima, setUltima] = useState<{ folio: string; total: number } | null>(null);
+  // En el teléfono: una sola categoría abierta a la vez y el resumen de la venta en un panel inferior.
+  const [catAbierta, setCatAbierta] = useState<string | null>(null);
+  const [hoja, setHoja] = useState(false);
   const raiz = useRef<HTMLFormElement>(null);
 
   const limpiar = () => {
@@ -50,6 +53,7 @@ export function FormCobro(p: {
     if (estado.ok && estado.folio && estado.folio !== atendido.current) {
       atendido.current = estado.folio;
       setUltima({ folio: estado.folio, total: estado.total ?? 0 });
+      setHoja(false);
       limpiar();
     }
   }, [estado]);
@@ -145,6 +149,8 @@ export function FormCobro(p: {
   const filtro = sinAcentos(buscar.trim());
   const visibles = p.servicios.filter((s) => !filtro || sinAcentos(`${s.nombre} ${s.categoria}`).includes(filtro));
   const categorias = [...new Set(visibles.map((s) => s.categoria))];
+  const abierta = buscar.trim() ? null : catAbierta ?? categorias[0] ?? null;
+  const nServ = lineas.reduce((a, l) => a + l.cantidad, 0);
   const personas = p.equipo.filter((e) => p.puedeOtros || e.id === p.yo);
 
   return (
@@ -158,8 +164,13 @@ export function FormCobro(p: {
 
         {categorias.length === 0 && <p className="muted">No hay servicios con ese nombre.</p>}
         {categorias.map((c) => (
-          <section key={c} className="pila-chica">
-            <span className="lab">{c}</span>
+          <section key={c} className={`pila-chica cat-cobro ${!buscar.trim() && abierta !== c ? "cerrada" : ""}`}>
+            <span className="lab solo-escritorio-b">{c}</span>
+            <button type="button" className="cat-btn" aria-expanded={!buscar.trim() ? abierta === c : true} onClick={() => setCatAbierta(abierta === c ? "" : c)}>
+              <span>{c}</span><small>{visibles.filter((s) => s.categoria === c).length}</small>
+              {lineas.some((l) => visibles.find((s) => s.id === l.servicioId)?.categoria === c) && <i className="punto-cat" aria-label="Con servicios elegidos" />}
+              <Icono n="abajo" />
+            </button>
             <div className="servicios-g">
               {visibles.filter((s) => s.categoria === c).map((s) => {
                 const l = lineas.find((x) => x.servicioId === s.id);
@@ -186,8 +197,19 @@ export function FormCobro(p: {
         </section>
       </div>
 
-      <aside className="glass ticket" aria-label="Esta venta">
-        <h2 className="titulo">Esta venta</h2>
+      {/* Teléfono: barra fija con lo elegido; al tocarla se abre la venta como panel inferior. */}
+      <div className={`barra-cobro ${nServ ? "con" : ""}`}>
+        <button type="button" className="bc-info" onClick={() => setHoja(true)} disabled={!nServ}>
+          <b>{nServ ? `${nServ} ${nServ === 1 ? "servicio seleccionado" : "servicios seleccionados"}` : "Elige un servicio"}</b>
+          <small>{nServ ? "Ver detalle de la venta" : ultima ? `Venta ${ultima.folio} cobrada` : "Toca un servicio para agregarlo"}</small>
+        </button>
+        <span className="bc-total num">{formatoDinero(total)}</span>
+        <button type="button" className="bt" disabled={!nServ} onClick={() => setHoja(true)}>Cobrar</button>
+      </div>
+      {hoja && <div className="velo-hoja" onClick={() => setHoja(false)} aria-hidden="true" />}
+
+      <aside className={`glass ticket ${hoja ? "hoja-abierta" : ""}`} aria-label="Esta venta">
+        <div className="entre cab-hoja"><h2 className="titulo">Esta venta</h2><button type="button" className="icb cerrar-hoja" onClick={() => setHoja(false)} aria-label="Cerrar"><Icono n="cerrar" /></button></div>
         {ultima && lineas.length === 0 && (
           <p className="aviso ok" role="status">Venta <b>{ultima.folio}</b> cobrada por <b>{formatoDinero(ultima.total)}</b>.</p>
         )}
