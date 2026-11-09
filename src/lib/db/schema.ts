@@ -62,6 +62,15 @@ export const barberias = pgTable("barberias", {
   // Al cerrar la caja se pueden adjuntar fotos o archivos (comprobantes de transferencias, vouchers de tarjeta).
   usaEvidenciaCorte: boolean("usa_evidencia_corte").notNull().default(false),
   usaPromociones: boolean("usa_promociones").notNull().default(false),
+  // Citas y reservaciones en línea. La dirección pública es /reservar/<slug>.
+  usaCitas: boolean("usa_citas").notNull().default(false),
+  slug: text("slug"),
+  // Horario del negocio por día de la semana (0 = domingo): { "1": ["10:00", "20:00"], ... }; día sin entrada = cerrado.
+  horario: jsonb("horario").$type<Record<string, [string, string]>>().notNull().default({ "1": ["10:00", "20:00"], "2": ["10:00", "20:00"], "3": ["10:00", "20:00"], "4": ["10:00", "20:00"], "5": ["10:00", "20:00"], "6": ["10:00", "20:00"] }),
+  // Días en que el negocio cierra (festivos): ["2026-12-25", ...]
+  diasCerrados: jsonb("dias_cerrados").$type<string[]>().notNull().default([]),
+  // Reglas de las reservaciones: anticipación, margen entre citas, opciones del cliente, pago y políticas.
+  citasConfig: jsonb("citas_config").$type<Record<string, unknown>>().notNull().default({}),
   usaComprobantes: boolean("usa_comprobantes").notNull().default(true),
   usaPeriodicidad: boolean("usa_periodicidad").notNull().default(true),
   // Formas de pago que se pueden usar al registrar un egreso.
@@ -96,6 +105,10 @@ export const usuarios = pgTable(
     avatar: text("avatar").notNull().default("tijera"),
     // Meta personal de ventas por semana (centavos). 0 = sin meta.
     metaSemanal: integer("meta_semanal").notNull().default(0),
+    // Horario propio por día (igual formato que el del negocio). Vacío: trabaja en el horario del negocio.
+    horario: jsonb("horario").$type<Record<string, [string, string]> | null>(),
+    // Si aparece en la agenda y en las reservaciones en línea.
+    atiendeCitas: boolean("atiende_citas").notNull().default(true),
     // Contraseña temporal cifrada, consultable por 30 minutos después de restablecerla.
     claveTemporal: text("clave_temporal"),
     claveTemporalExpira: timestamp("clave_temporal_expira", { withTimezone: true }),
@@ -649,4 +662,101 @@ export const faltantesCaja = pgTable(
     creadoEn: creadoEn(),
   },
   (t) => [index("faltantes_caja_usuario_idx").on(t.usuarioId, t.fecha), index("faltantes_caja_turno_idx").on(t.turnoId)],
+);
+
+// Descanso que se rota cada semana entre dos personas (por ejemplo, lunes y miércoles).
+// En la semana de inicio, la persona 1 descansa el día 1 y la persona 2 el día 2; la semana siguiente se invierten.
+export const rotacionesDescanso = pgTable("rotaciones_descanso", {
+  id: id(),
+  barberiaId: barberiaId(),
+  persona1: uuid("persona1").notNull().references(() => usuarios.id),
+  persona2: uuid("persona2").notNull().references(() => usuarios.id),
+  dia1: integer("dia1").notNull(),
+  dia2: integer("dia2").notNull(),
+  // Lunes de la semana en la que empieza la rotación.
+  semanaInicio: date("semana_inicio").notNull(),
+  activo: boolean("activo").notNull().default(true),
+  creadoEn: creadoEn(),
+});
+
+// Horarios bloqueados: comida, ausencia, vacaciones. Sin persona = bloquea a todo el negocio.
+export const bloqueosAgenda = pgTable(
+  "bloqueos_agenda",
+  {
+    id: id(),
+    barberiaId: barberiaId(),
+    usuarioId: uuid("usuario_id").references(() => usuarios.id),
+    inicio: timestamp("inicio", { withTimezone: true }).notNull(),
+    fin: timestamp("fin", { withTimezone: true }).notNull(),
+    motivo: text("motivo").notNull().default(""),
+    creadoPor: uuid("creado_por").references(() => usuarios.id),
+    creadoEn: creadoEn(),
+  },
+  (t) => [index("bloqueos_agenda_idx").on(t.barberiaId, t.inicio)],
+);
+
+// Citas. "apartada" es un horario guardado unos minutos mientras el cliente termina (por ejemplo, el pago).
+export const citas = pgTable(
+  "citas",
+  {
+    id: id(),
+    barberiaId: barberiaId(),
+    folio: text("folio").notNull(),
+    clienteNombre: text("cliente_nombre").notNull(),
+    clienteTelefono: text("cliente_telefono").notNull(),
+    barberoId: uuid("barbero_id").notNull().references(() => usuarios.id),
+    // El cliente eligió "cualquier barbero".
+    indiferente: boolean("indiferente").notNull().default(false),
+    inicio: timestamp("inicio", { withTimezone: true }).notNull(),
+    fin: timestamp("fin", { withTimezone: true }).notNull(),
+    duracionMin: integer("duracion_min").notNull(),
+    // [{ servicioId, nombre, precio, duracionMin, descuento, promocionId }]
+    servicios: jsonb("servicios").$type<{ servicioId: string; nombre: string; precio: number; duracionMin: number; descuento: number; promocionId: string | null }[]>().notNull(),
+    total: integer("total").notNull(),
+    pagado: integer("pagado").notNull().default(0),
+    metodoPago: text("metodo_pago"),
+    // sin_pago | anticipo | pagada
+    estadoPago: text("estado_pago").notNull().default("sin_pago"),
+    // apartada | en_espera | llego | en_atencion | completada | no_asistio | cancelada | expirada
+    estado: text("estado").notNull().default("en_espera"),
+    observaciones: text("observaciones").notNull().default(""),
+    // linea | negocio
+    origen: text("origen").notNull().default("negocio"),
+    // Enlace privado del cliente para ver, cambiar o cancelar su cita.
+    token: text("token").notNull(),
+    expiraEn: timestamp("expira_en", { withTimezone: true }),
+    ventaId: uuid("venta_id").references(() => ventas.id),
+    motivoCancelacion: text("motivo_cancelacion"),
+    creadoPor: uuid("creado_por").references(() => usuarios.id),
+    creadoEn: creadoEn(),
+    actualizadoEn: timestamp("actualizado_en", { withTimezone: true }).notNull().defaultNow(),
+  },
+  (t) => [
+    index("citas_agenda_idx").on(t.barberiaId, t.inicio),
+    index("citas_barbero_idx").on(t.barberoId, t.inicio),
+    uniqueIndex("citas_token_uq").on(t.token),
+    uniqueIndex("citas_folio_uq").on(t.barberiaId, t.folio),
+  ],
+);
+
+// Avisos por enviar (al cliente o al negocio). Se guardan aquí; el envío por WhatsApp u otro medio se conecta después.
+export const notificacionesCita = pgTable(
+  "notificaciones_cita",
+  {
+    id: id(),
+    barberiaId: barberiaId(),
+    citaId: uuid("cita_id").references(() => citas.id),
+    // reserva_confirmada | pago_confirmado | cita_modificada | cita_cancelada | recordatorio | nueva_reserva
+    tipo: text("tipo").notNull(),
+    // cliente | negocio
+    para: text("para").notNull(),
+    destino: text("destino").notNull().default(""),
+    mensaje: text("mensaje").notNull(),
+    // pendiente | enviada | omitida
+    estado: text("estado").notNull().default("pendiente"),
+    programadaPara: timestamp("programada_para", { withTimezone: true }).notNull().defaultNow(),
+    enviadaEn: timestamp("enviada_en", { withTimezone: true }),
+    creadoEn: creadoEn(),
+  },
+  (t) => [index("notificaciones_cita_idx").on(t.barberiaId, t.estado, t.programadaPara)],
 );

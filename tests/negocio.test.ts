@@ -105,7 +105,7 @@ describe("permisos", () => {
     // En el local hay una sola computadora: un barbero puede cobrar lo que hizo otra persona.
     expect(permisosDe("barbera").has("ventas.registrar_otros")).toBe(true);
     expect(permisosDe("barbera").has("caja.operar")).toBe(true);
-    expect(permisosDe("barbera", ["no.existe"]).size).toBe(4);
+    expect(permisosDe("barbera", ["no.existe"]).size).toBe(6);
     expect(permisosDe("contador").has("ventas.registrar")).toBe(false);
     expect(permisosDe("contador").has("reportes.exportar")).toBe(true);
     // El titular puede crear Soporte técnico; nadie puede crear el rol de encargado (ya no existe).
@@ -125,7 +125,8 @@ describe("permisos", () => {
     expect(t.has("usuarios.editar")).toBe(true);
     // Un puesto personalizado manda sobre la plantilla.
     const r = permisosDe("duena", [], [], ["ventas.registrar"]);
-    expect([...r]).toEqual(["ventas.registrar"]);
+    // Un puesto de antes de las citas puede consultarlas.
+    expect([...r]).toEqual(["ventas.registrar", "citas.ver"]);
   });
 });
 

@@ -23,7 +23,7 @@ export const dynamic = "force-dynamic";
 export default async function LayoutApp({ children }: { children: React.ReactNode }) {
   const s = await requerirSesion();
   const rol = s.usuario.rol;
-  const { items, sub: subAnalitica, atiende } = menuDe(rol, s.puede);
+  const { items, sub: subAnalitica, atiende } = menuDe(rol, s.puede, s.barberia.usaCitas);
   const soporte = s.usuario.esSoporte;
   const experiencias = soporte ? [
     ...PLANTILLAS.map((r) => ({ como: r, texto: NOMBRE_ROL[r] })),
