@@ -4,6 +4,7 @@ import { redirect } from "next/navigation";
 import { Avatar } from "@/components/Avatar";
 import { Ayuda } from "@/components/Ayuda";
 import { Aviso, AvisoUrl } from "@/components/Encabezado";
+import { esMovil } from "@/lib/dispositivo";
 import { Grafica } from "@/components/Grafica";
 import { Icono } from "@/components/Icono";
 import { VentasPorBarbero } from "./VentasPorBarbero";
@@ -117,15 +118,15 @@ export default async function Inicio({ searchParams }: { searchParams: Promise<Q
       <RefrescarConVentas />
       <section className="solo-movil inicio-m">
         <div className="glass im-hero subir d1">
-          <span className="lab">Ventas de hoy</span>
-          <b className="im-total num"><Cuenta valor={netas} /></b>
-          <small className="muted">{deHoy.length} {deHoy.length === 1 ? "cliente" : "clientes"}, {servicios} {servicios === 1 ? "servicio" : "servicios"}</small>
-          {(() => { const sh = serieHoy(movs, hoy, zona); return (
-            <div className="im-graf">
-              <Grafica id="inicio-movil" actual={sh.actual} previo={sh.previo} etiquetas={sh.etiquetas} cadaEtiqueta={sh.cada} alto={70} enCurso={sh.enCurso} descripcion="Ventas acumuladas de hoy por hora" vacio="Se dibuja con la primera venta" />
-            </div>
-          ); })()}
-          <span className="im-comp">{previoMismaHora || netas ? <>{netas - previoMismaHora >= 0 ? "+" : "−"}{formatoDinero(Math.abs(netas - previoMismaHora))} contra el {dia} pasado a esta hora</> : `El ${dia} pasado no había ventas a esta hora`}</span>
+          <div className="entre im-cab"><span className="lab">{modo === "hoy" ? "Ventas de hoy" : modo === "semana" ? "Ventas de la semana" : "Ventas del mes"}</span><SelectorGrafica modo={modo} conMes /></div>
+          <b className="im-total num"><Cuenta valor={totalPeriodo} /></b>
+          {modo === "hoy" && <small className="muted">{deHoy.length} {deHoy.length === 1 ? "cliente" : "clientes"}, {servicios} {servicios === 1 ? "servicio" : "servicios"}</small>}
+          <div className="im-graf">
+            <Grafica key={`m-${modo}`} id={`inicio-movil-${modo}`} actual={serie.actual} previo={serie.previo} etiquetas={serie.etiquetas} cadaEtiqueta={serie.cada} alto={150} enCurso={serie.enCurso} puntos={modo !== "hoy"} descripcion={modo === "hoy" ? "Ventas acumuladas de hoy por hora" : modo === "semana" ? "Ventas de la semana" : "Ventas del mes"} vacio="Se dibuja con la primera venta" />
+          </div>
+          <span className="im-comp">{modo === "hoy"
+            ? (previoMismaHora || netas ? <>{netas - previoMismaHora >= 0 ? "+" : "−"}{formatoDinero(Math.abs(netas - previoMismaHora))} contra el {dia} pasado a esta hora</> : `El ${dia} pasado no había ventas a esta hora`)
+            : varPeriodo === null ? "Sin registros en el periodo anterior" : `${Math.abs(varPeriodo)}% ${varPeriodo >= 0 ? "más" : "menos"} que ${modo === "semana" ? "la semana pasada" : "el mes pasado"} a estas alturas`}</span>
         </div>
         <div className="glass im-rend subir d2">
           <span className="lab">Rendimiento</span>
@@ -247,6 +248,7 @@ export default async function Inicio({ searchParams }: { searchParams: Promise<Q
 }
 
 async function InicioBarbero({ s, hoy, zona, q, avisos }: { s: Sesion; hoy: string; zona: string; q: Q; avisos: React.ReactNode }) {
+  const movil = await esMovil();
   const yo = s.usuario.id;
   const lunes = lunesDe(hoy);
   const [{ ventas }, [u], historia] = await Promise.all([
@@ -330,7 +332,7 @@ async function InicioBarbero({ s, hoy, zona, q, avisos }: { s: Sesion; hoy: stri
             <div style={{ textAlign: "right" }}><span className="lab">Servicios</span><span className="fig" style={{ fontSize: 30 }}><Cuenta valor={deHoy.length} formato="entero" /></span></div>
           </div>
           <div className="entre"><Comparacion hoy={totalHoy} previo={previo} dia={dia} /><SelectorGrafica modo={modo} conMes /></div>
-          <Grafica id={`barbero-${modo}`} actual={serie.actual} previo={serie.previo} etiquetas={serie.etiquetas} cadaEtiqueta={serie.cada} alto={ALTO_GRAFICA}
+          <Grafica id={`barbero-${modo}`} actual={serie.actual} previo={serie.previo} etiquetas={serie.etiquetas} cadaEtiqueta={serie.cada} alto={movil ? 140 : ALTO_GRAFICA}
             enCurso={"enCurso" in serie ? (serie.enCurso as number | undefined) : undefined}
             globos={serie.actual.map((v, i) => (v === null ? null : [modo === "hoy" ? `A las ${serie.etiquetas[i]}` : modo === "semana" ? nombreDia(new Date(`${sumarDias(lunes, i)}T12:00:00Z`).getUTCDay()) : `${serie.etiquetas[i]} de ${fechaLarga(hoy).split(" ").pop()}`, formatoDinero(v), modo === "hoy" ? "acumulado" : ""] as [string, string, string]))}
             descripcion={modo === "hoy" ? "Tus ventas de hoy por hora" : modo === "semana" ? "Tus ventas de la semana" : "Tus ventas del mes"} puntos={modo !== "hoy"} key={modo} vacio="Tu gráfica se dibuja con tu primer servicio" />

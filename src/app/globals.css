@@ -2310,3 +2310,31 @@ html:has(.capa) body, html:has(.velo-c) body, html:has(.velo-hoja) body, html:ha
   :where(main, main *):has(.pop-cal, .velo-cal, .ticket.hoja-abierta, .hoja-semana-m, .capa) { -webkit-backdrop-filter: none !important; backdrop-filter: none !important; transform: none !important; filter: none !important; animation: none !important; contain: none !important; will-change: auto !important; }
   .pop-cal { margin: auto 0 !important; }
 }
+@media (max-width: 760px) {
+  /* Inicio administrativo: selector Hoy, Semana, Mes junto al título. */
+  .im-cab { align-items: center; gap: 8px; }
+  .im-cab .seg.chico a { padding: 5px 10px; font-size: 12px; }
+  .im-graf .ejes { font-size: 10px; }
+
+  /* Inicio de barbero: más compacto al final. */
+  .inicio-b { gap: 12px; }
+  .inicio-b .hero-sin { gap: 10px !important; }
+  .inicio-b .glass.panel { padding: 14px 16px; gap: 10px; }
+  .inicio-b .vpb { gap: 8px; }
+  .inicio-b .vpb-n b, .inicio-b .vpb-n strong { font-size: 14px; }
+  .inicio-b .vpb small, .inicio-b .vpb .muted { font-size: 11.5px; }
+  .inicio-b .vpb .num { font-size: 14px; }
+  .inicio-b .meta-lado { font-size: 13px; gap: 6px; padding-top: 10px; }
+  .inicio-b .grafica-vacia { font-size: 12px; padding: 5px 12px; }
+  .cab-ult, .ultimos-cab { margin-top: 4px; }
+  .sub-t { font-size: 18px; }
+  .bt-ver { font-size: 12.5px; padding: 6px 6px 6px 12px; }
+  .bt-ver span { width: 22px; height: 22px; }
+  .historial .ultimo-l { padding: 8px 10px; gap: 8px; font-size: 13px; }
+  .historial .ultimo-l .t { font-size: 11px; }
+  .historial .ultimo-l .srv small { font-size: 11.5px; }
+}
+@media (max-width: 760px) {
+  .inicio-b .vpb-f { grid-template-columns: 30px minmax(0, 1fr) minmax(40px, 70px) auto; gap: 10px; }
+  .inicio-b .vpb-f .avatar, .inicio-b .vpb-f > :first-child { width: 30px !important; height: 30px !important; }
+}
