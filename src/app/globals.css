@@ -2338,3 +2338,6 @@ html:has(.capa) body, html:has(.velo-c) body, html:has(.velo-hoja) body, html:ha
   .inicio-b .vpb-f { grid-template-columns: 30px minmax(0, 1fr) minmax(40px, 70px) auto; gap: 10px; }
   .inicio-b .vpb-f .avatar, .inicio-b .vpb-f > :first-child { width: 30px !important; height: 30px !important; }
 }
+@media (max-width: 760px) {
+  .historial .hist-linea.ultimo-l { padding-top: 6px; padding-bottom: 6px; }
+}

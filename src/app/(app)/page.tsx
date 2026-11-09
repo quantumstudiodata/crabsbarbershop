@@ -301,7 +301,7 @@ async function InicioBarbero({ s, hoy, zona, q, avisos }: { s: Sesion; hoy: stri
     return { id: g.id, nombre: g.nombre, avatar: g.avatar, servicios: cs.length, monto: cs.reduce((a, c) => a + c.precioCobrado, 0) };
   }).sort((a, b) => b.monto - a.monto);
   // Últimos servicios: los de todo el equipo, con el mismo formato que ven los demás puestos.
-  const ultimosPropios = todas.slice(0, 10).map((v) => {
+  const ultimosPropios = todas.slice(0, movil ? 5 : 10).map((v) => {
     const quien = gente.find((g) => g.id === v.conceptos[0]?.barberoId);
     return {
       id: v.id, folio: v.folio, cancelada: v.estado === "cancelada", monto: formatoDinero(v.total),
