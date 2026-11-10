@@ -98,6 +98,13 @@ function InicioVista(v: Vista) {
   const pct = v.meta ? porcentaje(v.total, v.meta.monto) : 0;
   const barra = v.meta ? <div className="ini-meta" role="progressbar" aria-valuemin={0} aria-valuemax={100} aria-valuenow={Math.min(pct, 100)} aria-label="Avance de la meta"><i style={{ width: `${Math.max(Math.min(pct, 100), 2)}%` }} /></div> : null;
   const siguiente = v.citas?.[0];
+  const listaEquipo = v.equipo.length ? v.equipo.map((e) => (
+    <div key={e.id} className="ini-eq">
+      <Avatar avatar={e.avatar} nombre={e.nombre} t={28} />
+      <span>{e.nombre.split(" ")[0]}{e.id === s.usuario.id && v.barbero && <small className="muted"> (tú)</small>}</span>
+      <span className="ini-eq-m"><b>{formatoDinero(e.monto)}</b>{e.meta ? <small className="muted">de {formatoDinero(e.meta)}</small> : e.servicios ? <small className="muted">{e.servicios} {e.servicios === 1 ? "servicio" : "servicios"}</small> : null}</span>
+    </div>
+  )) : <p className="muted ini-vacio">Todavía no hay personas que atiendan.</p>;
   return (
     <>
       {v.avisos}
@@ -126,6 +133,10 @@ function InicioVista(v: Vista) {
           <div className="entre"><span><b>{siguiente.hora}</b> {siguiente.cliente}</span><span className="muted">{v.barbero ? siguiente.servicio : `con ${siguiente.con}`}</span></div>
         </section>
       )}
+      <section className="glass ini-card ini-eq-m-card solo-movil subir d2">
+        <div className="entre"><span className="lab">Equipo hoy</span>{v.verVentas && <Link className="ini-link" href="/analitica/ventas">Ventas</Link>}</div>
+        {listaEquipo}
+      </section>
 
       {/* Escritorio */}
       <div className="ini-rejilla solo-escritorio">
@@ -163,18 +174,12 @@ function InicioVista(v: Vista) {
           )}
           <section className="glass ini-card subir d2">
             <span className="lab">Equipo hoy</span>
-            {v.equipo.length ? v.equipo.map((e) => (
-              <div key={e.id} className="ini-eq">
-                <Avatar avatar={e.avatar} nombre={e.nombre} t={28} />
-                <span>{e.nombre.split(" ")[0]}{e.id === s.usuario.id && v.barbero && <small className="muted"> (tú)</small>}</span>
-                <span className="ini-eq-m"><b>{formatoDinero(e.monto)}</b>{e.meta ? <small className="muted">de {formatoDinero(e.meta)}</small> : e.servicios ? <small className="muted">{e.servicios} {e.servicios === 1 ? "servicio" : "servicios"}</small> : null}</span>
-              </div>
-            )) : <p className="muted ini-vacio">Todavía no hay personas que atiendan.</p>}
+            {listaEquipo}
           </section>
         </div>
       </div>
 
-      <section className="ultimos-s subir d3 solo-escritorio">
+      <section className="ultimos-s subir d3">
         <div className="entre">
           <h2 className="sub-t">Últimos servicios</h2>
           {v.verVentas && <Link className="bt-ver" href="/analitica/ventas">Ver todas las ventas<span><Icono n="derecha" /></span></Link>}

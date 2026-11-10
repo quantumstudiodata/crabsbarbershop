@@ -11,6 +11,7 @@ import { formatoDinero } from "@/lib/money";
 import {
   agendarCita, bloquearHorario, cambiarEstadoCita, horariosCita, cancelarCita, guardarHorarioPersona, guardarRotacion, horariosAgenda, quitarBloqueo, quitarRotacion, reprogramarCita, type Res,
 } from "./actions";
+import { NuevaCita } from "./NuevaCita";
 
 export type CitaVista = {
   id: string; folio: string; cliente: string; telefono: string; barberoId: string; barbero: string; indiferente: boolean;
@@ -110,7 +111,7 @@ export function PantallaCitas(p: {
       {p.vista === "horarios" && <VistaHorarios {...p} avisar={setAviso} />}
 
       {ver && <DetalleCita c={ver} cerrar={() => setVer(null)} puede={p.puede} equipo={p.equipo} avisar={setAviso} />}
-      {agendar && <Agendar equipo={p.equipo} servicios={p.servicios} dia={p.dia} hoy={p.hoy} cerrar={() => setAgendar(false)} avisar={setAviso} />}
+      {agendar && <NuevaCita equipo={p.equipo} servicios={p.servicios} dia={p.dia} hoy={p.hoy} horario={p.horarioNegocio} cerrados={p.cerrados} cerrar={() => setAgendar(false)} avisar={setAviso} />}
     </>
   );
 }
