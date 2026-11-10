@@ -3513,3 +3513,10 @@ a.eq2-fila:hover { background: rgba(255,255,255,.45); }
   .rs-c, .rs-c.dos { grid-template-columns: minmax(0, 1fr); gap: 12px; } .rs-b { gap: 12px; }
   .rs-card { padding: 16px 18px; }
 }
+/* Resumen: las tarjetas de cada fila miden lo mismo; la gráfica crece y su pie queda abajo. */
+.rs-b, .rs-c { align-items: stretch; }
+.rs-card { align-content: start; }
+.rs-b > .rs-card:first-child { display: flex; flex-direction: column; }
+.rs-b > .rs-card:first-child > .grafica { flex: 1; display: flex; flex-direction: column; justify-content: center; }
+.rs-b > .rs-card:first-child > .rs-pie { margin-top: auto; }
+.rs-c > .rs-card { display: flex; flex-direction: column; gap: 12px; } .rs-c > .rs-card > .rs-nota { margin-top: auto; }

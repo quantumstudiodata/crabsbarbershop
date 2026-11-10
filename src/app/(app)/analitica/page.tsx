@@ -122,7 +122,7 @@ export default async function Resumen({ searchParams }: { searchParams: Promise<
           <div className="rs-cab"><b>Actividad de ventas</b><span className="fila" style={{ gap: 12 }}><span className="leyenda-mv"><span><i className="l-act" />{nombreP}</span><span><i className="l-prev" />{nombrePrev}</span></span>{s.puede("ventas.ver_todas") && <Ir href="/analitica/ventas" titulo="Ir a Ventas" />}</span></div>
           {largo > 1 && largo <= 62
             ? <Grafica id="resumen" actual={dias.map((d) => (d <= hoy ? r.porDia.get(d) ?? 0 : null))} previo={dias.map((_, i) => prevCompleto.porDia.get(sumarDias(prevDesde, i)) ?? 0)}
-                etiquetas={dias.map((d) => (largo <= 7 ? DIA[new Date(`${d}T12:00:00Z`).getUTCDay()] : String(Number(d.slice(8)))))} cadaEtiqueta={largo <= 7 ? 1 : 5} alto={180} descripcion={`Ventas por día de ${nombreP} y ${nombrePrev}`} vacio="Sin ventas en estas fechas" />
+                etiquetas={dias.map((d) => (largo <= 7 ? DIA[new Date(`${d}T12:00:00Z`).getUTCDay()] : String(Number(d.slice(8)))))} cadaEtiqueta={largo <= 7 ? 1 : 5} alto={210} descripcion={`Ventas por día de ${nombreP} y ${nombrePrev}`} vacio="Sin ventas en estas fechas" />
             : <p className="muted">Elige un mes o una semana para ver la gráfica.</p>}
           <div className="rs-pie">
             {mejor && mejor[1] > 0 && <span>Mejor día: <b>{DIA_L[new Date(`${mejor[0]}T12:00:00Z`).getUTCDay()]} {Number(mejor[0].slice(8))}, {$(mejor[1])}</b></span>}
