@@ -72,7 +72,7 @@ async function accionesDe(s: Sesion, turno: Turno | null | undefined, hoy: strin
   const a: AccionInicio[] = [];
   if (s.puede("ventas.registrar") || s.puede("ventas.registrar_otros")) a.push({ k: "cobrar", href: "/cobrar", texto: "Cobrar", corto: "Cobrar", icono: "cobro", principal: true, dato: turno ? `Caja abierta desde ${horaCorta(turno.abiertoEn, zona)}` : "Abre la caja al cobrar" });
   if (s.barberia.usaCitas && s.puede("citas.modificar")) a.push({ k: "cita", href: "/citas?nueva=1", texto: "Nueva cita", corto: "Nueva cita", icono: "calendario", dato: citasHoy ? `${citasHoy} por llegar` : undefined });
-  if (barbero && citasHoy !== null) a.push({ k: "mias", href: `/citas?persona=${yo}`, texto: "Mis citas de hoy", corto: "Mis citas", icono: "reloj", dato: citasHoy ? `${citasHoy} por llegar` : "Sin pendientes" });
+  if (barbero && citasHoy !== null) a.push({ k: "mias", href: `/citas?vista=lista&persona=${yo}`, texto: "Mis citas de hoy", corto: "Mis citas", icono: "reloj", dato: citasHoy ? `${citasHoy} por llegar` : "Sin pendientes" });
   if (barbero) a.push({ k: "ventas", href: "/analitica/ventas", texto: "Mis ventas", corto: "Mis ventas", icono: "lista" });
   if (!barbero && s.puede("gastos.registrar")) a.push({ k: "egreso", href: "/analitica/finanzas?egreso=1", texto: "Registrar egreso", corto: "Egreso", icono: "archivo" });
   if (!barbero && s.puede("caja.operar") && turno) a.push({ k: "corte", href: "/cobrar?caja=cerrar", texto: "Corte de caja", corto: "Corte", icono: "candado", aviso: corteAtrasado, dato: corteAtrasado ? "Pendiente" : undefined });

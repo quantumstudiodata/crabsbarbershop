@@ -2,7 +2,7 @@
 
 import Link from "next/link";
 import { useRouter } from "next/navigation";
-import { useEffect, useMemo, useState, useTransition } from "react";
+import { useEffect, useMemo, useRef, useState, useTransition } from "react";
 import { Avatar } from "@/components/Avatar";
 import { Fl, Icono } from "@/components/Icono";
 import { Modal, Selector } from "@/components/ui";
@@ -36,7 +36,7 @@ const fechaTxt = (f: string) => `${DIAS_L[dow(f)]} ${Number(f.slice(8))} de ${["
 const activa = (e: string) => ["apartada", "en_espera", "llego", "en_atencion"].includes(e);
 
 export function PantallaCitas(p: {
-  abrirNueva?: boolean;
+  abrirNueva?: boolean; porDefecto: "lista" | "semana";
   hoy: string; dia: string; vista: "lista" | "calendario" | "semana" | "horarios"; persona: string; citas: CitaVista[]; ahora: number;
   equipo: Persona[]; servicios: Servicio[]; horarioNegocio: Horario; cerrados: string[]; conteo: Record<string, number>;
   rotacion: Rot | null; bloqueos: { id: string; persona: string; fecha: string; desde: string; hasta: string; motivo: string }[];
@@ -46,12 +46,11 @@ export function PantallaCitas(p: {
   const [ver, setVer] = useState<CitaVista | null>(null);
   const [agendar, setAgendar] = useState(!!p.abrirNueva && p.puede.modificar);
   const [aviso, setAviso] = useState<Res>({});
-  const [copiado, setCopiado] = useState(false);
   const url = (x: Partial<{ dia: string; vista: string; persona: string }>) => {
     const u = new URLSearchParams();
     const d = x.dia ?? p.dia, v = x.vista ?? p.vista, pe = x.persona ?? p.persona;
     if (d !== p.hoy) u.set("dia", d);
-    if (v !== "lista") u.set("vista", v);
+    if (v !== p.porDefecto) u.set("vista", v);
     if (pe) u.set("persona", pe);
     const t = u.toString();
     return `/citas${t ? `?${t}` : ""}`;
@@ -60,10 +59,14 @@ export function PantallaCitas(p: {
   const lunes = lunesDe(p.dia);
   const semana = Array.from({ length: 7 }, (_, i) => sumar(lunes, i));
 
-  const copiar = () => {
-    if (!p.enlace) return;
-    navigator.clipboard?.writeText(`${window.location.origin}${p.enlace}`).then(() => { setCopiado(true); setTimeout(() => setCopiado(false), 1800); });
-  };
+  const [compartir, setCompartir] = useState(false);
+  const [verVista, setVerVista] = useState(false);
+  const vistas = ([["lista", "Lista", "lista"], ["calendario", "Día", "reloj"], ["semana", "Semana", "calendario"], ...(p.puede.horarios ? [["horarios", "Horarios", "ajustes"]] : [])] as [string, string, string][]);
+  const actual = vistas.find(([k]) => k === p.vista) ?? vistas[0];
+  const MES = (f: string) => ["enero", "febrero", "marzo", "abril", "mayo", "junio", "julio", "agosto", "septiembre", "octubre", "noviembre", "diciembre"][Number(f.slice(5, 7)) - 1];
+  const domingo = semana[6];
+  const etiquetaSemana = lunes.slice(5, 7) === domingo.slice(5, 7) ? `${Number(lunes.slice(8))} al ${Number(domingo.slice(8))} de ${MES(lunes)}` : `${Number(lunes.slice(8))} de ${MES(lunes)} al ${Number(domingo.slice(8))} de ${MES(domingo)}`;
+  const enSemana = p.vista === "semana";
 
   return (
     <>
@@ -73,27 +76,43 @@ export function PantallaCitas(p: {
           <p className="sub">{p.dia === p.hoy ? "Hoy, " : ""}{fechaTxt(p.dia)}</p>
         </div>
         <div className="fila acc-citas">
-          {p.enlace && <button type="button" className="icb" onClick={copiar} aria-label="Copiar el enlace de reservaciones" title="Copiar el enlace de reservaciones"><Icono n={copiado ? "palomita" : "copiar"} /></button>}
-          {p.puede.modificar && <button type="button" className="bt" onClick={() => setAgendar(true)}>Agendar<span className="fl" aria-hidden="true"><Icono n="mas" /></span></button>}
+          {p.enlace && (
+            <div className="ag-pop-w">
+              <button type="button" className="ag-bt" aria-expanded={compartir} onClick={() => setCompartir(!compartir)}><Icono n="enviar" /><span>Compartir reservaciones</span></button>
+              {compartir && <Compartir enlace={p.enlace} cerrar={() => setCompartir(false)} />}
+            </div>
+          )}
+          {p.puede.modificar && <button type="button" className="ag-bt pri" onClick={() => setAgendar(true)}><Icono n="mas" /><span>Nueva cita</span></button>}
         </div>
       </div>
-      {copiado && <p className="confirma"><Icono n="palomita" />Enlace copiado. Compártelo por WhatsApp o redes sociales.</p>}
       {aviso.error && <p className="aviso error">{aviso.error}</p>}
       {aviso.mensaje && !aviso.error && <p className="aviso ok">{aviso.mensaje}</p>}
 
-      <div className="ctl-citas">
-        <nav className="seg chico" aria-label="Vista">
-          {([["lista", "Lista"], ["calendario", "Día"], ["semana", "Semana"], ...(p.puede.horarios ? [["horarios", "Horarios"]] : [])] as [string, string][]).map(([k, t]) => (
-            <Link key={k} href={url({ vista: k })} scroll={false} aria-current={p.vista === k ? "page" : undefined}>{t}</Link>
-          ))}
-        </nav>
+      <div className="ag-ctl">
+        <div className="fila ag-izq">
+          <div className="ag-pop-w">
+            <button type="button" className="ag-bt" aria-haspopup="menu" aria-expanded={verVista} onClick={() => setVerVista(!verVista)} aria-label={`Vista: ${actual[1]}`}><Icono n={actual[2]} /><span>{actual[1]}</span><Icono n="abajo" /></button>
+            {verVista && (
+              <Flotante cerrar={() => setVerVista(false)} className="ag-menu" rol="menu">
+                {vistas.map(([k, t, ic]) => <Link key={k} href={url({ vista: k })} scroll={false} role="menuitemradio" aria-checked={p.vista === k} className={`it ${p.vista === k ? "on" : ""}`} onClick={() => setVerVista(false)}><Icono n={ic} />{t}{p.vista === k && <Icono n="palomita" />}</Link>)}
+              </Flotante>
+            )}
+          </div>
+          {enSemana && (
+            <div className="ag-nav">
+              <Link href={url({ dia: sumar(p.dia, -7) })} scroll={false} aria-label="Semana anterior"><Icono n="izquierda" /></Link>
+              <Link href={url({ dia: p.hoy })} scroll={false} className="ag-hoy" title="Ir a esta semana">{etiquetaSemana}</Link>
+              <Link href={url({ dia: sumar(p.dia, 7) })} scroll={false} aria-label="Semana siguiente"><Icono n="derecha" /></Link>
+            </div>
+          )}
+        </div>
         {p.vista !== "horarios" && p.equipo.length > 1 && (
           <Selector className="sel-equipo" etiqueta="Persona" valor={p.persona} onChange={(v) => router.push(url({ persona: v }), { scroll: false })}
             opciones={[{ valor: "", texto: "Todo el equipo" }, ...p.equipo.map((e) => ({ valor: e.id, texto: primer(e.nombre), icono: <Avatar avatar={e.avatar} nombre={e.nombre} t={18} /> }))]} />
         )}
       </div>
 
-      {p.vista !== "horarios" && (
+      {(p.vista === "lista" || p.vista === "calendario") && (
         <div className="tira-dias" role="group" aria-label="Días">
           <Link href={url({ dia: sumar(lunes, -7) })} scroll={false} className="flecha-d" aria-label="Semana anterior"><Icono n="izquierda" /></Link>
           {semana.map((d) => (
@@ -216,7 +235,7 @@ function VistaDia({ citas, equipo, horario, dia, abrir }: { citas: CitaVista[]; 
 
 function VistaSemana({ citas, semana, horario, hoy, abrir, url }: { citas: CitaVista[]; semana: string[]; horario: Horario; hoy: string; abrir: (c: CitaVista) => void; url: (x: { dia?: string; vista?: string }) => string }) {
   const [ini, fin] = rango(horario);
-  const px = 0.8;
+  const px = 1;
   return (
     <section className="glass cal-dia cal-semana subir d1" style={{ ["--cols" as string]: 7 }}>
       <div className="cal-cab"><span />{semana.map((d) => <Link key={d} href={url({ dia: d, vista: "calendario" })} className={d === hoy ? "hoy" : ""}>{DIAS[dow(d)]} {Number(d.slice(8))}</Link>)}</div>
@@ -226,7 +245,7 @@ function VistaSemana({ citas, semana, horario, hoy, abrir, url }: { citas: CitaV
           <div key={d} className="cal-col">
             {citas.filter((c) => c.fecha === d).map((c) => (
               <button type="button" key={c.id} className={`blq-c mini e-${c.estado}`} style={{ top: (aMin(c.hora) - ini) * px, height: Math.max(c.duracion * px - 2, 16) }} onClick={() => abrir(c)} title={`${c.hora} ${c.cliente}`}>
-                <b>{c.hora}</b><small>{primer(c.cliente)}</small>
+                <b>{c.hora} {c.cliente.split(" ").slice(0, 2).map((x, i) => (i ? `${x[0]}.` : x)).join(" ")}</b><small>{c.duracion >= 35 ? `${c.servicios[0] ?? ""}, ${primer(c.barbero)}` : primer(c.barbero)}</small>
               </button>
             ))}
           </div>
@@ -534,5 +553,44 @@ function NuevoBloqueo({ equipo, dia, cerrar, avisar }: { equipo: Persona[]; dia:
         <div className="acciones"><button type="button" className="bt" disabled={pend} onClick={() => iniciar(async () => { const r = await bloquearHorario({ usuarioId: quien || null, fecha, desde, hasta, motivo }); if (r.error) setError(r.error); else { avisar(r); cerrar(); } })}>Bloquear<Fl /></button></div>
       </div>
     </Modal>
+  );
+}
+
+/** Capa flotante que se cierra al tocar fuera o con Escape. */
+function Flotante({ cerrar, className, rol, children }: { cerrar: () => void; className: string; rol: "menu" | "dialog"; children: React.ReactNode }) {
+  const ref = useRef<HTMLDivElement>(null);
+  useEffect(() => {
+    const fuera = (e: MouseEvent) => { if (!ref.current?.parentElement?.contains(e.target as Node)) cerrar(); };
+    const tecla = (e: KeyboardEvent) => { if (e.key === "Escape") cerrar(); };
+    document.addEventListener("mousedown", fuera);
+    document.addEventListener("keydown", tecla);
+    return () => { document.removeEventListener("mousedown", fuera); document.removeEventListener("keydown", tecla); };
+  }, [cerrar]);
+  return <div ref={ref} className={`ag-flot ${className}`} role={rol}>{children}</div>;
+}
+
+/** Compartir reservaciones: enlace público, código QR y la página como la ve el cliente. */
+function Compartir({ enlace, cerrar }: { enlace: string; cerrar: () => void }) {
+  const [copiado, setCopiado] = useState(false);
+  const [qr, setQr] = useState<string | null>(null);
+  const url = typeof window === "undefined" ? enlace : `${window.location.origin}${enlace}`;
+  const corto = url.replace(/^https?:\/\/(www\.)?/, "");
+  const copiar = () => navigator.clipboard?.writeText(url).then(() => { setCopiado(true); setTimeout(() => setCopiado(false), 1800); });
+  const verQr = async () => {
+    if (qr) { setQr(null); return; }
+    const QR = (await import("qrcode")).default;
+    setQr(await QR.toString(url, { type: "svg", margin: 1, color: { dark: "#13171c", light: "#ffffff" } }));
+  };
+  return (
+    <Flotante cerrar={cerrar} className="ag-comp" rol="dialog">
+      <div><b>Compartir reservaciones</b><small>Permite que tus clientes agenden directamente.</small></div>
+      <div className="ag-enl"><small>Enlace público</small>
+        <div><span>{corto}</span><button type="button" className="icb" onClick={copiar} aria-label="Copiar enlace"><Icono n={copiado ? "palomita" : "copiar"} /></button></div>
+        {copiado && <small className="ag-ok">Enlace copiado. Compártelo por WhatsApp o redes sociales.</small>}
+      </div>
+      <button type="button" className="ag-op" aria-expanded={!!qr} onClick={verQr}><span><Icono n="cuadros" /></span><span><b>{qr ? "Ocultar código QR" : "Mostrar código QR"}</b><small>Para imprimir o mostrar en el establecimiento</small></span></button>
+      {qr && <div className="qr ag-qr" dangerouslySetInnerHTML={{ __html: qr }} />}
+      <a className="ag-op" href={enlace} target="_blank" rel="noopener noreferrer"><span><Icono n="ojo" /></span><span><b>Ver página de reservaciones</b><small>Abrir la página como la ve el cliente</small></span></a>
+    </Flotante>
   );
 }

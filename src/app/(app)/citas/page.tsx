@@ -1,6 +1,7 @@
 import { and, asc, eq, gt, gte, lt, ne, notInArray, or, sql } from "drizzle-orm";
 import { redirect } from "next/navigation";
 import { requerirSesion } from "@/lib/auth";
+import { esMovil } from "@/lib/dispositivo";
 import { descansosDeSemana, instante, leerConfig, type Horario } from "@/lib/agenda";
 import { equipoAgenda, rotacionesDe } from "@/lib/citas";
 import { db, schema } from "@/lib/db";
@@ -19,7 +20,9 @@ export default async function Citas({ searchParams }: { searchParams: Promise<Q>
   const zona = b.zonaHoraria;
   const hoy = fechaLocal(new Date(), zona);
   const dia = /^\d{4}-\d{2}-\d{2}$/.test(q.dia ?? "") ? q.dia! : hoy;
-  const vista = q.vista === "calendario" || q.vista === "semana" || q.vista === "horarios" ? q.vista : "lista";
+  // En computadora la agenda abre en Semana; en el teléfono, en la lista del día.
+  const porDefecto = (await esMovil()) ? "lista" : "semana";
+  const vista = q.vista === "calendario" || q.vista === "semana" || q.vista === "horarios" || q.vista === "lista" ? q.vista : porDefecto;
   const lunes = lunesDe(dia);
   const desde = vista === "semana" ? lunes : dia;
   const hasta = vista === "semana" ? sumarDias(lunes, 7) : sumarDias(dia, 1);
@@ -50,7 +53,7 @@ export default async function Citas({ searchParams }: { searchParams: Promise<Q>
   const config = leerConfig(b.citasConfig);
   return (
     <PantallaCitas
-      abrirNueva={q.nueva === "1"}
+      abrirNueva={q.nueva === "1"} porDefecto={porDefecto}
       hoy={hoy} dia={dia} vista={vista} persona={q.persona ?? ""} citas={citas} ahora={Date.now()}
       equipo={equipo.map((e) => ({ id: e.id, nombre: e.nombre, avatar: e.avatar, horario: e.horario as Horario | null }))}
       servicios={servicios}

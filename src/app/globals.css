@@ -3165,3 +3165,43 @@ html:has(.capa) body, html:has(.velo-c) body, html:has(.velo-hoja) body, html:ha
 @media (max-width: 760px) { .ini-eq-m-card { padding: 14px 18px; } .ini-eq-m-card .lab { font-size: 9.5px; } }
 .nc-tramos button { display: inline-flex; align-items: center; justify-content: center; gap: 6px; }
 .nc-tramos button small { font-size: 11px; color: var(--faint); font-weight: 500; }
+
+/* ---------- Agenda: controles compactos y Compartir reservaciones ---------- */
+.ag-bt { display: inline-flex; align-items: center; gap: 8px; height: 38px; padding: 0 14px; border-radius: 12px; border: 1px solid rgba(255,255,255,.9); background: rgba(255,255,255,.75); font: 600 13px var(--f-body); color: var(--fg); cursor: pointer; white-space: nowrap; transition: background .15s; }
+.ag-bt:hover, .ag-bt[aria-expanded="true"] { background: #fff; }
+.ag-bt .ic { width: 15px; height: 15px; }
+.ag-bt > .ic:last-child:not(:first-child) { width: 13px; height: 13px; color: var(--muted); }
+.ag-bt.pri { background: linear-gradient(180deg, #2b3138, #13171c); border-color: #13171c; color: #fff; box-shadow: 0 8px 16px -8px rgba(10,15,20,.6); }
+.ag-pop-w { position: relative; }
+.ag-flot { position: absolute; z-index: 45; top: calc(100% + 8px); background: #fff; border: 1px solid rgba(30,45,60,.1); box-shadow: 0 24px 48px -20px rgba(20,35,50,.45); animation: aparecer .18s ease both; }
+.ag-menu { left: 0; width: 200px; padding: 6px; border-radius: 14px; display: grid; gap: 1px; }
+.ag-menu .it { display: flex; align-items: center; gap: 10px; padding: 9px 10px; border-radius: 10px; font-size: 13.5px; color: var(--fg); text-decoration: none; }
+.ag-menu .it:hover { background: var(--accent-soft); }
+.ag-menu .it .ic { width: 15px; height: 15px; color: var(--muted); } .ag-menu .it .ic:last-child:not(:first-child) { margin-left: auto; color: var(--fg); }
+.ag-menu .it.on { font-weight: 600; }
+.ag-comp { right: 0; width: 340px; padding: 16px; border-radius: 18px; display: grid; gap: 12px; }
+.ag-comp > div:first-child { display: grid; gap: 2px; } .ag-comp > div:first-child b { font-size: 15px; } .ag-comp > div:first-child small { font-size: 12.5px; color: var(--muted); }
+.ag-enl { display: grid; gap: 6px; } .ag-enl > small:first-child { font-size: 12px; font-weight: 600; color: var(--muted); }
+.ag-enl > div { display: flex; align-items: center; gap: 8px; padding: 4px 4px 4px 12px; border-radius: 12px; background: rgba(30,45,60,.05); }
+.ag-enl > div span { flex: 1; min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; font-size: 13px; }
+.ag-enl .icb { width: 34px; height: 34px; }
+.ag-ok { font-size: 12px; color: var(--muted); }
+.ag-op { display: flex; align-items: center; gap: 12px; padding: 10px; border-radius: 12px; border: 1px solid rgba(30,45,60,.08); background: none; font: inherit; color: var(--fg); text-align: left; text-decoration: none; cursor: pointer; width: 100%; }
+.ag-op:hover { background: var(--accent-soft); }
+.ag-op > span:first-child { width: 34px; height: 34px; border-radius: 10px; background: rgba(30,45,60,.06); display: grid; place-items: center; flex: none; } .ag-op > span:first-child .ic { width: 16px; height: 16px; }
+.ag-op > span:last-child { display: grid; } .ag-op b { font-size: 13.5px; font-weight: 600; } .ag-op small { font-size: 12px; color: var(--muted); }
+.ag-qr { justify-self: center; width: 180px; } .ag-qr svg { width: 100%; height: auto; display: block; }
+.ag-ctl { display: flex; justify-content: space-between; align-items: center; gap: 10px; flex-wrap: wrap; }
+.ag-izq { gap: 8px; }
+.ag-nav { display: flex; align-items: center; height: 38px; border-radius: 12px; border: 1px solid rgba(255,255,255,.9); background: rgba(255,255,255,.75); }
+.ag-nav a { display: grid; place-items: center; height: 100%; color: var(--fg); text-decoration: none; }
+.ag-nav a:not(.ag-hoy) { width: 34px; } .ag-nav a .ic { width: 14px; height: 14px; }
+.ag-hoy { padding: 0 4px; font-size: 13px; font-weight: 500; white-space: nowrap; }
+.cal-semana .blq-c.mini b { white-space: nowrap; overflow: hidden; text-overflow: ellipsis; display: block; }
+.cal-semana .blq-c.mini small { white-space: nowrap; overflow: hidden; text-overflow: ellipsis; display: block; }
+@media (max-width: 760px) {
+  .acc-citas .ag-bt span { display: none; } .acc-citas .ag-bt { width: 40px; padding: 0; justify-content: center; }
+  .ag-comp { position: fixed; left: 10px; right: 10px; top: auto; bottom: calc(env(safe-area-inset-bottom, 0px) + 96px); width: auto; }
+  .ag-bt, .ag-nav { height: 36px; }
+  .ag-ctl .sel-equipo { min-width: 0; }
+}
