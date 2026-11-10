@@ -4,7 +4,8 @@ import Link from "next/link";
 import { usePathname, useRouter } from "next/navigation";
 import { useEffect, useLayoutEffect, useRef, useState } from "react";
 import { Icono } from "./Icono";
-import type { ItemNav, SubNav } from "./Nav";
+import { grupoDe, pestanaActiva } from "@/lib/menu";
+import { enSeccion, type ItemNav, type SubNav } from "./Nav";
 
 /** Abre un panel que vive en la barra de escritorio (Ayuda, Ideas) desde el teléfono. */
 export const abrirPanel = (cual: "ayuda" | "ideas") => window.dispatchEvent(new Event(`crabs:${cual}`));
@@ -18,10 +19,9 @@ export function useAbrirPanel(cual: "ayuda" | "ideas", abrir: () => void) {
   }, [cual, abrir]);
 }
 
-const activo = (ruta: string, href: string) => (href === "/" ? ruta === "/" : ruta.startsWith(href));
 
 /** Parte izquierda de la barra superior en el teléfono: saludo en Inicio, nombre de la sección en lo demás. */
-export function TituloMovil({ negocio, nombre, fecha, items, sub }: { negocio: string; nombre: string; fecha: string; items: ItemNav[]; sub?: SubNav }) {
+export function TituloMovil({ negocio, nombre, fecha, items, grupos }: { negocio: string; nombre: string; fecha: string; items: ItemNav[]; grupos: SubNav[] }) {
   const ruta = usePathname();
   const router = useRouter();
   const [compacta, setCompacta] = useState(false);
@@ -33,9 +33,9 @@ export function TituloMovil({ negocio, nombre, fecha, items, sub }: { negocio: s
   }, []);
   useEffect(() => { document.querySelector(".barra")?.classList.toggle("compacta-m", compacta); }, [compacta]);
   const enCobro = ruta.startsWith("/cobrar");
-  const seccion = enCobro ? "Cobro" : items.find((i) => i.href !== "/" && activo(ruta, i.href))?.texto
+  const seccion = enCobro ? "Cobro" : items.find((i) => i.href !== "/" && enSeccion(ruta, i))?.texto
     ?? (ruta.startsWith("/historial") ? "Historial" : ruta.startsWith("/ajustes") ? "Ajustes" : ruta.startsWith("/soporte") ? "Soporte" : ruta === "/" ? null : "");
-  const dentro = !!sub && sub.items.length > 1 && ruta.startsWith(sub.base);
+  const grupo = grupoDe(ruta, grupos);
   return (
     <div className="titulo-m">
       <div className="fila-tm">
@@ -44,10 +44,10 @@ export function TituloMovil({ negocio, nombre, fecha, items, sub }: { negocio: s
           ? <span className="saludo-m"><small>{fecha}</small><b><em>Hola,</em> {nombre}</b></span>
           : <span className="saludo-m"><small>{negocio}</small><b key={seccion || "Inicio"} className="entra-m">{seccion || "Inicio"}</b></span>}
       </div>
-      {dentro && (
-        <nav className="sub-m" aria-label="Secciones de Analítica">
-          {sub!.items.map(([h, t]) => (
-            <Link key={h} href={h} aria-current={(h === sub!.base ? ruta === h : ruta.startsWith(h)) ? "page" : undefined}>{t}</Link>
+      {grupo && (
+        <nav className="sub-m" aria-label="Pestañas de la sección">
+          {grupo.items.map(([h, t]) => (
+            <Link key={h} href={h} aria-current={pestanaActiva(ruta, h, grupo.items) ? "page" : undefined}>{t}</Link>
           ))}
         </nav>
       )}
@@ -83,13 +83,13 @@ export function BarraInferior({ items }: { items: ItemNav[]; mas?: Mas }) {
       <nav ref={nav} className="secc-m" aria-label="Secciones">
         <span className="burbuja-m" style={pill} aria-hidden="true" />
         {secciones.map((i) => (
-          <Link key={i.href} href={i.href} className="tab-m" aria-current={activo(ruta, i.href) ? "page" : undefined}>
+          <Link key={i.href} href={i.href} className="tab-m" aria-current={enSeccion(ruta, i) ? "page" : undefined}>
             <Icono n={i.icono} />{i.texto}
           </Link>
         ))}
       </nav>
       {cobro && (
-        <Link href="/cobrar" className="cobrar-m" aria-current={activo(ruta, "/cobrar") ? "page" : undefined}>
+        <Link href="/cobrar" className="cobrar-m" aria-current={ruta.startsWith("/cobrar") ? "page" : undefined}>
           <Icono n="cobro" />Cobrar
         </Link>
       )}

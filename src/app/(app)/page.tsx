@@ -1,52 +1,187 @@
-import { eq } from "drizzle-orm";
+import { and, asc, eq, gt, or, sql } from "drizzle-orm";
 import Link from "next/link";
-import { redirect } from "next/navigation";
 import { Avatar } from "@/components/Avatar";
 import { Ayuda } from "@/components/Ayuda";
-import { Aviso, AvisoUrl } from "@/components/Encabezado";
-import { esMovil } from "@/lib/dispositivo";
+import { AvisoUrl } from "@/components/Encabezado";
 import { Grafica } from "@/components/Grafica";
 import { Icono } from "@/components/Icono";
-import { VentasPorBarbero } from "./VentasPorBarbero";
-import { RefrescarConVentas } from "./RefrescarConVentas";
-import { UltimosServicios } from "./UltimosServicios";
-import { AvisoCajaEmergente } from "./AvisoCaja";
 import { Cuenta } from "@/components/ui";
 import { requerirSesion } from "@/lib/auth";
-import { cajaDe, diasConVentas, equipoQueAtiende, foliosCorte, metasDelMes, turnosCerrados, movimientosDeTurno, turnoAbierto, ventasEntre } from "@/lib/datos";
+import { cajaDe, equipoQueAtiende, metasDelMes, turnoAbierto, ventasEntre } from "@/lib/datos";
 import { db, schema } from "@/lib/db";
-import { diasEntre, fechaLarga, fechaLocal, finDeMes, horaCorta, inicioDeMes, lunesDe, nombreDia, sumarDias } from "@/lib/fechas";
+import { fechaLarga, fechaLocal, horaCorta, lunesDe, nombreDia, sumarDias } from "@/lib/fechas";
 import { calcularMeta } from "@/lib/metas";
 import { cambio, formatoDinero, porcentaje } from "@/lib/money";
-import { serieHoy, serieSemana, type Movimiento } from "@/lib/series";
+import { serieHoy, type Movimiento } from "@/lib/series";
+import { AccionesEscritorio, AccionesMovil, type AccionInicio } from "./AccionesInicio";
+import { AvisoCajaEmergente } from "./AvisoCaja";
+import { RefrescarConVentas } from "./RefrescarConVentas";
+import { UltimosServicios, type FilaUltimo } from "./UltimosServicios";
 
-type Q = { aviso?: string; error?: string; grafica?: string };
-/** Misma altura y comportamiento de la gráfica para el administrador y el barbero. */
-const ALTO_GRAFICA = 200;
+type Q = { aviso?: string; error?: string };
 type Sesion = Awaited<ReturnType<typeof requerirSesion>>;
+type Turno = Awaited<ReturnType<typeof turnoAbierto>>;
+type Venta = Awaited<ReturnType<typeof ventasEntre>>["ventas"][number];
+type Gente = Awaited<ReturnType<typeof equipoQueAtiende>>;
 
-/** "↗ 12% más que el martes pasado a esta hora" */
-function Comparacion({ hoy, previo, dia }: { hoy: number; previo: number; dia: string }) {
+/** "12% más que el martes pasado a esta hora", en texto, sin colores de alarma. */
+function comparacion(hoy: number, previo: number, dia: string) {
   const v = cambio(hoy, previo);
-  if (v === null) return <span className="pill gris">{hoy ? `El ${dia} pasado a esta hora no había ventas` : "Todavía no hay ventas hoy"}</span>;
-  return <span className={`pill ${v >= 0 ? "ok" : "warn"}`}>{v >= 0 ? "↗" : "↘"} {Math.abs(v)}% {v >= 0 ? "más" : "menos"} que el {dia} pasado a esta hora</span>;
+  if (v === null) return hoy ? `El ${dia} pasado a esta hora no había ventas` : "Todavía no hay ventas hoy";
+  return `${Math.abs(v)}% ${v >= 0 ? "más" : "menos"} que el ${dia} pasado a esta hora`;
 }
 
-/** Al abrir: hoy si ya hay ventas hoy; si no, la semana; si tampoco, el mes. */
-function modoIdeal(fechas: string[], hoy: string, lunes: string, inicioMes: string): "hoy" | "semana" | "mes" {
-  if (fechas.includes(hoy)) return "hoy";
-  if (fechas.some((f) => f >= lunes && f <= hoy)) return "semana";
-  if (fechas.some((f) => f >= inicioMes && f <= hoy)) return "mes";
-  return "hoy";
+/** Lo último cobrado, con su detalle al tocarlo. */
+function filasUltimos(ventas: Venta[], gente: Gente, hoy: string, zona: string): FilaUltimo[] {
+  return ventas.map((v) => {
+    const quien = gente.find((e) => e.id === v.conceptos[0]?.barberoId);
+    return {
+      id: v.id, folio: v.folio, cancelada: v.estado === "cancelada", monto: formatoDinero(v.total),
+      t: v.fecha === hoy ? horaCorta(v.creadoEn, zona) : v.fecha === sumarDias(hoy, -1) ? "Ayer" : `${v.fecha.slice(8)}/${v.fecha.slice(5, 7)}`,
+      servicios: v.conceptos.map((c) => c.nombre).join(", "), quien: v.conceptos[0]?.barbero ?? "", avatar: quien?.avatar ?? "iniciales",
+      metodo: v.pagos.map((pg) => pg.metodo).join(" y ").toLowerCase() || "sin pago",
+      detalle: [
+        ["Servicios", v.conceptos.map((c) => `${c.nombre} con ${c.barbero.split(" ")[0]}, ${formatoDinero(c.precioCobrado)}`).join("; ")],
+        ...(v.conceptos.some((c) => c.descuento) ? [["Descuento", v.conceptos.filter((c) => c.descuento).map((c) => `${formatoDinero(c.descuento)} en ${c.nombre}`).join("; ")] as [string, string]] : []),
+        ...(v.propinas.length ? [["Propina", v.propinas.map((x) => formatoDinero(x.monto)).join(" y ")] as [string, string]] : []),
+        ["Pago", v.pagos.map((pg) => `${pg.metodo} ${formatoDinero(pg.monto)}`).join(" y ") || "Sin pago"],
+        ["Registró", v.registradaPor.split(" ")[0]],
+        ["Cuándo", `${fechaLarga(v.fecha)}, ${horaCorta(v.creadoEn, zona)}`],
+        ...(v.estado === "cancelada" ? [["Cancelada", v.motivoCancelacion ?? ""] as [string, string]] : []),
+      ] as [string, string][],
+    };
+  });
 }
 
-function SelectorGrafica({ modo, conMes }: { modo: "hoy" | "semana" | "mes"; conMes?: boolean }) {
+/** Citas de hoy que todavía no llegan (de todo el negocio o de una persona). */
+async function porLlegar(s: Sesion, hoy: string, zona: string, persona?: string) {
+  if (!s.barberia.usaCitas || !s.puede("citas.ver")) return null;
+  const filas = await db.select({ id: schema.citas.id, inicio: schema.citas.inicio, cliente: schema.citas.clienteNombre, servicios: schema.citas.servicios, barbero: schema.usuarios.nombre, indiferente: schema.citas.indiferente })
+    .from(schema.citas).innerJoin(schema.usuarios, eq(schema.usuarios.id, schema.citas.barberoId))
+    .where(and(eq(schema.citas.barberiaId, s.barberia.id), sql`(${schema.citas.inicio} at time zone ${zona})::date = ${hoy}::date`, gt(schema.citas.inicio, new Date()),
+      or(eq(schema.citas.estado, "en_espera"), and(eq(schema.citas.estado, "apartada"), gt(schema.citas.expiraEn, new Date()))),
+      ...(persona ? [eq(schema.citas.barberoId, persona)] : [])))
+    .orderBy(asc(schema.citas.inicio));
+  return filas.map((c) => ({ id: c.id, hora: horaCorta(c.inicio, zona), cliente: c.cliente, con: c.barbero.split(" ")[0], servicio: c.servicios.map((x) => x.nombre).join(" y ") }));
+}
+
+/** Acciones rápidas según los permisos. Cada una abre una pantalla que ya existe. */
+async function accionesDe(s: Sesion, turno: Turno | null | undefined, hoy: string, zona: string, citasHoy: number | null, barbero: boolean): Promise<AccionInicio[]> {
+  const yo = s.usuario.id;
+  const corteAtrasado = !!turno && turno.fechaOperativa < hoy;
+  const a: AccionInicio[] = [];
+  if (s.puede("ventas.registrar") || s.puede("ventas.registrar_otros")) a.push({ k: "cobrar", href: "/cobrar", texto: "Cobrar", corto: "Cobrar", icono: "cobro", principal: true, dato: turno ? `Caja abierta desde ${horaCorta(turno.abiertoEn, zona)}` : "Abre la caja al cobrar" });
+  if (s.barberia.usaCitas && s.puede("citas.modificar")) a.push({ k: "cita", href: "/citas?nueva=1", texto: "Nueva cita", corto: "Nueva cita", icono: "calendario", dato: citasHoy ? `${citasHoy} por llegar` : undefined });
+  if (barbero && citasHoy !== null) a.push({ k: "mias", href: `/citas?persona=${yo}`, texto: "Mis citas de hoy", corto: "Mis citas", icono: "reloj", dato: citasHoy ? `${citasHoy} por llegar` : "Sin pendientes" });
+  if (barbero) a.push({ k: "ventas", href: "/analitica/ventas", texto: "Mis ventas", corto: "Mis ventas", icono: "lista" });
+  if (!barbero && s.puede("gastos.registrar")) a.push({ k: "egreso", href: "/analitica/finanzas?egreso=1", texto: "Registrar egreso", corto: "Egreso", icono: "archivo" });
+  if (!barbero && s.puede("caja.operar") && turno) a.push({ k: "corte", href: "/cobrar?caja=cerrar", texto: "Corte de caja", corto: "Corte", icono: "candado", aviso: corteAtrasado, dato: corteAtrasado ? "Pendiente" : undefined });
+  if (s.puede("caja.retiros") && turno) a.push({ k: "retiro", href: "/cobrar?caja=retiro", texto: "Retiro de caja", corto: "Retiro", icono: "salida" });
+  if (!barbero && s.puede("equipo.pagar")) a.push({ k: "pago", href: "/equipo/pagos", texto: "Pago al equipo", corto: "Pago al equipo", icono: "efectivo" });
+  return a;
+}
+
+type Vista = {
+  s: Sesion; hoy: string; zona: string; avisos: React.ReactNode; acciones: AccionInicio[]; barbero: boolean;
+  total: number; servicios: number; clientes: number; previo: number; movs: Movimiento[];
+  meta: { monto: number; ayuda?: string; nota?: string } | null;
+  citas: Awaited<ReturnType<typeof porLlegar>>;
+  equipo: { id: string; nombre: string; avatar: string; monto: number; servicios: number; meta?: number }[];
+  ultimos: FilaUltimo[]; verMas: { href: string; texto: string } | null; verVentas: boolean;
+};
+
+/** Inicio: qué pasa hoy. Escritorio: acciones junto al saludo, la tarjeta de hoy con su gráfica y a la derecha citas y equipo. */
+function InicioVista(v: Vista) {
+  const { s, hoy, zona } = v;
+  const dia = nombreDia(new Date(`${hoy}T12:00:00Z`).getUTCDay());
+  const serie = serieHoy(v.movs, hoy, zona);
+  const pct = v.meta ? porcentaje(v.total, v.meta.monto) : 0;
+  const barra = v.meta ? <div className="ini-meta" role="progressbar" aria-valuemin={0} aria-valuemax={100} aria-valuenow={Math.min(pct, 100)} aria-label="Avance de la meta"><i style={{ width: `${Math.max(Math.min(pct, 100), 2)}%` }} /></div> : null;
+  const siguiente = v.citas?.[0];
   return (
-    <nav className="seg chico" aria-label="Ver gráfica">
-      <Link href="/?grafica=hoy" aria-current={modo === "hoy" ? "page" : undefined} scroll={false}>Hoy</Link>
-      <Link href="/?grafica=semana" aria-current={modo === "semana" ? "page" : undefined} scroll={false}>Semana</Link>
-      {conMes && <Link href="/?grafica=mes" aria-current={modo === "mes" ? "page" : undefined} scroll={false}>Mes</Link>}
-    </nav>
+    <>
+      {v.avisos}
+      <RefrescarConVentas />
+      <div className="ini-cab subir">
+        <div className="saludo-i">
+          <span className="lab">{fechaLarga(hoy)}</span>
+          <h1 className="titulo brillo">Hola, {s.usuario.nombre.split(" ")[0]}</h1>
+        </div>
+        <AccionesEscritorio acciones={v.acciones} />
+      </div>
+
+      {/* Teléfono */}
+      <section className="glass ini-hoy-m solo-movil subir d1">
+        <div className="entre">
+          <span><span className="lab">{v.barbero ? "Hoy llevas" : "Hoy llevan"}</span><b className="ini-big"><Cuenta valor={v.total} /></b></span>
+          <span className="ini-dato">{v.servicios} {v.servicios === 1 ? "servicio" : "servicios"}<br />
+            {v.meta ? <><b>{pct}%</b> de {v.barbero ? "tu meta" : "la meta"}</> : <><b>{v.clientes ? formatoDinero(Math.round(v.total / v.clientes)) : "$0"}</b> por cliente</>}</span>
+        </div>
+        {barra}
+      </section>
+      <AccionesMovil acciones={v.acciones} />
+      {siguiente && (
+        <section className="glass ini-sig solo-movil subir d2">
+          <span className="lab">{v.barbero ? "Tu siguiente cita" : "Próxima cita"}</span>
+          <div className="entre"><span><b>{siguiente.hora}</b> {siguiente.cliente}</span><span className="muted">{v.barbero ? siguiente.servicio : `con ${siguiente.con}`}</span></div>
+        </section>
+      )}
+
+      {/* Escritorio */}
+      <div className="ini-rejilla solo-escritorio">
+        <section className="glass ini-hoy subir d1">
+          <div className="ini-hoy-c">
+            <div><span className="lab">{v.barbero ? "Hoy llevas" : "Hoy llevan"}</span><b className="ini-big"><Cuenta valor={v.total} /></b></div>
+            <div className="ini-dato">
+              <span><b>{v.servicios}</b> {v.servicios === 1 ? "servicio" : "servicios"}{v.clientes > 0 && <>, <b>{formatoDinero(Math.round(v.total / v.clientes))}</b> por cliente</>}</span>
+              <span>{comparacion(v.total, v.previo, dia)}</span>
+            </div>
+          </div>
+          {v.meta && (
+            <div className="ini-meta-f">
+              <div className="entre"><span>{v.barbero ? "Tu meta de hoy" : "Meta de hoy"} {formatoDinero(v.meta.monto)}{v.meta.ayuda && <Ayuda titulo="Meta de hoy">{v.meta.ayuda}</Ayuda>}</span><b>{pct}%</b></div>
+              {barra}
+              {v.meta.nota && <small className="muted">{v.meta.nota}</small>}
+            </div>
+          )}
+          <div className="ini-graf">
+            <Grafica id="inicio-hoy" actual={serie.actual} previo={serie.previo} etiquetas={serie.etiquetas} cadaEtiqueta={serie.cada} alto={150} enCurso={serie.enCurso}
+              globos={serie.actual.map((x, i) => (x === null ? null : [`A las ${serie.etiquetas[i]}`, formatoDinero(x), "acumulado"] as [string, string, string]))}
+              descripcion={`${v.barbero ? "Tus ventas" : "Ventas"} de hoy por hora contra el ${dia} pasado`} vacio="Se dibuja con la primera venta del día" />
+          </div>
+          {v.verMas && <Link className="ini-link" href={v.verMas.href}>{v.verMas.texto}</Link>}
+        </section>
+        <div className={`ini-der ${v.citas ? "con-citas" : ""}`}>
+          {v.citas && (
+            <section className="glass ini-card subir d2">
+              <div className="entre"><span className="lab">{v.barbero ? "Tus próximas citas" : "Próximas citas"}</span><Link className="ini-link" href={v.barbero ? `/citas?persona=${s.usuario.id}` : "/citas"}>Agenda</Link></div>
+              {v.citas.length ? v.citas.slice(0, 3).map((c) => (
+                <div key={c.id} className="ini-cita"><b>{c.hora}</b><span>{c.cliente}</span><span className="muted">{v.barbero ? c.servicio : c.con}</span></div>
+              )) : <p className="muted ini-vacio">No hay más citas hoy.</p>}
+              {v.citas.length > 3 && <small className="muted">y {v.citas.length - 3} más</small>}
+            </section>
+          )}
+          <section className="glass ini-card subir d2">
+            <span className="lab">Equipo hoy</span>
+            {v.equipo.length ? v.equipo.map((e) => (
+              <div key={e.id} className="ini-eq">
+                <Avatar avatar={e.avatar} nombre={e.nombre} t={28} />
+                <span>{e.nombre.split(" ")[0]}{e.id === s.usuario.id && v.barbero && <small className="muted"> (tú)</small>}</span>
+                <span className="ini-eq-m"><b>{formatoDinero(e.monto)}</b>{e.meta ? <small className="muted">de {formatoDinero(e.meta)}</small> : e.servicios ? <small className="muted">{e.servicios} {e.servicios === 1 ? "servicio" : "servicios"}</small> : null}</span>
+              </div>
+            )) : <p className="muted ini-vacio">Todavía no hay personas que atiendan.</p>}
+          </section>
+        </div>
+      </div>
+
+      <section className="ultimos-s subir d3 solo-escritorio">
+        <div className="entre">
+          <h2 className="sub-t">Últimos servicios</h2>
+          {v.verVentas && <Link className="bt-ver" href="/analitica/ventas">Ver todas las ventas<span><Icono n="derecha" /></span></Link>}
+        </div>
+        <UltimosServicios filas={v.ultimos} />
+      </section>
+    </>
   );
 }
 
@@ -70,294 +205,76 @@ export default async function Inicio({ searchParams }: { searchParams: Promise<Q
       {turno && turno.fechaOperativa < hoy && s.barberia.corteObligatorio && !s.puede("reportes.ver") && s.puede("caja.operar") && <AvisoCajaEmergente dia={fechaLarga(turno.fechaOperativa).toLowerCase()} />}
     </>
   );
-  if (!s.puede("reportes.ver")) return <InicioBarbero s={s} hoy={hoy} zona={zona} q={q} avisos={avisos} />;
+  if (!s.puede("reportes.ver")) return <InicioBarbero s={s} hoy={hoy} zona={zona} turno={turno} avisos={avisos} />;
 
-  const lunes = lunesDe(hoy);
-  const [{ ventas }, equipo, historia] = await Promise.all([
-    ventasEntre(s.barberia.id, inicioDeMes(sumarDias(inicioDeMes(hoy), -1)) < sumarDias(hoy, -35) ? inicioDeMes(sumarDias(inicioDeMes(hoy), -1)) : sumarDias(hoy, -35), hoy, { zona }),
+  const [{ ventas }, equipo, citas] = await Promise.all([
+    ventasEntre(s.barberia.id, sumarDias(hoy, -28), hoy, { zona }),
     equipoQueAtiende(s.barberia.id),
-    diasConVentas(s.barberia.id, zona),
+    porLlegar(s, hoy, zona),
   ]);
   const pagadas = ventas.filter((v) => v.estado === "pagada");
-  const movs: Movimiento[] = pagadas.map((v) => ({ creadoEn: v.creadoEn, fecha: v.fecha, monto: v.total }));
   const deHoy = pagadas.filter((v) => v.fecha === hoy);
-  const netas = deHoy.reduce((a, v) => a + v.total, 0);
-  const servicios = deHoy.reduce((a, v) => a + v.conceptos.length, 0);
+  const total = deHoy.reduce((a, v) => a + v.total, 0);
   const limite = Date.now() - 7 * 86400000;
-  const previoMismaHora = pagadas.filter((v) => v.fecha === sumarDias(hoy, -7) && v.creadoEn.getTime() <= limite).reduce((a, v) => a + v.total, 0);
-  // Al abrir: si ya hay ventas hoy se ve el día; si no, la semana. Se puede cambiar a Hoy, Semana o Mes.
-  const inicioMes = inicioDeMes(hoy);
-  const modo = q.grafica === "hoy" || q.grafica === "semana" || q.grafica === "mes" ? q.grafica : modoIdeal(pagadas.map((v) => v.fecha), hoy, lunes, inicioMes);
-  const diasMes = Array.from({ length: Number(finDeMes(hoy).slice(8)) }, (_, i) => sumarDias(inicioMes, i));
-  const mesAnt = inicioDeMes(sumarDias(inicioMes, -1));
-  const totalDe = (f: string) => movs.filter((m) => m.fecha === f).reduce((x, m) => x + m.monto, 0);
-  const serie = modo === "hoy" ? serieHoy(movs, hoy, zona)
-    : modo === "semana" ? { ...serieSemana(movs, lunes, hoy), enCurso: diasEntre(lunes, hoy) }
-    : { actual: diasMes.map((d) => (d <= hoy ? totalDe(d) : null)), previo: diasMes.map((_, i) => totalDe(sumarDias(mesAnt, i))), etiquetas: diasMes.map((d) => String(Number(d.slice(8)))), cada: 5, enCurso: diasMes.indexOf(hoy) };
-  // Total y comparación del periodo elegido, contra el mismo tramo del periodo anterior.
-  const tramo = modo === "semana" ? { desde: lunes, prev: sumarDias(lunes, -7), n: diasEntre(lunes, hoy) } : { desde: inicioMes, prev: mesAnt, n: diasEntre(inicioMes, hoy) };
-  const totalPeriodo = modo === "hoy" ? netas : pagadas.filter((v) => v.fecha >= tramo.desde && v.fecha <= hoy).reduce((a, v) => a + v.total, 0);
-  const previoPeriodo = modo === "hoy" ? previoMismaHora : pagadas.filter((v) => v.fecha >= tramo.prev && v.fecha <= sumarDias(tramo.prev, tramo.n)).reduce((a, v) => a + v.total, 0);
-  const varPeriodo = cambio(totalPeriodo, previoPeriodo);
-  const dia = nombreDia(new Date(`${hoy}T12:00:00Z`).getUTCDay());
+  const previo = pagadas.filter((v) => v.fecha === sumarDias(hoy, -7) && v.creadoEn.getTime() <= limite).reduce((a, v) => a + v.total, 0);
   // Con meta mensual del negocio, la meta del día es la suma de lo que le toca a cada barbero.
-  const delMes = await metasDelMes(s.barberia.id, s.barberia.metaMensual, zona, hoy);
-  const meta = delMes ? { monto: Math.max(delMes.diaria, 1), origen: "asignada" as const } : calcularMeta(s.barberia.metaDiaria, [7, 14, 21, 28].map((d) => pagadas.filter((v) => v.fecha === sumarDias(hoy, -d)).reduce((a, v) => a + v.total, 0)));
-  const avance = Math.min(netas / meta.monto, 1);
-  const recientes = ventas.slice(0, 10);
-
-  const filasUlt = recientes.map((v) => {
-          const quien = equipo.find((e) => e.id === v.conceptos[0]?.barberoId);
-          return {
-            id: v.id, folio: v.folio, cancelada: v.estado === "cancelada", monto: formatoDinero(v.total),
-            t: v.fecha === hoy ? horaCorta(v.creadoEn, zona) : v.fecha === sumarDias(hoy, -1) ? "Ayer" : `${v.fecha.slice(8)}/${v.fecha.slice(5, 7)}`,
-            servicios: v.conceptos.map((c) => c.nombre).join(", "), quien: v.conceptos[0]?.barbero ?? "", avatar: quien?.avatar ?? "iniciales",
-            metodo: v.pagos.map((pg) => pg.metodo).join(" y ").toLowerCase() || "sin pago",
-            detalle: [
-              ["Servicios", v.conceptos.map((c) => `${c.nombre} con ${c.barbero.split(" ")[0]}, ${formatoDinero(c.precioCobrado)}`).join("; ")],
-              ...(v.conceptos.some((c) => c.descuento) ? [["Descuento", v.conceptos.filter((c) => c.descuento).map((c) => `${formatoDinero(c.descuento)} en ${c.nombre}`).join("; ")] as [string, string]] : []),
-              ...(v.propinas.length ? [["Propina", v.propinas.map((x) => formatoDinero(x.monto)).join(" y ")] as [string, string]] : []),
-              ["Pago", v.pagos.map((pg) => `${pg.metodo} ${formatoDinero(pg.monto)}`).join(" y ") || "Sin pago"],
-              ["Registró", v.registradaPor.split(" ")[0]],
-              ["Cuándo", `${fechaLarga(v.fecha)}, ${horaCorta(v.creadoEn, zona)}`],
-              ...(v.estado === "cancelada" ? [["Cancelada", v.motivoCancelacion ?? ""] as [string, string]] : []),
-            ] as [string, string][],
-          };
-        });
-  // Ventas por barbero en el periodo elegido.
-  const desdeEq = modo === "hoy" ? hoy : modo === "semana" ? lunes : inicioMes;
-  const conceptosPeriodo = pagadas.filter((v) => v.fecha >= desdeEq && v.fecha <= hoy).flatMap((v) => v.conceptos);
-  const porBarbero = equipo.map((e) => {
-    const cs = conceptosPeriodo.filter((c) => c.barberoId === e.id);
-    return { id: e.id, nombre: e.nombre, avatar: e.avatar, servicios: cs.length, monto: cs.reduce((x, c) => x + c.precioCobrado, 0) };
-  }).sort((x, y) => y.monto - x.monto);
-
+  const delMes = s.barberia.usaMetas ? await metasDelMes(s.barberia.id, s.barberia.metaMensual, zona, hoy) : null;
+  const meta = !s.barberia.usaMetas ? null : delMes ? { monto: Math.max(delMes.diaria, 1), ayuda: "Es la suma de la meta del día de cada persona; sale de la meta del mes.", nota: `Meta del mes ${formatoDinero(s.barberia.metaMensual)}` }
+    : { monto: calcularMeta(s.barberia.metaDiaria, [7, 14, 21, 28].map((d) => pagadas.filter((v) => v.fecha === sumarDias(hoy, -d)).reduce((a, v) => a + v.total, 0))).monto };
+  const conceptos = deHoy.flatMap((v) => v.conceptos);
+  const filasEq = equipo.map((e) => {
+    const cs = conceptos.filter((c) => c.barberoId === e.id);
+    const m = delMes?.porBarbero.find((b) => b.id === e.id && b.aplica);
+    return { id: e.id, nombre: e.nombre, avatar: e.avatar, servicios: cs.length, monto: cs.reduce((x, c) => x + c.precioCobrado, 0), meta: m?.diaria };
+  }).sort((a, b) => b.monto - a.monto);
+  const acciones = await accionesDe(s, turno, hoy, zona, citas?.length ?? null, false);
   return (
-    <>
-      {avisos}
-      <div className="subir saludo-i">
-        <span className="lab">{fechaLarga(hoy)}</span>
-        <h1 className="titulo brillo" style={{ fontSize: 30, marginTop: 8 }}>Hola, {s.usuario.nombre.split(" ")[0]}</h1>
-      </div>
-
-      {/* Móvil: lo esencial en una pantalla. En escritorio no se muestra. */}
-      <RefrescarConVentas />
-      <section className="solo-movil inicio-m inicio-b">
-        <div className="hero-sin subir d1">
-          <div className="entre im-top">
-            <div><span className="lab">{modo === "hoy" ? "Hoy llevan" : modo === "semana" ? "En la semana" : "En el mes"}</span><div className="big big-ini"><Cuenta valor={totalPeriodo} /></div></div>
-            <div className="im-datos">
-              <span><small className="lab">Servicios</small><b className="num">{modo === "hoy" ? servicios : conceptosPeriodo.length}</b></span>
-              {modo === "hoy" && <span><small className="lab">Promedio</small><b className="num">{deHoy.length ? formatoDinero(Math.round(netas / deHoy.length)) : "$0"}</b></span>}
-            </div>
-          </div>
-          <div className="entre im-ctrl">{modo === "hoy" ? <Comparacion hoy={netas} previo={previoMismaHora} dia={dia} />
-            : varPeriodo === null ? <span className="pill gris">Sin registros en el periodo anterior</span>
-            : <span className={`pill ${varPeriodo >= 0 ? "ok" : "warn"}`}>{varPeriodo >= 0 ? "↗" : "↘"} {Math.abs(varPeriodo)}% {varPeriodo >= 0 ? "más" : "menos"} que {modo === "semana" ? "la semana pasada" : "el mes pasado"}</span>}<SelectorGrafica modo={modo} conMes /></div>
-          <Grafica key={`m-${modo}`} id={`inicio-movil-${modo}`} actual={serie.actual} previo={serie.previo} etiquetas={serie.etiquetas} cadaEtiqueta={serie.cada} alto={140} enCurso={serie.enCurso} puntos={modo !== "hoy"} descripcion={modo === "hoy" ? "Ventas acumuladas de hoy por hora" : modo === "semana" ? "Ventas de la semana" : "Ventas del mes"} vacio="Se dibuja con la primera venta" />
-        </div>
-        <div className="glass panel subir d2">
-          <div className="entre">
-            <span className="lab">Ventas por barbero</span>
-            <Link className="muted" style={{ fontSize: 12 }} href="/analitica/ventas">{modo === "hoy" ? "Hoy" : modo === "semana" ? "Esta semana" : "Este mes"}</Link>
-          </div>
-          <VentasPorBarbero filas={porBarbero} yo="" />
-          {s.barberia.usaMetas && <div className="pila-chica meta-lado">
-            <div className="entre">
-              <span className="muted" style={{ fontSize: 13 }}>Meta de hoy: <b style={{ color: "var(--fg)" }}>{formatoDinero(meta.monto)}</b></span>
-              <b className="num">{porcentaje(netas, meta.monto)}%</b>
-            </div>
-            <div className="meta grande"><i style={{ width: `${Math.max(avance * 100, 3)}%` }} /></div>
-          </div>}
-        </div>
-        <section className="ultimos-s subir d3">
-          <div className="entre">
-            <h2 className="sub-t">Últimos servicios</h2>
-            {s.puede("ventas.ver_todas") && <Link className="bt-ver" href="/analitica/ventas">Ver todas<span><Icono n="derecha" /></span></Link>}
-          </div>
-          <UltimosServicios filas={filasUlt.slice(0, 5)} />
-        </section>
-      </section>
-
-      <section className="inicio-b solo-escritorio">
-        <div className="hero-sin subir d1">
-          <span className="lab">{modo === "hoy" ? "Ventas de hoy" : modo === "semana" ? "Ventas de la semana" : "Ventas del mes"}</span>
-          <div className="big big-ini"><Cuenta valor={totalPeriodo} /></div>
-          <div className="entre" style={{ marginTop: 10 }}><span>{modo === "hoy" ? <Comparacion hoy={netas} previo={previoMismaHora} dia={dia} />
-            : varPeriodo === null ? <span className="pill gris">Sin registros en el periodo anterior</span>
-            : <span className={`pill ${varPeriodo >= 0 ? "ok" : "warn"}`}>{varPeriodo >= 0 ? "↗" : "↘"} {Math.abs(varPeriodo)}% {varPeriodo >= 0 ? "más" : "menos"} que {modo === "semana" ? "la semana pasada" : "el mes pasado"} a estas alturas</span>}</span><SelectorGrafica modo={modo} conMes /></div>
-          <div className="pila-chica" style={{ marginTop: 16 }}>
-            <span className="fila" style={{ gap: 16, fontSize: 12 }}>
-              <span className="fila" style={{ gap: 6 }}><i className="ley-l" />{modo === "hoy" ? "Hoy" : modo === "semana" ? "Esta semana" : "Este mes"}</span>
-              <span className="fila muted" style={{ gap: 6 }}><i className="ley-p" />{modo === "hoy" ? `El ${dia} pasado` : modo === "semana" ? "La semana pasada" : "El mes pasado"}</span>
-            </span>
-            <Grafica key={modo} id={`inicio-${modo}`} actual={serie.actual} previo={serie.previo} etiquetas={serie.etiquetas} cadaEtiqueta={serie.cada} alto={ALTO_GRAFICA} enCurso={serie.enCurso}
-              puntos={modo !== "hoy"} globos={serie.actual.map((v, i) => (v === null ? null : [modo === "hoy" ? `A las ${serie.etiquetas[i]}` : modo === "semana" ? nombreDia(new Date(`${sumarDias(lunes, i)}T12:00:00Z`).getUTCDay()) : `${serie.etiquetas[i]} de ${fechaLarga(hoy).split(" ").pop()}`, formatoDinero(v), modo === "hoy" ? "acumulado" : ""] as [string, string, string]))}
-              descripcion={modo === "hoy" ? "Ventas acumuladas de hoy por hora contra el mismo día de la semana pasada" : modo === "semana" ? "Ventas por día de esta semana contra la semana pasada" : "Ventas por día de este mes contra el mes pasado"}
-              vacio="Aquí se dibujarán las ventas en cuanto se cobre la primera" />
-          </div>
-        </div>
-        <div className="glass panel subir d2">
-          <span className="lab">Hoy</span>
-          <div className="datos">
-            <div><span>Clientes atendidos</span><b><Cuenta valor={deHoy.length} formato="entero" /></b></div>
-            <div><span>Servicios</span><b><Cuenta valor={servicios} formato="entero" /></b></div>
-            <div><span>Promedio por cliente</span><b>{deHoy.length ? formatoDinero(Math.round(netas / deHoy.length)) : "Sin datos"}</b></div>
-            {s.barberia.usaMetas && <div className="meta-hoy">
-              <div className="entre"><span>{delMes ? "Meta del día, todo el equipo" : "Meta diaria"}</span><b className="num">{formatoDinero(meta.monto)}</b></div>
-              <div className="pista-meta"><i style={{ width: `${Math.min(avance * 100, 100)}%` }} /></div>
-              <div className="entre"><small className="muted">{porcentaje(netas, meta.monto)}% alcanzado</small>{delMes && <small className="muted">Meta del mes {formatoDinero(s.barberia.metaMensual)}</small>}</div>
-              {delMes && delMes.porBarbero.filter((b) => b.aplica).length > 0 && (
-                <div className="metas-eq">
-                  {delMes.porBarbero.filter((b) => b.aplica).map((b) => <span key={b.id}>{b.nombre.split(" ")[0]}<b className="num">{formatoDinero(b.diaria)}</b></span>)}
-                </div>
-              )}
-            </div>}
-          </div>
-        </div>
-      </section>
-
-      <section className="tira subir d3 solo-escritorio">
-        <span className="lab">Equipo hoy</span>
-        {equipo.length === 0 && <span className="muted">Todavía no hay barberos dados de alta.</span>}
-        {equipo.map((e) => {
-          const cs = deHoy.flatMap((v) => v.conceptos.filter((c) => c.barberoId === e.id));
-          const monto = cs.reduce((a, c) => a + c.precioCobrado, 0);
-          return (
-            <div key={e.id} className="persona">
-              <Avatar avatar={e.avatar} nombre={e.nombre} t={42} />
-              <span><b style={{ fontWeight: 600 }}>{e.nombre.split(" ")[0]}</b><small>{cs.length ? `${cs.length} ${cs.length === 1 ? "servicio" : "servicios"}, ${formatoDinero(monto)}` : "Sin servicios"}</small></span>
-            </div>
-          );
-        })}
-      </section>
-
-      <section className="ultimos-s subir d3 solo-escritorio">
-        <div className="entre">
-          <h2 className="sub-t">Últimos servicios</h2>
-          {s.puede("ventas.ver_todas") && <Link className="bt-ver" href="/analitica/ventas">Ver todas las ventas<span><Icono n="derecha" /></span></Link>}
-        </div>
-        <UltimosServicios filas={filasUlt} />
-      </section>
-    </>
+    <InicioVista s={s} hoy={hoy} zona={zona} avisos={avisos} acciones={acciones} barbero={false}
+      total={total} servicios={conceptos.length} clientes={deHoy.length} previo={previo}
+      movs={pagadas.map((v) => ({ creadoEn: v.creadoEn, fecha: v.fecha, monto: v.total }))}
+      meta={meta} citas={citas} equipo={filasEq}
+      ultimos={filasUltimos(ventas.slice(0, 5), equipo, hoy, zona)}
+      verMas={{ href: "/analitica", texto: "Ver semana y mes en Analítica" }} verVentas={s.puede("ventas.ver_todas")} />
   );
 }
 
-async function InicioBarbero({ s, hoy, zona, q, avisos }: { s: Sesion; hoy: string; zona: string; q: Q; avisos: React.ReactNode }) {
-  const movil = await esMovil();
+async function InicioBarbero({ s, hoy, zona, turno, avisos }: { s: Sesion; hoy: string; zona: string; turno: Turno | null | undefined; avisos: React.ReactNode }) {
   const yo = s.usuario.id;
   const lunes = lunesDe(hoy);
-  const [{ ventas }, [u], historia] = await Promise.all([
-    ventasEntre(s.barberia.id, inicioDeMes(sumarDias(inicioDeMes(hoy), -1)) < sumarDias(lunes, -28) ? inicioDeMes(sumarDias(inicioDeMes(hoy), -1)) : sumarDias(lunes, -28), hoy, { barberoId: yo, zona }),
+  const [{ ventas: todas }, [u], gente, citas] = await Promise.all([
+    ventasEntre(s.barberia.id, sumarDias(lunes, -28), hoy, { zona }),
     db.select({ meta: schema.usuarios.metaSemanal }).from(schema.usuarios).where(eq(schema.usuarios.id, yo)),
-    diasConVentas(s.barberia.id, zona, yo),
-  ]);
-  const mios = ventas.filter((v) => v.estado === "pagada").flatMap((v) =>
-    v.conceptos.filter((c) => c.barberoId === yo).map((c) => ({ ...c, fecha: v.fecha, creadoEn: v.creadoEn, metodos: v.pagos.map((p) => p.metodo.toLowerCase()) })));
-  const movs: Movimiento[] = mios.map((c) => ({ creadoEn: c.creadoEn, fecha: c.fecha, monto: c.precioCobrado }));
-  const deHoy = mios.filter((c) => c.fecha === hoy);
-  const recientes = [...mios].sort((a, b) => b.creadoEn.getTime() - a.creadoEn.getTime()).slice(0, 10);
-  // Las ventas de todo el equipo en el periodo de la gráfica, para ver cuánto lleva cada barbero.
-  const inicioMesEq = inicioDeMes(hoy);
-  const [{ ventas: todas }, gente] = await Promise.all([
-    ventasEntre(s.barberia.id, [inicioMesEq, lunes, sumarDias(hoy, -14)].sort()[0], hoy, { zona }),
     equipoQueAtiende(s.barberia.id),
+    porLlegar(s, hoy, zona, yo),
   ]);
-  const totalHoy = deHoy.reduce((a, c) => a + c.precioCobrado, 0);
-  const semana = mios.filter((c) => c.fecha >= lunes).reduce((a, c) => a + c.precioCobrado, 0);
+  const pagadas = todas.filter((v) => v.estado === "pagada");
+  const mios = pagadas.flatMap((v) => v.conceptos.filter((c) => c.barberoId === yo).map((c) => ({ ...c, fecha: v.fecha, creadoEn: v.creadoEn })));
+  const deHoy = mios.filter((c) => c.fecha === hoy);
+  const total = deHoy.reduce((a, c) => a + c.precioCobrado, 0);
   const limite = Date.now() - 7 * 86400000;
   const previo = mios.filter((c) => c.fecha === sumarDias(hoy, -7) && c.creadoEn.getTime() <= limite).reduce((a, c) => a + c.precioCobrado, 0);
-  // Al abrir: si ya hay ventas hoy se ve el día; si no, la semana. Se puede cambiar a Hoy, Semana o Mes.
-  void historia;
-  const inicioMes = inicioDeMes(hoy);
-  const modo = q.grafica === "hoy" || q.grafica === "semana" || q.grafica === "mes" ? q.grafica : modoIdeal(mios.map((c) => c.fecha), hoy, lunes, inicioMes);
-  const diasMes = Array.from({ length: Number(finDeMes(hoy).slice(8)) }, (_, i) => sumarDias(inicioMes, i));
-  const mesAnt = inicioDeMes(sumarDias(inicioMes, -1));
-  const totalDe = (f: string) => movs.filter((m) => m.fecha === f).reduce((x, m) => x + m.monto, 0);
-  const serie = modo === "hoy" ? serieHoy(movs, hoy, zona) : modo === "semana" ? serieSemana(movs, lunes, hoy)
-    : { actual: diasMes.map((d) => (d <= hoy ? totalDe(d) : null)), previo: diasMes.map((_, i) => totalDe(sumarDias(mesAnt, i))), etiquetas: diasMes.map((d) => String(Number(d.slice(8)))), cada: 5 };
+  // Su meta diaria sale de la meta mensual del negocio o de su meta semanal (seis días de trabajo).
   const semanas = [1, 2, 3, 4].map((k) => {
     const l = sumarDias(lunes, -7 * k);
     return mios.filter((c) => c.fecha >= l && c.fecha <= sumarDias(l, 6)).reduce((a, c) => a + c.precioCobrado, 0);
   });
-  // Su meta diaria sale de la meta mensual del negocio; la semana son seis días de trabajo.
-  const delMes = u?.meta ? null : await metasDelMes(s.barberia.id, s.barberia.metaMensual, zona, hoy);
+  const delMes = !s.barberia.usaMetas || u?.meta ? null : await metasDelMes(s.barberia.id, s.barberia.metaMensual, zona, hoy);
   const mia = delMes?.porBarbero.find((x) => x.id === yo);
-  const meta = mia?.aplica ? { monto: Math.max(mia.diaria * 6, 1), origen: "asignada" as const } : calcularMeta(u?.meta ?? 0, semanas);
-  const metaHoy = mia?.aplica ? mia.diaria : Math.round(meta.monto / 6);
-  // En su cuenta, el barbero ve solo su meta del día.
-  const enHoy = true;
-  const avance = Math.min((enHoy ? totalHoy : semana) / (enHoy ? Math.max(metaHoy, 1) : meta.monto), 1);
-  const dia = nombreDia(new Date(`${hoy}T12:00:00Z`).getUTCDay());
-  // Ventas por barbero en el periodo de la gráfica (datos del equipo, visibles para todos).
-  const desdeEq = modo === "hoy" ? hoy : modo === "semana" ? lunes : inicioMes;
-  const delPeriodo = todas.filter((v) => v.estado === "pagada" && v.fecha >= desdeEq).flatMap((v) => v.conceptos);
-  const porBarbero = gente.map((g) => {
-    const cs = delPeriodo.filter((c) => c.barberoId === g.id);
+  const metaHoy = mia?.aplica ? mia.diaria : Math.round(calcularMeta(u?.meta ?? 0, semanas).monto / 6);
+  const clientesHoy = new Set(pagadas.filter((v) => v.fecha === hoy && v.conceptos.some((c) => c.barberoId === yo)).map((v) => v.id)).size;
+  const conceptosHoy = pagadas.filter((v) => v.fecha === hoy).flatMap((v) => v.conceptos);
+  const filasEq = gente.map((g) => {
+    const cs = conceptosHoy.filter((c) => c.barberoId === g.id);
     return { id: g.id, nombre: g.nombre, avatar: g.avatar, servicios: cs.length, monto: cs.reduce((a, c) => a + c.precioCobrado, 0) };
   }).sort((a, b) => b.monto - a.monto);
-  // Últimos servicios: los de todo el equipo, con el mismo formato que ven los demás puestos.
-  const ultimosPropios = todas.slice(0, movil ? 5 : 10).map((v) => {
-    const quien = gente.find((g) => g.id === v.conceptos[0]?.barberoId);
-    return {
-      id: v.id, folio: v.folio, cancelada: v.estado === "cancelada", monto: formatoDinero(v.total),
-      t: v.fecha === hoy ? horaCorta(v.creadoEn, zona) : v.fecha === sumarDias(hoy, -1) ? "Ayer" : `${v.fecha.slice(8)}/${v.fecha.slice(5, 7)}`,
-      servicios: v.conceptos.map((c) => c.nombre).join(", "), quien: v.conceptos[0]?.barbero ?? "", avatar: quien?.avatar ?? "iniciales",
-      metodo: v.pagos.map((pg) => pg.metodo).join(" y ").toLowerCase() || "sin pago",
-      detalle: [
-        ["Servicios", v.conceptos.map((c) => `${c.nombre} con ${c.barbero.split(" ")[0]}, ${formatoDinero(c.precioCobrado)}`).join("; ")],
-        ["Pago", v.pagos.map((pg) => `${pg.metodo} ${formatoDinero(pg.monto)}`).join(" y ") || "Sin pago"],
-        ["Registró", v.registradaPor.split(" ")[0]],
-        ["Cuándo", `${fechaLarga(v.fecha)}, ${horaCorta(v.creadoEn, zona)}`],
-        ...(v.estado === "cancelada" ? [["Cancelada", v.motivoCancelacion ?? ""] as [string, string]] : []),
-      ] as [string, string][],
-    };
-  });
-
+  const acciones = await accionesDe(s, turno, hoy, zona, citas?.length ?? null, true);
   return (
-    <>
-      {avisos}
-      <div className="subir saludo-i">
-        <span className="lab">{fechaLarga(hoy)}</span>
-        <h1 className="titulo brillo" style={{ fontSize: 30, marginTop: 8 }}>Hola, {s.usuario.nombre.split(" ")[0]}</h1>
-      </div>
-      <section className="inicio-b">
-        <div className="hero-sin subir d1" style={{ display: "grid", gap: 14 }}>
-          <div className="entre" style={{ alignItems: "flex-end" }}>
-            <div><span className="lab">Hoy llevas</span><div className="big big-ini"><Cuenta valor={totalHoy} /></div></div>
-            <div style={{ textAlign: "right" }}><span className="lab">Servicios</span><span className="fig" style={{ fontSize: 30 }}><Cuenta valor={deHoy.length} formato="entero" /></span></div>
-          </div>
-          <div className="entre"><Comparacion hoy={totalHoy} previo={previo} dia={dia} /><SelectorGrafica modo={modo} conMes /></div>
-          <Grafica id={`barbero-${modo}`} actual={serie.actual} previo={serie.previo} etiquetas={serie.etiquetas} cadaEtiqueta={serie.cada} alto={movil ? 140 : ALTO_GRAFICA}
-            enCurso={"enCurso" in serie ? (serie.enCurso as number | undefined) : undefined}
-            globos={serie.actual.map((v, i) => (v === null ? null : [modo === "hoy" ? `A las ${serie.etiquetas[i]}` : modo === "semana" ? nombreDia(new Date(`${sumarDias(lunes, i)}T12:00:00Z`).getUTCDay()) : `${serie.etiquetas[i]} de ${fechaLarga(hoy).split(" ").pop()}`, formatoDinero(v), modo === "hoy" ? "acumulado" : ""] as [string, string, string]))}
-            descripcion={modo === "hoy" ? "Tus ventas de hoy por hora" : modo === "semana" ? "Tus ventas de la semana" : "Tus ventas del mes"} puntos={modo !== "hoy"} key={modo} vacio="Tu gráfica se dibuja con tu primer servicio" />
-
-        </div>
-        <div className="glass panel subir d2">
-          <div className="entre">
-            <span className="lab">Ventas por barbero</span>
-            <span className="muted" style={{ fontSize: 12 }}>{modo === "hoy" ? "Hoy" : modo === "semana" ? "Esta semana" : "Este mes"}</span>
-          </div>
-          <VentasPorBarbero filas={porBarbero} yo={yo} />
-          {s.barberia.usaMetas ? <div className="pila-chica meta-lado">
-            <div className="entre">
-              <span className="muted" style={{ fontSize: 13 }}>{enHoy ? "Meta de hoy" : "Meta de la semana"}: <b style={{ color: "var(--fg)" }}>{formatoDinero(enHoy ? metaHoy : meta.monto)}</b><Ayuda titulo={enHoy ? "Meta de hoy" : "Meta de la semana"}>{mia?.aplica ? "Sale de la meta mensual del negocio y de tu forma de pago." : "Refleja tu meta de ventas y cuánto llevas de ella."}</Ayuda></span>
-              <b className="num">{porcentaje(enHoy ? totalHoy : semana, enHoy ? Math.max(metaHoy, 1) : meta.monto)}%</b>
-            </div>
-            <div className="meta grande"><i style={{ width: `${Math.max(avance * 100, 3)}%` }} /></div>
-            <small className="muted">Llevas {formatoDinero(enHoy ? totalHoy : semana)} {enHoy ? "hoy" : "esta semana"}.</small>
-          </div> : <small className="muted meta-lado">Llevas {formatoDinero(semana)} esta semana.</small>}
-        </div>
-      </section>
-
-      <section className="ultimos-s subir d3">
-        <div className="entre">
-          <h2 className="sub-t">Últimos servicios</h2>
-          <Link className="bt-ver" href="/analitica/ventas">Ver todas las ventas<span><Icono n="derecha" /></span></Link>
-        </div>
-        <UltimosServicios filas={ultimosPropios} />
-      </section>
-    </>
+    <InicioVista s={s} hoy={hoy} zona={zona} avisos={avisos} acciones={acciones} barbero
+      total={total} servicios={deHoy.length} clientes={clientesHoy} previo={previo}
+      movs={mios.map((c) => ({ creadoEn: c.creadoEn, fecha: c.fecha, monto: c.precioCobrado }))}
+      meta={s.barberia.usaMetas ? { monto: Math.max(metaHoy, 1), ayuda: mia?.aplica ? "Sale de la meta mensual del negocio y de tu forma de pago." : "Refleja tu meta de ventas y cuánto llevas de ella." } : null}
+      citas={citas} equipo={filasEq}
+      ultimos={filasUltimos(todas.slice(0, 5), gente, hoy, zona)}
+      verMas={{ href: "/analitica/ventas", texto: "Ver tu semana y mes en Ventas" }} verVentas />
   );
 }

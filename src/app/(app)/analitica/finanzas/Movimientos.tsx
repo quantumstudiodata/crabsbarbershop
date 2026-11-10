@@ -15,11 +15,11 @@ type Categoria = { id: string; nombre: string; activo: boolean };
 const firma = (c: number) => `${c < 0 ? "−" : "+"}${formatoDinero(Math.abs(c))}`;
 
 /** Lista de movimientos del negocio: ventas del día, egresos y pagos al equipo. Cada uno se abre para ver su detalle. */
-export function Movimientos({ dias, registrar, hoy, cajaAbierta, categorias, opciones, filtros }: {
-  dias: DiaMovimientos[]; registrar: boolean; hoy: string; cajaAbierta: boolean; categorias: Categoria[]; opciones: OpcionesEgreso; filtros: React.ReactNode;
+export function Movimientos({ dias, registrar, hoy, cajaAbierta, categorias, opciones, filtros, abrirEgreso }: {
+  abrirEgreso?: boolean; dias: DiaMovimientos[]; registrar: boolean; hoy: string; cajaAbierta: boolean; categorias: Categoria[]; opciones: OpcionesEgreso; filtros: React.ReactNode;
 }) {
   const [abierto, setAbierto] = useState<string | null>(null);
-  const [nuevo, setNuevo] = useState(0);
+  const [nuevo, setNuevo] = useState(abrirEgreso && registrar ? 1 : 0);
   const [cancelar, setCancelar] = useState<FilaEgreso | null>(null);
   return (
     <>

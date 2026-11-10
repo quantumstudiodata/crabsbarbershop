@@ -24,7 +24,7 @@ const SUELDO = new Set(["sueldo", "mixto"]);
 const TIPOS = [["", "Todos los movimientos"], ["ingresos", "Ingresos"], ["egresos", "Egresos"], ["equipo", "Pagos al equipo"]] as const;
 const METODO: Record<string, string> = { efectivo: "efectivo", transferencia: "transferencia", tarjeta: "tarjeta" };
 
-type Q = ConsultaFiltros & { tipo?: string };
+type Q = ConsultaFiltros & { tipo?: string; egreso?: string };
 
 /** Finanzas y egresos en una sola pantalla: lo que quedó del periodo y todos los movimientos del negocio. */
 export default async function Finanzas({ searchParams }: { searchParams: Promise<Q> }) {
@@ -181,7 +181,7 @@ export default async function Finanzas({ searchParams }: { searchParams: Promise
           {anterior && <p className="aviso-sutil">Mostrando {nombreP} hasta que empiece el mes.</p>}
         </>
       )}
-      <Movimientos dias={dias} registrar={s.puede("gastos.registrar")} hoy={hoy} cajaAbierta={!!turno} categorias={cats}
+      <Movimientos abrirEgreso={q.egreso === "1"} dias={dias} registrar={s.puede("gastos.registrar")} hoy={hoy} cajaAbierta={!!turno} categorias={cats}
         opciones={{ metodos: s.barberia.metodosEgreso, periodicidad: s.barberia.usaPeriodicidad, comprobantes: s.barberia.usaComprobantes, frecuentes: frecuentes.map(({ id, concepto, categoria, monto, metodo, periodicidad }) => ({ id, concepto, categoria, monto, metodo, periodicidad })) }}
         filtros={<BarraFiltros p={f.periodo} hoy={hoy} personas={[]} persona="" buscar={f.buscar} sinPeriodo="Todas las fechas" textoBuscar="Buscar"
           descarga={s.puede("reportes.exportar") ? `/api/exportar?tipo=gastos${f.periodo ? `&desde=${f.periodo.desde}&hasta=${f.periodo.hasta}` : ""}` : undefined}

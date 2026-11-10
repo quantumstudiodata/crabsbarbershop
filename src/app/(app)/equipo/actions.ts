@@ -37,7 +37,7 @@ export async function decidirFaltante(form: FormData) {
 /** Responde una reseña. La respuesta queda visible para el equipo. */
 export async function responderResena(form: FormData) {
   const s = await requerirSesion("resenas.responder");
-  const regreso = texto(form, "regreso", 200).startsWith("/equipo/resenas") ? texto(form, "regreso", 200) : "/equipo/resenas";
+  const regreso = texto(form, "regreso", 200).startsWith("/clientes/resenas") ? texto(form, "regreso", 200) : "/clientes/resenas";
   if (s.vista) volver(regreso, { error: "En la vista previa no se guardan cambios." });
   const id = texto(form, "id", 40);
   const respuesta = texto(form, "respuesta", 600);
@@ -45,6 +45,6 @@ export async function responderResena(form: FormData) {
   const r = await db.update(schema.resenas).set({ respuesta, respondidaPor: s.usuario.id, respondidaEn: new Date() })
     .where(and(eq(schema.resenas.id, id), eq(schema.resenas.barberiaId, s.barberia.id))).returning({ id: schema.resenas.id });
   if (!r.length) volver(regreso, { error: "No se encontró esa reseña." });
-  revalidatePath("/equipo/resenas");
+  revalidatePath("/clientes/resenas");
   volver(regreso, { aviso: "guardado" });
 }

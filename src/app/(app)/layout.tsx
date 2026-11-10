@@ -25,7 +25,7 @@ export const dynamic = "force-dynamic";
 export default async function LayoutApp({ children }: { children: React.ReactNode }) {
   const s = await requerirSesion();
   const rol = s.usuario.rol;
-  const { items, sub: subAnalitica, atiende } = menuDe(rol, s.puede, s.barberia.usaCitas);
+  const { items, grupos, atiende } = menuDe(rol, s.puede, s.barberia.usaCitas);
   // En el teléfono caben cuatro secciones abajo (más Cobrar aparte); las demás van en el menú de la cuenta.
   const extraMovil = items.filter((i) => i.href !== "/cobrar").slice(4).map((i) => ({ href: i.href, texto: i.texto, icono: i.icono }));
   const soporte = s.usuario.esSoporte;
@@ -49,8 +49,8 @@ export default async function LayoutApp({ children }: { children: React.ReactNod
       <header className="barra">
         <div className="barra-in">
           <b className="negocio-n">{s.barberia.nombre}</b>
-          <TituloMovil negocio={s.barberia.nombre} nombre={s.usuario.nombre.split(" ")[0]} fecha={fechaLarga(fechaLocal(new Date(), s.barberia.zonaHoraria))} items={items} sub={{ base: "/analitica", items: subAnalitica }} />
-          <Nav items={items} sub={{ base: "/analitica", items: subAnalitica }} destacado={soporte && !s.vista ? { href: "/soporte", texto: "Soporte", icono: "llave" } : undefined} />
+          <TituloMovil negocio={s.barberia.nombre} nombre={s.usuario.nombre.split(" ")[0]} fecha={fechaLarga(fechaLocal(new Date(), s.barberia.zonaHoraria))} items={items} grupos={grupos} />
+          <Nav items={items} grupos={grupos} destacado={soporte && !s.vista ? { href: "/soporte", texto: "Soporte", icono: "llave" } : undefined} />
           <div className="herramientas">
             {!soporte && <Suspense fallback={null}><CentroAyuda {...await conteoAyuda(s.usuario.id)} /></Suspense>}
             <Campana />

@@ -9,7 +9,7 @@ import { PantallaCitas, type CitaVista } from "./PantallaCitas";
 
 export const metadata = { title: "Citas y agenda" };
 
-type Q = { dia?: string; vista?: string; persona?: string };
+type Q = { dia?: string; vista?: string; persona?: string; nueva?: string };
 
 export default async function Citas({ searchParams }: { searchParams: Promise<Q> }) {
   const s = await requerirSesion("citas.ver");
@@ -50,6 +50,7 @@ export default async function Citas({ searchParams }: { searchParams: Promise<Q>
   const config = leerConfig(b.citasConfig);
   return (
     <PantallaCitas
+      abrirNueva={q.nueva === "1"}
       hoy={hoy} dia={dia} vista={vista} persona={q.persona ?? ""} citas={citas} ahora={Date.now()}
       equipo={equipo.map((e) => ({ id: e.id, nombre: e.nombre, avatar: e.avatar, horario: e.horario as Horario | null }))}
       servicios={servicios}

@@ -3,7 +3,7 @@
 import { useState } from "react";
 import { Fl, Icono } from "@/components/Icono";
 import { Modal } from "@/components/ui";
-import { responderResena } from "../actions";
+import { responderResena } from "../../equipo/actions";
 
 /** Responder una reseña o leer la respuesta que ya se dio. */
 export function Responder({ id, cliente, comentario, respuesta, puede }: { id: string; cliente: string; comentario: string; respuesta: string | null; puede: boolean }) {
@@ -18,7 +18,7 @@ export function Responder({ id, cliente, comentario, respuesta, puede }: { id: s
           {respuesta ? <p>{respuesta}</p> : (
             <form action={responderResena} className="pila">
               <input type="hidden" name="id" value={id} />
-              <input type="hidden" name="regreso" value="/equipo/resenas" />
+              <input type="hidden" name="regreso" value="/clientes/resenas" />
               <label className="campo"><span>Tu respuesta</span><textarea className="input" name="respuesta" rows={4} maxLength={600} required placeholder="Escribe una respuesta amable" /></label>
               <div className="acciones"><button className="bt">Enviar respuesta<Fl /></button></div>
             </form>

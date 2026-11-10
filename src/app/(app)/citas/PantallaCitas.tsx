@@ -35,6 +35,7 @@ const fechaTxt = (f: string) => `${DIAS_L[dow(f)]} ${Number(f.slice(8))} de ${["
 const activa = (e: string) => ["apartada", "en_espera", "llego", "en_atencion"].includes(e);
 
 export function PantallaCitas(p: {
+  abrirNueva?: boolean;
   hoy: string; dia: string; vista: "lista" | "calendario" | "semana" | "horarios"; persona: string; citas: CitaVista[]; ahora: number;
   equipo: Persona[]; servicios: Servicio[]; horarioNegocio: Horario; cerrados: string[]; conteo: Record<string, number>;
   rotacion: Rot | null; bloqueos: { id: string; persona: string; fecha: string; desde: string; hasta: string; motivo: string }[];
@@ -42,7 +43,7 @@ export function PantallaCitas(p: {
 }) {
   const router = useRouter();
   const [ver, setVer] = useState<CitaVista | null>(null);
-  const [agendar, setAgendar] = useState(false);
+  const [agendar, setAgendar] = useState(!!p.abrirNueva && p.puede.modificar);
   const [aviso, setAviso] = useState<Res>({});
   const [copiado, setCopiado] = useState(false);
   const url = (x: Partial<{ dia: string; vista: string; persona: string }>) => {
@@ -138,12 +139,12 @@ function VistaLista({ citas, ahora, esHoy, abrir, puede, avisar }: { citas: Cita
       {esHoy && (siguiente || enAtencion.length > 0) && (
         <section className="glass sig-cita subir">
           {siguiente && (
-            <button type="button" className="sig-c" onClick={() => abrir(siguiente)}>
+            <div role="button" tabIndex={0} className="sig-c" onClick={() => abrir(siguiente)} onKeyDown={(e) => { if (e.target === e.currentTarget && (e.key === "Enter" || e.key === " ")) { e.preventDefault(); abrir(siguiente); } }}>
               <span className="lab">Sigue</span>
               <span className="sig-h num">{siguiente.hora}</span>
               <span className="sig-t"><b>{siguiente.cliente}</b><small>{siguiente.servicios.join(", ")}, con {primer(siguiente.barbero)}</small></span>
               {puede.modificar ? <SiguientePaso c={siguiente} avisar={avisar} /> : <Chip e={siguiente.estado} />}
-            </button>
+            </div>
           )}
           <div className="sig-res">
             <span><b className="num">{espera.length}</b> en espera</span>
