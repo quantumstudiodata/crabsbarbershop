@@ -1,6 +1,6 @@
 import { redirect } from "next/navigation";
 
-// El equipo se consulta desde Ventas, filtrando por persona.
+// El equipo tiene su propia sección.
 export default function Equipo() {
-  redirect("/analitica/ventas?periodo=mes");
+  redirect("/equipo");
 }

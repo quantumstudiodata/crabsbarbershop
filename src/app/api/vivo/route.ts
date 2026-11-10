@@ -11,7 +11,7 @@ export const dynamic = "force-dynamic";
 const s = schema;
 const RUTA: Record<string, string> = {
   venta: "/analitica/ventas", caja: "/analitica/cortes", usuario: "/ajustes", precio: "/ajustes/servicios",
-  ajuste: "/ajustes/cobro", equipo: "/analitica/equipo",
+  ajuste: "/ajustes/cobro", equipo: "/equipo",
 };
 
 export type EventoVivo = { id: string; t: string; titulo: string; detalle?: string; href?: string; nombre: string; avatar: string };

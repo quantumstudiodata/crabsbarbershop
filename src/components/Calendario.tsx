@@ -91,12 +91,12 @@ export function Calendario({ fecha, hoy, elegir, activo = true }: { fecha: strin
 }
 
 /** Botón pequeño con un menú que se abre por debajo. */
-function Desplegable({ texto, activo, children }: { texto: string; activo: boolean; children: (cerrar: () => void) => React.ReactNode }) {
+function Desplegable({ texto, activo, icono, children }: { texto: string; activo: boolean; icono?: string; children: (cerrar: () => void) => React.ReactNode }) {
   const { abierto, setAbierto, caja } = useVentana();
   return (
     <div style={{ position: "relative" }} ref={caja}>
       <button type="button" className={`bp ${activo ? "on" : ""}`} aria-expanded={abierto} onClick={() => setAbierto((x) => !x)}>
-        {texto}<Icono n="abajo" className={`ic flecha-bp ${abierto ? "girada" : ""}`} />
+        {icono ? <><Icono n={icono} /><span className="txt-bp">{texto}</span></> : texto}<Icono n="abajo" className={`ic flecha-bp ${abierto ? "girada" : ""}`} />
       </button>
       {abierto && <Flotante ancla={caja} className="calendario menu-p">{children(() => setAbierto(false))}</Flotante>}
     </div>
@@ -104,11 +104,11 @@ function Desplegable({ texto, activo, children }: { texto: string; activo: boole
 }
 
 /** Mes: se abre por debajo una cuadrícula con los meses y flechas para cambiar de año. */
-export function MenuMes({ mes, activo, hoy, elegir, conDatos }: { mes: string; activo: boolean; hoy: string; elegir: (ym: string) => void; conDatos?: string[] }) {
+export function MenuMes({ mes, activo, hoy, elegir, conDatos, icono }: { mes: string; activo: boolean; hoy: string; elegir: (ym: string) => void; conDatos?: string[]; icono?: string }) {
   const [anio, setAnio] = useState(Number(mes.slice(0, 4)));
   const tope = hoy.slice(0, 7);
   return (
-    <Desplegable texto={activo ? mesTexto(mes) : "Mes"} activo={activo}>
+    <Desplegable texto={activo ? mesTexto(mes) : "Mes"} activo={activo} icono={icono}>
       {(cerrar) => (
         <>
           <div className="entre">

@@ -58,7 +58,7 @@ export function TituloMovil({ nombre, fecha, items, sub }: { nombre: string; fec
 type Mas = { historial: boolean; ajustes: boolean; ideas: boolean; ayuda: boolean; soporte: boolean };
 
 /** Barra de secciones abajo, en el teléfono. Cobrar va al centro cuando el puesto puede cobrar. */
-export function BarraInferior({ items, mas }: { items: ItemNav[]; mas: Mas }) {
+export function BarraInferior({ items, mas, masEnAvatar }: { items: ItemNav[]; mas: Mas; masEnAvatar?: boolean }) {
   const ruta = usePathname();
   const [hoja, setHoja] = useState(false);
   useEffect(() => setHoja(false), [ruta]);
@@ -71,10 +71,12 @@ export function BarraInferior({ items, mas }: { items: ItemNav[]; mas: Mas }) {
 
   const cobro = items.find((i) => i.href === "/cobrar");
   const resto = items.filter((i) => i.href !== "/cobrar");
-  const visibles = resto.slice(0, cobro ? 3 : 4);
+  // Con cuatro secciones y Cobrar no cabe "Más": sus opciones van en el menú del avatar.
+  const visibles = resto.slice(0, masEnAvatar ? 4 : cobro ? 3 : 4);
   const extra = resto.slice(visibles.length);
   const izq = cobro ? visibles.slice(0, 2) : visibles;
   const der = cobro ? visibles.slice(2) : [];
+  const conMas = !masEnAvatar;
   const tab = (i: ItemNav) => (
     <Link key={i.href} href={i.href} className="tab-m" aria-current={activo(ruta, i.href) ? "page" : undefined}>
       <span className="ic-m"><Icono n={i.icono} /></span>{i.texto === "Cobro" ? "Cobrar" : i.texto}
@@ -90,7 +92,7 @@ export function BarraInferior({ items, mas }: { items: ItemNav[]; mas: Mas }) {
 
   return (
     <>
-      <nav className={`barra-inf ${cobro ? "con-cobro" : ""}`} aria-label="Secciones" style={{ ["--cols" as string]: izq.length + der.length + 1 }}>
+      <nav className={`barra-inf ${cobro ? "con-cobro" : ""}`} aria-label="Secciones" style={{ ["--cols" as string]: izq.length + der.length + (conMas ? 1 : 0) }}>
         {izq.map(tab)}
         {cobro && (
           <Link href="/cobrar" className="tab-m cobrar-m" aria-current={activo(ruta, "/cobrar") ? "page" : undefined}>
@@ -98,9 +100,9 @@ export function BarraInferior({ items, mas }: { items: ItemNav[]; mas: Mas }) {
           </Link>
         )}
         {der.map(tab)}
-        <button type="button" className="tab-m" aria-haspopup="dialog" aria-expanded={hoja} aria-current={masActivo ? "page" : undefined} onClick={() => setHoja(true)}>
+        {conMas && <button type="button" className="tab-m" aria-haspopup="dialog" aria-expanded={hoja} aria-current={masActivo ? "page" : undefined} onClick={() => setHoja(true)}>
           <span className="ic-m"><Icono n="puntos" /></span>Más
-        </button>
+        </button>}
       </nav>
       {hoja && (
         <>

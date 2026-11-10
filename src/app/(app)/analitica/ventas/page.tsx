@@ -3,16 +3,15 @@ import { AvisoUrl } from "@/components/Encabezado";
 import { BarraFiltros } from "@/components/BarraFiltros";
 import { Paginacion } from "@/components/Paginacion";
 import { requerirSesion } from "@/lib/auth";
-import { and, eq, gte, inArray, lte } from "drizzle-orm";
+import { inArray } from "drizzle-orm";
 import { Avatar } from "@/components/Avatar";
 import { Ayuda } from "@/components/Ayuda";
-import { describirRegla, elegirRegla, porSemana } from "@/lib/comisiones";
 import { MINUTOS_CORRECCION } from "@/lib/caja";
-import { cajaDe, copiaRegla, diasYTotalVentas, idsVentas, equipoConVentas, metodosActivos, reglasDe, ventasEntre } from "@/lib/datos";
+import { cajaDe, diasYTotalVentas, idsVentas, equipoConVentas, metodosActivos, ventasEntre } from "@/lib/datos";
 import { condicionVentas, type ConsultaFiltros, leerFiltros, paginaDeRegistros, rangoDePagina, urlDescarga } from "@/lib/filtros";
 import { esMovil } from "@/lib/dispositivo";
-import { db, schema } from "@/lib/db";
-import { diasEntre, lunesDe } from "@/lib/fechas";
+import { schema } from "@/lib/db";
+import { lunesDe } from "@/lib/fechas";
 import { fechaLarga, fechaLocal, horaCorta } from "@/lib/fechas";
 import { formatoDinero } from "@/lib/money";
 import { leerPeriodo } from "@/lib/periodo";
@@ -20,7 +19,7 @@ import { HistorialVentas, type DiaVentas } from "@/components/HistorialVentas";
 import { CabeceraVentas, periodoEncabezado } from "@/components/CabeceraPeriodo";
 import { Pagar } from "./Pagar";
 import { ConteoCortes } from "./ConteoCortes";
-import { faltantesDe } from "@/lib/faltantes";
+import { cuentaDe } from "@/lib/equipo";
 
 export const metadata = { title: "Ventas" };
 
@@ -142,27 +141,4 @@ export default async function Ventas({ searchParams }: { searchParams: Promise<Q
         texto={resumen.dias.length ? (movil ? `Página ${r.pagina} de ${r.paginas}` : `${resumen.dias.length} ${resumen.dias.length === 1 ? "día" : "días"} con ventas${r.paginas > 1 ? `, página ${r.pagina} de ${r.paginas}` : ""}`) : ""} />
     </>
   );
-}
-
-/** Cuenta de una persona en el periodo: lo que le corresponde, lo pagado y su renta. */
-async function cuentaDe(barberiaId: string, id: string, desde: string, hasta: string, pagadas: Awaited<ReturnType<typeof ventasEntre>>["ventas"]) {
-  const [reglas, pagos, falt] = await Promise.all([
-    reglasDe(barberiaId),
-    db.select().from(schema.pagosComision).where(and(eq(schema.pagosComision.barberiaId, barberiaId), eq(schema.pagosComision.barberoId, id), gte(schema.pagosComision.semana, lunesDe(desde)), lte(schema.pagosComision.semana, hasta))),
-    faltantesDe(barberiaId, desde, hasta),
-  ]);
-  const faltantes = falt.find((x) => x.usuarioId === id)?.monto ?? 0;
-  const cs = pagadas.flatMap((v) => v.conceptos.filter((c) => c.barberoId === id));
-  const regla = copiaRegla(elegirRegla(reglas, id, null, new Date()));
-  const semanas = Math.max(1, Math.ceil((diasEntre(lunesDe(desde), hasta) + 1) / 7));
-  const sueldo = regla && (regla.tipo === "sueldo" || regla.tipo === "mixto") ? porSemana(regla.montoSemanal, regla.periodo) * semanas : 0;
-  const renta = regla?.tipo === "renta" ? porSemana(regla.montoSemanal, regla.periodo) * semanas : 0;
-  const comision = regla?.tipo === "renta" ? 0 : cs.reduce((a, c) => a + c.comision, 0);
-  const pagado = pagos.filter((x) => x.tipo === "pago").reduce((a, x) => a + x.monto, 0);
-  const rentaPagada = pagos.filter((x) => x.tipo === "renta").reduce((a, x) => a + x.monto, 0);
-  return {
-    forma: describirRegla(regla, formatoDinero), vendido: cs.reduce((a, c) => a + c.precioCobrado, 0),
-    corresponde: comision + sueldo, pagado, faltantes, saldo: Math.max(comision + sueldo - pagado - faltantes, 0),
-    renta, rentaPagada, rentaPendiente: Math.max(renta - rentaPagada, 0),
-  };
 }

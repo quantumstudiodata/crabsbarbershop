@@ -26,6 +26,7 @@ export default async function LayoutApp({ children }: { children: React.ReactNod
   const s = await requerirSesion();
   const rol = s.usuario.rol;
   const { items, sub: subAnalitica, atiende } = menuDe(rol, s.puede, s.barberia.usaCitas);
+  const masEnAvatar = items.some((i) => i.href === "/cobrar") && items.filter((i) => i.href !== "/cobrar").length >= 4;
   const soporte = s.usuario.esSoporte;
   const experiencias = soporte ? [
     ...PLANTILLAS.map((r) => ({ como: r, texto: NOMBRE_ROL[r] })),
@@ -53,6 +54,10 @@ export default async function LayoutApp({ children }: { children: React.ReactNod
             avatar={s.usuario.avatar}
             ajustes={s.puede("usuarios.ver") || s.puede("servicios.ver") || PERMISOS_CONFIG.some((p) => s.puede(p))}
             historial={s.puede("ventas.ver_todas") || atiende}
+            masMovil={masEnAvatar ? {
+              extra: items.filter((i) => i.href !== "/cobrar").slice(4).map((i) => ({ href: i.href, texto: i.texto, icono: i.icono })),
+              ideas: s.puede("ideas.decidir"), ayuda: !soporte, soporte: soporte && !s.vista,
+            } : undefined}
             formaPago={atiende ? describirRegla(copiaRegla(elegirRegla(await reglasDe(s.barberia.id), s.usuario.id, null, new Date())), formatoDinero) : null}
           />
           <TituloMovil nombre={s.usuario.nombre.split(" ")[0]} fecha={fechaLarga(fechaLocal(new Date(), s.barberia.zonaHoraria))} items={items} sub={{ base: "/analitica", items: subAnalitica }} />
@@ -65,7 +70,7 @@ export default async function LayoutApp({ children }: { children: React.ReactNod
         </div>
       </header>
       <main className="contenedor">{children}</main>
-      <BarraInferior items={items} mas={{
+      <BarraInferior items={items} masEnAvatar={masEnAvatar} mas={{
         historial: s.puede("ventas.ver_todas") || atiende,
         ajustes: s.puede("usuarios.ver") || s.puede("servicios.ver") || PERMISOS_CONFIG.some((p) => s.puede(p)),
         ideas: s.puede("ideas.decidir"), ayuda: !soporte, soporte: soporte && !s.vista,

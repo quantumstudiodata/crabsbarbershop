@@ -12,6 +12,7 @@ export function menuDe(rol: Rol, puede: (p: Permiso) => boolean, citas = false) 
   if (cobra) items.push({ href: "/cobrar", texto: "Cobro", icono: "cobro" });
   if (citas && puede("citas.ver")) items.push({ href: "/citas", texto: "Citas", icono: "calendario" });
   if (atiende && !puede("ventas.ver_todas")) items.push({ href: "/analitica/ventas", texto: "Ventas", icono: "lista" });
+  if (puede("ventas.ver_todas") || puede("equipo.pagar")) items.push({ href: "/equipo", texto: "Equipo", icono: "persona" });
   if (analitica) items.push({ href: "/analitica", texto: "Analítica", icono: "grafica" });
   if (rol === "contador") items.push({ href: "/libreta", texto: "Datos", icono: "lista", resalta: true });
   const sub: [string, string][] = [];
