@@ -2,7 +2,7 @@
 
 import Link from "next/link";
 import { usePathname, useRouter } from "next/navigation";
-import { useEffect, useState } from "react";
+import { useEffect, useLayoutEffect, useRef, useState } from "react";
 import { Icono } from "./Icono";
 import type { ItemNav, SubNav } from "./Nav";
 
@@ -21,7 +21,7 @@ export function useAbrirPanel(cual: "ayuda" | "ideas", abrir: () => void) {
 const activo = (ruta: string, href: string) => (href === "/" ? ruta === "/" : ruta.startsWith(href));
 
 /** Parte izquierda de la barra superior en el teléfono: saludo en Inicio, nombre de la sección en lo demás. */
-export function TituloMovil({ nombre, fecha, items, sub }: { nombre: string; fecha: string; items: ItemNav[]; sub?: SubNav }) {
+export function TituloMovil({ negocio, nombre, fecha, items, sub }: { negocio: string; nombre: string; fecha: string; items: ItemNav[]; sub?: SubNav }) {
   const ruta = usePathname();
   const router = useRouter();
   const [compacta, setCompacta] = useState(false);
@@ -42,7 +42,7 @@ export function TituloMovil({ nombre, fecha, items, sub }: { nombre: string; fec
         {enCobro && <button type="button" className="icb cerrar-m" aria-label="Salir de Cobro" onClick={() => (history.length > 1 ? router.back() : router.push("/"))}><Icono n="cerrar" /></button>}
         {seccion === null && !compacta
           ? <span className="saludo-m"><small>{fecha}</small><b><em>Hola,</em> {nombre}</b></span>
-          : <span className="saludo-m"><b>{seccion || "Inicio"}</b></span>}
+          : <span className="saludo-m"><small>{negocio}</small><b key={seccion || "Inicio"} className="entra-m">{seccion || "Inicio"}</b></span>}
       </div>
       {dentro && (
         <nav className="sub-m" aria-label="Secciones de Analítica">
@@ -57,67 +57,42 @@ export function TituloMovil({ nombre, fecha, items, sub }: { nombre: string; fec
 
 type Mas = { historial: boolean; ajustes: boolean; ideas: boolean; ayuda: boolean; soporte: boolean };
 
-/** Barra de secciones abajo, en el teléfono. Cobrar va al centro cuando el puesto puede cobrar. */
-export function BarraInferior({ items, mas, masEnAvatar }: { items: ItemNav[]; mas: Mas; masEnAvatar?: boolean }) {
+/**
+ * Barra de secciones abajo, en el teléfono: hasta cuatro secciones en una píldora, con un fondo oscuro que se desliza
+ * a la elegida, y Cobrar aparte a la derecha. Lo demás (Ajustes, Historial, Ideas, Ayuda) está en el menú de la cuenta.
+ */
+export function BarraInferior({ items }: { items: ItemNav[]; mas?: Mas }) {
   const ruta = usePathname();
-  const [hoja, setHoja] = useState(false);
-  useEffect(() => setHoja(false), [ruta]);
-  useEffect(() => {
-    if (!hoja) return;
-    const esc = (e: KeyboardEvent) => { if (e.key === "Escape") setHoja(false); };
-    document.addEventListener("keydown", esc);
-    return () => document.removeEventListener("keydown", esc);
-  }, [hoja]);
-
   const cobro = items.find((i) => i.href === "/cobrar");
-  const resto = items.filter((i) => i.href !== "/cobrar");
-  // Con cuatro secciones y Cobrar no cabe "Más": sus opciones van en el menú del avatar.
-  const visibles = resto.slice(0, masEnAvatar ? 4 : cobro ? 3 : 4);
-  const extra = resto.slice(visibles.length);
-  const izq = cobro ? visibles.slice(0, 2) : visibles;
-  const der = cobro ? visibles.slice(2) : [];
-  const conMas = !masEnAvatar;
-  const tab = (i: ItemNav) => (
-    <Link key={i.href} href={i.href} className="tab-m" aria-current={activo(ruta, i.href) ? "page" : undefined}>
-      <span className="ic-m"><Icono n={i.icono} /></span>{i.texto === "Cobro" ? "Cobrar" : i.texto}
-    </Link>
-  );
-  const enMas = [
-    ...extra.map((i) => ({ k: i.href, href: i.href, icono: i.icono, texto: i.texto })),
-    ...(mas.historial ? [{ k: "h", href: "/historial", icono: "historial", texto: "Historial" }] : []),
-    ...(mas.ajustes ? [{ k: "a", href: "/ajustes", icono: "ajustes", texto: "Ajustes" }] : []),
-    ...(mas.soporte ? [{ k: "s", href: "/soporte", icono: "llave", texto: "Soporte" }] : []),
-  ];
-  const masActivo = enMas.some((x) => activo(ruta, x.href));
-
+  const secciones = items.filter((i) => i.href !== "/cobrar").slice(0, 4);
+  const nav = useRef<HTMLElement>(null);
+  const [pill, setPill] = useState<React.CSSProperties>({ opacity: 0 });
+  const [lista, setLista] = useState(false);
+  useLayoutEffect(() => {
+    const f = () => {
+      const a = nav.current?.querySelector<HTMLElement>('a[aria-current="page"]');
+      setPill(a ? { transform: `translateX(${a.offsetLeft}px)`, width: a.offsetWidth, opacity: 1 } : { opacity: 0 });
+    };
+    f();
+    const t = setTimeout(() => setLista(true), 50);
+    window.addEventListener("resize", f);
+    return () => { clearTimeout(t); window.removeEventListener("resize", f); };
+  }, [ruta]);
   return (
-    <>
-      <nav className={`barra-inf ${cobro ? "con-cobro" : ""}`} aria-label="Secciones" style={{ ["--cols" as string]: izq.length + der.length + (conMas ? 1 : 0) }}>
-        {izq.map(tab)}
-        {cobro && (
-          <Link href="/cobrar" className="tab-m cobrar-m" aria-current={activo(ruta, "/cobrar") ? "page" : undefined}>
-            <span className="fab-m"><Icono n="cobro" /></span>Cobrar
+    <div className={`barra-inf ${lista ? "lista" : ""}`}>
+      <nav ref={nav} className="secc-m" aria-label="Secciones">
+        <span className="burbuja-m" style={pill} aria-hidden="true" />
+        {secciones.map((i) => (
+          <Link key={i.href} href={i.href} className="tab-m" aria-current={activo(ruta, i.href) ? "page" : undefined}>
+            <Icono n={i.icono} />{i.texto}
           </Link>
-        )}
-        {der.map(tab)}
-        {conMas && <button type="button" className="tab-m" aria-haspopup="dialog" aria-expanded={hoja} aria-current={masActivo ? "page" : undefined} onClick={() => setHoja(true)}>
-          <span className="ic-m"><Icono n="puntos" /></span>Más
-        </button>}
+        ))}
       </nav>
-      {hoja && (
-        <>
-          <div className="velo-hoja-m" aria-hidden="true" />
-          <div className="hoja-m" role="dialog" aria-modal="true" aria-label="Más opciones">
-            <span className="asa-m" aria-hidden="true" />
-            <div className="cab-hoja-m"><b>Más</b><button type="button" className="icb" aria-label="Cerrar" onClick={() => setHoja(false)}><Icono n="cerrar" /></button></div>
-            <div className="mosaico-m">
-              {enMas.map((x) => <Link key={x.k} href={x.href} aria-current={activo(ruta, x.href) ? "page" : undefined}><Icono n={x.icono} />{x.texto}</Link>)}
-              {mas.ideas && <button type="button" onClick={() => { setHoja(false); abrirPanel("ideas"); }}><Icono n="chispa" />Ideas</button>}
-              {mas.ayuda && <button type="button" onClick={() => { setHoja(false); abrirPanel("ayuda"); }}><Icono n="ayuda" />Ayuda</button>}
-            </div>
-          </div>
-        </>
+      {cobro && (
+        <Link href="/cobrar" className="cobrar-m" aria-current={activo(ruta, "/cobrar") ? "page" : undefined}>
+          <Icono n="cobro" />Cobrar
+        </Link>
       )}
-    </>
+    </div>
   );
 }

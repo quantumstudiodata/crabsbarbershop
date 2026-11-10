@@ -13,8 +13,8 @@ import { abrirPanel } from "./BarraMovil";
 
 export function MenuUsuario(p: {
   nombre: string; usuario: string; rol: string; avatar: string; ajustes: boolean; historial: boolean; formaPago: string | null;
-  /** En el teléfono, cuando la barra de abajo no tiene "Más", sus opciones aparecen aquí. */
-  masMovil?: { extra: { href: string; texto: string; icono: string }[]; ideas: boolean; ayuda: boolean; soporte: boolean };
+  /** Herramientas que van en este menú: Ideas, Ayuda y, en el teléfono, Soporte y las secciones que no caben abajo. */
+  mas?: { extra: { href: string; texto: string; icono: string }[]; ideas: boolean; ayuda: boolean; soporte: boolean };
 }) {
   const [abierto, setAbierto] = useState(false);
   const [elegir, setElegir] = useState(false);
@@ -42,25 +42,25 @@ export function MenuUsuario(p: {
   const nombreCorto = p.nombre.split(" ").slice(0, 2).join(" ");
 
   return (
-    <div ref={caja} className="u-menu" style={{ position: "relative", justifySelf: "start" }}>
-      <button type="button" className="uchip" aria-haspopup="menu" aria-expanded={abierto} onClick={() => setAbierto((a) => !a)}>
-        <Avatar avatar={avatar} nombre={p.nombre} t={34} />
-        <span className="txt"><b>{nombreCorto}</b><small>{p.rol}</small></span>
-        <Icono n="abajo" className="ic txt" />
+    <div ref={caja} className="u-menu" style={{ position: "relative" }}>
+      <button type="button" className="menu-b" aria-haspopup="menu" aria-expanded={abierto} aria-label="Menú de tu cuenta" onClick={() => setAbierto((a) => !a)}>
+        <Avatar avatar={avatar} nombre={p.nombre} t={30} />
+        <span className="txt-m">Menú</span>
+        <Icono n="abajo" className="ic flecha-m" />
       </button>
       {abierto && (
-        <div className="menu" role="menu">
+        <div className="menu cuenta" role="menu">
           <div className="quien">
-            <div className="fila"><Avatar avatar={avatar} nombre={p.nombre} t={44} /><span><b>{p.nombre}</b><small className="muted" style={{ display: "block", fontFamily: "var(--f-mono)", fontSize: 11 }}>{p.usuario}</small></span></div>
-            <span className="etiqueta" style={{ width: "max-content" }}>{p.rol}</span>
+            <Avatar avatar={avatar} nombre={p.nombre} t={36} />
+            <span><b>{nombreCorto}</b><small className="muted" style={{ display: "block", fontSize: 11.5 }}>{p.rol}</small></span>
           </div>
           <button type="button" role="menuitem" className="it" onClick={() => { setPerfil(true); setAbierto(false); }}><Icono n="usuario" />Mi perfil</button>
-          {p.ajustes && <Link role="menuitem" className={`it ${p.masMovil ? "" : "solo-esc-m"}`} href="/ajustes" onClick={() => setAbierto(false)}><Icono n="ajustes" />Ajustes</Link>}
-          {p.historial && <Link role="menuitem" className={`it ${p.masMovil ? "" : "solo-esc-m"}`} href="/historial" onClick={() => setAbierto(false)}><Icono n="historial" />Historial</Link>}
-          {p.masMovil?.extra.map((i) => <Link key={i.href} role="menuitem" className="it solo-m-u" href={i.href} onClick={() => setAbierto(false)}><Icono n={i.icono} />{i.texto}</Link>)}
-          {p.masMovil?.soporte && <Link role="menuitem" className="it solo-m-u" href="/soporte" onClick={() => setAbierto(false)}><Icono n="llave" />Soporte</Link>}
-          {p.masMovil?.ideas && <button type="button" role="menuitem" className="it solo-m-u" onClick={() => { setAbierto(false); abrirPanel("ideas"); }}><Icono n="chispa" />Ideas</button>}
-          {p.masMovil?.ayuda && <button type="button" role="menuitem" className="it solo-m-u" onClick={() => { setAbierto(false); abrirPanel("ayuda"); }}><Icono n="ayuda" />Ayuda</button>}
+          {p.ajustes && <Link role="menuitem" className="it" href="/ajustes" onClick={() => setAbierto(false)}><Icono n="ajustes" />Ajustes</Link>}
+          {p.historial && <Link role="menuitem" className="it" href="/historial" onClick={() => setAbierto(false)}><Icono n="historial" />Historial</Link>}
+          {p.mas?.extra.map((i) => <Link key={i.href} role="menuitem" className="it solo-m-u" href={i.href} onClick={() => setAbierto(false)}><Icono n={i.icono} />{i.texto}</Link>)}
+          {p.mas?.soporte && <Link role="menuitem" className="it solo-m-u" href="/soporte" onClick={() => setAbierto(false)}><Icono n="llave" />Soporte</Link>}
+          {p.mas?.ideas && <button type="button" role="menuitem" className="it" onClick={() => { setAbierto(false); abrirPanel("ideas"); }}><Icono n="chispa" />Ideas</button>}
+          {p.mas?.ayuda && <button type="button" role="menuitem" className="it" onClick={() => { setAbierto(false); abrirPanel("ayuda"); }}><Icono n="ayuda" />Ayuda</button>}
           <div className="separador" style={{ margin: "4px 0" }} />
           <form action={salir}><button role="menuitem" className="it salir"><Icono n="salir" />Salir</button></form>
         </div>
