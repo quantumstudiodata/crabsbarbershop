@@ -1,5 +1,6 @@
 "use client";
 
+import { EncuestaQR } from "@/components/EncuestaQR";
 import { useActionState, useEffect, useMemo, useRef, useState } from "react";
 import { Avatar } from "@/components/Avatar";
 import { Fl, Icono } from "@/components/Icono";
@@ -42,7 +43,7 @@ export function FormCobro(p: {
   const [descuento, setDescuento] = useState<{ tipo: "pct" | "fijo"; valor: string } | null>(null);
   const [motivo, setMotivo] = useState("");
   const [propina, setPropina] = useState<{ tipo: "pct" | "fijo"; valor: string } | null>(null);
-  const [ultima, setUltima] = useState<{ folio: string; total: number } | null>(null);
+  const [ultima, setUltima] = useState<{ folio: string; total: number; encuesta?: string | null } | null>(null);
   // En el teléfono: una sola categoría abierta a la vez y el resumen de la venta en un panel inferior.
   const [catAbierta, setCatAbierta] = useState<string | null>(null);
   const [hoja, setHoja] = useState(false);
@@ -58,7 +59,7 @@ export function FormCobro(p: {
   useEffect(() => {
     if (estado.ok && estado.folio && estado.folio !== atendido.current) {
       atendido.current = estado.folio;
-      setUltima({ folio: estado.folio, total: estado.total ?? 0 });
+      setUltima({ folio: estado.folio, total: estado.total ?? 0, encuesta: estado.encuesta });
       setHoja(false);
       limpiar();
     }
@@ -236,7 +237,7 @@ export function FormCobro(p: {
         {cita && <p className="aviso-cita"><Icono n="calendario" />Cita {cita.folio} de <b>{cita.cliente}</b></p>}
         <div className="entre cab-hoja"><h2 className="titulo">Esta venta</h2><button type="button" className="icb cerrar-hoja" onClick={() => setHoja(false)} aria-label="Cerrar"><Icono n="cerrar" /></button></div>
         {ultima && lineas.length === 0 && (
-          <p className="aviso ok" role="status">Venta <b>{ultima.folio}</b> cobrada por <b>{formatoDinero(ultima.total)}</b>.</p>
+          <div className="aviso ok" role="status"><span>Venta <b>{ultima.folio}</b> cobrada por <b>{formatoDinero(ultima.total)}</b>.</span>{ultima.encuesta && <EncuestaQR token={ultima.encuesta} />}</div>
         )}
         {conServicio.length > 0 && (
           <div className="lineas">

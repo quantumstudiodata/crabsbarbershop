@@ -1,5 +1,8 @@
 "use server";
 
+import { instante } from "@/lib/agenda";
+import { esFechaValida, fechaLocal } from "@/lib/fechas";
+
 import { randomUUID } from "node:crypto";
 import { and, eq, isNull } from "drizzle-orm";
 import { describirRegla } from "@/lib/comisiones";
@@ -33,7 +36,10 @@ async function objetivo(s: Sesion, id: string) {
   return { u, puede: puedeEditarA(s, u, permisosDe(u.rol, u.permisosExtra, u.permisosQuitados, p?.permisos ?? null)) };
 }
 
-type ReglaNueva = { tipo: "porcentaje" | "fijo" | "renta" | "sueldo" | "mixto"; porcentaje: number; montoFijo: number; montoSemanal: number; periodo: string };
+type ReglaNueva = {
+  tipo: "porcentaje" | "fijo" | "renta" | "sueldo" | "mixto"; porcentaje: number; montoFijo: number; montoSemanal: number; periodo: string;
+  frecuenciaPago: string; diaCorte: number | null; diaPago: number; formaPago: string; vigente: string;
+};
 
 /** Lee la forma de pago del formulario. null si no aplica; texto si hay un error. */
 
@@ -52,16 +58,38 @@ function leerForma(form: FormData, rol: Rol): ReglaNueva | null | string {
     tipo, porcentaje: tipo === "porcentaje" || tipo === "mixto" ? Math.round(pct * 100) : 0,
     montoFijo: tipo === "fijo" ? fijo : 0, montoSemanal: ["renta", "sueldo", "mixto"].includes(tipo) ? semanal : 0,
     periodo: ["renta", "sueldo", "mixto"].includes(tipo) ? periodo : "semana",
+    ...leerCalendarioPago(form, periodo, ["renta", "sueldo", "mixto"].includes(tipo)),
+  };
+}
+
+/** Cada cuánto se le paga, día de corte, días hasta el pago, forma habitual y desde cuándo aplica. */
+function leerCalendarioPago(form: FormData, periodo: string, conPeriodo: boolean) {
+  const f = texto(form, "pagoFrecuencia");
+  const frecuenciaPago = ["dia", "semana", "quincena", "mes", "servicio"].includes(f) ? f : conPeriodo ? periodo : "semana";
+  const corte = Number(texto(form, "pagoCorte", 2));
+  const pago = Number(texto(form, "pagoDia", 2));
+  const forma = texto(form, "pagoForma");
+  const vig = texto(form, "pagoVigente", 10);
+  return {
+    frecuenciaPago,
+    diaCorte: frecuenciaPago === "semana" && Number.isInteger(corte) && corte >= 0 && corte <= 6 ? corte : frecuenciaPago === "semana" ? 0 : null,
+    diaPago: Number.isInteger(pago) && pago >= 0 && pago <= 7 ? pago : 0,
+    formaPago: ["efectivo", "transferencia", "otro"].includes(forma) ? forma : "efectivo",
+    vigente: esFechaValida(vig) ? vig : "",
   };
 }
 
 /** Guarda la forma de pago general. La anterior deja de aplicar desde ahora; lo ya cobrado conserva la suya. */
-async function guardarForma(tx: Tx, barberiaId: string, usuarioId: string, r: ReglaNueva) {
+async function guardarForma(tx: Tx, barberiaId: string, usuarioId: string, r: ReglaNueva, zona: string) {
   const [actual] = await tx.select().from(schema.reglasComision).where(and(eq(schema.reglasComision.barberiaId, barberiaId), eq(schema.reglasComision.barberoId, usuarioId), isNull(schema.reglasComision.vigenteHasta), isNull(schema.reglasComision.servicioId))).limit(1);
-  if (actual && actual.tipo === r.tipo && actual.porcentaje === r.porcentaje && actual.montoFijo === r.montoFijo && actual.montoSemanal === r.montoSemanal && actual.periodo === r.periodo) return false;
-  const ahora = new Date();
-  if (actual) await tx.update(schema.reglasComision).set({ vigenteHasta: ahora }).where(eq(schema.reglasComision.id, actual.id));
-  await tx.insert(schema.reglasComision).values({ barberiaId, barberoId: usuarioId, servicioId: null, ...r, vigenteDesde: ahora });
+  const { vigente, ...datos } = r;
+  if (actual && actual.tipo === r.tipo && actual.porcentaje === r.porcentaje && actual.montoFijo === r.montoFijo && actual.montoSemanal === r.montoSemanal && actual.periodo === r.periodo
+    && (actual.frecuenciaPago ?? actual.periodo) === r.frecuenciaPago && actual.diaCorte === r.diaCorte && (actual.diaPago ?? 0) === r.diaPago && actual.formaPago === r.formaPago) return false;
+  // Las condiciones nuevas aplican desde hoy o desde una fecha futura; lo anterior no cambia.
+  const hoy = fechaLocal(new Date(), zona);
+  const desde = vigente && vigente > hoy ? new Date(instante(vigente, 0, zona)) : new Date();
+  if (actual) await tx.update(schema.reglasComision).set({ vigenteHasta: desde }).where(eq(schema.reglasComision.id, actual.id));
+  await tx.insert(schema.reglasComision).values({ barberiaId, barberoId: usuarioId, servicioId: null, ...datos, vigenteDesde: desde });
   return true;
 }
 
@@ -147,7 +175,7 @@ export async function darDeAlta(_: EstadoPersona, form: FormData): Promise<Estad
   const expira = expiraClave();
   await db.transaction(async (tx) => {
     const [nuevo] = await tx.insert(schema.usuarios).values({ barberiaId: s.barberia.id, nombre, usuario, rol, puestoId, permisosExtra: extra, permisosQuitados: quitados, hash: await hashContrasena(clave), debeCambiar: true, claveTemporal: cifrar(clave), claveTemporalExpira: expira }).returning({ id: schema.usuarios.id });
-    if (forma) await guardarForma(tx, s.barberia.id, nuevo.id, forma);
+    if (forma) await guardarForma(tx, s.barberia.id, nuevo.id, forma, s.barberia.zonaHoraria);
     if (rem) await guardarRemuneracion(tx, s.barberia.id, nuevo.id, rem);
     await registrar(tx, { barberiaId: s.barberia.id, usuarioId: s.usuario.id, tipo: "usuario", accion: `${s.usuario.nombre} dio de alta a ${nombre} como ${puesto.nombre}`, detalle: { usuario, formaDePago: forma ? describirRegla(forma, formatoDinero) : undefined, remuneracion: rem ? describirRemuneracion(rem, formatoDinero) : undefined } });
   });
@@ -212,7 +240,7 @@ export async function actualizarPersona(_: EstadoPersona, form: FormData): Promi
     const cambios: string[] = [];
     if (nombre !== u.nombre) cambios.push(`nombre a ${nombre}`);
     if (rol !== u.rol || puestoId !== u.puestoId) cambios.push(`puesto a ${puesto.nombre}`);
-    if (forma && (await guardarForma(tx, s.barberia.id, u.id, forma))) cambios.push(`forma de pago a ${describirRegla(forma, formatoDinero)}`);
+    if (forma && (await guardarForma(tx, s.barberia.id, u.id, forma, s.barberia.zonaHoraria))) cambios.push(`forma de pago a ${describirRegla(forma, formatoDinero)}`);
     if (rem !== undefined && (await guardarRemuneracion(tx, s.barberia.id, u.id, rem))) cambios.push(rem ? `remuneración a ${describirRemuneracion(rem, formatoDinero)}` : "quitó la remuneración registrada");
     if ([...antes].sort().join() !== [...ahora].sort().join()) cambios.push("permisos");
     if (meta !== u.metaSemanal) cambios.push("meta semanal");

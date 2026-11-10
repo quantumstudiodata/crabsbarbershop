@@ -225,10 +225,13 @@ export const ventas = pgTable(
     ventaOrigenId: uuid("venta_origen_id"),
     // Evita cobrar dos veces si se presiona el botón dos veces.
     claveUnica: text("clave_unica").notNull(),
+    // Clave del enlace de la encuesta que se comparte con el cliente al cobrar.
+    tokenEncuesta: text("token_encuesta"),
     creadoEn: creadoEn(),
   },
   (t) => [
     uniqueIndex("ventas_folio_uq").on(t.barberiaId, t.folio),
+    uniqueIndex("ventas_token_encuesta_uq").on(t.tokenEncuesta),
     uniqueIndex("ventas_clave_uq").on(t.barberiaId, t.claveUnica),
     index("ventas_turno_idx").on(t.turnoId),
   ],
@@ -400,6 +403,14 @@ export const reglasComision = pgTable("reglas_comision", {
   // Renta o sueldo por periodo (ver "periodo"). El nombre de la columna se conserva por compatibilidad.
   montoSemanal: integer("monto_semanal").notNull().default(0),
   periodo: text("periodo").notNull().default("semana"),
+  // Cada cuánto se le paga: dia | semana | quincena | mes | servicio. Vacío: igual que "periodo".
+  frecuenciaPago: text("frecuencia_pago"),
+  // Semanal: día de la semana en que cierra el periodo (0 domingo ... 6 sábado).
+  diaCorte: integer("dia_corte"),
+  // Días después del corte en que se paga (0 = el mismo día).
+  diaPago: integer("dia_pago"),
+  // Forma de pago habitual: efectivo | transferencia | otro.
+  formaPago: text("forma_pago").notNull().default("efectivo"),
   vigenteDesde: timestamp("vigente_desde", { withTimezone: true }).notNull().defaultNow(),
   vigenteHasta: timestamp("vigente_hasta", { withTimezone: true }),
 });
@@ -659,6 +670,11 @@ export const faltantesCaja = pgTable(
     regla: text("regla").notNull(),
     fecha: date("fecha").notNull(),
     asignadoPor: uuid("asignado_por").references(() => usuarios.id),
+    // revision | autorizado | descartado. Solo lo autorizado se descuenta (LFT art. 110).
+    estado: text("estado").notNull().default("revision"),
+    autorizadoPor: uuid("autorizado_por").references(() => usuarios.id),
+    autorizadoEn: timestamp("autorizado_en", { withTimezone: true }),
+    nota: text("nota").notNull().default(""),
     creadoEn: creadoEn(),
   },
   (t) => [index("faltantes_caja_usuario_idx").on(t.usuarioId, t.fecha), index("faltantes_caja_turno_idx").on(t.turnoId)],
@@ -759,4 +775,23 @@ export const notificacionesCita = pgTable(
     creadoEn: creadoEn(),
   },
   (t) => [index("notificaciones_cita_idx").on(t.barberiaId, t.estado, t.programadaPara)],
+);
+
+// Reseñas que deja el cliente desde la encuesta de su venta. Se atribuyen a quien atendió el primer servicio.
+export const resenas = pgTable(
+  "resenas",
+  {
+    id: id(),
+    barberiaId: barberiaId(),
+    ventaId: uuid("venta_id").notNull().references(() => ventas.id),
+    barberoId: uuid("barbero_id").notNull().references(() => usuarios.id),
+    calificacion: integer("calificacion").notNull(),
+    comentario: text("comentario").notNull().default(""),
+    cliente: text("cliente").notNull().default(""),
+    respuesta: text("respuesta"),
+    respondidaPor: uuid("respondida_por").references(() => usuarios.id),
+    respondidaEn: timestamp("respondida_en", { withTimezone: true }),
+    creadoEn: creadoEn(),
+  },
+  (t) => [uniqueIndex("resenas_venta_uq").on(t.ventaId), index("resenas_barberia_idx").on(t.barberiaId, t.creadoEn)],
 );

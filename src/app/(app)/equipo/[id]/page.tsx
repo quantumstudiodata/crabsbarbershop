@@ -5,8 +5,12 @@ import { Avatar } from "@/components/Avatar";
 import { Icono } from "@/components/Icono";
 import { ventasEntre } from "@/lib/datos";
 import { db, schema } from "@/lib/db";
-import { NOMBRE_FRECUENCIA, cuentaDe, modalidadCorta, rendimiento } from "@/lib/equipo";
+import { NOMBRE_FORMA_PAGO, NOMBRE_FRECUENCIA, cuentaDe, frecuenciaDe, modalidadCorta, periodoDePago, rendimiento } from "@/lib/equipo";
+import { elegirRegla } from "@/lib/comisiones";
+import { reglasDe } from "@/lib/datos";
+import { sql } from "drizzle-orm";
 import { formatoDinero } from "@/lib/money";
+import { fechaLarga } from "@/lib/fechas";
 import { NOMBRE_ROL, type Rol } from "@/lib/permisos";
 import { MesEquipo } from "../Partes";
 import { mesElegido, sesionEquipo } from "../datos";
@@ -53,6 +57,11 @@ export default async function Ficha({ params, searchParams }: { params: Promise<
   const q = m.mes === m.hoy.slice(0, 7) ? "" : `?mes=${m.mes}`;
   const puesto = NOMBRE_ROL[u.rol as Rol] ?? "";
   const regla = cuenta.regla;
+  const cal = elegirRegla(await reglasDe(se.barberia.id), u.id, null, new Date());
+  const per = cal ? periodoDePago(cal, m.hoy) : null;
+  const [res] = await db.select({ n: sql<number>`count(*)::int`, prom: sql<number>`coalesce(avg(${schema.resenas.calificacion}), 0)::float` })
+    .from(schema.resenas).where(and(eq(schema.resenas.barberiaId, se.barberia.id), eq(schema.resenas.barberoId, u.id)));
+  const DIAS_C = ["domingo", "lunes", "martes", "miércoles", "jueves", "viernes", "sábado"];
 
   return (
     <div className="eq eq-ficha">
@@ -79,7 +88,9 @@ export default async function Ficha({ params, searchParams }: { params: Promise<
               <dl>
                 <dt>Modalidad</dt><dd>{modalidadCorta(regla)}</dd>
                 {regla && (regla.tipo === "porcentaje" || regla.tipo === "mixto") && <><dt>Porcentaje</dt><dd>{regla.porcentaje / 100}%</dd></>}
-                {regla && <><dt>Periodicidad</dt><dd>{NOMBRE_FRECUENCIA[regla.periodo ?? "semana"] ?? "Semanal"}</dd></>}
+                {cal && <><dt>Periodicidad</dt><dd>{NOMBRE_FRECUENCIA[frecuenciaDe(cal)] ?? "Semanal"}{frecuenciaDe(cal) === "semana" ? `, corte el ${DIAS_C[cal.diaCorte ?? 0]}` : ""}</dd></>}
+                {cal && <><dt>Forma de pago</dt><dd>{NOMBRE_FORMA_PAGO[cal.formaPago ?? "efectivo"]}</dd></>}
+                {per && regla?.tipo !== "renta" && <><dt>Próximo pago</dt><dd>{fechaLarga(per.pago)}</dd></>}
               </dl>
               {se.puede("equipo.pagar") && <Link href="/equipo/pagos" className="eq-bt">Consultar pagos<Icono n="derecha" /></Link>}
             </div>
@@ -89,7 +100,8 @@ export default async function Ficha({ params, searchParams }: { params: Promise<
           <div className="eq-tit"><span>Rendimiento mensual</span><MesEquipo mes={m.mes} hoy={m.hoy} /></div>
           <div className="glass eq-card eq-metricas">
             <div className="pri"><small>Ventas atribuidas</small><b>{formatoDinero(r.vendido)}</b>{cambio !== null && <span className="eq-comp">{cambio >= 0 ? "+" : ""}{cambio}% vs. {mesAnt}</span>}</div>
-            <div><small>Servicios</small><b>{r.servicios}</b></div>
+            <div className="solo-esc"><small>Servicios</small><b>{r.servicios}</b></div>
+            <div><small>Calificación</small><b className="eq-cal">{res.n ? <><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M12 3.5l2.6 5.3 5.9.9-4.2 4.1 1 5.8L12 16.9l-5.3 2.7 1-5.8-4.2-4.1 5.9-.9z" /></svg>{res.prom.toFixed(1)}</> : "Sin reseñas"}</b>{res.n > 0 && <span className="eq-comp">{res.n} {res.n === 1 ? "reseña" : "reseñas"}</span>}</div>
             <div className="solo-esc"><small>Transacciones</small><b>{r.transacciones}</b></div>
             <div className="solo-esc"><small>Ticket promedio</small><b>{formatoDinero(r.ticket)}</b></div>
           </div>

@@ -12,15 +12,17 @@ type Ventas = Awaited<ReturnType<typeof ventasEntre>>["ventas"];
 export async function cuentaDe(barberiaId: string, id: string, desde: string, hasta: string, pagadas: Ventas) {
   const [reglas, pagos, falt] = await Promise.all([
     reglasDe(barberiaId),
-    db.select().from(schema.pagosComision).where(and(eq(schema.pagosComision.barberiaId, barberiaId), eq(schema.pagosComision.barberoId, id), gte(schema.pagosComision.semana, lunesDe(desde)), lte(schema.pagosComision.semana, hasta))),
+    db.select().from(schema.pagosComision).where(and(eq(schema.pagosComision.barberiaId, barberiaId), eq(schema.pagosComision.barberoId, id), gte(schema.pagosComision.semana, diasEntre(desde, hasta) >= 6 ? lunesDe(desde) : desde), lte(schema.pagosComision.semana, hasta))),
     faltantesDe(barberiaId, desde, hasta),
   ]);
   const faltantes = falt.find((x) => x.usuarioId === id)?.monto ?? 0;
   const cs = pagadas.flatMap((v) => v.conceptos.filter((c) => c.barberoId === id));
   const regla = copiaRegla(elegirRegla(reglas, id, null, new Date()));
-  const semanas = Math.max(1, Math.ceil((diasEntre(lunesDe(desde), hasta) + 1) / 7));
-  const sueldo = regla && (regla.tipo === "sueldo" || regla.tipo === "mixto") ? porSemana(regla.montoSemanal, regla.periodo) * semanas : 0;
-  const renta = regla?.tipo === "renta" ? porSemana(regla.montoSemanal, regla.periodo) * semanas : 0;
+  // Sueldo y renta se cuentan por los días del periodo (a la semana entre 7), para que un periodo diario o quincenal no cobre semanas completas.
+  const dias = diasEntre(desde, hasta) + 1;
+  const proporcional = (monto: number) => Math.round((porSemana(monto, regla?.periodo) * dias) / 7 / 100) * 100;
+  const sueldo = regla && (regla.tipo === "sueldo" || regla.tipo === "mixto") ? proporcional(regla.montoSemanal) : 0;
+  const renta = regla?.tipo === "renta" ? proporcional(regla.montoSemanal) : 0;
   const comision = regla?.tipo === "renta" ? 0 : cs.reduce((a, c) => a + c.comision, 0);
   const pagado = pagos.filter((x) => x.tipo === "pago").reduce((a, x) => a + x.monto, 0);
   const rentaPagada = pagos.filter((x) => x.tipo === "renta").reduce((a, x) => a + x.monto, 0);
@@ -31,14 +33,32 @@ export async function cuentaDe(barberiaId: string, id: string, desde: string, ha
   };
 }
 
-export const NOMBRE_FRECUENCIA: Record<string, string> = { semana: "Semanal", quincena: "Quincenal", mes: "Mensual" };
+export const NOMBRE_FRECUENCIA: Record<string, string> = { dia: "Diario", semana: "Semanal", quincena: "Quincenal", mes: "Mensual", servicio: "Por servicio" };
+export const NOMBRE_FORMA_PAGO: Record<string, string> = { efectivo: "Efectivo de caja", transferencia: "Transferencia", otro: "Otro" };
 
-/** El periodo de pago en curso según la periodicidad de la persona. */
-export function periodoDePago(periodo: string | undefined, hoy: string): { desde: string; hasta: string } {
-  if (periodo === "mes") return { desde: `${hoy.slice(0, 7)}-01`, hasta: finDeMes(hoy) };
-  if (periodo === "quincena") return Number(hoy.slice(8)) <= 15 ? { desde: `${hoy.slice(0, 7)}-01`, hasta: `${hoy.slice(0, 7)}-15` } : { desde: `${hoy.slice(0, 7)}-16`, hasta: finDeMes(hoy) };
-  const l = lunesDe(hoy);
-  return { desde: l, hasta: sumarDias(l, 6) };
+type Calendario = { frecuenciaPago?: string | null; periodo?: string; diaCorte?: number | null; diaPago?: number | null } | null | undefined;
+
+/** Frecuencia con la que se le paga a la persona. Sin elegir, la del periodo de su sueldo o renta. */
+export const frecuenciaDe = (r: Calendario) => r?.frecuenciaPago || r?.periodo || "semana";
+
+/**
+ * Periodo de pago en curso según su periodicidad y día de corte, y la fecha en que se le paga.
+ * Diario y por servicio se liquidan cada día.
+ */
+export function periodoDePago(r: Calendario, hoy: string): { desde: string; hasta: string; pago: string } {
+  const f = frecuenciaDe(r);
+  const despues = r?.diaPago ?? 0;
+  let desde: string, hasta: string;
+  if (f === "mes") { desde = `${hoy.slice(0, 7)}-01`; hasta = finDeMes(hoy); }
+  else if (f === "quincena") ({ desde, hasta } = Number(hoy.slice(8)) <= 15 ? { desde: `${hoy.slice(0, 7)}-01`, hasta: `${hoy.slice(0, 7)}-15` } : { desde: `${hoy.slice(0, 7)}-16`, hasta: finDeMes(hoy) });
+  else if (f === "semana") {
+    // El periodo termina el día de corte (por omisión, domingo).
+    const corte = r?.diaCorte ?? 0;
+    const dow = new Date(`${hoy}T12:00:00Z`).getUTCDay();
+    hasta = sumarDias(hoy, (corte - dow + 7) % 7);
+    desde = sumarDias(hasta, -6);
+  } else { desde = hoy; hasta = hoy; }
+  return { desde, hasta, pago: sumarDias(hasta, despues) };
 }
 
 /** Modalidad corta para las filas: "Comisión 50%", "Sueldo más 10%", "Renta de silla". */

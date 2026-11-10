@@ -15,6 +15,8 @@ export const PERMISOS = {
   "gastos.registrar": "Registrar egresos",
   "gastos.cancelar": "Cancelar egresos",
   "equipo.pagar": "Registrar pagos al equipo",
+  "equipo.autorizar": "Autorizar faltantes del equipo",
+  "resenas.responder": "Responder reseñas",
   "ventas.ver_todas": "Ver movimientos del equipo",
   "usuarios.ver": "Ver usuarios",
   "usuarios.editar": "Editar usuarios",
@@ -38,6 +40,7 @@ export const PERMISOS = {
 /** Explicación corta de los permisos que no se entienden solo con el nombre. */
 export const DETALLE_PERMISO: Partial<Record<keyof typeof PERMISOS, string>> = {
   "configuracion.ver": "Consultar los ajustes de cada apartado",
+  "equipo.autorizar": "Solo un faltante autorizado se descuenta del pago, con el acuerdo por escrito de la persona",
   "configuracion.cobros": "Formas de pago, reglas de cobro y autorización de descuentos",
   "configuracion.caja": "Apertura, fondo inicial, diferencias y modelo de caja",
   "configuracion.metas": "Activar metas y cambiar los objetivos del negocio y del equipo",
@@ -132,8 +135,8 @@ export const DESCRIPCION_ROL: Record<Rol, string> = {
 /** Permisos agrupados por categoría, para asignarlos con interruptores. */
 export const GRUPOS_PERMISOS: { titulo: string; permisos: Permiso[] }[] = [
   { titulo: "Ventas y cobros", permisos: ["ventas.registrar", "ventas.registrar_otros", "ventas.descuento", "ventas.cancelar", "ventas.modificar", "servicios.editar"] },
-  { titulo: "Caja y pagos", permisos: ["caja.operar", "caja.retiros", "cortes.ver", "caja.corregir", "gastos.ver", "gastos.registrar", "gastos.cancelar", "equipo.pagar"] },
-  { titulo: "Equipo y administración", permisos: ["ventas.ver_todas", "usuarios.ver", "usuarios.editar", "servicios.ver"] },
+  { titulo: "Caja y pagos", permisos: ["caja.operar", "caja.retiros", "cortes.ver", "caja.corregir", "gastos.ver", "gastos.registrar", "gastos.cancelar", "equipo.pagar", "equipo.autorizar"] },
+  { titulo: "Equipo y administración", permisos: ["ventas.ver_todas", "usuarios.ver", "usuarios.editar", "servicios.ver", "resenas.responder"] },
   { titulo: "Citas y agenda", permisos: ["citas.ver", "citas.modificar", "citas.cancelar", "citas.pagos", "citas.horarios"] },
   { titulo: "Configurar negocio", permisos: ["configuracion.ver", "configuracion.cobros", "configuracion.caja", "configuracion.metas", "configuracion.egresos", "configuracion.citas"] },
   { titulo: "Analítica y finanzas", permisos: ["reportes.ver", "reportes.exportar"] },

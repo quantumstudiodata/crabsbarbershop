@@ -4,7 +4,10 @@ import { useState } from "react";
 import { formatoDinero, leerPesos } from "@/lib/money";
 
 export type TipoPago = "porcentaje" | "fijo" | "renta" | "sueldo" | "mixto";
-export type FormaActual = { tipo: TipoPago; porcentaje: number; montoFijo: number; montoSemanal: number; periodo?: string } | null;
+export type FormaActual = {
+  tipo: TipoPago; porcentaje: number; montoFijo: number; montoSemanal: number; periodo?: string;
+  frecuenciaPago?: string; diaCorte?: number | null; diaPago?: number; formaPago?: string; desde?: string;
+} | null;
 
 const TIPOS: { t: TipoPago; titulo: string; detalle: string }[] = [
   { t: "porcentaje", titulo: "Porcentaje por servicio", detalle: "Recibe un porcentaje de cada servicio realizado" },
@@ -14,10 +17,15 @@ const TIPOS: { t: TipoPago; titulo: string; detalle: string }[] = [
   { t: "mixto", titulo: "Sueldo más porcentaje", detalle: "Recibe un sueldo base y un porcentaje adicional" },
 ];
 const PERIODOS: [string, string][] = [["semana", "Semanal"], ["quincena", "Quincenal"], ["mes", "Mensual"]];
+const FRECUENCIAS: [string, string][] = [["dia", "Diario"], ["semana", "Semanal"], ["quincena", "Quincenal"], ["mes", "Mensual"], ["servicio", "Por servicio"]];
+const DIAS = ["Domingo", "Lunes", "Martes", "Miércoles", "Jueves", "Viernes", "Sábado"];
+const hoyLocal = () => new Date(Date.now() - new Date().getTimezoneOffset() * 60000).toISOString().slice(0, 10);
 const EJEMPLO = 15000;
 
 /** Remuneración de un barbero, dentro del alta o la edición del usuario. */
 export function CamposFormaPago({ actual, conRenta = true }: { actual: FormaActual; conRenta?: boolean }) {
+  const [frec, setFrec] = useState(actual?.frecuenciaPago ?? actual?.periodo ?? "semana");
+  const [tocada, setTocada] = useState(!!actual);
   const [tipo, setTipo] = useState<TipoPago>(actual?.tipo ?? "porcentaje");
   const [pct, setPct] = useState(actual?.porcentaje ? String(actual.porcentaje / 100) : "40");
   const [fijo, setFijo] = useState(actual?.montoFijo ? String(actual.montoFijo / 100) : "");
@@ -27,6 +35,8 @@ export function CamposFormaPago({ actual, conRenta = true }: { actual: FormaActu
   const comision = formatoDinero(Math.round((EJEMPLO * p) / 100));
   const per = { semana: "a la semana", quincena: "a la quincena", mes: "al mes" }[periodo] ?? "";
   const conPeriodo = tipo === "renta" || tipo === "sueldo" || tipo === "mixto";
+  // Mientras no se elija otra, la frecuencia sigue al periodo del sueldo o la renta.
+  const frecuencia = !tocada && conPeriodo ? periodo : frec;
   return (
     <div className="pila-chica">
       <input type="hidden" name="pagoTipo" value={tipo} />
@@ -59,6 +69,37 @@ export function CamposFormaPago({ actual, conRenta = true }: { actual: FormaActu
         )}
         {tipo === "fijo" && (
           <label className="campo"><span>Pago por servicio</span><input className="input" name="pagoFijo" inputMode="decimal" value={fijo} onChange={(e) => setFijo(e.target.value)} placeholder="$0" /></label>
+        )}
+        <div className="campo">
+          <span>{tipo === "renta" ? "Cada cuánto paga la renta" : "Cada cuánto se le paga"}</span>
+          <input type="hidden" name="pagoFrecuencia" value={frecuencia} />
+          <div className="frec-p" role="radiogroup" aria-label="Periodicidad">
+            {FRECUENCIAS.map(([k, t]) => <button type="button" key={k} role="radio" aria-checked={frecuencia === k} className={frecuencia === k ? "on" : ""} onClick={() => { setFrec(k); setTocada(true); }}>{t}</button>)}
+          </div>
+        </div>
+        <div className="dos-p">
+          {frecuencia === "semana" && (
+            <label className="campo"><span>Día de corte</span>
+              <select className="input" name="pagoCorte" defaultValue={String(actual?.diaCorte ?? 0)}>{DIAS.map((d, i) => <option key={d} value={i}>{d}</option>)}</select>
+            </label>
+          )}
+          <label className="campo"><span>Día de pago</span>
+            <select className="input" name="pagoDia" defaultValue={String(actual?.diaPago ?? (frecuencia === "semana" ? 1 : 0))}>
+              <option value="0">{frecuencia === "servicio" ? "Al terminar el servicio" : "El día del corte"}</option>
+              {[1, 2, 3].map((n) => <option key={n} value={n}>{n === 1 ? "Un día después" : `${n} días después`}</option>)}
+            </select>
+          </label>
+        </div>
+        <label className="campo"><span>Forma de pago habitual</span>
+          <select className="input" name="pagoForma" defaultValue={actual?.formaPago ?? "efectivo"}>
+            <option value="efectivo">Efectivo de caja</option><option value="transferencia">Transferencia</option><option value="otro">Otro</option>
+          </select>
+        </label>
+        {actual && (
+          <label className="campo vig-p"><span>Vigente desde</span>
+            <input className="input" type="date" name="pagoVigente" min={hoyLocal()} defaultValue={hoyLocal()} />
+            <small>Las nuevas condiciones aplican desde esa fecha. Los pagos y saldos anteriores no cambian.</small>
+          </label>
         )}
         <p className="ejemplo">
           {tipo === "porcentaje" && <>Con un servicio de {formatoDinero(EJEMPLO)}, le corresponden <b>{comision}</b>.</>}

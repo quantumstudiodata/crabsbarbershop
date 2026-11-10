@@ -11,7 +11,7 @@ import type { Corte } from "./HistorialCortes";
 
 const primer = (n: string) => n.split(" ")[0];
 
-/** La encargada elige quién cubre el faltante de un corte. Lo asignado se resta del próximo pago de cada quien. */
+/** La encargada elige quién cubre el faltante de un corte. Lo asignado queda en revisión hasta que se autorice. */
 export function DecidirFaltante({ c, cerrar }: { c: Corte; cerrar: () => void }) {
   const faltante = -c.diferencia;
   const cobradores = c.cobradores ?? [];
@@ -41,7 +41,7 @@ export function DecidirFaltante({ c, cerrar }: { c: Corte; cerrar: () => void })
   return (
     <Modal abierto cerrar={cerrar} etiqueta={`Corte ${c.folio}, ${c.fechaCorta}`} titulo={`Faltaron ${formatoDinero(faltante)}`}>
       <div className="pila" style={{ gap: 12 }}>
-        <p className="muted" style={{ margin: 0, fontSize: 13 }}>Elige quién cubre el faltante. Lo que le toque a cada persona se resta de su próximo pago.</p>
+        <p className="muted" style={{ margin: 0, fontSize: 13 }}>Elige quién cubre el faltante. Queda en revisión y solo se descuenta si se autoriza en Equipo, Pagos.</p>
         <div className="tipos-p" role="radiogroup" aria-label="Quién cubre el faltante">
           {opciones.map((o) => (
             <button type="button" key={o.k} role="radio" aria-checked={regla === o.k} disabled={!o.ok} className={`tipo-p ${regla === o.k ? "on" : ""}`} onClick={() => { setRegla(o.k); setError(null); }}>

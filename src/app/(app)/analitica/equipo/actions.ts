@@ -4,7 +4,7 @@ import { and, eq } from "drizzle-orm";
 import { revalidatePath } from "next/cache";
 import { requerirSesion } from "@/lib/auth";
 import { db, schema } from "@/lib/db";
-import { esFechaValida, lunesDe } from "@/lib/fechas";
+import { esFechaValida } from "@/lib/fechas";
 import { registrar } from "@/lib/historial";
 import { formatoDinero, leerPesos } from "@/lib/money";
 import { texto, volver } from "@/lib/volver";
@@ -16,7 +16,8 @@ export async function registrarPago(form: FormData) {
   const tipo = texto(form, "tipo") === "renta" ? "renta" : "pago";
   const monto = leerPesos(texto(form, "monto"));
   const nota = texto(form, "nota", 200);
-  const semana = esFechaValida(semanaTxt) ? lunesDe(semanaTxt) : null;
+  // La fecha con la que se agrupa el pago: el lunes de la semana (Ventas) o el cierre del periodo (Equipo).
+  const semana = esFechaValida(semanaTxt) ? semanaTxt : null;
   const reg = texto(form, "regreso", 200);
   const ruta = reg.startsWith("/analitica/ventas") || reg.startsWith("/equipo") ? reg : "/analitica/ventas";
   if (!semana || !monto) volver(ruta, { error: "Escribe el monto." });

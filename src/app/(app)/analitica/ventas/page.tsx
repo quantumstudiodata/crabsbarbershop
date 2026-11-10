@@ -123,7 +123,7 @@ export default async function Ventas({ searchParams }: { searchParams: Promise<Q
               <>
                 <div><span className="lab">Le corresponde<Ayuda titulo="Le corresponde">Su comisión en estas fechas, más su sueldo si tiene uno.</Ayuda></span><b>{formatoDinero(cuenta.corresponde)}</b></div>
                 <div><span className="lab">Pagado</span><b>{formatoDinero(cuenta.pagado)}</b></div>
-                {cuenta.faltantes > 0 && <div><span className="lab">Faltantes de caja<Ayuda titulo="Faltantes de caja">Lo que se le asignó de faltantes en cortes de caja. Se resta de lo que se le paga.</Ayuda></span><b>−{formatoDinero(cuenta.faltantes)}</b></div>}
+                {cuenta.faltantes > 0 && <div><span className="lab">Faltantes de caja<Ayuda titulo="Faltantes de caja">Faltantes de cortes de caja ya autorizados. Solo lo autorizado se resta de lo que se le paga.</Ayuda></span><b>−{formatoDinero(cuenta.faltantes)}</b></div>}
                 <div><span className="lab">Por pagar</span>{cuenta.saldo > 0 ? <b>{formatoDinero(cuenta.saldo)}</b> : <span className="cubierto"><i>✓</i>Al corriente</span>}</div>
               </>
             )}

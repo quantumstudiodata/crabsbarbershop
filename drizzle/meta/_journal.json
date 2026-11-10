@@ -148,6 +148,13 @@
       "when": 1794219413364,
       "tag": "0020_citas_agenda",
       "breakpoints": true
+    },
+    {
+      "idx": 21,
+      "version": "7",
+      "when": 1794284903970,
+      "tag": "0021_equipo_pagos_resenas",
+      "breakpoints": true
     }
   ]
 }

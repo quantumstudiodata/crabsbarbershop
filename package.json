@@ -15,11 +15,13 @@
     "db:demo": "tsx scripts/demo.ts"
   },
   "dependencies": {
+    "@types/qrcode": "^1.5.6",
     "bcryptjs": "3.0.3",
     "drizzle-orm": "0.45.4",
     "exceljs": "4.4.0",
     "next": "15.5.28",
     "postgres": "3.4.9",
+    "qrcode": "^1.5.4",
     "react": "19.3.0",
     "react-dom": "19.3.0"
   },

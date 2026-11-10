@@ -21,6 +21,10 @@ export type Regla = {
   montoFijo: number;
   montoSemanal: number;
   periodo?: string;
+  frecuenciaPago?: string | null;
+  diaCorte?: number | null;
+  diaPago?: number | null;
+  formaPago?: string;
   vigenteDesde: Date;
   vigenteHasta: Date | null;
 };

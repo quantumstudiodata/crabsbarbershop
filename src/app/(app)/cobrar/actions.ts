@@ -1,5 +1,7 @@
 "use server";
 
+import { randomBytes } from "node:crypto";
+
 import { and, eq, inArray, sql } from "drizzle-orm";
 import { revalidatePath } from "next/cache";
 import { requerirSesion } from "@/lib/auth";
@@ -11,7 +13,7 @@ import { fechaLocal } from "@/lib/fechas";
 import { formatoDinero } from "@/lib/money";
 import { aplicarPromos, momentoEn, type Promo } from "@/lib/promociones";
 
-export type EstadoCobro = { ok?: boolean; error?: string; folio?: string; total?: number };
+export type EstadoCobro = { ok?: boolean; error?: string; folio?: string; total?: number; encuesta?: string | null };
 
 type Entrada = {
   clave: string;
@@ -57,9 +59,9 @@ export async function registrarVenta(_: EstadoCobro, form: FormData): Promise<Es
   if (e.lineas.length === 0) return { error: "Elige al menos un servicio." };
 
   // ¿Ya se guardó esta misma venta (doble clic)?
-  const [previa] = await db.select({ folio: schema.ventas.folio, total: schema.ventas.total }).from(schema.ventas)
+  const [previa] = await db.select({ folio: schema.ventas.folio, total: schema.ventas.total, tokenEncuesta: schema.ventas.tokenEncuesta }).from(schema.ventas)
     .where(and(eq(schema.ventas.barberiaId, bId), eq(schema.ventas.claveUnica, e.clave))).limit(1);
-  if (previa) return { ok: true, folio: previa.folio, total: previa.total };
+  if (previa) return { ok: true, folio: previa.folio, total: previa.total, encuesta: previa.tokenEncuesta };
 
   const turno = await cajaOAbrir(s);
   if (!turno) return { error: "La caja está cerrada. Hay que abrirla antes de cobrar." };
@@ -130,13 +132,15 @@ export async function registrarVenta(_: EstadoCobro, form: FormData): Promise<Es
   });
 
   try {
+    // Clave del enlace de la encuesta para el cliente: aleatoria, corta y sin datos de la venta.
+    const encuesta = randomBytes(9).toString("base64url");
     const folio = await db.transaction(async (tx) => {
       const [{ n }] = await tx.update(schema.barberias).set({ siguienteFolio: sql`${schema.barberias.siguienteFolio} + 1` })
         .where(eq(schema.barberias.id, bId)).returning({ n: sql<number>`${schema.barberias.siguienteFolio} - 1` });
       const folio = `${s.barberia.folioPrefijo}-${String(n).padStart(6, "0")}`;
       const [v] = await tx.insert(schema.ventas).values({
         barberiaId: bId, folio, turnoId: turno.id, registradaPor: s.usuario.id, total, descuentoTotal: descPromo + e.descuento,
-        observaciones: e.observaciones, claveUnica: e.clave,
+        observaciones: e.observaciones, claveUnica: e.clave, tokenEncuesta: encuesta,
       }).returning({ id: schema.ventas.id });
       await tx.insert(schema.conceptos).values(conceptos.map((c) => ({ ...c, ventaId: v.id })));
       // Si viene de una cita, queda ligada a la venta y completada (una cita no se cobra dos veces).
@@ -165,14 +169,14 @@ export async function registrarVenta(_: EstadoCobro, form: FormData): Promise<Es
       return folio;
     });
     revalidatePath("/", "layout");
-    return { ok: true, folio, total };
+    return { ok: true, folio, total, encuesta };
   } catch (err) {
     const msg = String((err as Error)?.message ?? "");
     if (msg.includes("cita_cobrada")) return { error: "Esa cita ya se cobró." };
     if (msg.includes("promo_agotada")) return { error: "Una promoción llegó a su límite de usos. Recarga la página para cobrar sin ella." };
     if (msg.includes("ventas_clave_uq")) {
       const [v] = await db.select().from(schema.ventas).where(and(eq(schema.ventas.barberiaId, bId), eq(schema.ventas.claveUnica, e.clave))).limit(1);
-      if (v) return { ok: true, folio: v.folio, total: v.total };
+      if (v) return { ok: true, folio: v.folio, total: v.total, encuesta: v.tokenEncuesta };
     }
     console.error(err);
     return { error: "No se pudo guardar la venta. Revisa tu conexión e intenta otra vez." };

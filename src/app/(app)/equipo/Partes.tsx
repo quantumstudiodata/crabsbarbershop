@@ -10,10 +10,12 @@ export function PestanasEquipo({ pagos }: { pagos: boolean }) {
   const mes = useSearchParams().get("mes");
   const q = mes ? `?mes=${mes}` : "";
   const enPagos = ruta.startsWith("/equipo/pagos");
+  const enRes = ruta.startsWith("/equipo/resenas");
   return (
     <nav className="eq-tabs" aria-label="Secciones de Equipo">
-      <Link href={`/equipo${q}`} aria-current={!enPagos ? "page" : undefined}>Personas</Link>
+      <Link href={`/equipo${q}`} aria-current={!enPagos && !enRes ? "page" : undefined}>Personas</Link>
       {pagos && <Link href="/equipo/pagos" aria-current={enPagos ? "page" : undefined}>Pagos</Link>}
+      <Link href="/equipo/resenas" aria-current={enRes ? "page" : undefined}>Reseñas</Link>
     </nav>
   );
 }

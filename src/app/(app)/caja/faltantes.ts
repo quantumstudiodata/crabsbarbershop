@@ -13,7 +13,7 @@ export type ReglaFaltante = "abrio" | "iguales" | "proporcional" | "manual" | "n
 
 
 
-/** La encargada decide quién cubre el faltante de un corte. Lo asignado se resta de lo que se le paga a cada quien. */
+/** La encargada decide quién cubre el faltante de un corte. Queda en revisión hasta que se autorice; solo entonces se descuenta. */
 export async function asignarFaltante(d: { turnoId: string; regla: ReglaFaltante; manual?: Record<string, string> }): Promise<{ error?: string; mensaje?: string }> {
   const s = await requerirSesion("caja.corregir");
   if (s.vista) return { error: "En la vista previa no se guardan cambios." };
@@ -53,7 +53,7 @@ export async function asignarFaltante(d: { turnoId: string; regla: ReglaFaltante
     const f = await tx.update(schema.turnosCaja).set({ faltanteRegla: d.regla, revisadoPor: s.usuario.id, revisadoEn: new Date() })
       .where(and(eq(schema.turnosCaja.id, t.id), sql`${schema.turnosCaja.faltanteRegla} is null`)).returning({ id: schema.turnosCaja.id });
     if (!f.length) return false;
-    if (partes.length) await tx.insert(schema.faltantesCaja).values(partes.map((x) => ({ barberiaId: b, turnoId: t.id, usuarioId: x.id, monto: x.monto, regla: d.regla, fecha: t.fechaOperativa, asignadoPor: s.usuario.id })));
+    if (partes.length) await tx.insert(schema.faltantesCaja).values(partes.map((x) => ({ barberiaId: b, turnoId: t.id, usuarioId: x.id, monto: x.monto, regla: d.regla, fecha: t.fechaOperativa, asignadoPor: s.usuario.id, estado: "revision" })));
     await registrar(tx, {
       barberiaId: b, usuarioId: s.usuario.id, tipo: "caja",
       accion: d.regla === "negocio"
@@ -65,6 +65,6 @@ export async function asignarFaltante(d: { turnoId: string; regla: ReglaFaltante
   });
   if (!ok) return { error: "El faltante de ese corte ya se asignó." };
   revalidatePath("/", "layout");
-  return { mensaje: d.regla === "negocio" ? "Listo. El negocio absorbe el faltante." : "Faltante asignado. Se restará de su próximo pago." };
+  return { mensaje: d.regla === "negocio" ? "Listo. El negocio absorbe el faltante." : "Faltante asignado. Queda en revisión: solo se descuenta si se autoriza en Equipo, Pagos." };
 }
 
