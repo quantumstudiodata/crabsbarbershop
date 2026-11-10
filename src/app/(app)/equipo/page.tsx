@@ -40,57 +40,61 @@ export default async function Equipo({ searchParams }: { searchParams: Promise<{
   const verArch = q0.archivados === "1";
   const urlArch = `/equipo?${new URLSearchParams({ ...(q ? { mes: m.mes } : {}), ...(verArch ? {} : { archivados: "1" }) }).toString()}`;
 
+  const maxV = Math.max(1, ...filas.map((p) => p.r.vendido));
+  const conRegla = cuentas.filter((c) => !c.sinRegla);
+  const hayRentas = conRegla.some((c) => c.renta), hayEquipo = conRegla.some((c) => !c.renta);
+
   return (
-    <div className="eq2">
+    <div className="eq2 eqa">
       <AvisoUrl aviso={q0.aviso} error={q0.error} />
-      <div className="eq2-cab">
-        <div><h1>Equipo</h1></div>
-        <div className="eq2-acc">
-          <MesEquipo mes={m.mes} hoy={m.hoy} />
-          {puedePagar && <RegistrarPago filas={cuentas.filter((c) => c.saldo > 0).map((c) => c.fila)} regreso={`/equipo${q}`} />}
-        </div>
-      </div>
-      <p className="eq2-res">
-        El equipo vendió <b>{formatoDinero(total.vendido)}</b> en {total.servicios} {total.servicios === 1 ? "servicio" : "servicios"}
-        {cal?.n ? <>, con calificación de <b>{cal.prom.toFixed(1)}</b></> : null}.
-        {porPagar > 0 && <> Quedan <b>{formatoDinero(porPagar)}</b> por pagar.</>}
-        {porCobrar > 0 && <> Hay <b>{formatoDinero(porCobrar)}</b> de renta por cobrar.</>}
-        {" "}{se.puede("ventas.ver_todas") && <Link href="/analitica/ventas" className="eq2-link">Estadísticas completas</Link>}
-      </p>
-      <section className="glass eq2-lista" aria-label="Personas">
-        {filas.length ? filas.map((p) => {
-          const c = p.c;
-          const pend = !c || c.sinRegla ? null : c.renta ? (c.saldo > 0 ? { t: `${formatoDinero(c.saldo)} por cobrar`, aviso: true } : { t: "Renta al corriente", aviso: false }) : c.saldo > 0 ? { t: `${formatoDinero(c.saldo)} por pagar`, aviso: true } : null;
-          return (
-            <Link key={p.id} href={`/equipo/${p.id}${q}`} className="eq2-fila">
-              <Avatar avatar={p.avatar} nombre={p.nombre} t={38} />
-              <span><b>{p.nombre}</b><small>{!c || c.sinRegla ? "Sin forma de pago" : `${c.modalidad}, ${c.frecuencia.toLowerCase()}`}</small></span>
-              <span className="eq2-m"><b>{formatoDinero(p.r.vendido)}</b>{pend && <small className={pend.aviso ? "pend" : undefined} title="Del periodo de pago en curso">{pend.t}</small>}</span>
-              <Icono n="derecha" />
-            </Link>
-          );
-        }) : <Vacio icono="persona" titulo="Todavía no hay personas que atiendan" texto="Da de alta a tu equipo en Ajustes, Usuarios, y aquí verás lo que vende cada persona." />}
-      </section>
-      {verArch && archivadas.length > 0 && (
-        <section className="glass eq2-lista arch" aria-label="Archivados">
-          {archivadas.map((p) => (
-            <Link key={p.id} href={`/equipo/${p.id}${q}`} className="eq2-fila">
-              <Avatar avatar={p.avatar} nombre={p.nombre} t={34} />
-              <span><b>{p.nombre}</b><small>Archivada</small></span>
-              <span className="eq2-m"><b>{formatoDinero(p.r.vendido)}</b></span>
-              <Icono n="derecha" />
-            </Link>
-          ))}
-        </section>
-      )}
-      <div className="eq2-pie">
-        <span>Ventas atribuidas de {m.nombre.toLowerCase()}. Lo pendiente es del periodo de pago en curso.</span>
-        <span className="eq2-links">
-          {revision.length > 0 && <Link href="/equipo/pagos#faltantes">{revision.length} {revision.length === 1 ? "faltante en revisión" : "faltantes en revisión"}</Link>}
+      <aside className="glass eqa-res">
+        <div className="entre"><span className="lab">{m.nombre}</span><MesEquipo mes={m.mes} hoy={m.hoy} /></div>
+        <span className="eqa-total"><small>Ventas atribuidas</small><b>{formatoDinero(total.vendido)}</b><em>{total.servicios} {total.servicios === 1 ? "servicio" : "servicios"}{cal?.n ? `, ★ ${cal.prom.toFixed(1)}` : ""}</em></span>
+        {(hayEquipo || hayRentas) && (
+          <div className="eqa-pend">
+            {hayEquipo && <span><small>Por pagar al equipo</small><b>{formatoDinero(porPagar)}</b></span>}
+            {hayRentas && <span><small>Renta por cobrar</small><b>{formatoDinero(porCobrar)}</b></span>}
+          </div>
+        )}
+        {puedePagar && <RegistrarPago filas={cuentas.filter((c) => c.saldo > 0).map((c) => c.fila)} regreso={`/equipo${q}`} clase="eq2-pri eqa-bt" />}
+        <nav className="eqa-links" aria-label="Más de Equipo">
           {puedePagar && <Link href="/equipo/pagos">Historial de pagos</Link>}
+          {revision.length > 0 && <Link href="/equipo/pagos#faltantes">{revision.length} {revision.length === 1 ? "faltante en revisión" : "faltantes en revisión"}</Link>}
+          {se.puede("ventas.ver_todas") && <Link href="/analitica/ventas">Estadísticas completas</Link>}
           {archivadas.length > 0 && <Link href={urlArch} className="sutil">{verArch ? "Ocultar archivados" : `Archivados (${archivadas.length})`}</Link>}
-        </span>
-      </div>
+        </nav>
+      </aside>
+      <section className="eqa-col">
+        <div className="eqa-cab"><h1>Equipo</h1><small>{filas.length} {filas.length === 1 ? "persona activa" : "personas activas"}</small></div>
+        <div className="glass eq2-lista" aria-label="Personas">
+          {filas.length ? filas.map((p) => {
+            const c = p.c;
+            const pend = !c || c.sinRegla ? null : c.renta ? (c.saldo > 0 ? `${formatoDinero(c.saldo)} por cobrar` : "Renta al corriente") : c.saldo > 0 ? `${formatoDinero(c.saldo)} por pagar` : null;
+            return (
+              <Link key={p.id} href={`/equipo/${p.id}${q}`} className="eq2-fila">
+                <Avatar avatar={p.avatar} nombre={p.nombre} t={38} />
+                <span><b>{p.nombre}</b><small>{!c || c.sinRegla ? "Sin forma de pago" : `${c.modalidad}, ${c.frecuencia.toLowerCase()}`}</small>
+                  <i className="eqa-barra" aria-hidden="true"><i style={{ width: `${Math.max((p.r.vendido / maxV) * 100, 2)}%` }} /></i></span>
+                <span className="eq2-m"><b>{formatoDinero(p.r.vendido)}</b>{pend && <small className="pend">{pend}</small>}</span>
+                <Icono n="derecha" />
+              </Link>
+            );
+          }) : <Vacio icono="persona" titulo="Todavía no hay personas que atiendan" texto="Da de alta a tu equipo en Ajustes, Usuarios, y aquí verás lo que vende cada persona." />}
+        </div>
+        {verArch && archivadas.length > 0 && (
+          <div className="glass eq2-lista arch" aria-label="Archivados">
+            {archivadas.map((p) => (
+              <Link key={p.id} href={`/equipo/${p.id}${q}`} className="eq2-fila">
+                <Avatar avatar={p.avatar} nombre={p.nombre} t={34} />
+                <span><b>{p.nombre}</b><small>Archivada</small></span>
+                <span className="eq2-m"><b>{formatoDinero(p.r.vendido)}</b></span>
+                <Icono n="derecha" />
+              </Link>
+            ))}
+          </div>
+        )}
+        {filas.length > 0 && <small className="eqa-nota">La barra muestra cuánto aporta cada persona a las ventas del mes. Lo pendiente es del periodo de pago en curso.</small>}
+      </section>
     </div>
   );
 }

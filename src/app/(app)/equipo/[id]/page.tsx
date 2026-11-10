@@ -16,6 +16,7 @@ import { NOMBRE_ROL, type Rol } from "@/lib/permisos";
 import { MesEquipo } from "../Partes";
 import { cuentasEnCurso, mesElegido, sesionEquipo } from "../datos";
 import { RegistrarPago } from "../Pago";
+import { CuentaFicha, type VistaCuenta } from "../CuentaFicha";
 
 export const metadata = { title: "Equipo" };
 
@@ -71,7 +72,6 @@ export default async function Ficha({ params, searchParams }: { params: Promise<
   const renta = regla?.tipo === "renta";
   const DIAS_PAGO = ["domingos", "lunes", "martes", "miércoles", "jueves", "viernes", "sábados"];
   const sePaga = cal && !renta ? (frecuenciaDe(cal) === "semana" && per ? `se paga los ${DIAS_PAGO[new Date(`${per.pago}T12:00:00Z`).getUTCDay()]}` : `se paga ${(NOMBRE_FRECUENCIA[frecuenciaDe(cal)] ?? "").toLowerCase()}`) : "";
-  const subt = [puesto, cuenta.forma ? cuenta.forma.replace(/^./, (x) => x.toLowerCase()) : "", sePaga].filter(Boolean).join(", ");
   const fecha = (d: Date) => fechaLarga(fechaLocal(d, se.barberia.zonaHoraria));
   const enMes = m.mes === m.hoy.slice(0, 7) ? "en el mes" : `en ${m.nombre.toLowerCase().split(" ")[0]}`;
   const periodoActual = enCurso && !enCurso.sinRegla ? <>Periodo en curso: {enCurso.fila.monto}</> : undefined;
@@ -80,49 +80,72 @@ export default async function Ficha({ params, searchParams }: { params: Promise<
     : [["Ventas atribuidas", formatoDinero(r.vendido)], [cuenta.sueldo ? "Le corresponde" : "Comisión generada", formatoDinero(cuenta.corresponde)], ["Pagado", formatoDinero(cuenta.pagado)], [`Por pagar ${enMes}`, formatoDinero(cuenta.saldo), periodoActual, cuenta.saldo > 0]];
   cifras[0][2] = <>{r.servicios} {r.servicios === 1 ? "servicio" : "servicios"}{res.n ? <>, ★ {res.prom.toFixed(1)}</> : null}</>;
 
+  const sinActividad = r.servicios === 0 && cuenta.corresponde === 0 && cuenta.pagado === 0 && cuenta.renta === 0;
+  const pendLabel = renta ? "Por cobrar" : "Por pagar";
+  const detalle = enCurso?.fila.detalle ?? [];
+  const dato = (k: string) => detalle.find(([a]) => a === k)?.[1] ?? "";
+  const vistas: VistaCuenta[] = [
+    { clave: "mes", titulo: m.nombre.split(" ")[0].replace(/^./, (x) => x.toUpperCase()), pendiente: formatoDinero(renta ? cuenta.rentaPendiente : cuenta.saldo), nota: `Lo acumulado ${enMes}`,
+      renglones: renta ? [["Renta del mes", formatoDinero(cuenta.renta)], ["Recibido", formatoDinero(cuenta.rentaPagada)], ["Ventas atribuidas", formatoDinero(r.vendido)]]
+        : [["Ventas atribuidas", formatoDinero(r.vendido)], [cuenta.sueldo ? "Le corresponde" : "Comisión generada", formatoDinero(cuenta.corresponde)], ["Pagado", formatoDinero(cuenta.pagado)]] },
+    ...(enCurso && !enCurso.sinRegla ? [{ clave: "periodo", titulo: "Periodo en curso", pendiente: enCurso.fila.monto, nota: `${dato("Periodo")}${dato(renta ? "Fecha límite" : "Fecha de pago") ? `, ${renta ? "vence" : "se paga"} el ${dato(renta ? "Fecha límite" : "Fecha de pago").toLowerCase()}` : ""}`,
+      renglones: detalle.filter(([a]) => !["Periodo", "Fecha de pago", "Fecha límite", "Saldo pendiente", "Pendiente", "Forma de pago"].includes(a)) }] : []),
+  ];
+  const pagar = enCurso && enCurso.fila.puedePagar ? <RegistrarPago filas={[enCurso.fila]} regreso={`/equipo/${u.id}${q}`} texto={renta ? "Registrar cobro" : "Registrar pago"} clase="eq2-pri eqa-bt" /> : null;
+  const info = (
+    <dl className="fa-dl">
+      <dt>Horario</dt><dd>{h.horas || "Sin horario"}</dd>
+      <dt>Días</dt><dd>{h.dias}</dd>
+      <dt>Modalidad</dt><dd>{modalidadCorta(regla)}{regla && (regla.tipo === "porcentaje" || regla.tipo === "mixto") && !modalidadCorta(regla).includes("%") ? `, ${regla.porcentaje / 100}%` : ""}</dd>
+      {cal && <><dt>Periodicidad</dt><dd>{NOMBRE_FRECUENCIA[frecuenciaDe(cal)] ?? "Semanal"}{frecuenciaDe(cal) === "semana" ? `, corte el ${DIAS_C[cal.diaCorte ?? 0]}` : ""}</dd></>}
+      {cal && <><dt>Forma de pago</dt><dd>{NOMBRE_FORMA_PAGO[cal.formaPago ?? "efectivo"]}</dd></>}
+      {per && !renta && <><dt>Próximo pago</dt><dd>{fechaLarga(per.pago)}</dd></>}
+      <dt>Mes anterior</dt><dd>{formatoDinero(anterior.r.vendido)} en {mesAnt}</dd>
+    </dl>
+  );
+  const lapiz = se.puede("usuarios.editar") && <Link href={`/ajustes?editar=${u.id}`} className="eq2-lapiz" aria-label="Editar perfil" title="Editar perfil"><Icono n="editar" /></Link>;
+
   return (
-    <div className="eq2 eq2-ficha">
-      <div className="eq2-per">
-        <div className="eq2-id">
-          <Link href={`/equipo${q}`} className="eq2-atr" aria-label="Volver a Equipo"><Icono n="izquierda" /></Link>
-          <Avatar avatar={u.avatar} nombre={u.nombre} t={52} />
-          <span><span className="eq2-nom"><h1>{u.nombre}</h1>{se.puede("usuarios.editar") && <Link href={`/ajustes?editar=${u.id}`} className="eq2-lapiz" aria-label="Editar perfil" title="Editar perfil"><Icono n="editar" /></Link>}</span><small>{subt}{!u.activo && <>, archivada</>}</small></span>
-        </div>
-        <div className="eq2-acc">
-          <MesEquipo mes={m.mes} hoy={m.hoy} />
-          {enCurso && enCurso.fila.puedePagar && <RegistrarPago filas={[enCurso.fila]} regreso={`/equipo/${u.id}${q}`} texto={renta ? "Registrar cobro" : "Registrar pago"} />}
+    <div className="eq2 fa">
+      <div className="eq2-tit fa-vol"><Link href={`/equipo${q}`} className="eq2-atr" aria-label="Volver a Equipo"><Icono n="izquierda" /></Link><span><small>Equipo</small></span></div>
+      <div className="fa-grid">
+        <aside className="glass fa-perfil">
+          <div className="fa-id">
+            <Avatar avatar={u.avatar} nombre={u.nombre} t={72} />
+            <span><span className="eq2-nom"><h1>{u.nombre}</h1>{lapiz}</span><small>{puesto}{!u.activo && ", archivada"}</small><small className="fa-forma">{[cuenta.forma, sePaga].filter(Boolean).join(", ")}</small></span>
+          </div>
+          <div className="solo-escritorio fa-acc">{pagar}</div>
+          <div className="fa-info solo-escritorio">{info}{se.puede("citas.horarios") && <Link href="/citas?vista=horarios" className="eq2-link">Editar horario</Link>}</div>
+        </aside>
+        <div className="fa-main">
+          <div className="entre fa-mes"><span className="lab">{m.nombre}</span><MesEquipo mes={m.mes} hoy={m.hoy} /></div>
+          {sinActividad && !(enCurso && enCurso.saldo > 0) ? (
+            <Vacio icono="calendario" titulo={`Sin actividad ${enMes}`} texto="No tiene servicios, pagos ni saldo pendiente en este mes. Elige otro mes para ver su historial." />
+          ) : (
+            <>
+              <section className="glass fa-cifras solo-escritorio">
+                {cifras.map(([t, v, sub, pend]) => <span key={t}><small className={pend ? "pend" : undefined}>{t}</small><b>{v}</b>{sub && <em>{sub}</em>}</span>)}
+              </section>
+              <div className="solo-movil fa-mov"><CuentaFicha vistas={vistas} etiqueta={pendLabel}>{pagar}</CuentaFicha></div>
+            </>
+          )}
+          <div className="fa-dos">
+            <section className="glass fa-card">
+              <div className="entre"><span className="lab">Lo que más hace</span>{r.servicios > 0 && <Link className="eq2-link" href={`/analitica/ventas?persona=${u.id}&periodo=mes&mes=${m.mes}`}>Ver actividad</Link>}</div>
+              {r.top.length ? <div className="eq2-tabla">{r.top.slice(0, 5).map((t) => <div key={t.nombre}><span>{t.nombre}</span><b>{t.veces}</b></div>)}</div> : <Vacio icono="lista" titulo="Sin servicios este mes" texto="Cuando atienda a su primer cliente del mes, aquí verás lo que más hace." />}
+            </section>
+            <section className="glass fa-card">
+              <div className="entre"><span className="lab">Pagos</span>{puedePagar && pagosRecientes.length > 0 && <Link className="eq2-link" href={`/equipo/pagos?persona=${u.id}`}>Ver todos</Link>}</div>
+              {pagosRecientes.length ? <div className="eq2-tabla">{pagosRecientes.map((x) => <div key={x.id}><span>{fecha(x.creadoEn)}{x.tipo === "renta" ? ", renta" : ""}</span><b>{formatoDinero(x.monto)}</b></div>)}</div> : <Vacio icono="efectivo" titulo="Sin pagos registrados" texto="Cada pago que le registres aparecerá aquí con su fecha y monto." />}
+            </section>
+          </div>
+          <details className="eq2-mas solo-movil fa-det">
+            <summary>Horario y forma de pago<Icono n="abajo" /></summary>
+            {info}
+            {se.puede("citas.horarios") && <Link href="/citas?vista=horarios" className="eq2-link">Editar horario</Link>}
+          </details>
         </div>
       </div>
-      <section className="glass eq2-cifras">
-        {cifras.map(([t, v, sub, pend]) => (
-          <span key={t}><small className={pend ? "pend" : undefined}>{t}</small><b>{v}</b>{sub && <em>{sub}</em>}</span>
-        ))}
-      </section>
-      <div className="eq2-dos">
-        <section>
-          <div className="entre"><span className="lab">Lo que más hace</span>{r.servicios > 0 && <Link className="eq2-link" href={`/analitica/ventas?persona=${u.id}&periodo=mes&mes=${m.mes}`}>Ver actividad</Link>}</div>
-          {r.top.length ? <div className="eq2-tabla">{r.top.slice(0, 5).map((t) => <div key={t.nombre}><span>{t.nombre}</span><b>{t.veces}</b></div>)}</div> : <Vacio icono="lista" titulo="Sin servicios este mes" texto="Cuando atienda a su primer cliente del mes, aquí verás lo que más hace." />}
-        </section>
-        <section>
-          <div className="entre"><span className="lab">Pagos</span>{puedePagar && pagosRecientes.length > 0 && <Link className="eq2-link" href={`/equipo/pagos?persona=${u.id}`}>Ver todos</Link>}</div>
-          {pagosRecientes.length ? <div className="eq2-tabla">{pagosRecientes.map((x) => <div key={x.id}><span>{fecha(x.creadoEn)}{x.tipo === "renta" ? ", renta" : ""}</span><b>{formatoDinero(x.monto)}</b></div>)}</div> : <Vacio icono="efectivo" titulo="Sin pagos registrados" texto="Cada pago que le registres aparecerá aquí con su fecha y monto." />}
-        </section>
-      </div>
-      <details className="eq2-mas">
-        <summary>Horario y forma de pago<Icono n="abajo" /></summary>
-        <dl>
-          <dt>Horario habitual</dt><dd>{h.horas || "Sin horario"}</dd>
-          <dt>Días laborales</dt><dd>{h.dias}</dd>
-          <dt>Modalidad</dt><dd>{modalidadCorta(regla)}</dd>
-          {regla && (regla.tipo === "porcentaje" || regla.tipo === "mixto") && <><dt>Porcentaje</dt><dd>{regla.porcentaje / 100}%</dd></>}
-          {cal && <><dt>Periodicidad</dt><dd>{NOMBRE_FRECUENCIA[frecuenciaDe(cal)] ?? "Semanal"}{frecuenciaDe(cal) === "semana" ? `, corte el ${DIAS_C[cal.diaCorte ?? 0]}` : ""}</dd></>}
-          {cal && <><dt>Forma de pago</dt><dd>{NOMBRE_FORMA_PAGO[cal.formaPago ?? "efectivo"]}</dd></>}
-          {per && !renta && <><dt>Próximo pago</dt><dd>{fechaLarga(per.pago)}</dd></>}
-          <dt>Mes anterior</dt><dd>{formatoDinero(anterior.r.vendido)} en {mesAnt}</dd>
-          <dt>Transacciones del mes</dt><dd>{r.transacciones}, ticket promedio {formatoDinero(r.ticket)}</dd>
-        </dl>
-        {se.puede("citas.horarios") && <Link href="/citas?vista=horarios" className="eq2-link">Editar horario</Link>}
-      </details>
     </div>
   );
 }
