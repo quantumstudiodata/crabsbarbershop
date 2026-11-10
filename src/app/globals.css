@@ -2985,12 +2985,6 @@ html:has(.capa) body, html:has(.velo-c) body, html:has(.velo-hoja) body, html:ha
 .eq-resumen > .eq-prox { padding: 10px 0 0; }
 
 /* ---------- Menú superior: píldora deslizante, menú de cuenta vertical y animaciones suaves ---------- */
-.nav.con-pill .capa-n { position: relative; }
-.pill-n { position: absolute; left: 0; top: 0; height: 100%; border-radius: 13px; background: linear-gradient(180deg, #2b3138, #13171c); box-shadow: 0 8px 16px -8px rgba(10,15,20,.6), inset 0 1px 0 rgba(255,255,255,.14); pointer-events: none; }
-.nav.con-pill.lista .pill-n { transition: transform .38s cubic-bezier(.2,.8,.2,1), width .38s cubic-bezier(.2,.8,.2,1), opacity .2s; }
-.nav.con-pill a { position: relative; z-index: 1; }
-.nav.con-pill a[aria-current="page"] { background: none; box-shadow: none; }
-.nav a .ic { transition: transform .25s ease; } .nav a:hover .ic { transform: translateY(-1px); }
 .negocio-n { justify-self: start; font-size: 16px; font-weight: 700; letter-spacing: -.01em; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; max-width: 100%; }
 .herramientas .ayuda-b, .herramientas .orbe { display: none !important; }
 .menu-b { display: inline-flex; align-items: center; gap: 8px; height: 40px; padding: 0 12px 0 4px; border-radius: 13px; cursor: pointer; border: 1px solid var(--glass-border); background: var(--surface); box-shadow: var(--sh1), var(--hi); -webkit-backdrop-filter: blur(16px); backdrop-filter: blur(16px); font: 600 13px var(--f-body); color: var(--fg); transition: background .2s, transform .15s; }
@@ -3006,7 +3000,7 @@ html:has(.capa) body, html:has(.velo-c) body, html:has(.velo-hoja) body, html:ha
 @keyframes menu-entra { from { opacity: 0; transform: translateY(-6px) scale(.97); } to { opacity: 1; transform: none; } }
 .campana:hover .ic { animation: mece .5s ease; }
 @keyframes mece { 0%, 100% { transform: rotate(0); } 30% { transform: rotate(12deg); } 60% { transform: rotate(-8deg); } }
-@media (prefers-reduced-motion: reduce) { .nav.con-pill.lista .pill-n, .menu.cuenta, .menu.cuenta .it, .menu-b .flecha-m, .nav a .ic { transition: none; animation: none; } .campana:hover .ic { animation: none; } }
+@media (prefers-reduced-motion: reduce) { .menu.cuenta, .menu.cuenta .it, .menu-b .flecha-m { transition: none; animation: none; } .campana:hover .ic { animation: none; } }
 @media (max-width: 760px) {
   .negocio-n { display: none; }
   .menu-b { width: 40px; height: 40px; padding: 0; border-radius: 50%; justify-content: center; border: 2px solid #fff; }
@@ -3036,13 +3030,3 @@ html:has(.capa) body, html:has(.velo-c) body, html:has(.velo-hoja) body, html:ha
   .contenedor { padding-bottom: calc(100px + env(safe-area-inset-bottom, 0px)); }
 }
 @media (max-width: 760px) and (prefers-reduced-motion: reduce) { .barra-inf.lista .burbuja-m, .secc-m .tab-m { transition: none; } .cobrar-m::after, .entra-m { animation: none; } }
-/* Cobro: el menú de arriba se esconde y no deja hueco; aparece encima al deslizar hacia arriba. */
-body.foco .barra { position: fixed; left: 0; right: 0; top: env(safe-area-inset-top, 0px); padding-bottom: 8px; transform: translateY(-115%); opacity: 0; pointer-events: none; }
-body.foco .barra.ver, body.foco .barra:focus-within { transform: none; opacity: 1; pointer-events: auto; }
-@media (max-width: 760px) {
-  body.foco .barra { transform: translateY(-115%); opacity: 0; pointer-events: none; }
-  body.foco .barra.ver, body.foco .barra:focus-within { position: fixed; transform: none; opacity: 1; pointer-events: auto; }
-}
-@media (max-width: 760px) {
-  body.foco .barra.ver .barra-in { background: rgba(255,255,255,.88); -webkit-backdrop-filter: blur(18px); backdrop-filter: blur(18px); border: 1px solid #fff; box-shadow: var(--sh1); padding: 6px 6px 6px 8px; }
-}

@@ -2,50 +2,34 @@
 
 import { useEffect } from "react";
 
-/**
- * En Cobro el menú de arriba se esconde para dar espacio a la venta.
- * Aparece al deslizar hacia arriba (o al llevar el cursor a la orilla) y se vuelve a esconder al deslizar hacia abajo.
- */
+/** En Cobro la barra de arriba se esconde. Aparece al acercar el cursor a la orilla, al tocarla o, en el teléfono, al deslizar hacia arriba. */
 export function ModoFoco() {
   useEffect(() => {
     document.body.classList.add("foco");
-    const barra = () => document.querySelector<HTMLElement>(".barra");
-    const ver = (si: boolean) => barra()?.classList.toggle("ver", si);
+    // En el teléfono: al deslizar hacia arriba aparece el menú; al bajar se esconde.
     let ultimo = window.scrollY;
     const alDesplazar = () => {
+      if (!window.matchMedia("(max-width: 760px)").matches) return;
+      const b = document.querySelector<HTMLElement>(".barra");
       const y = window.scrollY;
-      if (y < ultimo - 4) ver(true);
-      else if (y > ultimo + 4) ver(false);
+      if (y < 8 || y < ultimo - 4) b?.classList.add("ver");
+      else if (y > ultimo + 4) b?.classList.remove("ver");
       ultimo = y;
     };
-    // Si la página ya está hasta arriba no hay desplazamiento: se toma el gesto de la rueda o del dedo.
-    const rueda = (e: WheelEvent) => { if (e.deltaY < -8) ver(true); else if (e.deltaY > 8) ver(false); };
-    let inicioY: number | null = null;
-    const toca = (e: TouchEvent) => { inicioY = e.touches[0]?.clientY ?? null; };
-    const mueve = (e: TouchEvent) => {
-      if (inicioY === null) return;
-      const d = (e.touches[0]?.clientY ?? inicioY) - inicioY;
-      if (d > 24) { ver(true); inicioY = null; } else if (d < -24) { ver(false); inicioY = null; }
-    };
+    // Al abrir, en el teléfono el menú se ve: la página empieza arriba.
+    if (window.matchMedia("(max-width: 760px)").matches) document.querySelector<HTMLElement>(".barra")?.classList.add("ver");
     window.addEventListener("scroll", alDesplazar, { passive: true });
-    window.addEventListener("wheel", rueda, { passive: true });
-    window.addEventListener("touchstart", toca, { passive: true });
-    window.addEventListener("touchmove", mueve, { passive: true });
-    return () => {
-      document.body.classList.remove("foco");
-      barra()?.classList.remove("ver");
-      window.removeEventListener("scroll", alDesplazar);
-      window.removeEventListener("wheel", rueda);
-      window.removeEventListener("touchstart", toca);
-      window.removeEventListener("touchmove", mueve);
-    };
+    return () => { document.body.classList.remove("foco"); window.removeEventListener("scroll", alDesplazar); };
   }, []);
+  const barra = () => document.querySelector<HTMLElement>(".barra");
   const mostrar = () => {
-    const b = document.querySelector<HTMLElement>(".barra");
+    const b = barra();
     if (!b) return;
     b.classList.add("ver");
     const ocultar = () => { b.classList.remove("ver"); b.removeEventListener("mouseleave", ocultar); };
     b.addEventListener("mouseleave", ocultar);
   };
-  return <div className="foco-zona" onMouseEnter={mostrar} aria-hidden="true" />;
+  return (
+    <div className="foco-zona" onMouseEnter={mostrar} onClick={() => barra()?.classList.toggle("ver")} aria-hidden="true" />
+  );
 }
