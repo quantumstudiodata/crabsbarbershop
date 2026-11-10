@@ -1,116 +1,67 @@
 import Link from "next/link";
-import { and, eq, gte, isNull, lt, sql } from "drizzle-orm";
+import { and, desc, eq, gte, isNull, lt, sql } from "drizzle-orm";
+import { alias } from "drizzle-orm/pg-core";
 import { AvisoUrl } from "@/components/Encabezado";
 import { Icono } from "@/components/Icono";
-import { elegirRegla } from "@/lib/comisiones";
-import { reglasDe, ventasEntre } from "@/lib/datos";
 import { db, schema } from "@/lib/db";
-import { NOMBRE_FORMA_PAGO, NOMBRE_FRECUENCIA, cuentaDe, frecuenciaDe, modalidadCorta, periodoDePago } from "@/lib/equipo";
 import { faltantesEnRevision } from "@/lib/faltantes";
-import { fechaCorta, fechaLarga, sumarDias } from "@/lib/fechas";
+import { fechaCorta, fechaLocal, horaCorta, sumarDias } from "@/lib/fechas";
 import { formatoDinero } from "@/lib/money";
-import { PestanasEquipo } from "../Partes";
-import { personasEquipo, sesionEquipo, mesElegido } from "../datos";
+import { personasEquipo, sesionEquipo } from "../datos";
 import { decidirFaltante } from "../actions";
-import { FilaPago, type DatosFila } from "./FilaPago";
 
 export const metadata = { title: "Pagos del equipo" };
 
-const diaCorto = (f: string) => new Date(`${f}T12:00:00Z`).toLocaleDateString("es-MX", { weekday: "short", day: "numeric", month: "short", timeZone: "UTC" }).replace(/\./g, "");
-
-export default async function Pagos({ searchParams }: { searchParams: Promise<{ aviso?: string; error?: string }> }) {
+/** Historial de pagos del equipo y faltantes de caja por decidir. Se llega desde Equipo. */
+export default async function Pagos({ searchParams }: { searchParams: Promise<{ persona?: string; n?: string; aviso?: string; error?: string }> }) {
   const se = await sesionEquipo();
   const q = await searchParams;
-  const { hoy } = mesElegido({}, se.barberia.zonaHoraria);
-  const personas = (await personasEquipo(se.barberia.id)).filter((p) => p.activo);
-  const reglas = await reglasDe(se.barberia.id);
-  const periodos = new Map(personas.map((p) => { const r = elegirRegla(reglas, p.id, null, new Date()); return [p.id, { r, per: periodoDePago(r, hoy) }]; }));
-  // Una sola consulta de ventas que cubre el periodo más largo en curso.
-  const inicio = [...[...periodos.values()].map((x) => x.per.desde), hoy].sort()[0];
-  const [{ ventas }, revision, sinAsignar] = await Promise.all([
-    ventasEntre(se.barberia.id, inicio, hoy, { zona: se.barberia.zonaHoraria }),
+  const zona = se.barberia.zonaHoraria;
+  const hoy = fechaLocal(new Date(), zona);
+  const personas = await personasEquipo(se.barberia.id);
+  const persona = personas.some((p) => p.id === q.persona) ? q.persona! : "";
+  const limite = Math.min(Math.max(Number(q.n) || 30, 30), 300);
+  const quien = alias(schema.usuarios, "quien");
+  const [revision, sinAsignar, pagos] = await Promise.all([
     faltantesEnRevision(se.barberia.id),
     db.select({ n: sql<number>`count(*)::int` }).from(schema.turnosCaja)
       .where(and(eq(schema.turnosCaja.barberiaId, se.barberia.id), eq(schema.turnosCaja.estado, "cerrado"), lt(schema.turnosCaja.diferencia, 0), isNull(schema.turnosCaja.faltanteRegla), gte(schema.turnosCaja.fechaOperativa, sumarDias(hoy, -60)))),
+    db.select({ id: schema.pagosComision.id, tipo: schema.pagosComision.tipo, monto: schema.pagosComision.monto, nota: schema.pagosComision.nota, creadoEn: schema.pagosComision.creadoEn, nombre: schema.usuarios.nombre, registro: quien.nombre })
+      .from(schema.pagosComision).innerJoin(schema.usuarios, eq(schema.usuarios.id, schema.pagosComision.barberoId)).innerJoin(quien, eq(quien.id, schema.pagosComision.usuarioId))
+      .where(and(eq(schema.pagosComision.barberiaId, se.barberia.id), ...(persona ? [eq(schema.pagosComision.barberoId, persona)] : [])))
+      .orderBy(desc(schema.pagosComision.creadoEn)).limit(limite + 1),
   ]);
-  const pagadas = ventas.filter((v) => v.estado === "pagada");
-  const puedePagar = se.puede("equipo.pagar");
+  const hayMas = pagos.length > limite;
   const puedeAutorizar = se.puede("equipo.autorizar");
-
-  const cuentas = await Promise.all(personas.map(async (p) => {
-    const { r, per } = periodos.get(p.id)!;
-    const hasta = per.hasta > hoy ? hoy : per.hasta;
-    const c = await cuentaDe(se.barberia.id, p.id, per.desde, hasta, pagadas.filter((v) => v.fecha >= per.desde && v.fecha <= hasta));
-    const renta = c.regla?.tipo === "renta";
-    const saldo = renta ? c.rentaPendiente : c.saldo;
-    const pagado = renta ? c.rentaPagada : c.pagado;
-    const periodo = per.desde === per.hasta ? fechaLarga(per.desde) : `Del ${fechaCorta(per.desde)} al ${fechaCorta(per.hasta)}`;
-    const fila: DatosFila = {
-      id: p.id, nombre: p.nombre, avatar: p.avatar, modalidad: modalidadCorta(c.regla), frecuencia: NOMBRE_FRECUENCIA[frecuenciaDe(r)] ?? "Semanal",
-      periodo, semana: hoy, renta, monto: formatoDinero(saldo), parcial: pagado > 0 && saldo > 0,
-      estado: saldo <= 0 ? (renta ? "Cubierta" : "Al corriente") : pagado > 0 ? "Pago parcial" : "Pendiente",
-      puedePagar: puedePagar && saldo > 0,
-      detalle: renta
-        ? [["Periodo", periodo], ["Fecha límite", fechaLarga(per.pago)], ["Renta del periodo", formatoDinero(c.renta)], ["Recibido", formatoDinero(c.rentaPagada)], ["Pendiente", formatoDinero(c.rentaPendiente)]]
-        : [["Periodo", periodo], ["Fecha de pago", fechaLarga(per.pago)], ["Forma de pago", NOMBRE_FORMA_PAGO[r?.formaPago ?? "efectivo"] ?? "Efectivo de caja"], ["Ventas atribuidas", formatoDinero(c.vendido)],
-          ...(c.comision ? [["Comisión generada", formatoDinero(c.comision)] as [string, string]] : []), ...(c.sueldo ? [["Sueldo del periodo", formatoDinero(c.sueldo)] as [string, string]] : []),
-          ["Pagos registrados", formatoDinero(c.pagado)], ...(c.faltantes ? [["Faltantes autorizados", `−${formatoDinero(c.faltantes)}`] as [string, string]] : []), ["Saldo pendiente", formatoDinero(c.saldo)]],
-    };
-    return { renta, saldo, fila, sinRegla: !c.regla, pago: per.pago };
-  }));
-  const equipo = cuentas.filter((c) => !c.renta && !c.sinRegla);
-  const rentas = cuentas.filter((c) => c.renta);
-  const porPagar = equipo.filter((c) => c.saldo > 0);
-  const porCobrar = rentas.filter((c) => c.saldo > 0);
-  const alCorriente = [...equipo, ...rentas].filter((c) => c.saldo <= 0);
-  const suma = (xs: typeof cuentas) => xs.reduce((a, c) => a + c.saldo, 0);
-  const proximo = porPagar.map((c) => c.pago).filter((f) => f >= hoy).sort()[0];
   const nSinAsignar = sinAsignar[0]?.n ?? 0;
+  const url = (x: { persona?: string; n?: number }) => {
+    const u = new URLSearchParams();
+    const pe = x.persona ?? persona;
+    if (pe) u.set("persona", pe);
+    if (x.n) u.set("n", String(x.n));
+    const t = u.toString();
+    return `/equipo/pagos${t ? `?${t}` : ""}`;
+  };
+  const dia = (d: Date) => { const f = fechaLocal(d, zona); return f === hoy ? `Hoy, ${horaCorta(d, zona)}` : fechaCorta(f); };
 
   return (
-    <div className="eq">
+    <div className="eq2">
       <AvisoUrl aviso={q.aviso} error={q.error} />
-      <PestanasEquipo pagos={puedePagar} />
-      <div className="glass eq-card eq-resumen">
-        <div className="eq-res-cifras">
-          {equipo.length > 0 && <div className="pri"><small>Por pagar al equipo</small><b>{formatoDinero(suma(porPagar))}</b><span>{porPagar.length} {porPagar.length === 1 ? "persona" : "personas"}</span></div>}
-          {rentas.length > 0 && <div><small>Por cobrar de rentas</small><b>{formatoDinero(suma(porCobrar))}</b><span>{porCobrar.length} {porCobrar.length === 1 ? "renta" : "rentas"}</span></div>}
-          {!equipo.length && !rentas.length && <p className="muted">Configura la forma de pago de cada persona en Ajustes, Usuarios.</p>}
-        </div>
-        {proximo && <p className="eq-prox">Próximo pago: {diaCorto(proximo)}</p>}
-      </div>
-      <div className="eq-2col">
-        {equipo.length > 0 && (
-          <section>
-            <div className="eq-h"><b>Por pagar al equipo</b><small>{porPagar.length} {porPagar.length === 1 ? "pendiente" : "pendientes"}</small></div>
-            {porPagar.length ? <div className="glass eq-card">{porPagar.map((c) => <FilaPago key={c.fila.id} f={c.fila} />)}</div> : <p className="muted eq-vacio">Nadie tiene saldo pendiente.</p>}
-          </section>
-        )}
-        {rentas.length > 0 && (
-          <section>
-            <div className="eq-h"><b>Por cobrar</b><small>{porCobrar.length} {porCobrar.length === 1 ? "renta pendiente" : "rentas pendientes"}</small></div>
-            {porCobrar.length ? <div className="glass eq-card">{porCobrar.map((c) => <FilaPago key={c.fila.id} f={c.fila} />)}</div> : <p className="muted eq-vacio">Todas las rentas están cubiertas.</p>}
-          </section>
-        )}
-      </div>
-      {alCorriente.length > 0 && (
-        <details className="eq-sec">
-          <summary><Icono n="palomita" />Sin saldo pendiente<Icono n="abajo" /></summary>
-          <div className="glass eq-card">{alCorriente.map((c) => <FilaPago key={c.fila.id} f={c.fila} />)}</div>
-        </details>
-      )}
+      <Link href="/equipo" className="eq2-volver"><Icono n="izquierda" />Equipo</Link>
+      <div className="eq2-cab"><div><h1>Pagos del equipo</h1></div></div>
+
       {(revision.length > 0 || nSinAsignar > 0) && (
-        <section className="eq-falt">
-          <div className="eq-h"><b>Faltantes de caja</b><small>{revision.length} en revisión</small></div>
+        <section id="faltantes" className="eq2-sec">
+          <span className="lab">Faltantes de caja</span>
           {nSinAsignar > 0 && se.puede("cortes.ver") && (
             <Link href="/analitica/cortes" className="eq-aviso"><Icono n="caja" /><span><b>{nSinAsignar} {nSinAsignar === 1 ? "corte con faltante detectado" : "cortes con faltante detectado"}</b><small>Falta decidir quién lo cubre</small></span><Icono n="derecha" /></Link>
           )}
           {revision.length > 0 && (
-            <div className="glass eq-card">
+            <div className="glass eq2-lista">
               {revision.map((f) => (
-                <div key={f.id} className="eq-fila eq-ffila">
-                  <span className="eq-m"><b>{f.nombre}</b><small>Corte del {fechaCorta(f.fecha)}, en revisión</small></span>
-                  <b className="eq-monto">{formatoDinero(f.monto)}</b>
+                <div key={f.id} className="eq2-fila sin">
+                  <span><b>{f.nombre}</b><small>Corte del {fechaCorta(f.fecha)}, en revisión</small></span>
+                  <span className="eq2-m"><b>{formatoDinero(f.monto)}</b></span>
                   {puedeAutorizar && (
                     <div className="eq-facc">
                       <form action={decidirFaltante}><input type="hidden" name="id" value={f.id} /><input type="hidden" name="decision" value="descartar" /><button className="eq-bt">Descartar</button></form>
@@ -124,6 +75,29 @@ export default async function Pagos({ searchParams }: { searchParams: Promise<{ 
           <p className="eq-nota">Un faltante en revisión no afecta el saldo. Solo se descuenta si se autoriza y la persona lo acepta por escrito (Ley Federal del Trabajo, art. 110).</p>
         </section>
       )}
+
+      <section className="eq2-sec">
+        <div className="entre">
+          <span className="lab">Historial</span>
+          {personas.length > 1 && (
+            <nav className="ln-chips" aria-label="Persona">
+              <Link href={url({ persona: "" })} aria-current={!persona ? "true" : undefined}>Todos</Link>
+              {personas.filter((p) => p.activo || p.id === persona).map((p) => <Link key={p.id} href={url({ persona: p.id })} aria-current={persona === p.id ? "true" : undefined}>{p.nombre.split(" ")[0]}</Link>)}
+            </nav>
+          )}
+        </div>
+        {pagos.length ? (
+          <div className="glass eq2-lista">
+            {pagos.slice(0, limite).map((x) => (
+              <div key={x.id} className="eq2-fila sin">
+                <span><b>{x.tipo === "renta" ? `${x.nombre} pagó renta` : `Pago a ${x.nombre}`}</b><small>{dia(x.creadoEn)}, registró {x.registro.split(" ")[0]}{x.nota ? `, ${x.nota}` : ""}</small></span>
+                <span className="eq2-m"><b>{formatoDinero(x.monto)}</b></span>
+              </div>
+            ))}
+          </div>
+        ) : <p className="muted eq2-vacio">Todavía no hay pagos registrados.</p>}
+        {hayMas && <Link className="eq-mas" href={url({ n: limite + 30 })}>Ver más<Icono n="abajo" /></Link>}
+      </section>
     </div>
   );
 }

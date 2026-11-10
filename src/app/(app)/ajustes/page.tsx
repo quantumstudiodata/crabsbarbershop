@@ -11,7 +11,7 @@ import { Personas } from "./Personas";
 
 export const metadata = { title: "Usuarios" };
 
-export default async function PaginaPersonas({ searchParams }: { searchParams: Promise<{ restablecer?: string }> }) {
+export default async function PaginaPersonas({ searchParams }: { searchParams: Promise<{ restablecer?: string; editar?: string }> }) {
   const s = await requerirSesion();
   if (!s.puede("usuarios.ver")) redirect(s.puede("servicios.ver") ? "/ajustes/servicios" : "/ajustes/cobro");
   const q = await searchParams;
@@ -51,6 +51,7 @@ export default async function PaginaPersonas({ searchParams }: { searchParams: P
       editoTotal={esTotal(s)}
       puedeEditar={s.puede("usuarios.editar")}
       descuentoLibre={s.barberia.limiteDescuentoPct >= 100}
+      editarId={q.editar && personas.some((p) => p.id === q.editar && p.editable) ? q.editar : null}
       restablecerId={q.restablecer && personas.some((p) => p.id === q.restablecer && p.editable) ? q.restablecer : null}
     />
   );

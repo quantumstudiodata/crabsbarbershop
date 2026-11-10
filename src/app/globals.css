@@ -3249,3 +3249,67 @@ div.ln-libre { cursor: default; }
   .ag-ctl { flex-wrap: nowrap; }
 }
 @media (min-width: 761px) { .ln-chips { flex-wrap: wrap; } }
+
+/* ---------- Equipo: lista tranquila y ficha ---------- */
+.eq2 { width: min(860px, 100%); margin: 0 auto; display: grid; gap: 18px; align-content: start; }
+.eq2-cab { display: flex; justify-content: space-between; align-items: flex-end; gap: 16px; }
+.eq2-cab > div:first-child { display: grid; gap: 6px; }
+.eq2-cab h1, .eq2-per h1 { margin: 0; font-size: 28px; letter-spacing: -.02em; }
+.eq2-acc { display: flex; align-items: center; gap: 12px; }
+.eq2-acc .eq-mes .menu-mes > button, .eq2-mes .eq-mes button { height: 38px; }
+.eq2-pri { height: 38px; padding: 0 16px; border-radius: 999px; border: 0; background: linear-gradient(180deg, #2b3138, #13171c); color: #fff; font: 600 13.5px var(--f-body); cursor: pointer; white-space: nowrap; box-shadow: 0 8px 16px -8px rgba(10,15,20,.6); }
+.eq2-res { margin: 0; font-size: 14.5px; line-height: 1.6; color: var(--muted); }
+.eq2-res b { color: var(--fg); }
+.eq2-link { font-size: 13px; font-weight: 600; color: var(--accent); text-decoration: none; }
+.eq2-link:hover { color: var(--fg); }
+.eq2-lista { border-radius: 20px; overflow: hidden; box-shadow: var(--sh1), var(--hi); }
+.eq2-lista.arch { opacity: .8; }
+.eq2-fila { display: grid; grid-template-columns: auto minmax(0, 1fr) auto 16px; gap: 14px; align-items: center; padding: 14px 20px; color: var(--fg); text-decoration: none; transition: background .15s; }
+.eq2-fila.sin { grid-template-columns: minmax(0, 1fr) auto auto; }
+.eq2-fila + .eq2-fila { border-top: 1px solid rgba(30,45,60,.08); }
+a.eq2-fila:hover { background: rgba(255,255,255,.45); }
+.eq2-fila > span:not(.eq2-m) { display: grid; min-width: 0; } .eq2-fila > span b { font-size: 15px; font-weight: 600; } .eq2-fila > span small { font-size: 12.5px; color: var(--faint); }
+.eq2-fila > .ic:last-child { width: 14px; height: 14px; color: #a9b3bc; }
+.eq2-m { display: grid; justify-items: end; } .eq2-m b { font-size: 15px; font-variant-numeric: tabular-nums; } .eq2-m small { font-size: 12px; color: var(--faint); }
+.pend { color: var(--warn) !important; }
+.eq2-pie { display: flex; justify-content: space-between; gap: 12px; flex-wrap: wrap; padding: 0 4px; font-size: 13px; color: var(--faint); }
+.eq2-links { display: flex; gap: 18px; flex-wrap: wrap; } .eq2-links a { color: var(--accent); text-decoration: none; } .eq2-links a.sutil { color: var(--faint); }
+.eq2-vacio { padding: 18px 20px; margin: 0; }
+.eq2-volver { display: inline-flex; align-items: center; gap: 6px; justify-self: start; font-size: 13px; color: var(--muted); text-decoration: none; }
+.eq2-volver .ic { width: 14px; height: 14px; }
+.eq2-per { display: flex; justify-content: space-between; align-items: center; gap: 16px; flex-wrap: wrap; }
+.eq2-id { display: flex; align-items: center; gap: 14px; min-width: 0; } .eq2-id > span { display: grid; gap: 2px; min-width: 0; } .eq2-id h1 { font-size: 24px; } .eq2-id small { font-size: 13px; color: var(--faint); }
+.eq2-mes { display: flex; align-items: center; justify-content: space-between; margin-bottom: -8px; padding: 0 4px; }
+.eq2-cifras { display: grid; grid-template-columns: repeat(4, minmax(0, 1fr)); padding: 20px 4px; border-radius: 20px; box-shadow: var(--sh1), var(--hi); }
+.eq2-cifras > span { display: grid; gap: 4px; align-content: start; padding: 0 22px; min-width: 0; }
+.eq2-cifras > span + span { border-left: 1px solid rgba(30,45,60,.1); }
+.eq2-cifras small { font: 500 10px var(--f-mono); letter-spacing: .12em; text-transform: uppercase; color: var(--faint); }
+.eq2-cifras b { font: 800 34px/1 var(--f-display); font-variant-numeric: tabular-nums; }
+.eq2-cifras em { font-style: normal; font-size: 12px; color: var(--faint); }
+.eq2-dos { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 32px; padding: 0 4px; }
+.eq2-dos section { display: grid; gap: 10px; align-content: start; }
+.eq2-tabla { display: grid; gap: 8px; font-size: 14px; } .eq2-tabla > div { display: flex; justify-content: space-between; gap: 12px; }
+.eq2-dos .eq2-vacio { padding: 0; }
+.eq2-mas { padding: 0 4px; } .eq2-mas summary { display: flex; align-items: center; gap: 6px; cursor: pointer; font-size: 13px; font-weight: 600; color: var(--accent); list-style: none; } .eq2-mas summary::-webkit-details-marker { display: none; }
+.eq2-mas summary .ic { width: 13px; height: 13px; transition: transform .2s; } .eq2-mas[open] summary .ic { transform: rotate(180deg); }
+.eq2-mas dl { display: grid; grid-template-columns: auto 1fr; gap: 6px 18px; margin: 12px 0; font-size: 13.5px; } .eq2-mas dt { color: var(--faint); } .eq2-mas dd { margin: 0; }
+.eq2-sec { display: grid; gap: 10px; }
+.eq2-sec .ln-chips { max-width: 70%; }
+.eq2-elige { display: grid; gap: 4px; }
+.eq2-elige .eq2-fila { grid-template-columns: auto minmax(0, 1fr) auto; border: 0; background: none; font: inherit; text-align: left; border-radius: 14px; padding: 10px 12px; cursor: pointer; }
+.eq2-elige .eq2-fila:hover { background: var(--accent-soft); }
+.eq2-elige .eq2-fila + .eq2-fila { border-top: 0; }
+.eq2-atras { display: inline-flex; align-items: center; gap: 6px; justify-self: start; border: 0; background: none; padding: 0; font: 600 13px var(--f-body); color: var(--accent); cursor: pointer; } .eq2-atras .ic { width: 14px; height: 14px; }
+@media (max-width: 760px) {
+  .eq2 { gap: 14px; }
+  .eq2-cab h1 { font-size: 24px; }
+  .eq2-fila { padding: 12px 14px; gap: 12px; }
+  .eq2-cifras { grid-template-columns: repeat(2, minmax(0, 1fr)); padding: 4px; }
+  .eq2-cifras > span { padding: 14px 14px; } .eq2-cifras > span + span { border-left: 0; }
+  .eq2-cifras > span:nth-child(even) { border-left: 1px solid rgba(30,45,60,.1); } .eq2-cifras > span:nth-child(n+3) { border-top: 1px solid rgba(30,45,60,.1); }
+  .eq2-cifras b { font-size: 28px; }
+  .eq2-dos { grid-template-columns: 1fr; gap: 20px; }
+  .eq2-per .eq2-acc { width: 100%; justify-content: space-between; }
+  .eq2-pie { flex-direction: column; }
+  .eq2-sec .ln-chips { max-width: 60%; }
+}

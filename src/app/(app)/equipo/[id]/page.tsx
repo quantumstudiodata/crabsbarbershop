@@ -1,6 +1,6 @@
 import Link from "next/link";
 import { notFound } from "next/navigation";
-import { and, eq } from "drizzle-orm";
+import { and, desc, eq } from "drizzle-orm";
 import { Avatar } from "@/components/Avatar";
 import { Icono } from "@/components/Icono";
 import { ventasEntre } from "@/lib/datos";
@@ -10,10 +10,11 @@ import { elegirRegla } from "@/lib/comisiones";
 import { reglasDe } from "@/lib/datos";
 import { sql } from "drizzle-orm";
 import { formatoDinero } from "@/lib/money";
-import { fechaLarga } from "@/lib/fechas";
+import { fechaLarga, fechaLocal } from "@/lib/fechas";
 import { NOMBRE_ROL, type Rol } from "@/lib/permisos";
 import { MesEquipo } from "../Partes";
-import { mesElegido, sesionEquipo } from "../datos";
+import { cuentasEnCurso, mesElegido, sesionEquipo } from "../datos";
+import { RegistrarPago } from "../Pago";
 
 export const metadata = { title: "Equipo" };
 
@@ -51,9 +52,7 @@ export default async function Ficha({ params, searchParams }: { params: Promise<
   const cuenta = await cuentaDe(se.barberia.id, u.id, m.desde, m.hasta, ventas.filter((v) => v.estado === "pagada"));
   const [neg] = await db.select({ horario: schema.barberias.horario }).from(schema.barberias).where(eq(schema.barberias.id, se.barberia.id)).limit(1);
   const h = resumenHorario(u.horario ?? neg.horario);
-  const cambio = anterior.r.vendido ? Math.round(((r.vendido - anterior.r.vendido) / anterior.r.vendido) * 100) : null;
   const mesAnt = new Date(`${anterior.nombre}-15T12:00:00Z`).toLocaleDateString("es-MX", { month: "long", timeZone: "UTC" });
-  const max = Math.max(1, ...r.top.map((t) => t.veces));
   const q = m.mes === m.hoy.slice(0, 7) ? "" : `?mes=${m.mes}`;
   const puesto = NOMBRE_ROL[u.rol as Rol] ?? "";
   const regla = cuenta.regla;
@@ -63,59 +62,67 @@ export default async function Ficha({ params, searchParams }: { params: Promise<
     .from(schema.resenas).where(and(eq(schema.resenas.barberiaId, se.barberia.id), eq(schema.resenas.barberoId, u.id)));
   const DIAS_C = ["domingo", "lunes", "martes", "miércoles", "jueves", "viernes", "sábado"];
 
+  const pagosRecientes = await db.select({ id: schema.pagosComision.id, tipo: schema.pagosComision.tipo, monto: schema.pagosComision.monto, creadoEn: schema.pagosComision.creadoEn })
+    .from(schema.pagosComision).where(and(eq(schema.pagosComision.barberiaId, se.barberia.id), eq(schema.pagosComision.barberoId, u.id)))
+    .orderBy(desc(schema.pagosComision.creadoEn)).limit(4);
+  const puedePagar = se.puede("equipo.pagar");
+  const [enCurso] = u.activo ? await cuentasEnCurso(se.barberia.id, se.barberia.zonaHoraria, [{ id: u.id, nombre: u.nombre, avatar: u.avatar }], puedePagar) : [];
+  const renta = regla?.tipo === "renta";
+  const DIAS_PAGO = ["domingos", "lunes", "martes", "miércoles", "jueves", "viernes", "sábados"];
+  const sePaga = cal && !renta ? (frecuenciaDe(cal) === "semana" && per ? `se paga los ${DIAS_PAGO[new Date(`${per.pago}T12:00:00Z`).getUTCDay()]}` : `se paga ${(NOMBRE_FRECUENCIA[frecuenciaDe(cal)] ?? "").toLowerCase()}`) : "";
+  const subt = [puesto, cuenta.forma ? cuenta.forma.replace(/^./, (x) => x.toLowerCase()) : "", sePaga].filter(Boolean).join(", ");
+  const fecha = (d: Date) => fechaLarga(fechaLocal(d, se.barberia.zonaHoraria));
+  const enMes = m.mes === m.hoy.slice(0, 7) ? "en el mes" : `en ${m.nombre.toLowerCase().split(" ")[0]}`;
+  const periodoActual = enCurso && !enCurso.sinRegla ? <>Periodo en curso: {enCurso.fila.monto}</> : undefined;
+  const cifras: [string, string, React.ReactNode?, boolean?][] = renta
+    ? [["Ventas atribuidas", formatoDinero(r.vendido)], ["Renta del mes", formatoDinero(cuenta.renta)], ["Recibido", formatoDinero(cuenta.rentaPagada)], [`Por cobrar ${enMes}`, formatoDinero(cuenta.rentaPendiente), periodoActual, cuenta.rentaPendiente > 0]]
+    : [["Ventas atribuidas", formatoDinero(r.vendido)], [cuenta.sueldo ? "Le corresponde" : "Comisión generada", formatoDinero(cuenta.corresponde)], ["Pagado", formatoDinero(cuenta.pagado)], [`Por pagar ${enMes}`, formatoDinero(cuenta.saldo), periodoActual, cuenta.saldo > 0]];
+  cifras[0][2] = <>{r.servicios} {r.servicios === 1 ? "servicio" : "servicios"}{res.n ? <>, ★ {res.prom.toFixed(1)}</> : null}</>;
+
   return (
-    <div className="eq eq-ficha">
-      <div className="eq-volver"><Link href={`/equipo${q}`} className="icb" aria-label="Volver a Equipo"><Icono n="izquierda" /></Link><b>Perfil</b></div>
-      <div className="eq-asim">
-        <aside className="eq-perfil">
-          <div className="eq-id">
-            <Avatar avatar={u.avatar} nombre={u.nombre} t={52} />
-            <div>
-              <h2>{u.nombre}</h2>
-              <small>{puesto}{puesto ? ", " : ""}<i className={`eq-dot ${u.activo ? "on" : ""}`} />{u.activo ? "Activa" : "Archivada"}</small>
-              <small className="eq-pago"><Icono n="efectivo" /><span>{cuenta.forma}</span></small>
-            </div>
-          </div>
-          {se.puede("usuarios.editar") && <Link href="/ajustes/usuarios" className="eq-bt"><Icono n="editar" />Editar perfil</Link>}
-          <div className="eq-lab">
-            <div>
-              <span className="eq-sup">Horario</span>
-              <dl><dt>Horario habitual</dt><dd>{h.horas || "Sin horario"}</dd><dt>Días laborales</dt><dd>{h.dias}</dd></dl>
-              {se.puede("citas.horarios") && <Link href="/citas" className="eq-bt">Editar horario<Icono n="derecha" /></Link>}
-            </div>
-            <div>
-              <span className="eq-sup">Remuneración</span>
-              <dl>
-                <dt>Modalidad</dt><dd>{modalidadCorta(regla)}</dd>
-                {regla && (regla.tipo === "porcentaje" || regla.tipo === "mixto") && <><dt>Porcentaje</dt><dd>{regla.porcentaje / 100}%</dd></>}
-                {cal && <><dt>Periodicidad</dt><dd>{NOMBRE_FRECUENCIA[frecuenciaDe(cal)] ?? "Semanal"}{frecuenciaDe(cal) === "semana" ? `, corte el ${DIAS_C[cal.diaCorte ?? 0]}` : ""}</dd></>}
-                {cal && <><dt>Forma de pago</dt><dd>{NOMBRE_FORMA_PAGO[cal.formaPago ?? "efectivo"]}</dd></>}
-                {per && regla?.tipo !== "renta" && <><dt>Próximo pago</dt><dd>{fechaLarga(per.pago)}</dd></>}
-              </dl>
-              {se.puede("equipo.pagar") && <Link href="/equipo/pagos" className="eq-bt">Consultar pagos<Icono n="derecha" /></Link>}
-            </div>
-          </div>
-        </aside>
-        <div className="eq-princ">
-          <div className="eq-tit"><span>Rendimiento mensual</span><MesEquipo mes={m.mes} hoy={m.hoy} /></div>
-          <div className="glass eq-card eq-metricas">
-            <div className="pri"><small>Ventas atribuidas</small><b>{formatoDinero(r.vendido)}</b>{cambio !== null && <span className="eq-comp">{cambio >= 0 ? "+" : ""}{cambio}% vs. {mesAnt}</span>}</div>
-            <div className="solo-esc"><small>Servicios</small><b>{r.servicios}</b></div>
-            <div><small>Calificación</small><b className="eq-cal">{res.n ? <><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M12 3.5l2.6 5.3 5.9.9-4.2 4.1 1 5.8L12 16.9l-5.3 2.7 1-5.8-4.2-4.1 5.9-.9z" /></svg>{res.prom.toFixed(1)}</> : "Sin reseñas"}</b>{res.n > 0 && <span className="eq-comp">{res.n} {res.n === 1 ? "reseña" : "reseñas"}</span>}</div>
-            <div className="solo-esc"><small>Transacciones</small><b>{r.transacciones}</b></div>
-            <div className="solo-esc"><small>Ticket promedio</small><b>{formatoDinero(r.ticket)}</b></div>
-          </div>
-          <div className="eq-tit"><span>Actividad</span><small>{r.servicios} {r.servicios === 1 ? "servicio" : "servicios"}</small></div>
-          <div className="glass eq-card eq-act">
-            {r.top.length ? r.top.slice(0, 5).map((t) => (
-              <div key={t.nombre} className="eq-barra">
-                <span>{t.nombre}</span><i><em style={{ width: `${(t.veces / max) * 100}%` }} /></i><b>{t.veces}</b><small className="solo-esc">{formatoDinero(t.monto)}</small>
-              </div>
-            )) : <p className="muted">Sin servicios en este mes.</p>}
-            {r.servicios > 0 && <Link className="eq-ver" href={`/analitica/ventas?persona=${u.id}&periodo=mes&mes=${m.mes}`}>Ver toda la actividad<Icono n="derecha" /></Link>}
-          </div>
+    <div className="eq2 eq2-ficha">
+      <Link href={`/equipo${q}`} className="eq2-volver"><Icono n="izquierda" />Equipo</Link>
+      <div className="eq2-per">
+        <div className="eq2-id">
+          <Avatar avatar={u.avatar} nombre={u.nombre} t={52} />
+          <span><h1>{u.nombre}</h1><small>{subt}{!u.activo && <>, archivada</>}</small></span>
+        </div>
+        <div className="eq2-acc">
+          <MesEquipo mes={m.mes} hoy={m.hoy} />
+          {se.puede("usuarios.editar") && <Link href={`/ajustes?editar=${u.id}`} className="eq2-link">Editar perfil</Link>}
+          {enCurso && enCurso.fila.puedePagar && <RegistrarPago filas={[enCurso.fila]} regreso={`/equipo/${u.id}${q}`} texto={renta ? "Registrar cobro" : "Registrar pago"} />}
         </div>
       </div>
+      <section className="glass eq2-cifras">
+        {cifras.map(([t, v, sub, pend]) => (
+          <span key={t}><small className={pend ? "pend" : undefined}>{t}</small><b>{v}</b>{sub && <em>{sub}</em>}</span>
+        ))}
+      </section>
+      <div className="eq2-dos">
+        <section>
+          <div className="entre"><span className="lab">Lo que más hace</span>{r.servicios > 0 && <Link className="eq2-link" href={`/analitica/ventas?persona=${u.id}&periodo=mes&mes=${m.mes}`}>Ver actividad</Link>}</div>
+          {r.top.length ? <div className="eq2-tabla">{r.top.slice(0, 5).map((t) => <div key={t.nombre}><span>{t.nombre}</span><b>{t.veces}</b></div>)}</div> : <p className="muted eq2-vacio">Sin servicios en este mes.</p>}
+        </section>
+        <section>
+          <div className="entre"><span className="lab">Pagos</span>{puedePagar && pagosRecientes.length > 0 && <Link className="eq2-link" href={`/equipo/pagos?persona=${u.id}`}>Ver todos</Link>}</div>
+          {pagosRecientes.length ? <div className="eq2-tabla">{pagosRecientes.map((x) => <div key={x.id}><span>{fecha(x.creadoEn)}{x.tipo === "renta" ? ", renta" : ""}</span><b>{formatoDinero(x.monto)}</b></div>)}</div> : <p className="muted eq2-vacio">Sin pagos registrados.</p>}
+        </section>
+      </div>
+      <details className="eq2-mas">
+        <summary>Horario y forma de pago<Icono n="abajo" /></summary>
+        <dl>
+          <dt>Horario habitual</dt><dd>{h.horas || "Sin horario"}</dd>
+          <dt>Días laborales</dt><dd>{h.dias}</dd>
+          <dt>Modalidad</dt><dd>{modalidadCorta(regla)}</dd>
+          {regla && (regla.tipo === "porcentaje" || regla.tipo === "mixto") && <><dt>Porcentaje</dt><dd>{regla.porcentaje / 100}%</dd></>}
+          {cal && <><dt>Periodicidad</dt><dd>{NOMBRE_FRECUENCIA[frecuenciaDe(cal)] ?? "Semanal"}{frecuenciaDe(cal) === "semana" ? `, corte el ${DIAS_C[cal.diaCorte ?? 0]}` : ""}</dd></>}
+          {cal && <><dt>Forma de pago</dt><dd>{NOMBRE_FORMA_PAGO[cal.formaPago ?? "efectivo"]}</dd></>}
+          {per && !renta && <><dt>Próximo pago</dt><dd>{fechaLarga(per.pago)}</dd></>}
+          <dt>Mes anterior</dt><dd>{formatoDinero(anterior.r.vendido)} en {mesAnt}</dd>
+          <dt>Transacciones del mes</dt><dd>{r.transacciones}, ticket promedio {formatoDinero(r.ticket)}</dd>
+        </dl>
+        {se.puede("citas.horarios") && <Link href="/citas?vista=horarios" className="eq2-link">Editar horario</Link>}
+      </details>
     </div>
   );
 }

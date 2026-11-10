@@ -20,7 +20,7 @@ type Persona = {
 };
 type Props = {
   personas: Persona[]; plantillas: OpcionPuesto[]; puestos: PuestoNegocio[]; grupos: GrupoPermisos[]; editoTotal: boolean;
-  restablecerId: string | null; puedeEditar: boolean; descuentoLibre: boolean;
+  restablecerId: string | null; editarId?: string | null; puedeEditar: boolean; descuentoLibre: boolean;
 };
 
 const esBarbero = (r: string) => r === "barbera" || r === "encargada";
@@ -244,7 +244,8 @@ function AltaUsuario({ props, cerrar, alGuardar }: { props: Props; cerrar: () =>
 
 export function Personas(props: Props) {
   const [clave, setClave] = useState<ClaveVisible | null>(null);
-  const [editar, setEditar] = useState<Persona | null>(null);
+  // Desde Equipo, "Editar perfil" llega con ?editar=<id> y abre directo la ventana de esa persona.
+  const [editar, setEditar] = useState<Persona | null>(() => (props.editarId ? props.personas.find((x) => x.id === props.editarId) ?? null : null));
   const [confirmar, setConfirmar] = useState<{ tipo: "restablecer" | "desactivar" | "eliminar" | "borrarDatos"; p: Persona } | null>(
     () => (props.restablecerId ? { tipo: "restablecer", p: props.personas.find((x) => x.id === props.restablecerId)! } : null),
   );

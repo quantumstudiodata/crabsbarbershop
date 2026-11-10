@@ -2,7 +2,11 @@ import { and, asc, eq, sql } from "drizzle-orm";
 import { redirect } from "next/navigation";
 import { requerirSesion } from "@/lib/auth";
 import { db, schema as s } from "@/lib/db";
-import { fechaLocal } from "@/lib/fechas";
+import { elegirRegla } from "@/lib/comisiones";
+import { reglasDe, ventasEntre } from "@/lib/datos";
+import { NOMBRE_FORMA_PAGO, NOMBRE_FRECUENCIA, cuentaDe, frecuenciaDe, modalidadCorta, periodoDePago } from "@/lib/equipo";
+import { fechaCorta, fechaLarga, fechaLocal } from "@/lib/fechas";
+import { formatoDinero } from "@/lib/money";
 import { periodoMes } from "@/lib/periodo";
 
 /** Quién entra a Equipo: quien ve los movimientos del equipo o registra sus pagos. */
@@ -28,4 +32,36 @@ export function mesElegido(q: { mes?: string }, zona: string) {
   const mes = q.mes && /^\d{4}-(0[1-9]|1[0-2])$/.test(q.mes) && q.mes <= hoy.slice(0, 7) ? q.mes : hoy.slice(0, 7);
   const p = periodoMes(mes, hoy);
   return { hoy, mes, desde: p.desde, hasta: p.hasta > hoy ? hoy : p.hasta, nombre: p.etiqueta };
+}
+
+/** Cuenta del periodo de pago en curso de cada persona: lo que se le debe (o debe de renta) y su desglose. */
+export async function cuentasEnCurso(barberiaId: string, zona: string, personas: { id: string; nombre: string; avatar: string }[], puedePagar: boolean) {
+  const hoy = fechaLocal(new Date(), zona);
+  const reglas = await reglasDe(barberiaId);
+  const periodos = new Map(personas.map((p) => { const r = elegirRegla(reglas, p.id, null, new Date()); return [p.id, { r, per: periodoDePago(r, hoy) }]; }));
+  const inicio = [...[...periodos.values()].map((x) => x.per.desde), hoy].sort()[0];
+  const { ventas } = await ventasEntre(barberiaId, inicio, hoy, { zona });
+  const pagadas = ventas.filter((v) => v.estado === "pagada");
+  return Promise.all(personas.map(async (p) => {
+    const { r, per } = periodos.get(p.id)!;
+    const hasta = per.hasta > hoy ? hoy : per.hasta;
+    const c = await cuentaDe(barberiaId, p.id, per.desde, hasta, pagadas.filter((v) => v.fecha >= per.desde && v.fecha <= hasta));
+    const renta = c.regla?.tipo === "renta";
+    const saldo = renta ? c.rentaPendiente : c.saldo;
+    const pagado = renta ? c.rentaPagada : c.pagado;
+    const periodo = per.desde === per.hasta ? fechaLarga(per.desde) : `Del ${fechaCorta(per.desde)} al ${fechaCorta(per.hasta)}`;
+    const frecuencia = NOMBRE_FRECUENCIA[frecuenciaDe(r)] ?? "Semanal";
+    const fila = {
+      id: p.id, nombre: p.nombre, avatar: p.avatar, modalidad: modalidadCorta(c.regla), frecuencia,
+      periodo, semana: hoy, renta, monto: formatoDinero(saldo), parcial: pagado > 0 && saldo > 0,
+      estado: saldo <= 0 ? (renta ? "Cubierta" : "Al corriente") : pagado > 0 ? "Pago parcial" : "Pendiente",
+      puedePagar: puedePagar && saldo > 0,
+      detalle: (renta
+        ? [["Periodo", periodo], ["Fecha límite", fechaLarga(per.pago)], ["Renta del periodo", formatoDinero(c.renta)], ["Recibido", formatoDinero(c.rentaPagada)], ["Pendiente", formatoDinero(c.rentaPendiente)]]
+        : [["Periodo", periodo], ["Fecha de pago", fechaLarga(per.pago)], ["Forma de pago", NOMBRE_FORMA_PAGO[r?.formaPago ?? "efectivo"] ?? "Efectivo de caja"], ["Ventas atribuidas", formatoDinero(c.vendido)],
+          ...(c.comision ? [["Comisión generada", formatoDinero(c.comision)]] : []), ...(c.sueldo ? [["Sueldo del periodo", formatoDinero(c.sueldo)]] : []),
+          ["Pagos registrados", formatoDinero(c.pagado)], ...(c.faltantes ? [["Faltantes autorizados", `−${formatoDinero(c.faltantes)}`]] : []), ["Saldo pendiente", formatoDinero(c.saldo)]]) as [string, string][],
+    };
+    return { id: p.id, renta, saldo, fila, sinRegla: !c.regla, pago: per.pago, frecuencia, modalidad: modalidadCorta(c.regla) };
+  }));
 }
