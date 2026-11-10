@@ -18,7 +18,6 @@ import { leerPeriodo } from "@/lib/periodo";
 import { HistorialVentas, type DiaVentas } from "@/components/HistorialVentas";
 import { CabeceraVentas, periodoEncabezado } from "@/components/CabeceraPeriodo";
 import { Pagar } from "./Pagar";
-import { ConteoCortes } from "./ConteoCortes";
 import { cuentaDe } from "@/lib/equipo";
 
 export const metadata = { title: "Ventas" };
@@ -97,14 +96,12 @@ export default async function Ventas({ searchParams }: { searchParams: Promise<Q
   const rango = p ?? leerPeriodo({ periodo: "mes" }, hoy);
   const cuenta = elegida ? await cuentaDe(s.barberia.id, elegida.id, rango.desde, rango.hasta > hoy ? hoy : rango.hasta, (await ventasEntre(s.barberia.id, rango.desde, rango.hasta, { zona, barberoId: elegida.id })).ventas.filter((v) => v.estado === "pagada")) : null;
   const qs = new URLSearchParams(Object.entries(q).filter(([k, v]) => v && k !== "aviso" && k !== "error") as [string, string][]).toString();
-  const qsSinCortes = new URLSearchParams(Object.entries(q).filter(([k, v]) => v && k !== "aviso" && k !== "error" && k !== "cortes") as [string, string][]).toString();
   const regreso = `/analitica/ventas${qs ? `?${qs}` : ""}`;
 
   return (
     <>
       <AvisoUrl aviso={q.aviso} error={q.error} />
       <CabeceraVentas barberiaId={s.barberia.id} zona={zona} hoy={hoy} persona={verTodas ? persona || undefined : s.usuario.id} propias={!verTodas} {...periodoEncabezado(p, hoy)} />
-      <ConteoCortes barberiaId={s.barberia.id} zona={zona} hoy={hoy} modo={q.cortes === "mes" ? "mes" : "semana"} base={`/analitica/ventas${qsSinCortes ? `?${qsSinCortes}` : ""}`} />
       {verTodas && elegida && cuenta && (
         <section className="glass panel subir">
           <div className="entre">
