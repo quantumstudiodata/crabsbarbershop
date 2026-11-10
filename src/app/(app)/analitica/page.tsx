@@ -95,6 +95,7 @@ export default async function Resumen({ searchParams }: { searchParams: Promise<
         {anterior && <span className="aviso-sutil" style={{ margin: 0 }}>Mostrando {nombreP.toLowerCase()} hasta que empiece el mes.</span>}
       </div>
 
+      <div className="rs-esc solo-escritorio">
       <section className={`rs-com subir ${meta > 0 ? "" : "sin-meta"}`} aria-label="Resultado comercial">
         <div className="rs-ventas">
           <span className="lab">{p.tipo === "mes" ? `Ventas de ${nombreP.toLowerCase()}, del 1 al ${Number(hastaV.slice(8))}` : `Ventas, ${p.etiqueta}`}</span>
@@ -169,6 +170,58 @@ export default async function Resumen({ searchParams }: { searchParams: Promise<
               <Link key={x.titulo} href={x.href} className="rs-pend"><span><span>{x.titulo}</span><small>{x.detalle}</small></span><Icono n="derecha" /></Link>
             ))}
           </section>
+        )}
+      </div>
+      </div>
+      {/* Teléfono: la cifra del mes arriba y cada sección cerrada con su cifra clave; se abre al tocarla. */}
+      <div className="rs-mov solo-movil">
+        <section className="glass rs-mh">
+          <span className="lab">{p.tipo === "mes" ? `${nombreP}, del 1 al ${Number(hastaV.slice(8))}` : p.etiqueta}</span>
+          <div className="rs-mh-f">
+            <span><b className="rs-big">{$(r.netas)}</b>{v !== null && <small>{v === 0 ? "Igual" : `${Math.abs(v)}% ${v > 0 ? "más" : "menos"}`} que {p.tipo === "mes" ? `${nombrePrev.toLowerCase()} a esta fecha` : "el periodo anterior"}</small>}</span>
+            {meta > 0 && <span className="anillo-m rs-mini-anillo" role="img" aria-label={`${pct}% de la meta`} style={{ ["--p" as string]: Math.min(pct, 100) }}><span>{pct}%</span></span>}
+          </div>
+          <div className="rs-mh-d"><span><b>{r.clientes}</b> {r.clientes === 1 ? "cliente" : "clientes"}</span><span><b>{r.clientes ? $(Math.round(r.ticket / 100) * 100) : "$0"}</b> por cliente</span>{meta > 0 && r.netas < meta && <span>Faltan <b>{$(meta - r.netas)}</b></span>}</div>
+        </section>
+        <details className="glass rs-acc" open>
+          <summary><span><b>Actividad de ventas</b><small>{mejor && mejor[1] > 0 ? `Promedio diario, mejor día ${DIA_L[new Date(`${mejor[0]}T12:00:00Z`).getUTCDay()]} ${Number(mejor[0].slice(8))}` : "Promedio diario"}</small></span><b>{$(Math.round(r.netas / Math.max(tramo, 1)))}</b><Icono n="abajo" /></summary>
+          <div className="rs-acc-c">
+            {largo > 1 && largo <= 62
+              ? <Grafica id="resumen-m" actual={dias.map((d) => (d <= hoy ? r.porDia.get(d) ?? 0 : null))} previo={dias.map((_, i) => prevCompleto.porDia.get(sumarDias(prevDesde, i)) ?? 0)}
+                  etiquetas={dias.map((d) => (largo <= 7 ? DIA[new Date(`${d}T12:00:00Z`).getUTCDay()] : String(Number(d.slice(8)))))} cadaEtiqueta={largo <= 7 ? 1 : 7} alto={130} descripcion={`Ventas por día de ${nombreP} y ${nombrePrev}`} vacio="Sin ventas en estas fechas" />
+              : <p className="muted">Elige un mes o una semana para ver la gráfica.</p>}
+            <div className="rs-pie">{mejor && mejor[1] > 0 && <span>Mejor día <b>{$(mejor[1])}</b></span>}{p.tipo === "mes" && <span>{nombrePrev} a esta fecha <b>{$(prev.netas)}</b></span>}</div>
+            {s.puede("ventas.ver_todas") && <Link className="eq2-link" href="/analitica/ventas">Ver ventas</Link>}
+          </div>
+        </details>
+        <details className="glass rs-acc">
+          <summary><span><b>Resultado financiero</b><small>Después de pagos realizados</small></span><b>{signo(resultado)}</b><Icono n="abajo" /></summary>
+          <div className="rs-acc-c">
+            <div className="rs-f"><span><span>Ingresos</span><small>Ventas netas{rentas ? ` y rentas ${$(rentas)}` : ""}</small></span><b>{$(ingresos)}</b></div>
+            <div className="rs-f"><span><span>Egresos del negocio</span><small>{topCats.length ? lista(topCats) : "Sin egresos"}</small></span><b>{egresos ? `−${$(egresos)}` : "$0"}</b></div>
+            <div className="rs-f"><span><span>Pagos al equipo realizados</span></span><b>{pagadoEquipo ? `−${$(pagadoEquipo)}` : "$0"}</b></div>
+            <div className="rs-f porpagar"><span><span>Pendiente al equipo</span><small>{pendEquipo > 0 ? `Si se paga hoy: ${signo(resultado - pendEquipo)}` : "Nada pendiente"}</small></span><b>{$(pendEquipo)}</b></div>
+            {s.puede("reportes.ver") && <Link className="eq2-link" href="/analitica/finanzas">Ver finanzas</Link>}
+          </div>
+        </details>
+        <details className="glass rs-acc">
+          <summary><span><b>Equipo</b><small>{r.porBarbero.length ? `${lista(r.porBarbero.map((b) => b.nombre.split(" ")[0]))}, ${r.porBarbero.reduce((a, b) => a + b.servicios, 0)} servicios` : "Sin servicios"}</small></span><b>{$(r.porBarbero.reduce((a, b) => a + b.monto, 0))}</b><Icono n="abajo" /></summary>
+          <div className="rs-acc-c">
+            {r.porBarbero.map((b) => { const c = calDe(b.id); return (
+              <div key={b.id} className="rs-mp">
+                <span className="rs-per"><Avatar avatar={equipo.find((x) => x.id === b.id)?.avatar ?? "iniciales"} nombre={b.nombre} t={26} /><span><b>{b.nombre.split(" ")[0]}</b><small>{b.servicios} {b.servicios === 1 ? "servicio" : "servicios"}{c?.n ? `, ★ ${c.prom.toFixed(1)}` : ""}</small></span></span>
+                <b>{$(b.monto)}</b>
+                <i className="rs-mp-b"><em style={{ width: `${Math.max((b.monto / totalVentas) * 100, 2)}%` }} /></i>
+              </div>
+            ); })}
+            <small className="rs-nota">Ventas atribuidas: lo cobrado por sus servicios, no lo que recibió cada quien.</small>
+          </div>
+        </details>
+        {pendientes.length > 0 && (
+          <details className="rs-atn">
+            <summary><b className="eq2-num">{pendientes.length}</b><span><b>Requiere atención</b><small>{lista(pendientes.map((x) => x.titulo.toLowerCase())).replace(/^./, (c) => c.toUpperCase())}</small></span><Icono n="abajo" /></summary>
+            <div className="rs-acc-c">{pendientes.map((x) => <Link key={x.titulo} href={x.href} className="rs-pend"><span><span>{x.titulo}</span><small>{x.detalle}</small></span><Icono n="derecha" /></Link>)}</div>
+          </details>
         )}
       </div>
     </>
