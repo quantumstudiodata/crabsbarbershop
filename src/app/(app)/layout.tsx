@@ -60,7 +60,7 @@ export default async function LayoutApp({ children }: { children: React.ReactNod
               usuario={s.usuario.usuario}
               rol={s.usuario.puesto}
               avatar={s.usuario.avatar}
-              ajustes={s.puede("usuarios.ver") || s.puede("servicios.ver") || PERMISOS_CONFIG.some((p) => s.puede(p))}
+              ajustes={s.puede("usuarios.ver") || s.puede("servicios.ver") || s.puede("citas.horarios") || PERMISOS_CONFIG.some((p) => s.puede(p))}
               historial={s.puede("ventas.ver_todas") || atiende}
               mas={{ extra: extraMovil, ideas: s.puede("ideas.decidir"), ayuda: !soporte, soporte: soporte && !s.vista }}
               formaPago={atiende ? describirRegla(copiaRegla(elegirRegla(await reglasDe(s.barberia.id), s.usuario.id, null, new Date())), formatoDinero) : null}
@@ -71,7 +71,7 @@ export default async function LayoutApp({ children }: { children: React.ReactNod
       <main className="contenedor">{children}</main>
       <BarraInferior items={items} mas={{
         historial: s.puede("ventas.ver_todas") || atiende,
-        ajustes: s.puede("usuarios.ver") || s.puede("servicios.ver") || PERMISOS_CONFIG.some((p) => s.puede(p)),
+        ajustes: s.puede("usuarios.ver") || s.puede("servicios.ver") || s.puede("citas.horarios") || PERMISOS_CONFIG.some((p) => s.puede(p)),
         ideas: s.puede("ideas.decidir"), ayuda: !soporte, soporte: soporte && !s.vista,
       }} />
       <VentanaVivo />

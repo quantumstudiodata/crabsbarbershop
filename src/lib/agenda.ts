@@ -18,6 +18,10 @@ export type ConfigCitas = {
   politicaCancelacion: string;
   politicaReembolso: string;
   apartarMin: number; // minutos que se guarda un horario mientras el cliente paga
+  // Interruptores de Ajustes, Horarios: apagados no borran lo configurado, solo dejan de aplicarse.
+  usaHorarioPersona: boolean;
+  usaRotacion: boolean;
+  usaBloqueos: boolean;
 };
 
 export const CONFIG_CITAS: ConfigCitas = {
@@ -27,6 +31,7 @@ export const CONFIG_CITAS: ConfigCitas = {
   pago: { modo: "sin_pago", valor: 0 }, cancelarHorasAntes: 2,
   politicaCancelacion: "Puedes cancelar o cambiar tu cita hasta 2 horas antes.",
   politicaReembolso: "", apartarMin: 10,
+  usaHorarioPersona: true, usaRotacion: true, usaBloqueos: true,
 };
 
 export function leerConfig(raw: unknown): ConfigCitas {
@@ -48,6 +53,9 @@ export function leerConfig(raw: unknown): ConfigCitas {
     politicaCancelacion: typeof r.politicaCancelacion === "string" ? r.politicaCancelacion.slice(0, 400) : d.politicaCancelacion,
     politicaReembolso: typeof r.politicaReembolso === "string" ? r.politicaReembolso.slice(0, 400) : d.politicaReembolso,
     apartarMin: num(r.apartarMin, d.apartarMin, 5, 30),
+    usaHorarioPersona: r.usaHorarioPersona ?? d.usaHorarioPersona,
+    usaRotacion: r.usaRotacion ?? d.usaRotacion,
+    usaBloqueos: r.usaBloqueos ?? d.usaBloqueos,
   };
 }
 

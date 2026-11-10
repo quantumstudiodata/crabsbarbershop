@@ -224,3 +224,17 @@ export async function guardarConfigCitas(d: {
   revalidatePath("/", "layout");
   return { mensaje: "Configuración guardada." };
 }
+
+/** Interruptores de Ajustes, Horarios. Apagar uno no borra lo configurado: solo deja de aplicarse en la agenda y en las reservaciones. */
+export async function guardarInterruptorHorarios(clave: "usaHorarioPersona" | "usaRotacion" | "usaBloqueos", valor: boolean): Promise<Res> {
+  const s = await requerirSesion();
+  if (!s.puede("citas.horarios") && !s.puede("configuracion.citas")) return { error: "No tienes permiso para cambiar los horarios." };
+  if (s.vista) return { error: "En la vista previa no se guardan cambios." };
+  if (!["usaHorarioPersona", "usaRotacion", "usaBloqueos"].includes(clave)) return { error: "Opción no válida." };
+  const config = leerConfig({ ...leerConfig(s.barberia.citasConfig), [clave]: !!valor });
+  await db.update(schema.barberias).set({ citasConfig: config }).where(eq(schema.barberias.id, s.barberia.id));
+  const nombre = { usaHorarioPersona: "los horarios por persona", usaRotacion: "el descanso rotativo", usaBloqueos: "el bloqueo de horarios" }[clave];
+  await registrar(db, { barberiaId: s.barberia.id, usuarioId: s.usuario.id, tipo: "ajuste", accion: `${s.usuario.nombre} ${valor ? "activó" : "desactivó"} ${nombre}` });
+  revalidatePath("/", "layout");
+  return { mensaje: valor ? "Activado." : "Desactivado. Lo configurado se conserva." };
+}

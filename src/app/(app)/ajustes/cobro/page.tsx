@@ -5,9 +5,9 @@ import { categoriasGasto, datosParaMeta } from "@/lib/datos";
 import { db, schema } from "@/lib/db";
 import { fechaLocal } from "@/lib/fechas";
 import { formatoDinero } from "@/lib/money";
-import { NOMBRE_ROL, PERMISOS_CONFIG, permisosDe, type Permiso } from "@/lib/permisos";
-import { leerConfig, type Horario } from "@/lib/agenda";
-import { ConfigCitas } from "./ConfigCitas";
+import { NOMBRE_ROL, PERMISOS_CONFIG, permisosDe } from "@/lib/permisos";
+import { leerConfig } from "@/lib/agenda";
+import { Icono } from "@/components/Icono";
 import { redirect } from "next/navigation";
 import { Funciones } from "./Funciones";
 import { Metodos } from "./Metodos";
@@ -35,7 +35,6 @@ export default async function ConfigurarNegocio({ searchParams }: { searchParams
     .filter((x) => !x.pausada && x.desde <= hoyN && (!x.hasta || x.hasta >= hoyN)).length;
   const $ = (c: number) => formatoDinero(c);
   const cfgCitas = leerConfig(b.citasConfig);
-  const quienes = (p: Permiso) => [...new Set(gente.filter((u) => permisosDe(u.rol, u.extra, u.quitados, u.puesto).has(p)).map((u) => u.nombre.split(" ")[0]))].join(", ") || "Nadie";
   const si = (v: boolean) => (v ? "Activo" : "Apagado");
   const activos = metodos.filter((m) => m.activo);
   const edita = (p: "cobros" | "caja" | "metas" | "egresos") => s.puede(`configuracion.${p}`) && !s.vista;
@@ -97,28 +96,12 @@ export default async function ConfigurarNegocio({ searchParams }: { searchParams
         ]} />
       </Bloque>
 
-      <Bloque numero={5} titulo="Citas y agenda" puedeEditar={s.puede("configuracion.citas") && !s.vista}
-        resumen={b.usaCitas ? `Agenda activa${cfgCitas.enLinea ? ", reservaciones en línea activas" : ", sin reservaciones en línea"}` : "Apagada"}
-        detalle={<>
-          <Resumen filas={[
-            ["Citas y agenda", si(b.usaCitas)], ["Reservaciones en línea", si(cfgCitas.enLinea)],
-            ["Página de reservaciones", b.slug ? `/reservar/${b.slug}` : "Sin dirección"],
-            ["Anticipación", `De ${cfgCitas.anticipacionMinMin / 60} horas a ${cfgCitas.anticipacionMaxDias} días`],
-            ["Tiempo entre citas", cfgCitas.margenMin ? `${cfgCitas.margenMin} minutos` : "Sin tiempo adicional"],
-            ["Pago al reservar", ({ sin_pago: "Sin pago", opcional: "Opcional", completo: "Completo", anticipo_fijo: `Anticipo de ${$(cfgCitas.pago.valor)}`, anticipo_pct: `Anticipo del ${cfgCitas.pago.valor / 100}%` } as Record<string, string>)[cfgCitas.pago.modo]],
-          ]} />
-          <div className="quien-citas">
-            <span className="lab">Quién puede</span>
-            {([["citas.ver", "Consultar las citas"], ["citas.modificar", "Modificar las citas"], ["citas.cancelar", "Cancelar reservaciones"], ["citas.pagos", "Consultar los pagos"], ["citas.horarios", "Administrar horarios y disponibilidad"]] as const).map(([k, t]) => (
-              <div key={k}><span>{t}</span><b>{quienes(k)}</b></div>
-            ))}
-            <small className="muted">Se cambia en Usuarios, con los permisos de cada puesto o persona.</small>
-          </div>
-        </>}>
-        <ConfigCitas inicial={{ usaCitas: b.usaCitas, slug: b.slug ?? "", horario: b.horario as Horario, cerrados: b.diasCerrados, config: cfgCitas, origen: "crabsbarber.shop" }} />
-      </Bloque>
+      <a href="/ajustes/citas" className="glass ac-aviso">
+        <span><b>Citas y agenda</b><small>{b.usaCitas ? `Agenda activa${cfgCitas.enLinea ? ", reservaciones en línea activas" : ", sin reservaciones en línea"}` : "Apagada"}. Ahora tiene su propia sección en Ajustes.</small></span>
+        <span className="eq2-ir">Abrir<Icono n="derecha" /></span>
+      </a>
 
-      <Bloque numero={6} titulo="Egresos y finanzas" puedeEditar={edita("egresos")}
+      <Bloque numero={5} titulo="Egresos y finanzas" puedeEditar={edita("egresos")}
         resumen={`${cats.filter((c) => c.activo).length} categorías, ${conceptos.length} ${conceptos.length === 1 ? "gasto frecuente" : "gastos frecuentes"}, pagos con ${b.metodosEgreso.map((m) => NOMBRE_MET[m].toLowerCase()).join(", ")}`}
         detalle={
           <div className="pila">

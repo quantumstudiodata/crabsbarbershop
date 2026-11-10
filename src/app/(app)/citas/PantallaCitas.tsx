@@ -18,10 +18,10 @@ export type CitaVista = {
   fecha: string; hora: string; horaFin: string; inicioMs: number; duracion: number; servicios: string[]; total: number;
   pagado: number | null; metodo: string | null; estadoPago: string | null; estado: string; observaciones: string; origen: string; creada: string; ventaId: string | null;
 };
-type Bloqueo = { id: string; personaId: string; persona: string; fecha: string; desde: string; hasta: string; motivo: string };
-type Persona = { id: string; nombre: string; avatar: string; horario: Horario | null };
+export type Bloqueo = { id: string; personaId: string; persona: string; fecha: string; desde: string; hasta: string; motivo: string };
+export type Persona = { id: string; nombre: string; avatar: string; horario: Horario | null };
 type Servicio = { id: string; nombre: string; categoria: string; precio: number; duracionMin: number };
-type Rot = { persona1: string; persona2: string; dia1: number; dia2: number; semanaInicio: string; activo: boolean; estaSemana: { dia: number; persona: string }[] };
+export type Rot = { persona1: string; persona2: string; dia1: number; dia2: number; semanaInicio: string; activo: boolean; estaSemana: { dia: number; persona: string }[] };
 
 const ESTADO: Record<string, string> = { apartada: "Apartada", en_espera: "En espera", llego: "Llegó", en_atencion: "En atención", completada: "Completada", no_asistio: "No asistió", cancelada: "Cancelada" };
 const PAGO: Record<string, string> = { sin_pago: "Sin pago", anticipo: "Anticipo", pagada: "Pagada" };
@@ -63,7 +63,7 @@ export function PantallaCitas(p: {
 
   const [compartir, setCompartir] = useState(false);
   const [verVista, setVerVista] = useState(false);
-  const vistas = ([["linea", "Línea del tiempo", "reloj"], ["lista", "Lista", "lista"], ["calendario", "Día por persona", "persona"], ["semana", "Semana", "calendario"], ...(p.puede.horarios ? [["horarios", "Horarios", "ajustes"]] : [])] as [string, string, string][]);
+  const vistas = ([["linea", "Línea del tiempo", "reloj"], ["lista", "Lista", "lista"], ["calendario", "Día por persona", "persona"], ["semana", "Semana", "calendario"]] as [string, string, string][]);
   const actual = vistas.find(([k]) => k === p.vista) ?? vistas[0];
   const MES = (f: string) => ["enero", "febrero", "marzo", "abril", "mayo", "junio", "julio", "agosto", "septiembre", "octubre", "noviembre", "diciembre"][Number(f.slice(5, 7)) - 1];
   const domingo = semana[6];
@@ -137,7 +137,6 @@ export function PantallaCitas(p: {
       {p.vista === "lista" && <VistaLista citas={citas} ahora={p.ahora} esHoy={p.dia === p.hoy} abrir={setVer} puede={p.puede} avisar={setAviso} />}
       {p.vista === "calendario" && <VistaDia citas={citas} equipo={p.equipo.filter((e) => !p.persona || e.id === p.persona)} horario={p.horarioNegocio} dia={p.dia} abrir={setVer} />}
       {p.vista === "semana" && <VistaSemana citas={citas} semana={semana} horario={p.horarioNegocio} hoy={p.hoy} abrir={setVer} url={url} />}
-      {p.vista === "horarios" && <VistaHorarios {...p} avisar={setAviso} />}
 
       {ver && <DetalleCita c={ver} cerrar={() => setVer(null)} puede={p.puede} equipo={p.equipo} avisar={setAviso} />}
       {agendar && <NuevaCita equipo={p.equipo} servicios={p.servicios} dia={p.dia} hoy={p.hoy} horario={p.horarioNegocio} cerrados={p.cerrados} minutoInicial={agendar.minuto} personaInicial={p.persona} cerrar={() => setAgendar(false)} avisar={setAviso} />}
@@ -403,61 +402,6 @@ function Agendar({ equipo, servicios, dia, hoy, cerrar, avisar, cambiar }: { equ
 }
 
 
-function VistaHorarios(p: { equipo: Persona[]; horarioNegocio: Horario; rotacion: Rot | null; bloqueos: Bloqueo[]; dia: string; avisar: (r: Res) => void }) {
-  const [editar, setEditar] = useState<Persona | null>(null);
-  const [rot, setRot] = useState(false);
-  const [bloq, setBloq] = useState(false);
-  const [pend, iniciar] = useTransition();
-  const resumen = (h: Horario | null) => {
-    const base = h ?? p.horarioNegocio;
-    const dias = ORDEN.filter((d) => base[String(d)]);
-    if (!dias.length) return "Sin días de trabajo";
-    const iguales = dias.every((d) => base[String(d)][0] === base[String(dias[0])][0] && base[String(d)][1] === base[String(dias[0])][1]);
-    return `${h ? "" : "Igual que el negocio: "}${DIAS[dias[0]]} a ${DIAS[dias[dias.length - 1]]}${iguales ? `, ${base[String(dias[0])][0]} a ${base[String(dias[0])][1]}` : ""}`;
-  };
-  const nom = (id: string) => primer(p.equipo.find((e) => e.id === id)?.nombre ?? "");
-  return (
-    <>
-      <section className="glass panel-h subir">
-        <span className="lab">Horario de cada persona</span>
-        {p.equipo.map((e) => (
-          <div key={e.id} className="fila-h">
-            <Avatar avatar={e.avatar} nombre={e.nombre} t={30} />
-            <span className="t-c"><b>{primer(e.nombre)}</b><small>{resumen(e.horario)}</small></span>
-            <button type="button" className="bt sec chico" onClick={() => setEditar(e)}><Icono n="editar" />Editar</button>
-          </div>
-        ))}
-      </section>
-
-      <section className="glass panel-h subir d1">
-        <div className="entre"><span className="lab">Descanso rotativo</span>
-          <button type="button" className="bt sec chico" onClick={() => setRot(true)}><Icono n={p.rotacion ? "editar" : "mas"} />{p.rotacion ? "Editar" : "Configurar"}</button></div>
-        {p.rotacion ? (
-          <div className="rot-res">
-            <small className="muted">Cada semana se alterna. Esta semana:</small>
-            {p.rotacion.estaSemana.map((x) => <span key={x.dia}><b>{nom(x.persona)}</b> descansa el {DIAS_L[x.dia]}</span>)}
-          </div>
-        ) : <small className="muted">Dos personas se turnan dos días de descanso cada semana, por ejemplo lunes y miércoles.</small>}
-      </section>
-
-      <section className="glass panel-h subir d2">
-        <div className="entre"><span className="lab">Horarios bloqueados</span>
-          <button type="button" className="bt sec chico" onClick={() => setBloq(true)}><Icono n="candado" />Bloquear horario</button></div>
-        {p.bloqueos.length === 0 && <small className="muted">No hay horarios bloqueados próximamente.</small>}
-        {p.bloqueos.map((x) => (
-          <div key={x.id} className="fila-h">
-            <span className="t-c"><b>{x.persona}</b><small>{fechaTxt(x.fecha)}, {x.desde} a {x.hasta}{x.motivo ? `, ${x.motivo}` : ""}</small></span>
-            <button type="button" className="icb" disabled={pend} aria-label="Quitar bloqueo" onClick={() => iniciar(async () => p.avisar(await quitarBloqueo(x.id)))}><Icono n="basura" /></button>
-          </div>
-        ))}
-      </section>
-
-      {editar && <EditarHorario persona={editar} negocio={p.horarioNegocio} cerrar={() => setEditar(null)} avisar={p.avisar} />}
-      {rot && <EditarRotacion equipo={p.equipo} actual={p.rotacion} dia={p.dia} cerrar={() => setRot(false)} avisar={p.avisar} />}
-      {bloq && <NuevoBloqueo equipo={p.equipo} dia={p.dia} cerrar={() => setBloq(false)} avisar={p.avisar} />}
-    </>
-  );
-}
 
 export function EditorSemana({ valor, onChange }: { valor: Horario; onChange: (h: Horario) => void }) {
   return (
@@ -481,7 +425,7 @@ export function EditorSemana({ valor, onChange }: { valor: Horario; onChange: (h
   );
 }
 
-function EditarHorario({ persona, negocio, cerrar, avisar }: { persona: Persona; negocio: Horario; cerrar: () => void; avisar: (r: Res) => void }) {
+export function EditarHorario({ persona, negocio, cerrar, avisar }: { persona: Persona; negocio: Horario; cerrar: () => void; avisar: (r: Res) => void }) {
   const [propio, setPropio] = useState(!!persona.horario);
   const [h, setH] = useState<Horario>(persona.horario ?? negocio);
   const [error, setError] = useState<string | null>(null);
@@ -501,7 +445,7 @@ function EditarHorario({ persona, negocio, cerrar, avisar }: { persona: Persona;
   );
 }
 
-function EditarRotacion({ equipo, actual, dia, cerrar, avisar }: { equipo: Persona[]; actual: Rot | null; dia: string; cerrar: () => void; avisar: (r: Res) => void }) {
+export function EditarRotacion({ equipo, actual, dia, cerrar, avisar }: { equipo: Persona[]; actual: Rot | null; dia: string; cerrar: () => void; avisar: (r: Res) => void }) {
   const [p1, setP1] = useState(actual?.persona1 ?? equipo[0]?.id ?? "");
   const [p2, setP2] = useState(actual?.persona2 ?? equipo[1]?.id ?? "");
   const [d1, setD1] = useState(String(actual?.dia1 ?? 1));
@@ -540,7 +484,7 @@ function EditarRotacion({ equipo, actual, dia, cerrar, avisar }: { equipo: Perso
   );
 }
 
-function NuevoBloqueo({ equipo, dia, cerrar, avisar, personaInicial = "" }: { equipo: Persona[]; dia: string; cerrar: () => void; avisar: (r: Res) => void; personaInicial?: string }) {
+export function NuevoBloqueo({ equipo, dia, cerrar, avisar, personaInicial = "" }: { equipo: Persona[]; dia: string; cerrar: () => void; avisar: (r: Res) => void; personaInicial?: string }) {
   const [quien, setQuien] = useState(personaInicial);
   const [fecha, setFecha] = useState(dia);
   const [desde, setDesde] = useState("14:00");

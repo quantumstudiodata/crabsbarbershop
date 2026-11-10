@@ -32,7 +32,7 @@ export async function rotacionesDe(barberiaId: string, conn: Conn = db): Promise
 }
 
 /** Citas que ocupan horario y bloqueos entre dos instantes. Las apartadas vencidas ya no cuentan. */
-export async function ocupadosEntre(barberiaId: string, desde: number, hasta: number, conn: Conn = db, ignorar?: string): Promise<Ocupado[]> {
+export async function ocupadosEntre(barberiaId: string, desde: number, hasta: number, conn: Conn = db, ignorar?: string, conBloqueos = true): Promise<Ocupado[]> {
   const ahora = new Date();
   const [cs, bs] = await Promise.all([
     conn.select({ persona: schema.citas.barberoId, inicio: schema.citas.inicio, fin: schema.citas.fin, id: schema.citas.id }).from(schema.citas)
@@ -44,7 +44,7 @@ export async function ocupadosEntre(barberiaId: string, desde: number, hasta: nu
   ]);
   return [
     ...cs.filter((c) => c.id !== ignorar).map((c) => ({ persona: c.persona, inicio: c.inicio.getTime(), fin: c.fin.getTime() })),
-    ...bs.map((b) => ({ persona: b.persona, inicio: b.inicio.getTime(), fin: b.fin.getTime() })),
+    ...(conBloqueos ? bs : []).map((b) => ({ persona: b.persona, inicio: b.inicio.getTime(), fin: b.fin.getTime() })),
   ];
 }
 
@@ -57,13 +57,13 @@ export async function disponibilidadDia(b: Barberia, fecha: string, duracion: nu
   const zona = b.zonaHoraria;
   const [equipo, rots, ocupados] = await Promise.all([
     equipoAgenda(b.id, conn), rotacionesDe(b.id, conn),
-    ocupadosEntre(b.id, instante(fecha, 0, zona), instante(fecha, 24 * 60, zona), conn, opciones.ignorarCita),
+    ocupadosEntre(b.id, instante(fecha, 0, zona), instante(fecha, 24 * 60, zona), conn, opciones.ignorarCita, config.usaBloqueos),
   ]);
   const ahora = Date.now();
   const mapa = new Map<number, string[]>();
   for (const e of equipo) {
     if (persona && e.id !== persona) continue;
-    const ventana = ventanaDelDia(fecha, b.horario as Horario, b.diasCerrados, e.horario as Horario | null, rots, e.id);
+    const ventana = ventanaDelDia(fecha, b.horario as Horario, b.diasCerrados, config.usaHorarioPersona ? (e.horario as Horario | null) : null, config.usaRotacion ? rots : [], e.id);
     for (const m of horariosLibres({ fecha, zona, ahora, duracion, config, ventana, persona: e.id, ocupados })) mapa.set(m, [...(mapa.get(m) ?? []), e.id]);
   }
   return [...mapa.entries()].sort((a, b) => a[0] - b[0]).map(([minuto, personas]) => ({ minuto, personas }));
@@ -162,13 +162,13 @@ export async function diasConLugar(b: Barberia, fechas: string[], duracion: numb
   const zona = b.zonaHoraria;
   const [equipo, rots, ocupados] = await Promise.all([
     equipoAgenda(b.id), rotacionesDe(b.id),
-    ocupadosEntre(b.id, instante(fechas[0], 0, zona), instante(fechas[fechas.length - 1], 24 * 60, zona)),
+    ocupadosEntre(b.id, instante(fechas[0], 0, zona), instante(fechas[fechas.length - 1], 24 * 60, zona), db, undefined, config.usaBloqueos),
   ]);
   const ahora = Date.now();
   const r: Record<string, boolean> = {};
   for (const fecha of fechas) {
     r[fecha] = equipo.some((e) => (!persona || e.id === persona)
-      && horariosLibres({ fecha, zona, ahora, duracion, config, ventana: ventanaDelDia(fecha, b.horario as Horario, b.diasCerrados, e.horario as Horario | null, rots, e.id), persona: e.id, ocupados }).length > 0);
+      && horariosLibres({ fecha, zona, ahora, duracion, config, ventana: ventanaDelDia(fecha, b.horario as Horario, b.diasCerrados, config.usaHorarioPersona ? (e.horario as Horario | null) : null, config.usaRotacion ? rots : [], e.id), persona: e.id, ocupados }).length > 0);
   }
   return r;
 }

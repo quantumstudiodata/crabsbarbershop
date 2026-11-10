@@ -115,7 +115,7 @@ export default async function Ficha({ params, searchParams }: { params: Promise<
             <span><span className="eq2-nom"><h1>{u.nombre}</h1>{lapiz}</span><small>{puesto}{!u.activo && ", archivada"}</small><small className="fa-forma">{[cuenta.forma, sePaga].filter(Boolean).join(", ")}</small></span>
           </div>
           <div className="solo-escritorio fa-acc">{pagar}</div>
-          <div className="fa-info solo-escritorio">{info}{se.puede("citas.horarios") && <Link href="/citas?vista=horarios" className="eq2-link">Editar horario</Link>}</div>
+          <div className="fa-info solo-escritorio">{info}{se.puede("citas.horarios") && <Link href="/ajustes/citas?tab=horarios" className="eq2-link">Editar horario</Link>}</div>
         </aside>
         <div className="fa-main">
           <div className="entre fa-mes"><span className="lab">{m.nombre}</span><MesEquipo mes={m.mes} hoy={m.hoy} /></div>
@@ -142,7 +142,7 @@ export default async function Ficha({ params, searchParams }: { params: Promise<
           <details className="eq2-mas solo-movil fa-det">
             <summary>Horario y forma de pago<Icono n="abajo" /></summary>
             {info}
-            {se.puede("citas.horarios") && <Link href="/citas?vista=horarios" className="eq2-link">Editar horario</Link>}
+            {se.puede("citas.horarios") && <Link href="/ajustes/citas?tab=horarios" className="eq2-link">Editar horario</Link>}
           </details>
         </div>
       </div>
