@@ -82,9 +82,9 @@ export default async function Ficha({ params, searchParams }: { params: Promise<
 
   return (
     <div className="eq2 eq2-ficha">
-      <Link href={`/equipo${q}`} className="eq2-volver"><Icono n="izquierda" />Equipo</Link>
       <div className="eq2-per">
         <div className="eq2-id">
+          <Link href={`/equipo${q}`} className="eq2-atr" aria-label="Volver a Equipo"><Icono n="izquierda" /></Link>
           <Avatar avatar={u.avatar} nombre={u.nombre} t={52} />
           <span><h1>{u.nombre}</h1><small>{subt}{!u.activo && <>, archivada</>}</small></span>
         </div>

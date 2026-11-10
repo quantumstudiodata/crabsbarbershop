@@ -48,14 +48,20 @@ export default async function Pagos({ searchParams }: { searchParams: Promise<{ 
   return (
     <div className="eq2">
       <AvisoUrl aviso={q.aviso} error={q.error} />
-      <Link href="/equipo" className="eq2-volver"><Icono n="izquierda" />Equipo</Link>
-      <div className="eq2-cab"><div><h1>Pagos del equipo</h1></div></div>
+      <div className="eq2-tit">
+        <Link href="/equipo" className="eq2-atr" aria-label="Volver a Equipo"><Icono n="izquierda" /></Link>
+        <span><small>Equipo</small><h1>Pagos del equipo</h1></span>
+      </div>
 
       {(revision.length > 0 || nSinAsignar > 0) && (
         <section id="faltantes" className="eq2-sec">
           <span className="lab">Faltantes de caja</span>
           {nSinAsignar > 0 && se.puede("cortes.ver") && (
-            <Link href="/analitica/cortes" className="eq-aviso"><Icono n="caja" /><span><b>{nSinAsignar} {nSinAsignar === 1 ? "corte con faltante detectado" : "cortes con faltante detectado"}</b><small>Falta decidir quién lo cubre</small></span><Icono n="derecha" /></Link>
+            <Link href="/analitica/cortes" className="glass eq2-alerta">
+              <b className="eq2-num">{nSinAsignar}</b>
+              <span><b>{nSinAsignar === 1 ? "Corte con faltante" : "Cortes con faltante"}</b><small>Elige quién cubre cada faltante en Corte de caja</small></span>
+              <span className="eq2-ir">Revisar<Icono n="derecha" /></span>
+            </Link>
           )}
           {revision.length > 0 && (
             <div className="glass eq2-lista">
@@ -73,7 +79,6 @@ export default async function Pagos({ searchParams }: { searchParams: Promise<{ 
               ))}
             </div>
           )}
-          <p className="eq-nota">Un faltante en revisión no afecta el saldo. Solo se descuenta si se autoriza y la persona lo acepta por escrito (Ley Federal del Trabajo, art. 110).</p>
         </section>
       )}
 
