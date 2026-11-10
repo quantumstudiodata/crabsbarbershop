@@ -40,6 +40,7 @@ export function NuevaCita({ equipo, servicios, dia, hoy, horario, cerrados, cerr
   const [otra, setOtra] = useState(false);
   const [libres, setLibres] = useState<{ minuto: number; personas: string[] }[] | null>(null);
   const [minuto, setMinuto] = useState<number | null>(null);
+  const [tramo, setTramo] = useState<string>("");
   const [nombre, setNombre] = useState("");
   const [tel, setTel] = useState("");
   const [obs, setObs] = useState("");
@@ -68,6 +69,10 @@ export function NuevaCita({ equipo, servicios, dia, hoy, horario, cerrados, cerr
     return () => { vivo = false; };
   }, [fecha, persona, elegidos.join(","), paso >= 1]); // eslint-disable-line react-hooks/exhaustive-deps
 
+  // Las horas libres se agrupan en mañana, tarde y noche para no mostrar una lista larga.
+  const grupos = ([["m", "Mañana", 0, 720], ["t", "Tarde", 720, 1080], ["n", "Noche", 1080, 1440]] as const)
+    .map(([k, t, a, b]) => ({ k, t, xs: (libres ?? []).filter((x) => x.minuto >= a && x.minuto < b) })).filter((g) => g.xs.length);
+  const tramoV = grupos.some((g) => g.k === tramo) ? tramo : grupos.find((g) => minuto !== null && g.xs.some((x) => x.minuto === minuto))?.k ?? grupos[0]?.k;
   const sel = servicios.filter((s) => elegidos.includes(s.id));
   const total = sel.reduce((a, s) => a + s.precio, 0);
   const duracion = sel.reduce((a, s) => a + s.duracionMin, 0);
@@ -143,7 +148,14 @@ export function NuevaCita({ equipo, servicios, dia, hoy, horario, cerrados, cerr
               <div className="nc-campo"><span>Hora disponible</span>
                 {libres === null ? <small className="muted">Buscando horarios…</small>
                   : libres.length === 0 ? <small className="muted">No hay horarios libres ese día. Prueba con otro día o con otra persona.</small>
-                  : <div className="nc-horas">{libres.map((x) => <button type="button" key={x.minuto} className={minuto === x.minuto ? "on" : ""} aria-pressed={minuto === x.minuto} onClick={() => setMinuto(x.minuto)}>{aHora(x.minuto)}</button>)}</div>}
+                  : <>
+                    {grupos.length > 1 && (
+                      <div className="nc-seg nc-tramos" role="tablist" aria-label="Momento del día">
+                        {grupos.map((g) => <button type="button" key={g.k} role="tab" aria-selected={g.k === tramoV} className={g.k === tramoV ? "on" : ""} onClick={() => setTramo(g.k)}>{g.t}<small>{g.xs.length}</small></button>)}
+                      </div>
+                    )}
+                    <div className="nc-horas">{(grupos.find((g) => g.k === tramoV)?.xs ?? []).map((x) => <button type="button" key={x.minuto} className={minuto === x.minuto ? "on" : ""} aria-pressed={minuto === x.minuto} onClick={() => setMinuto(x.minuto)}>{aHora(x.minuto)}</button>)}</div>
+                  </>}
                 {!persona && <small className="muted">Con Cualquiera se asigna a quien esté libre a esa hora.</small>}
               </div>
             </>

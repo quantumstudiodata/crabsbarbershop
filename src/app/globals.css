@@ -3163,3 +3163,5 @@ html:has(.capa) body, html:has(.velo-c) body, html:has(.velo-hoja) body, html:ha
 }
 @media (prefers-reduced-motion: reduce) { .nc { animation: none; } .nc-prog i { transition: none; } }
 @media (max-width: 760px) { .ini-eq-m-card { padding: 14px 18px; } .ini-eq-m-card .lab { font-size: 9.5px; } }
+.nc-tramos button { display: inline-flex; align-items: center; justify-content: center; gap: 6px; }
+.nc-tramos button small { font-size: 11px; color: var(--faint); font-weight: 500; }
