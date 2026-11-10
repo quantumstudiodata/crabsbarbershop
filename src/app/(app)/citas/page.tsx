@@ -20,9 +20,9 @@ export default async function Citas({ searchParams }: { searchParams: Promise<Q>
   const zona = b.zonaHoraria;
   const hoy = fechaLocal(new Date(), zona);
   const dia = /^\d{4}-\d{2}-\d{2}$/.test(q.dia ?? "") ? q.dia! : hoy;
-  // En computadora la agenda abre en Semana; en el teléfono, en la lista del día.
-  const porDefecto = (await esMovil()) ? "lista" : "semana";
-  const vista = q.vista === "calendario" || q.vista === "semana" || q.vista === "horarios" || q.vista === "lista" ? q.vista : porDefecto;
+  // En computadora la agenda abre en Semana; en el teléfono, en la línea del tiempo del día.
+  const porDefecto = (await esMovil()) ? "linea" : "semana";
+  const vista = q.vista === "calendario" || q.vista === "semana" || q.vista === "horarios" || q.vista === "lista" || q.vista === "linea" ? q.vista : porDefecto;
   const lunes = lunesDe(dia);
   const desde = vista === "semana" ? lunes : dia;
   const hasta = vista === "semana" ? sumarDias(lunes, 7) : sumarDias(dia, 1);
@@ -59,7 +59,7 @@ export default async function Citas({ searchParams }: { searchParams: Promise<Q>
       servicios={servicios}
       horarioNegocio={b.horario as Horario} cerrados={b.diasCerrados} conteo={Object.fromEntries(futuros.map((x) => [x.d, x.n]))}
       rotacion={rots[0] ? { ...rots[0], estaSemana: descansosDeSemana(rots[0], dia) } : null}
-      bloqueos={bloqueos.map((x) => ({ id: x.id, persona: x.usuarioId ? nombre(x.usuarioId) : "Todo el negocio", fecha: fechaLocal(x.inicio, zona), desde: horaCorta(x.inicio, zona), hasta: horaCorta(x.fin, zona), motivo: x.motivo }))}
+      bloqueos={bloqueos.map((x) => ({ id: x.id, personaId: x.usuarioId ?? "", persona: x.usuarioId ? nombre(x.usuarioId) : "Todo el negocio", fecha: fechaLocal(x.inicio, zona), desde: horaCorta(x.inicio, zona), hasta: horaCorta(x.fin, zona), motivo: x.motivo }))}
       enlace={config.enLinea && b.slug ? `/reservar/${b.slug}` : null}
       puede={{ modificar: s.puede("citas.modificar") && !s.vista, cancelar: s.puede("citas.cancelar") && !s.vista, pagos: verPagos, horarios: s.puede("citas.horarios") && !s.vista, cobrar: s.puede("ventas.registrar") || s.puede("ventas.registrar_otros") }}
     />

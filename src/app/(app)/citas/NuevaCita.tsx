@@ -22,13 +22,15 @@ const TITULOS = ["¿Qué servicios?", "¿Cuándo y con quién?", "¿Para quién 
  * Nueva cita en tres pasos: servicios, cuándo y con quién, y los datos del cliente.
  * En escritorio es una ventana angosta; en el teléfono, una hoja que sube desde abajo. Solo se cierra con la X.
  */
-export function NuevaCita({ equipo, servicios, dia, hoy, horario, cerrados, cerrar, avisar }: {
-  equipo: Persona[]; servicios: Servicio[]; dia: string; hoy: string; horario: Horario; cerrados: string[];
+export function NuevaCita({ equipo, servicios, dia, hoy, horario, cerrados, cerrar, avisar, minutoInicial, personaInicial = "" }: {
+  equipo: Persona[]; servicios: Servicio[]; dia: string; hoy: string; horario: Horario; cerrados: string[]; minutoInicial?: number; personaInicial?: string;
   cerrar: () => void; avisar: (r: Res) => void;
 }) {
   const [paso, setPaso] = useState(0);
   const [elegidos, setElegidos] = useState<string[]>([]);
-  const [persona, setPersona] = useState("");
+  const [persona, setPersona] = useState(personaInicial);
+  // Desde un hueco libre de la agenda: se propone esa hora la primera vez que aparece libre.
+  const propuesta = useRef(minutoInicial !== undefined && minutoInicial >= 0 ? minutoInicial : null);
   const abierto = (f: string) => !cerrados.includes(f) && !!horario[String(dow(f))];
   // Los próximos días que abre el negocio, empezando por el día que se está viendo en la agenda.
   const dias = useMemo(() => {
@@ -65,7 +67,15 @@ export function NuevaCita({ equipo, servicios, dia, hoy, horario, cerrados, cerr
     if (paso < 1 || !elegidos.length) return;
     let vivo = true;
     setLibres(null);
-    horariosAgenda(fecha, elegidos, persona || null).then((r) => { if (vivo) setLibres(r); });
+    horariosAgenda(fecha, elegidos, persona || null).then((r) => {
+      if (!vivo) return;
+      setLibres(r);
+      if (propuesta.current !== null) {
+        const x = r.find((l) => l.minuto >= propuesta.current!);
+        if (x) setMinuto(x.minuto);
+        propuesta.current = null;
+      }
+    });
     return () => { vivo = false; };
   }, [fecha, persona, elegidos.join(","), paso >= 1]); // eslint-disable-line react-hooks/exhaustive-deps
 

@@ -18,6 +18,7 @@ export type CitaVista = {
   fecha: string; hora: string; horaFin: string; inicioMs: number; duracion: number; servicios: string[]; total: number;
   pagado: number | null; metodo: string | null; estadoPago: string | null; estado: string; observaciones: string; origen: string; creada: string; ventaId: string | null;
 };
+type Bloqueo = { id: string; personaId: string; persona: string; fecha: string; desde: string; hasta: string; motivo: string };
 type Persona = { id: string; nombre: string; avatar: string; horario: Horario | null };
 type Servicio = { id: string; nombre: string; categoria: string; precio: number; duracionMin: number };
 type Rot = { persona1: string; persona2: string; dia1: number; dia2: number; semanaInicio: string; activo: boolean; estaSemana: { dia: number; persona: string }[] };
@@ -36,15 +37,16 @@ const fechaTxt = (f: string) => `${DIAS_L[dow(f)]} ${Number(f.slice(8))} de ${["
 const activa = (e: string) => ["apartada", "en_espera", "llego", "en_atencion"].includes(e);
 
 export function PantallaCitas(p: {
-  abrirNueva?: boolean; porDefecto: "lista" | "semana";
-  hoy: string; dia: string; vista: "lista" | "calendario" | "semana" | "horarios"; persona: string; citas: CitaVista[]; ahora: number;
+  abrirNueva?: boolean; porDefecto: "linea" | "semana";
+  hoy: string; dia: string; vista: "linea" | "lista" | "calendario" | "semana" | "horarios"; persona: string; citas: CitaVista[]; ahora: number;
   equipo: Persona[]; servicios: Servicio[]; horarioNegocio: Horario; cerrados: string[]; conteo: Record<string, number>;
-  rotacion: Rot | null; bloqueos: { id: string; persona: string; fecha: string; desde: string; hasta: string; motivo: string }[];
+  rotacion: Rot | null; bloqueos: Bloqueo[];
   enlace: string | null; puede: { modificar: boolean; cancelar: boolean; pagos: boolean; horarios: boolean; cobrar: boolean };
 }) {
   const router = useRouter();
   const [ver, setVer] = useState<CitaVista | null>(null);
-  const [agendar, setAgendar] = useState(!!p.abrirNueva && p.puede.modificar);
+  const [agendar, setAgendar] = useState<false | { minuto?: number }>(p.abrirNueva && p.puede.modificar ? {} : false);
+  const [bloquear, setBloquear] = useState(false);
   const [aviso, setAviso] = useState<Res>({});
   const url = (x: Partial<{ dia: string; vista: string; persona: string }>) => {
     const u = new URLSearchParams();
@@ -61,7 +63,7 @@ export function PantallaCitas(p: {
 
   const [compartir, setCompartir] = useState(false);
   const [verVista, setVerVista] = useState(false);
-  const vistas = ([["lista", "Lista", "lista"], ["calendario", "Día", "reloj"], ["semana", "Semana", "calendario"], ...(p.puede.horarios ? [["horarios", "Horarios", "ajustes"]] : [])] as [string, string, string][]);
+  const vistas = ([["linea", "Línea del tiempo", "reloj"], ["lista", "Lista", "lista"], ["calendario", "Día por persona", "persona"], ["semana", "Semana", "calendario"], ...(p.puede.horarios ? [["horarios", "Horarios", "ajustes"]] : [])] as [string, string, string][]);
   const actual = vistas.find(([k]) => k === p.vista) ?? vistas[0];
   const MES = (f: string) => ["enero", "febrero", "marzo", "abril", "mayo", "junio", "julio", "agosto", "septiembre", "octubre", "noviembre", "diciembre"][Number(f.slice(5, 7)) - 1];
   const domingo = semana[6];
@@ -82,7 +84,7 @@ export function PantallaCitas(p: {
               {compartir && <Compartir enlace={p.enlace} cerrar={() => setCompartir(false)} />}
             </div>
           )}
-          {p.puede.modificar && <button type="button" className="ag-bt pri" onClick={() => setAgendar(true)}><Icono n="mas" /><span>Nueva cita</span></button>}
+          {p.puede.modificar && p.vista !== "linea" && <button type="button" className="ag-bt pri" onClick={() => setAgendar({})}><Icono n="mas" /><span>Nueva cita</span></button>}
         </div>
       </div>
       {aviso.error && <p className="aviso error">{aviso.error}</p>}
@@ -106,7 +108,11 @@ export function PantallaCitas(p: {
             </div>
           )}
         </div>
-        {p.vista !== "horarios" && p.equipo.length > 1 && (
+        <div className="fila ag-mov solo-movil">
+          {p.enlace && <button type="button" className="ln-ib" aria-label="Compartir reservaciones" aria-expanded={compartir} onMouseDown={(e) => e.stopPropagation()} onClick={() => setCompartir(!compartir)}><Icono n="enviar" /></button>}
+          {p.puede.modificar && p.vista !== "linea" && <button type="button" className="ln-ib pri" onClick={() => setAgendar({})} aria-label="Nueva cita"><Icono n="mas" /></button>}
+        </div>
+        {p.vista !== "horarios" && p.vista !== "linea" && p.equipo.length > 1 && (
           <Selector className="sel-equipo" etiqueta="Persona" valor={p.persona} onChange={(v) => router.push(url({ persona: v }), { scroll: false })}
             opciones={[{ valor: "", texto: "Todo el equipo" }, ...p.equipo.map((e) => ({ valor: e.id, texto: primer(e.nombre), icono: <Avatar avatar={e.avatar} nombre={e.nombre} t={18} /> }))]} />
         )}
@@ -124,13 +130,18 @@ export function PantallaCitas(p: {
         </div>
       )}
 
+      {p.vista === "linea" && (
+        <VistaLinea citas={citas} bloqueos={p.bloqueos} equipo={p.equipo} persona={p.persona} dia={p.dia} hoy={p.hoy} horario={p.horarioNegocio} cerrados={p.cerrados} ahora={p.ahora}
+          abrir={setVer} url={url} puede={p.puede} agendar={(m) => setAgendar({ minuto: m })} bloquear={() => setBloquear(true)} avisar={setAviso} />
+      )}
       {p.vista === "lista" && <VistaLista citas={citas} ahora={p.ahora} esHoy={p.dia === p.hoy} abrir={setVer} puede={p.puede} avisar={setAviso} />}
       {p.vista === "calendario" && <VistaDia citas={citas} equipo={p.equipo.filter((e) => !p.persona || e.id === p.persona)} horario={p.horarioNegocio} dia={p.dia} abrir={setVer} />}
       {p.vista === "semana" && <VistaSemana citas={citas} semana={semana} horario={p.horarioNegocio} hoy={p.hoy} abrir={setVer} url={url} />}
       {p.vista === "horarios" && <VistaHorarios {...p} avisar={setAviso} />}
 
       {ver && <DetalleCita c={ver} cerrar={() => setVer(null)} puede={p.puede} equipo={p.equipo} avisar={setAviso} />}
-      {agendar && <NuevaCita equipo={p.equipo} servicios={p.servicios} dia={p.dia} hoy={p.hoy} horario={p.horarioNegocio} cerrados={p.cerrados} cerrar={() => setAgendar(false)} avisar={setAviso} />}
+      {agendar && <NuevaCita equipo={p.equipo} servicios={p.servicios} dia={p.dia} hoy={p.hoy} horario={p.horarioNegocio} cerrados={p.cerrados} minutoInicial={agendar.minuto} personaInicial={p.persona} cerrar={() => setAgendar(false)} avisar={setAviso} />}
+      {bloquear && <NuevoBloqueo equipo={p.equipo} dia={p.dia < p.hoy ? p.hoy : p.dia} personaInicial={p.persona} cerrar={() => setBloquear(false)} avisar={setAviso} />}
     </>
   );
 }
@@ -392,7 +403,7 @@ function Agendar({ equipo, servicios, dia, hoy, cerrar, avisar, cambiar }: { equ
 }
 
 
-function VistaHorarios(p: { equipo: Persona[]; horarioNegocio: Horario; rotacion: Rot | null; bloqueos: { id: string; persona: string; fecha: string; desde: string; hasta: string; motivo: string }[]; dia: string; avisar: (r: Res) => void }) {
+function VistaHorarios(p: { equipo: Persona[]; horarioNegocio: Horario; rotacion: Rot | null; bloqueos: Bloqueo[]; dia: string; avisar: (r: Res) => void }) {
   const [editar, setEditar] = useState<Persona | null>(null);
   const [rot, setRot] = useState(false);
   const [bloq, setBloq] = useState(false);
@@ -529,8 +540,8 @@ function EditarRotacion({ equipo, actual, dia, cerrar, avisar }: { equipo: Perso
   );
 }
 
-function NuevoBloqueo({ equipo, dia, cerrar, avisar }: { equipo: Persona[]; dia: string; cerrar: () => void; avisar: (r: Res) => void }) {
-  const [quien, setQuien] = useState("");
+function NuevoBloqueo({ equipo, dia, cerrar, avisar, personaInicial = "" }: { equipo: Persona[]; dia: string; cerrar: () => void; avisar: (r: Res) => void; personaInicial?: string }) {
+  const [quien, setQuien] = useState(personaInicial);
   const [fecha, setFecha] = useState(dia);
   const [desde, setDesde] = useState("14:00");
   const [hasta, setHasta] = useState("15:00");
@@ -592,5 +603,113 @@ function Compartir({ enlace, cerrar }: { enlace: string; cerrar: () => void }) {
       {qr && <div className="qr ag-qr" dangerouslySetInnerHTML={{ __html: qr }} />}
       <a className="ag-op" href={enlace} target="_blank" rel="noopener noreferrer"><span><Icono n="ojo" /></span><span><b>Ver página de reservaciones</b><small>Abrir la página como la ve el cliente</small></span></a>
     </Flotante>
+  );
+}
+
+/** Línea del tiempo del día (teléfono): horas a la izquierda, la hora actual marcada, huecos libres para agendar y bloqueos. */
+function VistaLinea(p: {
+  citas: CitaVista[]; bloqueos: Bloqueo[]; equipo: Persona[]; persona: string; dia: string; hoy: string; horario: Horario; cerrados: string[]; ahora: number;
+  abrir: (c: CitaVista) => void; url: (x: Partial<{ dia: string; vista: string; persona: string }>) => string;
+  puede: { modificar: boolean; horarios: boolean }; agendar: (minuto: number) => void; bloquear: () => void; avisar: (r: Res) => void;
+}) {
+  const [quitar, setQuitar] = useState<Bloqueo | null>(null);
+  const [pend, iniciar] = useTransition();
+  const h = p.cerrados.includes(p.dia) ? null : p.horario[String(dow(p.dia))];
+  const PX = 1.2;
+  const etiqueta = p.dia === p.hoy ? `Hoy, ${DIAS_L[dow(p.dia)]} ${Number(p.dia.slice(8))}` : `${DIAS_L[dow(p.dia)].replace(/^./, (x) => x.toUpperCase())} ${Number(p.dia.slice(8))}`;
+  // Minutos de ahora en la hora local del negocio: la diferencia entre la hora de las citas y su instante da la zona.
+  const ahoraMin = (() => {
+    if (p.dia !== p.hoy) return null;
+    const ref = p.citas[0];
+    const d = new Date(p.ahora);
+    if (ref) return Math.round(aMin(ref.hora) + (p.ahora - ref.inicioMs) / 60000);
+    return d.getHours() * 60 + d.getMinutes();
+  })();
+  const visibles = p.citas.filter((c) => c.fecha === p.dia && c.estado !== "cancelada" && c.estado !== "expirada");
+  const bloqueos = p.bloqueos.filter((b) => b.fecha === p.dia && (!p.persona || !b.personaId || b.personaId === p.persona));
+  const barra = (
+    <div className="ln-barra">
+      <div className="ln-dia">
+        <Link href={p.url({ dia: sumar(p.dia, -1) })} scroll={false} aria-label="Día anterior"><Icono n="izquierda" /></Link>
+        <Link href={p.url({ dia: p.hoy })} scroll={false} className="ln-hoy" title="Ir a hoy">{etiqueta}</Link>
+        <Link href={p.url({ dia: sumar(p.dia, 1) })} scroll={false} aria-label="Día siguiente"><Icono n="derecha" /></Link>
+      </div>
+      {p.puede.horarios && <button type="button" className="ln-ib" onClick={p.bloquear} aria-label="Bloquear horario" title="Bloquear horario"><Icono n="candado" /></button>}
+      {p.puede.modificar && <button type="button" className="ln-ib pri" onClick={() => p.agendar(-1)} aria-label="Nueva cita" title="Nueva cita"><Icono n="mas" /></button>}
+    </div>
+  );
+  const chips = p.equipo.length > 1 && (
+    <nav className="ln-chips" aria-label="Persona">
+      <Link href={p.url({ persona: "" })} scroll={false} aria-current={!p.persona ? "true" : undefined}>Todo el equipo</Link>
+      {p.equipo.map((e) => <Link key={e.id} href={p.url({ persona: e.id })} scroll={false} aria-current={p.persona === e.id ? "true" : undefined}><Avatar avatar={e.avatar} nombre={e.nombre} t={18} />{primer(e.nombre)}</Link>)}
+    </nav>
+  );
+  if (!h) return <>{barra}{chips}<p className="muted ln-vacio">El negocio no abre este día.</p></>;
+  const ini = Math.floor(aMin(h[0]) / 60) * 60, fin = Math.ceil(aMin(h[1]) / 60) * 60;
+  const y = (m: number) => (m - ini) * PX;
+  // Carriles: citas que se empalman (dos personas a la misma hora) van lado a lado.
+  const orden = [...visibles].sort((a, b) => a.inicioMs - b.inicioMs);
+  const carril = new Map<string, { c: number; de: number }>();
+  let grupo: CitaVista[] = [], finGrupo = -1, ocupados: number[] = [];
+  const cerrarGrupo = () => { const n = Math.max(ocupados.length, 1); grupo.forEach((c) => carril.set(c.id, { c: carril.get(c.id)!.c, de: n })); grupo = []; ocupados = []; };
+  for (const c of orden) {
+    const a = aMin(c.hora), b = a + c.duracion;
+    if (a >= finGrupo) { cerrarGrupo(); finGrupo = -1; }
+    let i = ocupados.findIndex((f) => f <= a);
+    if (i < 0) { i = ocupados.length; ocupados.push(b); } else ocupados[i] = b;
+    carril.set(c.id, { c: i, de: 1 });
+    grupo.push(c);
+    finGrupo = Math.max(finGrupo, b);
+  }
+  cerrarGrupo();
+  // Huecos libres de al menos 30 minutos (desde ahora si es hoy), entre citas y bloqueos.
+  const ocupado = [...visibles.map((c) => [aMin(c.hora), aMin(c.hora) + c.duracion]), ...bloqueos.map((b) => [aMin(b.desde), aMin(b.hasta)])].sort((a, b) => a[0] - b[0]);
+  const huecos: [number, number][] = [];
+  let cursor = Math.max(aMin(h[0]), ahoraMin !== null ? Math.ceil(ahoraMin / 15) * 15 : 0);
+  if (p.dia < p.hoy) cursor = Infinity;
+  for (const [a, b] of [...ocupado, [aMin(h[1]), aMin(h[1])]]) {
+    const desde = Math.ceil(cursor / 15) * 15;
+    if (a - desde >= 30) huecos.push([desde, a]);
+    cursor = Math.max(cursor, b);
+  }
+  const horas = Array.from({ length: (fin - ini) / 60 + 1 }, (_, i) => ini + i * 60);
+  return (
+    <>
+      {barra}
+      {chips}
+      <section className="ln" style={{ height: (fin - ini) * PX + 16 }} aria-label={`Agenda del ${etiqueta}`}>
+        {horas.map((m) => <span key={m} className="ln-h" style={{ top: y(m) }}><small>{aHora(m)}</small><i /></span>)}
+        {huecos.map(([a, b]) => p.puede.modificar ? (
+          <button type="button" key={a} className="ln-libre" style={{ top: y(a) + 2, height: Math.max((b - a) * PX - 4, 26) }} onClick={() => p.agendar(a)}>
+            <span>Libre de {aHora(a)} a {aHora(b)}</span><b><Icono n="mas" />Agendar</b>
+          </button>
+        ) : <div key={a} className="ln-libre" style={{ top: y(a) + 2, height: Math.max((b - a) * PX - 4, 26) }}><span>Libre de {aHora(a)} a {aHora(b)}</span></div>)}
+        {bloqueos.map((b) => (
+          <button type="button" key={b.id} className="ln-blq" style={{ top: y(aMin(b.desde)) + 1, height: Math.max((aMin(b.hasta) - aMin(b.desde)) * PX - 2, 22) }} onClick={() => setQuitar(b)} disabled={!p.puede.horarios}>
+            Bloqueado{b.motivo ? `, ${b.motivo}` : ""}{b.personaId ? ` de ${primer(b.persona)}` : ", todo el negocio"}
+          </button>
+        ))}
+        {orden.map((c) => {
+          const k = carril.get(c.id)!;
+          const ahoraEn = ahoraMin !== null && ahoraMin >= aMin(c.hora) && ahoraMin < aMin(c.hora) + c.duracion;
+          return (
+            <button type="button" key={c.id} className={`ln-c e-${c.estado} ${ahoraEn || c.estado === "en_atencion" ? "osc" : ""}`} onClick={() => p.abrir(c)}
+              style={{ top: y(aMin(c.hora)) + 1, height: Math.max(c.duracion * PX - 3, 26), left: `calc(52px + (100% - 52px) * ${k.c / k.de})`, width: `calc((100% - 52px) / ${k.de} - 4px)` }}>
+              <span><b>{c.hora} {c.cliente}</b>{c.duracion >= 25 && <small>{c.servicios.join(", ")}, {primer(c.barbero)}</small>}</span>
+              {k.de === 1 && c.duracion >= 25 && <Chip e={c.estado} />}
+            </button>
+          );
+        })}
+        {ahoraMin !== null && ahoraMin >= ini && ahoraMin <= fin && <i className="ln-ahora" style={{ top: y(ahoraMin) }} aria-hidden="true" />}
+      </section>
+      {quitar && (
+        <Modal abierto cerrar={() => setQuitar(null)} etiqueta="Bloqueo" titulo={`${quitar.desde} a ${quitar.hasta}`}>
+          <div className="pila" style={{ gap: 12 }}>
+            <p className="muted" style={{ margin: 0 }}>{quitar.personaId ? primer(quitar.persona) : "Todo el negocio"}{quitar.motivo ? `, ${quitar.motivo}` : ""}. Mientras esté bloqueado no se pueden agendar citas en ese horario.</p>
+            <div className="acciones"><button type="button" className="bt sec" disabled={pend} onClick={() => iniciar(async () => { const r = await quitarBloqueo(quitar.id); p.avisar(r); if (!r.error) setQuitar(null); })}><Icono n="basura" />Quitar bloqueo</button></div>
+          </div>
+        </Modal>
+      )}
+    </>
   );
 }
