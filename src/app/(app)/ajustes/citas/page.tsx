@@ -1,4 +1,5 @@
 import { and, asc, eq, gt } from "drizzle-orm";
+import { cobraEnLinea } from "@/lib/stripe";
 import { redirect } from "next/navigation";
 import { requerirSesion } from "@/lib/auth";
 import { descansosDeSemana, leerConfig, type Horario } from "@/lib/agenda";
@@ -32,7 +33,7 @@ export default async function AjustesCitasPagina({ searchParams }: { searchParam
   const tab = q.tab === "reservaciones" || q.tab === "pagina" ? q.tab : "horarios";
   return (
     <AjustesCitas
-      tab={tab} negocio={b.nombre} origen="crabsbarber.shop" puedeConfig={puedeConfig} puedeHorarios={puedeHorarios} hoy={hoy}
+      tab={tab} negocio={b.nombre} origen="crabsbarber.shop" puedeConfig={puedeConfig} puedeHorarios={puedeHorarios} hoy={hoy} cobraEnLinea={cobraEnLinea(b)}
       inicial={{ usaCitas: b.usaCitas, slug: b.slug ?? "", horario: b.horario as Horario, cerrados: b.diasCerrados, config: leerConfig(b.citasConfig) }}
       equipo={equipo.map((e) => ({ id: e.id, nombre: e.nombre, avatar: e.avatar, horario: e.horario as Horario | null }))}
       rotacion={rots[0] ? { ...rots[0], estaSemana: descansosDeSemana(rots[0], hoy) } : null}

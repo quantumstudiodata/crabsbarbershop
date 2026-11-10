@@ -4,7 +4,8 @@ import { useRouter } from "next/navigation";
 import { useEffect, useMemo, useState, useTransition } from "react";
 import { Avatar } from "@/components/Avatar";
 import { Icono } from "@/components/Icono";
-import { aHora } from "@/lib/agenda";
+import { aHora, montoAPagar, type ConfigCitas } from "@/lib/agenda";
+import { PagoReserva, type FormaPago } from "./PagoReserva";
 import { formatoDinero } from "@/lib/money";
 import { cotizar, diasPublicos, horariosPublicos, reservar } from "../actions";
 
@@ -21,7 +22,8 @@ const fechaTxt = (f: string) => `${["domingo", "lunes", "martes", "miércoles", 
 export function Reservar(p: {
   slug: string; negocio: string; hoy: string; servicios: Servicio[]; equipo: Persona[];
   opciones: { elegir: boolean; cualquiera: boolean; varios: boolean; maxDias: number };
-  pago: { modo: string; ejemplo: { minimo: number }; politica: string; reembolso: string };
+  pago: { modo: string; ejemplo: { minimo: number }; politica: string; reembolso: string; regla: ConfigCitas["pago"]; apartarMin: number };
+  enLinea: { llave: string; cuenta: string } | null;
 }) {
   const router = useRouter();
   const [paso, setPaso] = useState(0);
@@ -37,6 +39,9 @@ export function Reservar(p: {
   const [sitio, setSitio] = useState("");
   const [cot, setCot] = useState<{ filas: { nombre: string; precio: number; descuento: number }[]; total: number; duracion: number } | null>(null);
   const [error, setError] = useState<string | null>(null);
+  // Pago en línea (si el negocio lo tiene): anticipo, total o pagar en el negocio.
+  const pagaEnLinea = !!p.enLinea && p.pago.modo !== "sin_pago";
+  const [forma, setForma] = useState<FormaPago>(p.pago.modo === "completo" ? "total" : p.pago.modo === "opcional" ? "negocio" : "anticipo");
   const [pend, iniciar] = useTransition();
   const elegidos = p.servicios.filter((s) => svc.includes(s.id));
   const duracion = elegidos.reduce((a, s) => a + s.duracionMin, 0);
@@ -187,7 +192,15 @@ export function Reservar(p: {
           </>
         )}
 
-        {paso === 6 && (
+        {paso === 6 && (pagaEnLinea ? (
+          <PagoReserva slug={p.slug} enLinea={p.enLinea!} modo={p.pago.modo} forma={forma} setForma={setForma}
+            total={cot?.total ?? estimado} anticipo={montoAPagar(cot?.total ?? estimado, p.pago.regla).minimo} apartarMin={p.pago.apartarMin}
+            politica={p.pago.politica} reembolso={p.pago.reembolso}
+            datos={{ servicioIds: svc, persona, fecha: fecha!, minuto: minuto!, nombre, telefono: tel, notas, sitio }}
+            alConfirmar={(token) => router.push(`/reservar/${p.slug}/cita/${token}`)}
+            alOcupado={() => { setMinuto(null); setPaso(3); }}
+            enNegocio={() => ir(7)} />
+        ) : (
           <>
             <h1>Pago</h1>
             <div className="rv-pago">
@@ -197,7 +210,7 @@ export function Reservar(p: {
             {p.pago.politica && <p className="rv-politica"><b>Cancelaciones.</b> {p.pago.politica}</p>}
             {p.pago.reembolso && <p className="rv-politica"><b>Reembolsos.</b> {p.pago.reembolso}</p>}
           </>
-        )}
+        ))}
 
         {paso === 7 && (
           <>
@@ -213,12 +226,12 @@ export function Reservar(p: {
         {error && <p className="aviso error">{error}</p>}
       </section>
 
-      <footer className="rv-barra">
+      {!(paso === 6 && pagaEnLinea) && <footer className="rv-barra">
         <span className="rv-sum"><b>{svc.length ? formatoDinero(cot?.total ?? estimado) : "Elige un servicio"}</b><small>{svc.length ? `${svc.length} ${svc.length === 1 ? "servicio" : "servicios"}, ${duracion} min` : ""}</small></span>
         {paso < 7
           ? <button type="button" className="bt" disabled={!puedeSeguir} onClick={() => ir(paso + 1)}>Continuar</button>
           : <button type="button" className="bt" disabled={pend} onClick={confirmar}>{pend ? "Reservando…" : "Confirmar cita"}</button>}
-      </footer>
+      </footer>}
     </main>
   );
 }

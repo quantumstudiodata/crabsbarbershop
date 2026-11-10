@@ -21,7 +21,7 @@ const lista = (xs: string[]) => (xs.length < 2 ? xs.join("") : `${xs.slice(0, -1
 type Tab = "horarios" | "reservaciones" | "pagina";
 
 export function AjustesCitas(p: {
-  tab: Tab; negocio: string; origen: string; puedeConfig: boolean; puedeHorarios: boolean;
+  tab: Tab; negocio: string; origen: string; puedeConfig: boolean; puedeHorarios: boolean; cobraEnLinea: boolean;
   inicial: { usaCitas: boolean; slug: string; horario: Horario; cerrados: string[]; config: Config };
   equipo: Persona[]; rotacion: Rot | null; bloqueos: Bloqueo[]; hoy: string; servicios: { nombre: string; precio: number }[]; quien: [string, string][];
 }) {
@@ -80,7 +80,7 @@ export function AjustesCitas(p: {
               <label className="ac-fila"><span>Pago al reservar</span>
                 <select className="ac-sel" value={d.pagoModo} onChange={(e) => cambia({ pagoModo: e.target.value as ModoPago })}>{MODOS.map(([k, t]) => <option key={k} value={k}>{t}</option>)}</select></label>
               {(d.pagoModo === "anticipo_pct" || d.pagoModo === "anticipo_fijo") && <Num etiqueta={d.pagoModo === "anticipo_pct" ? "Porcentaje del anticipo" : "Cantidad del anticipo"} valor={d.pagoValor} unidad={d.pagoModo === "anticipo_pct" ? "%" : "pesos"} onChange={(v) => cambia({ pagoValor: v })} />}
-              {d.pagoModo !== "sin_pago" && <small className="ac-nota">La pasarela de pagos se conecta en la siguiente fase; mientras tanto las reservaciones se guardan sin pago.</small>}
+              {d.pagoModo !== "sin_pago" && !p.cobraEnLinea && <small className="ac-nota">Para cobrar en línea, conecta Stripe en Configuración del negocio. Mientras tanto las reservaciones se guardan sin pago y el cliente paga en el negocio.</small>}
             </section>
             <section className="glass ac-card">
               <span className="lab">Cancelaciones</span>

@@ -15,6 +15,8 @@
     "db:demo": "tsx scripts/demo.ts"
   },
   "dependencies": {
+    "@stripe/react-stripe-js": "^3.11.0",
+    "@stripe/stripe-js": "^5.10.0",
     "@types/qrcode": "^1.5.6",
     "bcryptjs": "3.0.3",
     "drizzle-orm": "0.45.4",
@@ -23,7 +25,8 @@
     "postgres": "3.4.9",
     "qrcode": "^1.5.4",
     "react": "19.3.0",
-    "react-dom": "19.3.0"
+    "react-dom": "19.3.0",
+    "stripe": "^17.7.0"
   },
   "devDependencies": {
     "@types/node": "22.20.5",

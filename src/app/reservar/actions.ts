@@ -2,7 +2,11 @@
 
 import { and, eq, gt, inArray, sql } from "drizzle-orm";
 import { headers } from "next/headers";
-import { leerConfig } from "@/lib/agenda";
+import { randomBytes } from "node:crypto";
+import { leerConfig, montoAPagar } from "@/lib/agenda";
+import { pagosLinea } from "@/lib/db/schema";
+import { cobraEnLinea, crearIntento } from "@/lib/stripe";
+import { reembolsarCita } from "@/lib/pagos";
 import { avisosDeConfirmacion, crearCita, diasConLugar, disponibilidadDia, encolarAviso, equipoAgenda, serviciosDeCita, telefonoValido, textoCita } from "@/lib/citas";
 import { db, schema } from "@/lib/db";
 import { fechaLocal, sumarDias } from "@/lib/fechas";
@@ -46,7 +50,9 @@ export async function cotizar(slug: string, fecha: string, minuto: number, servi
   return svc ? { filas: svc.filas, total: svc.total, duracion: svc.duracion } : null;
 }
 
-export async function reservar(slug: string, d: { servicioIds: string[]; persona: string | null; fecha: string; minuto: number; nombre: string; telefono: string; notas: string; sitio?: string }): Promise<{ error?: string; token?: string }> {
+type DatosReserva = { servicioIds: string[]; persona: string | null; fecha: string; minuto: number; nombre: string; telefono: string; notas: string; sitio?: string };
+
+export async function reservar(slug: string, d: DatosReserva, apartar = false): Promise<{ error?: string; token?: string; citaId?: string }> {
   // Campo trampa: las personas no lo ven; los robots lo llenan.
   if (d.sitio) return { error: "No se pudo completar la reservación." };
   const n = await negocio(slug);
@@ -65,9 +71,42 @@ export async function reservar(slug: string, d: { servicioIds: string[]; persona
     .where(and(eq(schema.citas.barberiaId, n.b.id), eq(schema.citas.clienteTelefono, tel), inArray(schema.citas.estado, ["en_espera", "llego"]), gt(schema.citas.inicio, new Date())));
   if (c >= 3) return { error: "Ya tienes 3 citas pendientes con nosotros. Para otra, comunícate al negocio." };
   void (await headers());
-  const r = await crearCita(n.b, { servicioIds, persona: d.persona, fecha: d.fecha, minuto: d.minuto, nombre, telefono: tel, observaciones: String(d.notas ?? ""), origen: "linea" });
+  const r = await crearCita(n.b, { servicioIds, persona: d.persona, fecha: d.fecha, minuto: d.minuto, nombre, telefono: tel, observaciones: String(d.notas ?? ""), origen: "linea", apartar });
   if ("error" in r) return { error: r.error };
-  return { token: r.cita.token };
+  return { token: r.cita.token, citaId: r.cita.id };
+}
+
+/**
+ * Reservar pagando en línea: aparta el horario unos minutos y crea el intento de pago en la cuenta del negocio.
+ * La cita se confirma solo cuando Stripe avisa que el pago entró; si no se paga, el apartado vence solo.
+ */
+export async function prepararPagoReserva(slug: string, d: DatosReserva, forma: "anticipo" | "total"): Promise<{ error?: string; secreto?: string; token?: string; monto?: number }> {
+  const n = await negocio(slug);
+  if (!n || !cobraEnLinea(n.b)) return { error: "El pago en línea no está disponible. Puedes reservar y pagar en el negocio." };
+  if (n.config.pago.modo === "sin_pago") return { error: "Este negocio no pide pago al reservar." };
+  const r = await reservar(slug, d, true);
+  if (r.error || !r.citaId) return { error: r.error ?? "No se pudo apartar el horario." };
+  const [c] = await db.select().from(schema.citas).where(eq(schema.citas.id, r.citaId)).limit(1);
+  const anticipo = montoAPagar(c.total, n.config.pago).minimo;
+  const monto = forma === "total" || n.config.pago.modo === "completo" || n.config.pago.modo === "opcional" ? c.total : anticipo;
+  if (monto < 1000) return { error: "El monto es muy bajo para pagar en línea. Reserva y paga en el negocio." };
+  try {
+    const [pago] = await db.insert(pagosLinea).values({
+      barberiaId: n.b.id, tipo: "cita", token: randomBytes(12).toString("base64url"), citaId: c.id, monto,
+      detalle: { negocio: n.b.nombre, folio: c.folio, servicios: c.servicios.map((x) => x.nombre), total: c.total },
+    }).returning();
+    const pi = await crearIntento(n.b.stripeCuenta!, {
+      monto, descripcion: `${n.b.nombre}: ${monto < c.total ? "anticipo de " : ""}cita ${c.folio}`,
+      metadata: { pagoId: pago.id, barberiaId: n.b.id, tipo: "cita", citaId: c.id }, clave: `cita-${c.id}`,
+    });
+    await db.update(pagosLinea).set({ intento: pi.id }).where(eq(pagosLinea.id, pago.id));
+    return { secreto: pi.client_secret ?? undefined, token: c.token, monto };
+  } catch (err) {
+    console.error(err);
+    // Sin intento de pago no hay nada que pagar: se libera el horario.
+    await db.update(schema.citas).set({ estado: "expirada" }).where(and(eq(schema.citas.id, c.id), eq(schema.citas.estado, "apartada")));
+    return { error: "No se pudo preparar el pago. Intenta otra vez en un momento." };
+  }
 }
 
 async function citaPorToken(token: string) {
@@ -89,6 +128,8 @@ export async function cancelarPorCliente(token: string): Promise<{ error?: strin
     await encolarAviso(tx, { barberiaId: x.b.id, citaId: x.c.id, tipo: "cita_cancelada", para: "cliente", destino: x.c.clienteTelefono, mensaje: `Tu cita ${x.c.folio} en ${x.b.nombre} quedó cancelada.` });
     await encolarAviso(tx, { barberiaId: x.b.id, citaId: x.c.id, tipo: "cita_cancelada", para: "negocio", mensaje: `${x.c.clienteNombre} canceló su cita ${x.c.folio}.` });
   });
+  // Lo pagado en línea se devuelve solo (la cancelación ya está dentro del tiempo permitido).
+  if (x.c.pagado > 0) await reembolsarCita(x.c.id, { barberiaId: x.b.id, usuarioId: null, nombre: x.c.clienteNombre }).catch((err) => console.error("reembolso", err));
   return {};
 }
 

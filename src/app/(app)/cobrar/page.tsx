@@ -1,4 +1,5 @@
 import { and, eq } from "drizzle-orm";
+import { cobraEnLinea } from "@/lib/stripe";
 import { requerirSesion } from "@/lib/auth";
 import { cajaOAbrir, categoriasGasto, equipoQueAtiende, folioCorte, metodosActivos, movimientosDeTurno, serviciosActivos } from "@/lib/datos";
 import { db, schema } from "@/lib/db";
@@ -28,7 +29,7 @@ export default async function Cobrar({ searchParams }: { searchParams: Promise<{
     ? await db.select().from(schema.citas).where(and(eq(schema.citas.id, q.cita), eq(schema.citas.barberiaId, s.barberia.id))).limit(1)
     : [];
   const desdeCita = cita && !cita.ventaId && !["cancelada", "no_asistio", "expirada"].includes(cita.estado)
-    ? { id: cita.id, folio: cita.folio, cliente: cita.clienteNombre, barberoId: cita.barberoId, servicioIds: cita.servicios.map((x) => x.servicioId) }
+    ? { id: cita.id, folio: cita.folio, cliente: cita.clienteNombre, barberoId: cita.barberoId, servicioIds: cita.servicios.map((x) => x.servicioId), pagado: cita.pagado }
     : null;
   let turno: Turno | null = null;
   if (t) {
@@ -64,6 +65,7 @@ export default async function Cobrar({ searchParams }: { searchParams: Promise<{
                 desdeCita={desdeCita}
                 promos={promos.map(({ creadoEn: _c, creadoPor: _p, barberiaId: _b, ...x }) => x) as unknown as Promo[]} zona={zona}
                 usa={{ propinas: s.barberia.usaPropinas, descuentos: s.barberia.usaDescuentos, dividir: s.barberia.usaDividirPago }}
+                qr={cobraEnLinea(s.barberia)}
               />
             )}
           </>

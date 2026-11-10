@@ -1,0 +1,120 @@
+import "server-only";
+import { randomBytes } from "node:crypto";
+import { and, eq, ne, gt, lt, inArray, sql } from "drizzle-orm";
+import type Stripe from "stripe";
+import { avisosDeConfirmacion, ESTADOS_ACTIVOS } from "./citas";
+import { db, schema } from "./db";
+import { pagosLinea } from "./db/schema";
+import { registrar } from "./historial";
+import { formatoDinero } from "./money";
+import { estadoDeCuenta, stripe, tarjetaDe } from "./stripe";
+import { insertarVenta, type PlanVenta, type PropinaVenta } from "./ventas";
+
+/**
+ * Stripe confirmó un pago (aviso verificado). Es idempotente: si el aviso llega dos veces, la segunda no hace nada.
+ * Cita: queda confirmada con lo pagado. Cobro con QR: se registra la venta con su folio.
+ */
+export async function confirmarPago(pi: Stripe.PaymentIntent, cuenta: string) {
+  const [p] = await db.select().from(pagosLinea).where(eq(pagosLinea.intento, pi.id)).limit(1);
+  if (!p) return { omitido: "sin_pago" };
+  const [b] = await db.select().from(schema.barberias).where(eq(schema.barberias.id, p.barberiaId)).limit(1);
+  // El pago tiene que venir de la cuenta del propio negocio.
+  if (!b || b.stripeCuenta !== cuenta) return { omitido: "otra_cuenta" };
+  const completo = await stripe().paymentIntents.retrieve(pi.id, { expand: ["latest_charge"] }, { stripeAccount: cuenta }).catch(() => pi);
+  if (completo.status !== "succeeded") return { omitido: "no_pagado" };
+  const cobrado = completo.amount_received || completo.amount;
+  const tarjeta = tarjetaDe(completo);
+
+  if (p.tipo === "venta") {
+    const datos = p.plan as { plan: PlanVenta; propina: PropinaVenta; propinaPara: string; anticipo?: number } | null;
+    if (!datos) return { omitido: "sin_plan" };
+    const propinaCliente = Math.max(cobrado - p.monto, 0);
+    const r = await db.transaction(async (tx) => {
+      const marcado = await tx.update(pagosLinea).set({ estado: "pagado", pagadoEn: new Date(), tarjeta, propina: propinaCliente })
+        .where(and(eq(pagosLinea.id, p.id), inArray(pagosLinea.estado, ["pendiente", "cancelado"]))).returning({ id: pagosLinea.id });
+      if (!marcado.length) return null;
+      // Si la caja del cobro ya se cerró, la venta entra en la caja abierta del negocio (si hay una).
+      const [abierta] = await tx.select({ id: schema.turnosCaja.id }).from(schema.turnosCaja)
+        .where(and(eq(schema.turnosCaja.barberiaId, b.id), eq(schema.turnosCaja.estado, "abierto"))).limit(1);
+      const [original] = await tx.select({ estado: schema.turnosCaja.estado }).from(schema.turnosCaja).where(eq(schema.turnosCaja.id, datos.plan.turnoId)).limit(1);
+      const plan = { ...datos.plan, turnoId: original?.estado === "abierto" || !abierta ? datos.plan.turnoId : abierta.id };
+      const propina: PropinaVenta = propinaCliente > 0 ? { monto: propinaCliente, barberoId: datos.propina?.barberoId || datos.propinaPara, efectivo: false } : null;
+      const anticipo = datos.anticipo ?? 0;
+      const v = await insertarVenta(tx, plan, [
+        { metodoPagoId: null, nombreMetodo: "Pago con QR", esEfectivo: false, monto: plan.total - anticipo },
+        ...(anticipo > 0 ? [{ metodoPagoId: null, nombreMetodo: "Anticipo en línea", esEfectivo: false, monto: anticipo }] : []),
+      ], propina, randomBytes(9).toString("base64url"));
+      await tx.update(pagosLinea).set({ ventaId: v.ventaId }).where(eq(pagosLinea.id, p.id));
+      return v;
+    }).catch(async (err) => {
+      // La misma venta ya se cobró por otro lado (otro QR o la cita ya cobrada): se devuelve este pago.
+      const msg = String((err as Error)?.message ?? "");
+      if (!msg.includes("ventas_clave_uq") && !msg.includes("cita_cobrada")) throw err;
+      await stripe().refunds.create({ payment_intent: pi.id, reason: "duplicate" }, { stripeAccount: cuenta, idempotencyKey: `reemb-${p.id}` });
+      await db.update(pagosLinea).set({ estado: "reembolsado", pagadoEn: new Date(), tarjeta }).where(eq(pagosLinea.id, p.id));
+      return null;
+    });
+    return r ? { venta: r.folio } : { omitido: "repetido" };
+  }
+
+  // Anticipo o pago completo de una cita reservada en línea.
+  const r = await db.transaction(async (tx) => {
+    const marcado = await tx.update(pagosLinea).set({ estado: "pagado", pagadoEn: new Date(), tarjeta, monto: cobrado })
+      .where(and(eq(pagosLinea.id, p.id), eq(pagosLinea.estado, "pendiente"))).returning({ id: pagosLinea.id });
+    if (!marcado.length || !p.citaId) return null;
+    const [c] = await tx.select().from(schema.citas).where(eq(schema.citas.id, p.citaId)).limit(1);
+    if (!c) return null;
+    // Si el apartado ya venció y alguien más tomó el horario, se devuelve el dinero.
+    if (c.estado === "expirada" || c.estado === "cancelada") {
+      const [choque] = await tx.select({ n: sql<number>`count(*)::int` }).from(schema.citas)
+        .where(and(eq(schema.citas.barberiaId, c.barberiaId), eq(schema.citas.barberoId, c.barberoId), ne(schema.citas.id, c.id),
+          lt(schema.citas.inicio, c.fin), gt(schema.citas.fin, c.inicio), inArray(schema.citas.estado, [...ESTADOS_ACTIVOS])));
+      if (c.estado === "cancelada" || choque.n > 0) return { reembolsar: true, c };
+    }
+    const pagado = c.pagado + cobrado;
+    const [act] = await tx.update(schema.citas).set({
+      estado: c.estado === "apartada" || c.estado === "expirada" ? "en_espera" : c.estado, expiraEn: null,
+      pagado, estadoPago: pagado >= c.total ? "pagada" : "anticipo", metodoPago: tarjeta ? `En línea, ${tarjeta}` : "En línea", actualizadoEn: new Date(),
+    }).where(eq(schema.citas.id, c.id)).returning();
+    if (c.estado === "apartada" || c.estado === "expirada") {
+      const [u] = await tx.select({ nombre: schema.usuarios.nombre }).from(schema.usuarios).where(eq(schema.usuarios.id, c.barberoId)).limit(1);
+      await avisosDeConfirmacion(tx, b, act, u?.nombre.split(" ")[0] ?? "");
+    }
+    return { reembolsar: false, c: act };
+  });
+  if (r?.reembolsar) {
+    await stripe().refunds.create({ payment_intent: pi.id, reason: "requested_by_customer" }, { stripeAccount: cuenta, idempotencyKey: `reemb-${p.id}` });
+    await db.update(pagosLinea).set({ estado: "reembolsado" }).where(eq(pagosLinea.id, p.id));
+    return { reembolsado: true };
+  }
+  return r ? { cita: r.c.folio } : { omitido: "repetido" };
+}
+
+/** Devuelve lo que se pagó en línea por una cita (al cancelarla). No hace nada si no se pagó en línea. */
+export async function reembolsarCita(citaId: string, quien: { barberiaId: string; usuarioId: string | null; nombre: string }) {
+  const pagos = await db.select().from(pagosLinea).where(and(eq(pagosLinea.citaId, citaId), eq(pagosLinea.estado, "pagado")));
+  if (!pagos.length) return { monto: 0 };
+  const [b] = await db.select().from(schema.barberias).where(eq(schema.barberias.id, quien.barberiaId)).limit(1);
+  if (!b?.stripeCuenta) return { monto: 0, error: "La cuenta de Stripe del negocio no está conectada; devuelve el anticipo desde el panel de Stripe." };
+  let monto = 0;
+  for (const p of pagos) {
+    if (!p.intento) continue;
+    await stripe().refunds.create({ payment_intent: p.intento, reason: "requested_by_customer" }, { stripeAccount: b.stripeCuenta, idempotencyKey: `reemb-${p.id}` });
+    await db.update(pagosLinea).set({ estado: "reembolsado" }).where(eq(pagosLinea.id, p.id));
+    monto += p.monto;
+  }
+  await db.update(schema.citas).set({ pagado: 0, estadoPago: "sin_pago", actualizadoEn: new Date() }).where(eq(schema.citas.id, citaId));
+  await registrar(db, { barberiaId: quien.barberiaId, usuarioId: quien.usuarioId, tipo: "venta", accion: `${quien.nombre} canceló una cita y se devolvieron ${formatoDinero(monto)} pagados en línea` });
+  return { monto };
+}
+
+/** Stripe avisó que cambió la cuenta conectada de un negocio (datos completos, cobros habilitados). */
+export async function actualizarCuenta(a: Stripe.Account) {
+  await db.update(schema.barberias).set({ stripeEstado: estadoDeCuenta(a) }).where(eq(schema.barberias.stripeCuenta, a.id));
+}
+
+/** Stripe devolvió un cobro (desde su panel o por nosotros). */
+export async function marcarReembolso(ch: Stripe.Charge) {
+  const pi = typeof ch.payment_intent === "string" ? ch.payment_intent : ch.payment_intent?.id;
+  if (pi && ch.refunded) await db.update(pagosLinea).set({ estado: "reembolsado" }).where(eq(pagosLinea.intento, pi));
+}

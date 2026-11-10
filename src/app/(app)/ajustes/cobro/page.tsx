@@ -1,4 +1,6 @@
-import { and, asc, eq } from "drizzle-orm";
+import { and, asc, eq, sql } from "drizzle-orm";
+import { pagosDisponibles } from "@/lib/stripe";
+import { PagosLinea } from "./PagosLinea";
 import { AvisoUrl } from "@/components/Encabezado";
 import { requerirSesion } from "@/lib/auth";
 import { categoriasGasto, datosParaMeta } from "@/lib/datos";
@@ -17,7 +19,7 @@ import { Bloque, CategoriasEgresos, GastosFrecuentes, OpcionesRegistro, Resumen 
 
 export const metadata = { title: "Configurar negocio" };
 
-export default async function ConfigurarNegocio({ searchParams }: { searchParams: Promise<{ aviso?: string; error?: string }> }) {
+export default async function ConfigurarNegocio({ searchParams }: { searchParams: Promise<{ aviso?: string; error?: string; stripe?: string }> }) {
   const s = await requerirSesion();
   if (!PERMISOS_CONFIG.some((p) => s.puede(p))) redirect("/?aviso=sin-permiso");
   const q = await searchParams;
@@ -43,9 +45,15 @@ export default async function ConfigurarNegocio({ searchParams }: { searchParams
     <>
       <AvisoUrl aviso={q.aviso} error={q.error} />
       <div>
-        <h1 className="titulo">Configurar negocio</h1>
+        <h1 className="titulo">Configuración del negocio</h1>
         <p className="sub">Abre cada apartado para ver cómo está configurado.</p>
       </div>
+
+      {pagosDisponibles() && (
+        <PagosLinea estado={(b.stripeEstado as "sin" | "pendiente" | "activa") ?? "sin"} revisar={q.stripe === "volver" || q.stripe === "reintentar"} puede={edita("cobros")}
+          cobradoMes={(await db.select({ m: sql<number>`coalesce(sum(${schema.pagosLinea.monto} + ${schema.pagosLinea.propina}), 0)::int` }).from(schema.pagosLinea)
+            .where(and(eq(schema.pagosLinea.barberiaId, b.id), eq(schema.pagosLinea.estado, "pagado"), sql`${schema.pagosLinea.pagadoEn} >= date_trunc('month', now())`)))[0]?.m ?? 0} />
+      )}
 
       <Bloque numero={1} titulo="Cobros y métodos de pago" puedeEditar={edita("cobros")}
         resumen={`${activos.length} ${activos.length === 1 ? "forma de pago" : "formas de pago"}, descuentos hasta ${b.limiteDescuentoPct}% sin autorización`}

@@ -8,12 +8,17 @@ import { requerirSesion } from "@/lib/auth";
 import { comisionDeServicio, elegirRegla } from "@/lib/comisiones";
 import { copiaRegla, equipoQueAtiende, reglasDe, cajaOAbrir } from "@/lib/datos";
 import { db, schema } from "@/lib/db";
-import { registrar } from "@/lib/historial";
 import { fechaLocal } from "@/lib/fechas";
 import { formatoDinero } from "@/lib/money";
 import { aplicarPromos, momentoEn, type Promo } from "@/lib/promociones";
+import { cobraEnLinea, crearIntento, origen, stripe } from "@/lib/stripe";
+import { insertarVenta, type PagoVenta, type PlanVenta, type PropinaVenta } from "@/lib/ventas";
+import { pagosLinea } from "@/lib/db/schema";
 
-export type EstadoCobro = { ok?: boolean; error?: string; folio?: string; total?: number; encuesta?: string | null };
+/** Identificador de la forma de pago "Pago con QR" (no es una forma de pago guardada del negocio). */
+const QR = "qr";
+
+export type EstadoCobro = { ok?: boolean; error?: string; folio?: string; total?: number; encuesta?: string | null; qr?: { id: string; url: string; total: number } };
 
 type Entrada = {
   clave: string;
@@ -101,12 +106,24 @@ export async function registrarVenta(_: EstadoCobro, form: FormData): Promise<Es
   const total = neto - e.descuento;
   const nombrePromo = (id?: string) => promos.find((x) => x.id === id)?.nombre ?? "";
 
+  // Pago con QR: el cliente paga en su teléfono; la venta se guarda cuando Stripe confirma el pago.
+  const conQr = e.pagos.some((p) => p.metodoId === QR);
+  if (conQr && (e.pagos.length > 1 || !cobraEnLinea(s.barberia))) return { error: "El pago con QR no está disponible en este momento." };
+  if (conQr && total <= 0) return { error: "No hay nada que cobrar con QR." };
   const metodos = await db.select().from(schema.metodosPago).where(and(eq(schema.metodosPago.barberiaId, bId), eq(schema.metodosPago.activo, true)));
-  const pagos = e.pagos.filter((p) => p.monto > 0).map((p) => ({ ...p, m: metodos.find((m) => m.id === p.metodoId) }));
-  if (pagos.length === 0 && total > 0) return { error: "Elige cómo pagó." };
+  const pagos = conQr ? [] : e.pagos.filter((p) => p.monto > 0).map((p) => ({ ...p, m: metodos.find((m) => m.id === p.metodoId) }));
+  if (pagos.length === 0 && total > 0 && !conQr && !(e.citaId)) return { error: "Elige cómo pagó." };
   if (pagos.some((p) => !p.m)) return { error: "Esa forma de pago ya no está disponible. Recarga la página." };
-  const pagado = pagos.reduce((a, p) => a + p.monto, 0);
-  if (pagado !== total) return { error: `Los pagos suman ${formatoDinero(pagado)} y la venta es de ${formatoDinero(total)}.` };
+  // Anticipo pagado en línea al reservar: ya está cobrado y se registra como un pago más de la venta.
+  let anticipo = 0;
+  if (e.citaId) {
+    const [c] = await db.select({ pagado: schema.citas.pagado }).from(schema.citas).where(and(eq(schema.citas.id, e.citaId), eq(schema.citas.barberiaId, bId))).limit(1);
+    anticipo = Math.min(c?.pagado ?? 0, total);
+  }
+  const porCobrar = total - anticipo;
+  if (conQr && porCobrar <= 0) return { error: "La cita ya está pagada en línea; cóbrala con cualquier forma de pago por $0." };
+  const pagado = conQr ? porCobrar : pagos.reduce((a, p) => a + p.monto, 0);
+  if (pagado !== porCobrar) return { error: `Los pagos suman ${formatoDinero(pagado)} y ${anticipo ? "falta por cobrar" : "la venta es de"} ${formatoDinero(porCobrar)}.` };
   if (e.propina.monto > 0 && !equipo.has(e.propina.barberoId)) return { error: "Elige para quién es la propina." };
 
   // Reparte el descuento manual entre los servicios en proporción a lo que queda después de la promoción.
@@ -131,43 +148,20 @@ export async function registrarVenta(_: EstadoCobro, form: FormData): Promise<Es
     };
   });
 
+  const plan: PlanVenta = {
+    barberiaId: bId, turnoId: turno.id, usuarioId: s.usuario.id, usuarioNombre: s.usuario.nombre, total, descuentoTotal: descPromo + e.descuento,
+    descuento: e.descuento, motivoDescuento: e.motivoDescuento, observaciones: e.observaciones, clave: e.clave, citaId: e.citaId,
+    promosUsadas: ap.usadas, nombresPromo: ap.usadas.map((x) => nombrePromo(x)).join(", "), conceptos,
+  };
+  const propina: PropinaVenta = e.propina.monto > 0 ? { monto: e.propina.monto, barberoId: e.propina.barberoId, efectivo: conQr ? false : e.propina.efectivo } : null;
+  const anticipoPago: PagoVenta[] = anticipo > 0 ? [{ metodoPagoId: null, nombreMetodo: "Anticipo en línea", esEfectivo: false, monto: anticipo }] : [];
+  if (conQr) return prepararQr(s, plan, propina, lineas.map((l) => ({ nombre: l.s.nombre, barberoId: l.barberoId, precio: l.s.precio })), anticipo);
+
   try {
     // Clave del enlace de la encuesta para el cliente: aleatoria, corta y sin datos de la venta.
     const encuesta = randomBytes(9).toString("base64url");
-    const folio = await db.transaction(async (tx) => {
-      const [{ n }] = await tx.update(schema.barberias).set({ siguienteFolio: sql`${schema.barberias.siguienteFolio} + 1` })
-        .where(eq(schema.barberias.id, bId)).returning({ n: sql<number>`${schema.barberias.siguienteFolio} - 1` });
-      const folio = `${s.barberia.folioPrefijo}-${String(n).padStart(6, "0")}`;
-      const [v] = await tx.insert(schema.ventas).values({
-        barberiaId: bId, folio, turnoId: turno.id, registradaPor: s.usuario.id, total, descuentoTotal: descPromo + e.descuento,
-        observaciones: e.observaciones, claveUnica: e.clave, tokenEncuesta: encuesta,
-      }).returning({ id: schema.ventas.id });
-      await tx.insert(schema.conceptos).values(conceptos.map((c) => ({ ...c, ventaId: v.id })));
-      // Si viene de una cita, queda ligada a la venta y completada (una cita no se cobra dos veces).
-      if (e.citaId) {
-        const r = await tx.update(schema.citas).set({ ventaId: v.id, estado: "completada", estadoPago: "pagada", actualizadoEn: new Date() })
-          .where(and(eq(schema.citas.id, e.citaId), eq(schema.citas.barberiaId, bId), sql`${schema.citas.ventaId} is null`)).returning({ id: schema.citas.id });
-        if (!r.length) throw new Error("cita_cobrada");
-      }
-      // Cada promoción usada cuenta una vez por venta; si tiene límite y ya se agotó, no se cobra.
-      for (const pid of ap.usadas) {
-        const r = await tx.update(schema.promociones).set({ usos: sql`${schema.promociones.usos} + 1` })
-          .where(and(eq(schema.promociones.id, pid), sql`(${schema.promociones.limiteUsos} is null or ${schema.promociones.usos} < ${schema.promociones.limiteUsos})`)).returning({ id: schema.promociones.id });
-        if (!r.length) throw new Error("promo_agotada");
-      }
-      if (pagos.length) {
-        await tx.insert(schema.pagos).values(pagos.map((p) => ({ barberiaId: bId, ventaId: v.id, metodoPagoId: p.m!.id, nombreMetodo: p.m!.nombre, esEfectivo: p.m!.esEfectivo, monto: p.monto })));
-      }
-      if (e.propina.monto > 0) {
-        await tx.insert(schema.propinas).values({ barberiaId: bId, ventaId: v.id, barberoId: e.propina.barberoId, monto: e.propina.monto, esEfectivo: e.propina.efectivo });
-      }
-      await registrar(tx, {
-        barberiaId: bId, usuarioId: s.usuario.id, tipo: "venta",
-        accion: `${s.usuario.nombre} cobró la venta ${folio}`,
-        detalle: { folio, total, descuento: e.descuento, motivoDescuento: e.motivoDescuento || undefined, promociones: ap.usadas.map((x) => nombrePromo(x)).join(", ") || undefined },
-      });
-      return folio;
-    });
+    const { folio } = await db.transaction((tx) => insertarVenta(tx, plan,
+      [...pagos.map((p) => ({ metodoPagoId: p.m!.id, nombreMetodo: p.m!.nombre, esEfectivo: p.m!.esEfectivo, monto: p.monto })), ...anticipoPago], propina, encuesta));
     revalidatePath("/", "layout");
     return { ok: true, folio, total, encuesta };
   } catch (err) {
@@ -181,4 +175,65 @@ export async function registrarVenta(_: EstadoCobro, form: FormData): Promise<Es
     console.error(err);
     return { error: "No se pudo guardar la venta. Revisa tu conexión e intenta otra vez." };
   }
+}
+
+type Sesion = Awaited<ReturnType<typeof requerirSesion>>;
+
+/** Prepara un cobro con QR: guarda la venta calculada y crea el intento de pago en la cuenta del negocio. */
+async function prepararQr(s: Sesion, plan: PlanVenta, propina: PropinaVenta, lineas: { nombre: string; barberoId: string; precio: number }[], anticipo: number): Promise<EstadoCobro> {
+  const b = s.barberia;
+  const base = await origen();
+  // Doble clic: si ya hay un cobro con QR pendiente para esta misma venta, se reutiliza.
+  const [previo] = await db.select().from(pagosLinea)
+    .where(and(eq(pagosLinea.barberiaId, b.id), eq(pagosLinea.estado, "pendiente"), sql`${pagosLinea.plan}->'plan'->>'clave' = ${plan.clave}`)).limit(1);
+  if (previo) return { qr: { id: previo.id, url: `${base}/pagar/${previo.token}`, total: previo.monto + previo.propina } };
+  const equipo = await equipoQueAtiende(b.id);
+  const nombre = (id: string) => equipo.find((x) => x.id === id)?.nombre.split(" ")[0] ?? "";
+  const token = randomBytes(12).toString("base64url");
+  const propinaFija = propina?.monto ?? 0;
+  try {
+    const [pago] = await db.insert(pagosLinea).values({
+      barberiaId: b.id, tipo: "venta", token, monto: plan.total - anticipo, propina: propinaFija, creadoPor: s.usuario.id,
+      plan: { plan, propina, propinaPara: propina?.barberoId ?? lineas[0]?.barberoId ?? "", anticipo },
+      detalle: { negocio: b.nombre, conceptos: lineas.map((l) => ({ nombre: l.nombre, con: nombre(l.barberoId), precio: l.precio })), propinaFija: propinaFija > 0, descuento: plan.descuentoTotal, anticipo },
+    }).returning();
+    const pi = await crearIntento(b.stripeCuenta!, {
+      monto: plan.total - anticipo + propinaFija, descripcion: `${b.nombre}: ${lineas.map((l) => l.nombre).join(", ")}`,
+      metadata: { pagoId: pago.id, barberiaId: b.id, tipo: "venta" }, clave: `qr-${pago.id}`,
+    });
+    await db.update(pagosLinea).set({ intento: pi.id }).where(eq(pagosLinea.id, pago.id));
+    return { qr: { id: pago.id, url: `${base}/pagar/${token}`, total: plan.total - anticipo + propinaFija } };
+  } catch (err) {
+    console.error(err);
+    return { error: "No se pudo preparar el cobro con QR. Revisa la conexión con Stripe e intenta otra vez." };
+  }
+}
+
+/** Estado de un cobro con QR, para la ventana que espera el pago. */
+export async function estadoCobroQr(id: string): Promise<{ estado: string; folio?: string; total?: number; tarjeta?: string; propina?: number }> {
+  const s = await requerirSesion();
+  if (!/^[0-9a-f-]{36}$/.test(String(id))) return { estado: "desconocido" };
+  const [p] = await db.select().from(pagosLinea).where(and(eq(pagosLinea.id, id), eq(pagosLinea.barberiaId, s.barberia.id))).limit(1);
+  if (!p) return { estado: "desconocido" };
+  let folio: string | undefined;
+  if (p.ventaId) [{ folio }] = await db.select({ folio: schema.ventas.folio }).from(schema.ventas).where(eq(schema.ventas.id, p.ventaId)).limit(1);
+  return { estado: p.estado, folio, total: p.monto + p.propina, tarjeta: p.tarjeta, propina: p.propina };
+}
+
+/** Cancela un cobro con QR que todavía no se paga (al cerrar la ventana). */
+export async function cancelarCobroQr(id: string): Promise<{ ok?: boolean; error?: string }> {
+  const s = await requerirSesion();
+  if (!/^[0-9a-f-]{36}$/.test(String(id))) return { error: "Cobro no encontrado." };
+  const [p] = await db.select().from(pagosLinea).where(and(eq(pagosLinea.id, id), eq(pagosLinea.barberiaId, s.barberia.id))).limit(1);
+  if (!p || p.estado !== "pendiente") return { ok: true };
+  try {
+    if (p.intento && s.barberia.stripeCuenta) await stripe().paymentIntents.cancel(p.intento, {}, { stripeAccount: s.barberia.stripeCuenta });
+  } catch (err) {
+    // Si Stripe ya lo cobró, el aviso de Stripe registra la venta; no se marca como cancelado.
+    const pi = p.intento && s.barberia.stripeCuenta ? await stripe().paymentIntents.retrieve(p.intento, {}, { stripeAccount: s.barberia.stripeCuenta }).catch(() => null) : null;
+    if (pi?.status === "succeeded" || pi?.status === "processing") return { error: "El cliente ya pagó; la venta se registrará en unos segundos." };
+    console.error(err);
+  }
+  await db.update(pagosLinea).set({ estado: "cancelado" }).where(and(eq(pagosLinea.id, p.id), eq(pagosLinea.estado, "pendiente")));
+  return { ok: true };
 }

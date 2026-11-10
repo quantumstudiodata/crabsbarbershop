@@ -155,6 +155,13 @@
       "when": 1794284903970,
       "tag": "0021_equipo_pagos_resenas",
       "breakpoints": true
+    },
+    {
+      "idx": 22,
+      "version": "7",
+      "when": 1794346264928,
+      "tag": "0022_pagos_en_linea",
+      "breakpoints": true
     }
   ]
 }

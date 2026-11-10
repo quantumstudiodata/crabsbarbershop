@@ -71,6 +71,9 @@ export const barberias = pgTable("barberias", {
   diasCerrados: jsonb("dias_cerrados").$type<string[]>().notNull().default([]),
   // Reglas de las reservaciones: anticipación, margen entre citas, opciones del cliente, pago y políticas.
   citasConfig: jsonb("citas_config").$type<Record<string, unknown>>().notNull().default({}),
+  // Pagos en línea: cada negocio conecta su propia cuenta de Stripe (Connect). sin | pendiente | activa
+  stripeCuenta: text("stripe_cuenta"),
+  stripeEstado: text("stripe_estado").notNull().default("sin"),
   usaComprobantes: boolean("usa_comprobantes").notNull().default(true),
   usaPeriodicidad: boolean("usa_periodicidad").notNull().default(true),
   // Formas de pago que se pueden usar al registrar un egreso.
@@ -794,4 +797,35 @@ export const resenas = pgTable(
     creadoEn: creadoEn(),
   },
   (t) => [uniqueIndex("resenas_venta_uq").on(t.ventaId), index("resenas_barberia_idx").on(t.barberiaId, t.creadoEn)],
+);
+
+// Pagos en línea con Stripe: anticipos de citas y cobros con QR. Nunca se guardan datos de tarjetas:
+// solo el identificador del intento de pago de Stripe, el monto y la marca y terminación que Stripe reporta.
+// Un pago cuenta únicamente cuando llega el aviso verificado de Stripe (webhook).
+export const pagosLinea = pgTable(
+  "pagos_linea",
+  {
+    id: id(),
+    barberiaId: barberiaId(),
+    // cita | venta
+    tipo: text("tipo").notNull(),
+    // Enlace público del pago (página que abre el cliente al escanear el QR).
+    token: text("token").notNull(),
+    intento: text("intento"),
+    citaId: uuid("cita_id").references(() => citas.id),
+    ventaId: uuid("venta_id").references(() => ventas.id),
+    monto: integer("monto").notNull(),
+    propina: integer("propina").notNull().default(0),
+    // pendiente | pagado | cancelado | reembolsado
+    estado: text("estado").notNull().default("pendiente"),
+    // Venta lista para registrarse cuando Stripe confirme (cobros con QR).
+    plan: jsonb("plan").$type<Record<string, unknown>>(),
+    // Lo que ve el cliente: conceptos y para quién es la propina.
+    detalle: jsonb("detalle").$type<Record<string, unknown>>().notNull().default({}),
+    tarjeta: text("tarjeta").notNull().default(""),
+    creadoPor: uuid("creado_por").references(() => usuarios.id),
+    creadoEn: creadoEn(),
+    pagadoEn: timestamp("pagado_en", { withTimezone: true }),
+  },
+  (t) => [uniqueIndex("pagos_linea_token_uq").on(t.token), uniqueIndex("pagos_linea_intento_uq").on(t.intento), index("pagos_linea_barberia_idx").on(t.barberiaId, t.creadoEn)],
 );

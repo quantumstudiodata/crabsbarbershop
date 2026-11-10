@@ -1,4 +1,5 @@
 import { and, asc, eq } from "drizzle-orm";
+import { cobraEnLinea } from "@/lib/stripe";
 import type { Metadata } from "next";
 import { notFound } from "next/navigation";
 import { leerConfig, montoAPagar } from "@/lib/agenda";
@@ -53,7 +54,8 @@ export default async function PaginaReservar({ params }: { params: Promise<{ slu
       servicios={conPromo.sort((a, c) => orden.indexOf(a.categoria) - orden.indexOf(c.categoria))}
       equipo={equipo.map((e) => ({ id: e.id, nombre: e.nombre.split(" ")[0], avatar: e.avatar }))}
       opciones={{ elegir: config.elegirBarbero, cualquiera: config.cualquierBarbero, varios: config.variosServicios, maxDias: config.anticipacionMaxDias }}
-      pago={{ modo: config.pago.modo, ejemplo: montoAPagar(10000, config.pago), politica: config.politicaCancelacion, reembolso: config.politicaReembolso }}
+      pago={{ modo: config.pago.modo, ejemplo: montoAPagar(10000, config.pago), politica: config.politicaCancelacion, reembolso: config.politicaReembolso, regla: config.pago, apartarMin: config.apartarMin }}
+      enLinea={cobraEnLinea(b) ? { llave: process.env.NEXT_PUBLIC_STRIPE_PUBLISHABLE_KEY!, cuenta: b.stripeCuenta! } : null}
     />
   );
 }

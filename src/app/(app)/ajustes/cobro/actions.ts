@@ -227,3 +227,47 @@ export async function guardarMetodo(d: { id?: string; nombre: string; descripcio
   revalidatePath("/", "layout");
   return { ok: true, n: Date.now(), id: m.id };
 }
+
+/** Conectar la cuenta de Stripe del negocio: crea su cuenta (la primera vez) y devuelve el enlace para completar sus datos en Stripe. */
+export async function conectarStripe(): Promise<{ url?: string; error?: string }> {
+  const s = await requerirSesion("configuracion.cobros");
+  if (s.vista) return { error: "En la vista previa no se guardan cambios." };
+  const { pagosDisponibles, stripe, origen } = await import("@/lib/stripe");
+  if (!pagosDisponibles()) return { error: "Los pagos en línea todavía no están disponibles." };
+  try {
+    let cuenta = s.barberia.stripeCuenta;
+    if (!cuenta) {
+      const a = await stripe().accounts.create({ type: "standard", country: "MX", business_profile: { name: s.barberia.nombre }, metadata: { barberiaId: s.barberia.id } }, { idempotencyKey: `cuenta-${s.barberia.id}` });
+      cuenta = a.id;
+      await db.update(schema.barberias).set({ stripeCuenta: cuenta, stripeEstado: "pendiente" }).where(eq(schema.barberias.id, s.barberia.id));
+      await registrar(db, { barberiaId: s.barberia.id, usuarioId: s.usuario.id, tipo: "ajuste", accion: `${s.usuario.nombre} empezó a conectar la cuenta de Stripe del negocio` });
+    }
+    const base = await origen();
+    const link = await stripe().accountLinks.create({ account: cuenta, type: "account_onboarding", refresh_url: `${base}${R}?stripe=reintentar`, return_url: `${base}${R}?stripe=volver` });
+    return { url: link.url };
+  } catch (err) {
+    console.error(err);
+    return { error: "No se pudo abrir Stripe. Intenta de nuevo en un momento." };
+  }
+}
+
+/** Consulta en Stripe si la cuenta del negocio ya puede cobrar (al regresar de Stripe). */
+export async function revisarStripe(): Promise<{ estado?: string; error?: string }> {
+  const s = await requerirSesion("configuracion.cobros");
+  if (!s.barberia.stripeCuenta) return { estado: "sin" };
+  const { pagosDisponibles, stripe, estadoDeCuenta } = await import("@/lib/stripe");
+  if (!pagosDisponibles()) return { estado: s.barberia.stripeEstado };
+  try {
+    const a = await stripe().accounts.retrieve(s.barberia.stripeCuenta);
+    const estado = estadoDeCuenta(a);
+    if (estado !== s.barberia.stripeEstado) {
+      await db.update(schema.barberias).set({ stripeEstado: estado }).where(eq(schema.barberias.id, s.barberia.id));
+      if (estado === "activa") await registrar(db, { barberiaId: s.barberia.id, usuarioId: s.usuario.id, tipo: "ajuste", accion: `${s.usuario.nombre} conectó la cuenta de Stripe: ya se pueden cobrar pagos en línea` });
+      revalidatePath("/", "layout");
+    }
+    return { estado };
+  } catch (err) {
+    console.error(err);
+    return { error: "No se pudo consultar Stripe." };
+  }
+}

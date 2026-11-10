@@ -1,7 +1,7 @@
 "use client";
 
 import { useRouter } from "next/navigation";
-import { useState, useTransition } from "react";
+import { useEffect, useState, useTransition } from "react";
 import { Avatar } from "@/components/Avatar";
 import { Icono } from "@/components/Icono";
 import { aHora } from "@/lib/agenda";
@@ -25,13 +25,20 @@ export function MiCita({ slug, token, negocio, hoy, maxDias, cita, politica, hor
   const [error, setError] = useState<string | null>(null);
   const [pend, iniciar] = useTransition();
   const activa = cita.estado === "en_espera";
+  const confirmando = cita.estado === "apartada";
+  // Mientras Stripe confirma el pago, la página se actualiza sola.
+  useEffect(() => {
+    if (!confirmando) return;
+    const t = setInterval(() => router.refresh(), 3000);
+    return () => clearInterval(t);
+  }, [confirmando, router]);
   const elegirDia = (f: string) => { setFecha(f); setLibres(null); horariosParaCambio(token, f).then(setLibres); };
   return (
     <main className="reserva">
       <header className="rv-cab"><span className="rv-logo" aria-hidden="true"><Icono n="calendario" /></span><span className="rv-tit"><b>{negocio}</b><small>Comprobante de tu cita</small></span></header>
       <section className="rv-cuerpo">
         <div className={`rv-ticket ${activa ? "" : "inactiva"}`}>
-          <span className="rv-estado">{activa ? <><Icono n="palomita" />Cita confirmada</> : cita.estadoTxt}</span>
+          <span className="rv-estado">{activa ? <><Icono n="palomita" />Cita confirmada</> : confirmando ? <><Icono n="reloj" />Confirmando tu pago…</> : cita.estado === "expirada" ? "El apartado venció sin pago" : cita.estadoTxt}</span>
           <b className="rv-cuando">{fechaTxt(cita.fecha).replace(/^./, (x) => x.toUpperCase())}</b>
           <span className="rv-hora">{cita.hora}<small>{cita.duracion} min</small></span>
           <span className="rv-con"><Avatar avatar={cita.avatar} nombre={cita.barbero} t={28} />Te atiende {cita.barbero}</span>

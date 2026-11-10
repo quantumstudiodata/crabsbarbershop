@@ -7,6 +7,7 @@ import { Fl, Icono } from "@/components/Icono";
 import { Selector } from "@/components/ui";
 import { formatoDinero, leerPesos } from "@/lib/money";
 import { registrarVenta, type EstadoCobro } from "./actions";
+import { CobroQR } from "./CobroQR";
 import { aplicarPromos, descuentoDe, momentoEn, participa, vigente, type Promo } from "@/lib/promociones";
 
 type Servicio = { id: string; nombre: string; duracionMin: number; precio: number; categoria: string };
@@ -22,7 +23,9 @@ const iconoMetodo = (m: Metodo) => (m.esEfectivo ? "efectivo" : /tarjeta/i.test(
 export function FormCobro(p: {
   servicios: Servicio[]; equipo: Persona[]; metodos: Metodo[]; yo: string; puedeOtros: boolean; limiteDescuento: number;
   usa: { propinas: boolean; descuentos: boolean; dividir: boolean }; promos?: Promo[]; zona?: string;
-  desdeCita?: { id: string; folio: string; cliente: string; barberoId: string; servicioIds: string[] } | null;
+  desdeCita?: { id: string; folio: string; cliente: string; barberoId: string; servicioIds: string[]; pagado?: number } | null;
+  /** El negocio puede cobrar con QR (Stripe conectado). */
+  qr?: boolean;
 }) {
   const promos = p.promos ?? [];
   const [estado, accion, enviando] = useActionState<EstadoCobro, FormData>(registrarVenta, {});
@@ -44,6 +47,11 @@ export function FormCobro(p: {
   const [motivo, setMotivo] = useState("");
   const [propina, setPropina] = useState<{ tipo: "pct" | "fijo"; valor: string } | null>(null);
   const [ultima, setUltima] = useState<{ folio: string; total: number; encuesta?: string | null } | null>(null);
+  const [cobroQr, setCobroQr] = useState<{ id: string; url: string; total: number } | null>(null);
+  const qrVisto = useRef<string | null>(null);
+  // "Pago con QR" aparece junto a las formas de pago del negocio, pero no es una de ellas: no entra al efectivo de la caja.
+  const metodosVista = p.qr ? [...p.metodos, { id: "qr", nombre: "Pago con QR", esEfectivo: false }] : p.metodos;
+  const conQr = metodo === "qr";
   // En el teléfono: una sola categoría abierta a la vez y el resumen de la venta en un panel inferior.
   const [catAbierta, setCatAbierta] = useState<string | null>(null);
   const [hoja, setHoja] = useState(false);
@@ -63,6 +71,7 @@ export function FormCobro(p: {
       setHoja(false);
       limpiar();
     }
+    if (estado.qr && estado.qr.id !== qrVisto.current) { qrVisto.current = estado.qr.id; setCobroQr(estado.qr); }
   }, [estado]);
 
   /** Mueve el foco al paso más cercano en una dirección (flechas) o al siguiente en orden (Enter). */
@@ -137,8 +146,11 @@ export function FormCobro(p: {
   const calc = (x: { tipo: "pct" | "fijo"; valor: string } | null, base: number) =>
     !x ? 0 : x.tipo === "pct" ? Math.round((base * (Number(x.valor) || 0)) / 100) : leerPesos(x.valor) ?? 0;
   const desc = Math.min(calc(descuento, subtotal), subtotal);
-  const total = Math.max(subtotal - desc, 0);
-  const prop = calc(propina, total);
+  const totalVenta = Math.max(subtotal - desc, 0);
+  // Si la cita ya tiene un anticipo pagado en línea, solo se cobra el resto.
+  const anticipo = Math.min(cita?.pagado ?? 0, totalVenta);
+  const total = totalVenta - anticipo;
+  const prop = calc(propina, totalVenta);
   const m1 = dividir ? Math.min(leerPesos(monto1) ?? 0, total) : total;
   const metodoActual = p.metodos.find((m) => m.id === metodo);
   const pasaLimite = desc > Math.floor((subtotal * p.limiteDescuento) / 100);
@@ -154,7 +166,7 @@ export function FormCobro(p: {
     lineas: conServicio.flatMap((l) => Array.from({ length: l.cantidad }, () => ({ servicioId: l.servicioId, barberoId: l.barberoId }))),
     descuento: desc,
     motivoDescuento: desc > 0 ? motivo || "Sin motivo" : "",
-    pagos: dividir ? [{ metodoId: metodo, monto: m1 }, { metodoId: metodo2, monto: total - m1 }] : [{ metodoId: metodo, monto: total }],
+    pagos: dividir && !conQr ? [{ metodoId: metodo, monto: m1 }, { metodoId: metodo2, monto: total - m1 }] : [{ metodoId: metodo, monto: total }],
     propina: { monto: prop, barberoId: conServicio[0]?.barberoId ?? barbero, efectivo: propinaEfectivo },
     observaciones: "",
     codigo,
@@ -273,7 +285,7 @@ export function FormCobro(p: {
             <Icono n="mas" />{prop ? `Propina ${formatoDinero(prop)}` : "Propina"}
           </button>}
           {p.usa.dividir && p.metodos.length > 1 && (
-            <button type="button" data-paso="" className={`chipf ${dividir ? "on" : ""}`} aria-pressed={dividir} onClick={() => setDividir((d) => !d)}><Icono n="cobro" />Dividir pago</button>
+            <button type="button" data-paso="" className={`chipf ${dividir ? "on" : ""}`} aria-pressed={dividir} onClick={() => { if (conQr) setMetodo(p.metodos[0]?.id ?? ""); setDividir((d) => !d); }}><Icono n="cobro" />Dividir pago</button>
           )}
         </div>
 
@@ -326,12 +338,13 @@ export function FormCobro(p: {
         )}
 
         <div className="metodos" role="radiogroup" aria-label="Forma de pago">
-          {p.metodos.map((m) => (
+          {metodosVista.map((m) => (
             <button type="button" key={m.id} data-paso="" role="radio" aria-checked={metodo === m.id} className="metodo" onClick={() => {
               setMetodo(m.id);
+              if (m.id === "qr") setDividir(false);
               if (metodo2 === m.id) setMetodo2(p.metodos.find((x) => x.id !== m.id)?.id ?? "");
             }}>
-              <Icono n={iconoMetodo(m)} />{m.nombre}
+              <Icono n={m.id === "qr" ? "cuadros" : iconoMetodo(m)} />{m.nombre}
             </button>
           ))}
         </div>
@@ -348,6 +361,9 @@ export function FormCobro(p: {
             <span className={`conteo-l ${m1 > 0 && m1 < total ? "ok" : "dif"}`}><Icono n={m1 > 0 && m1 < total ? "palomita" : "reloj"} />{m1 > 0 && m1 < total ? `${metodoActual?.nombre} ${formatoDinero(m1)} y ${p.metodos.find((x) => x.id === metodo2)?.nombre} ${formatoDinero(total - m1)}` : "Escribe cuánto se paga con la primera forma"}</span>
           </div>
         )}
+        {conQr && total > 0 && (
+          <div className="paga-con qr-nota"><Icono n="cuadros" /><span>El cliente escanea el código y paga en su teléfono. No entra al efectivo de la caja.</span></div>
+        )}
         {efectivoSolo && total > 0 && (
           <div className="paga-con">
             <span className="otra"><span>Paga con</span><input data-paso="" inputMode="decimal" value={recibido} onChange={(e) => setRecibido(e.target.value)} placeholder={formatoDinero(aCobrarEfectivo)} aria-label="Con cuánto paga" /></span>
@@ -358,12 +374,13 @@ export function FormCobro(p: {
 
         <div className="separador" />
         {descPromo > 0 && <div className="renglon promo-t"><span className="muted">Ahorro por promociones</span><b className="num">−{formatoDinero(descPromo)}</b></div>}
+        {anticipo > 0 && <div className="renglon promo-t"><span className="muted">Anticipo pagado en línea</span><b className="num">−{formatoDinero(anticipo)}</b></div>}
         <div className="renglon" style={{ alignItems: "center" }}>
-          <span className="lab">Total{prop > 0 ? ` más ${formatoDinero(prop)} de propina` : ""}</span>
+          <span className="lab">{anticipo > 0 ? "Por cobrar" : "Total"}{prop > 0 ? ` más ${formatoDinero(prop)} de propina` : ""}</span>
           <span className="big">{formatoDinero(total)}</span>
         </div>
         {estado.error && <p className="aviso error" role="alert">{estado.error}</p>}
-        <button className="bt grande" data-paso="cobrar" disabled={enviando || lineas.length === 0}>{enviando ? "Guardando…" : `Cobrar ${formatoDinero(total)}`}<Fl /></button>
+        <button className="bt grande" data-paso="cobrar" disabled={enviando || lineas.length === 0}>{enviando ? (conQr ? "Preparando el QR…" : "Guardando…") : conQr ? `Mostrar QR para cobrar ${formatoDinero(total + prop)}` : `Cobrar ${formatoDinero(total)}`}<Fl /></button>
         <div className="atajos" aria-label="Atajos de teclado">
           <span><span className="k">Enter</span> o <span className="k">flechas</span> Moverse</span>
           <span><span className="k">Espacio</span> Elegir</span>
@@ -373,6 +390,12 @@ export function FormCobro(p: {
           <span><span className="k">Esc</span> Limpiar</span>
         </div>
       </aside>
+      {cobroQr && (
+        <CobroQR cobro={cobroQr}
+          detalle={`${conServicio.map((l) => l.s.nombre).join(", ")}${conServicio[0] ? ` con ${(p.equipo.find((e) => e.id === conServicio[0].barberoId)?.nombre ?? "").split(" ")[0]}` : ""}`}
+          listo={(r) => { setCobroQr(null); setUltima({ folio: r.folio, total: r.total }); setHoja(false); limpiar(); }}
+          cerrar={() => { setCobroQr(null); setClave(nuevaClave()); }} />
+      )}
     </form>
   );
 }

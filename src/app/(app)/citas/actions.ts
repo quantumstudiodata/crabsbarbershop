@@ -1,6 +1,8 @@
 "use server";
 
 import { and, eq, sql } from "drizzle-orm";
+import { formatoDinero } from "@/lib/money";
+import { reembolsarCita } from "@/lib/pagos";
 import { revalidatePath } from "next/cache";
 import { requerirSesion } from "@/lib/auth";
 import { aMin, instante, leerConfig, type Horario, type ModoPago } from "@/lib/agenda";
@@ -78,8 +80,15 @@ export async function cancelarCita(id: string, motivo: string): Promise<Res> {
     await encolarAviso(tx, { barberiaId: s.barberia.id, citaId: id, tipo: "cita_cancelada", para: "cliente", destino: c.clienteTelefono, mensaje: `Tu cita ${c.folio} en ${s.barberia.nombre} fue cancelada.` });
     await registrar(tx, { barberiaId: s.barberia.id, usuarioId: s.usuario.id, tipo: "venta", accion: `${s.usuario.nombre} canceló la cita ${c.folio} de ${c.clienteNombre}`, detalle: { motivo } });
   });
+  // Si el cliente pagó en línea, se le devuelve lo pagado.
+  let devuelto = 0;
+  if (c.pagado > 0) {
+    const r = await reembolsarCita(id, { barberiaId: s.barberia.id, usuarioId: s.usuario.id, nombre: s.usuario.nombre }).catch((err) => { console.error("reembolso", err); return { monto: 0, error: "No se pudo devolver el anticipo; devuélvelo desde el panel de Stripe." }; });
+    if ("error" in r && r.error) { revalidatePath("/citas"); return { mensaje: `Cita cancelada. ${r.error}` }; }
+    devuelto = r.monto;
+  }
   revalidatePath("/citas");
-  return { mensaje: "Cita cancelada." };
+  return { mensaje: devuelto ? `Cita cancelada. Se devolvieron ${formatoDinero(devuelto)} pagados en línea.` : "Cita cancelada." };
 }
 
 /** Cambia el día, la hora o la persona de una cita, revisando que el nuevo horario esté libre. */
