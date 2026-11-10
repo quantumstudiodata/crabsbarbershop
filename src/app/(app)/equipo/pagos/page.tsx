@@ -1,4 +1,5 @@
 import Link from "next/link";
+import { Vacio } from "../Vacio";
 import { and, desc, eq, gte, isNull, lt, sql } from "drizzle-orm";
 import { alias } from "drizzle-orm/pg-core";
 import { AvisoUrl } from "@/components/Encabezado";
@@ -95,7 +96,7 @@ export default async function Pagos({ searchParams }: { searchParams: Promise<{ 
               </div>
             ))}
           </div>
-        ) : <p className="muted eq2-vacio">Todavía no hay pagos registrados.</p>}
+        ) : <Vacio icono="historial" titulo="Todavía no hay pagos registrados" texto="Cuando registres un pago o un cobro de renta desde Equipo, aparecerá aquí con quién lo registró." />}
         {hayMas && <Link className="eq-mas" href={url({ n: limite + 30 })}>Ver más<Icono n="abajo" /></Link>}
       </section>
     </div>

@@ -1,4 +1,5 @@
 import Link from "next/link";
+import { Vacio } from "../Vacio";
 import { notFound } from "next/navigation";
 import { and, desc, eq } from "drizzle-orm";
 import { Avatar } from "@/components/Avatar";
@@ -101,11 +102,11 @@ export default async function Ficha({ params, searchParams }: { params: Promise<
       <div className="eq2-dos">
         <section>
           <div className="entre"><span className="lab">Lo que más hace</span>{r.servicios > 0 && <Link className="eq2-link" href={`/analitica/ventas?persona=${u.id}&periodo=mes&mes=${m.mes}`}>Ver actividad</Link>}</div>
-          {r.top.length ? <div className="eq2-tabla">{r.top.slice(0, 5).map((t) => <div key={t.nombre}><span>{t.nombre}</span><b>{t.veces}</b></div>)}</div> : <p className="muted eq2-vacio">Sin servicios en este mes.</p>}
+          {r.top.length ? <div className="eq2-tabla">{r.top.slice(0, 5).map((t) => <div key={t.nombre}><span>{t.nombre}</span><b>{t.veces}</b></div>)}</div> : <Vacio icono="lista" titulo="Sin servicios este mes" texto="Cuando atienda a su primer cliente del mes, aquí verás lo que más hace." />}
         </section>
         <section>
           <div className="entre"><span className="lab">Pagos</span>{puedePagar && pagosRecientes.length > 0 && <Link className="eq2-link" href={`/equipo/pagos?persona=${u.id}`}>Ver todos</Link>}</div>
-          {pagosRecientes.length ? <div className="eq2-tabla">{pagosRecientes.map((x) => <div key={x.id}><span>{fecha(x.creadoEn)}{x.tipo === "renta" ? ", renta" : ""}</span><b>{formatoDinero(x.monto)}</b></div>)}</div> : <p className="muted eq2-vacio">Sin pagos registrados.</p>}
+          {pagosRecientes.length ? <div className="eq2-tabla">{pagosRecientes.map((x) => <div key={x.id}><span>{fecha(x.creadoEn)}{x.tipo === "renta" ? ", renta" : ""}</span><b>{formatoDinero(x.monto)}</b></div>)}</div> : <Vacio icono="efectivo" titulo="Sin pagos registrados" texto="Cada pago que le registres aparecerá aquí con su fecha y monto." />}
         </section>
       </div>
       <details className="eq2-mas">

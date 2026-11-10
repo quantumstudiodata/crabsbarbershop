@@ -1,4 +1,5 @@
 import Link from "next/link";
+import { Vacio } from "./Vacio";
 import { eq, sql } from "drizzle-orm";
 import { Avatar } from "@/components/Avatar";
 import { AvisoUrl } from "@/components/Encabezado";
@@ -68,7 +69,7 @@ export default async function Equipo({ searchParams }: { searchParams: Promise<{
               <Icono n="derecha" />
             </Link>
           );
-        }) : <p className="muted eq2-vacio">Todavía no hay personas que atiendan.</p>}
+        }) : <Vacio icono="persona" titulo="Todavía no hay personas que atiendan" texto="Da de alta a tu equipo en Ajustes, Usuarios, y aquí verás lo que vende cada persona." />}
       </section>
       {verArch && archivadas.length > 0 && (
         <section className="glass eq2-lista arch" aria-label="Archivados">
