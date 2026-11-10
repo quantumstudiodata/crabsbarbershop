@@ -3335,3 +3335,7 @@ a.eq2-fila:hover { background: rgba(255,255,255,.45); }
 .eq2-ir { display: inline-flex; align-items: center; gap: 4px; font-size: 13px; font-weight: 600; color: var(--accent); } .eq2-ir .ic { width: 13px; height: 13px; }
 @media (max-width: 760px) { .eq2-ir { font-size: 0; gap: 0; } .eq2-ir .ic { width: 15px; height: 15px; } .eq2-id .eq2-atr { width: 36px; height: 36px; } }
 .eq2-per > .eq2-acc { margin-left: auto; }
+.eq2-nom { display: flex; align-items: center; gap: 6px; min-width: 0; }
+.eq2-lapiz { width: 30px; height: 30px; flex: none; border-radius: 50%; display: grid; place-items: center; color: var(--faint); text-decoration: none; transition: background .15s, color .15s; }
+.eq2-lapiz:hover, .eq2-lapiz:focus-visible { background: rgba(255,255,255,.7); color: var(--fg); }
+.eq2-lapiz .ic { width: 15px; height: 15px; }

@@ -86,11 +86,10 @@ export default async function Ficha({ params, searchParams }: { params: Promise<
         <div className="eq2-id">
           <Link href={`/equipo${q}`} className="eq2-atr" aria-label="Volver a Equipo"><Icono n="izquierda" /></Link>
           <Avatar avatar={u.avatar} nombre={u.nombre} t={52} />
-          <span><h1>{u.nombre}</h1><small>{subt}{!u.activo && <>, archivada</>}</small></span>
+          <span><span className="eq2-nom"><h1>{u.nombre}</h1>{se.puede("usuarios.editar") && <Link href={`/ajustes?editar=${u.id}`} className="eq2-lapiz" aria-label="Editar perfil" title="Editar perfil"><Icono n="editar" /></Link>}</span><small>{subt}{!u.activo && <>, archivada</>}</small></span>
         </div>
         <div className="eq2-acc">
           <MesEquipo mes={m.mes} hoy={m.hoy} />
-          {se.puede("usuarios.editar") && <Link href={`/ajustes?editar=${u.id}`} className="eq2-link">Editar perfil</Link>}
           {enCurso && enCurso.fila.puedePagar && <RegistrarPago filas={[enCurso.fila]} regreso={`/equipo/${u.id}${q}`} texto={renta ? "Registrar cobro" : "Registrar pago"} />}
         </div>
       </div>
