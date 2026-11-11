@@ -10,12 +10,14 @@ import { fechaCorta, fechaLocal, horaCorta, sumarDias } from "@/lib/fechas";
 import { formatoDinero } from "@/lib/money";
 import { personasEquipo, sesionEquipo } from "../datos";
 import { decidirFaltante } from "../actions";
+import { AnularPago } from "./AnularPago";
 
 export const metadata = { title: "Pagos del equipo" };
 
 /** Historial de pagos del equipo y faltantes de caja por decidir. Se llega desde Equipo. */
 export default async function Pagos({ searchParams }: { searchParams: Promise<{ persona?: string; n?: string; aviso?: string; error?: string }> }) {
   const se = await sesionEquipo();
+  const puedeAnular = se.puede("equipo.pagar");
   const q = await searchParams;
   const zona = se.barberia.zonaHoraria;
   const hoy = fechaLocal(new Date(), zona);
@@ -97,7 +99,8 @@ export default async function Pagos({ searchParams }: { searchParams: Promise<{ 
             {pagos.slice(0, limite).map((x) => (
               <div key={x.id} className="eq2-fila sin">
                 <span><b>{x.tipo === "renta" ? `${x.nombre} pagó renta` : `Pago a ${x.nombre}`}</b><small>{dia(x.creadoEn)}, {/(Pago|Renta) automática?/.test(x.nota) ? x.nota.replace(/^.*?: /, "").replace(/^(Pago|Renta)/, (m) => m.toLowerCase()) : <>registró {x.registro.split(" ")[0]}{x.nota ? `, ${x.nota}` : ""}</>}</small></span>
-                <span className="eq2-m"><b>{formatoDinero(x.monto)}</b></span>
+                <span className="eq2-m">{x.monto === 0 ? <><b className="tachado">Anulado</b></> : <b>{formatoDinero(x.monto)}</b>}
+                  {puedeAnular && x.monto > 0 && <AnularPago id={x.id} texto={`${x.tipo === "renta" ? `Cobro de renta a ${x.nombre}` : `Pago a ${x.nombre}`} por ${formatoDinero(x.monto)}`} />}</span>
               </div>
             ))}
           </div>

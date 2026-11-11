@@ -43,3 +43,30 @@ export async function registrarPago(form: FormData) {
   revalidatePath("/equipo", "layout");
   volver(ruta, { aviso: "guardado" });
 }
+
+/**
+ * Anula un pago al equipo o un cobro de renta (por ejemplo, una renta automática que la persona no pagó).
+ * No se borra: queda en cero con la nota de lo que era, para que el historial lo conserve y el pago automático no se repita.
+ * Lo anulado vuelve a contar como pendiente.
+ */
+export async function anularPagoEquipo(id: string, motivo: string): Promise<{ ok?: boolean; error?: string }> {
+  const s = await requerirSesion("equipo.pagar");
+  if (!/^[0-9a-f-]{36}$/.test(String(id))) return { error: "Pago no encontrado." };
+  const m = String(motivo ?? "").trim().slice(0, 120);
+  if (!m) return { error: "Escribe el motivo." };
+  const [p] = await db.select().from(schema.pagosComision).where(and(eq(schema.pagosComision.id, id), eq(schema.pagosComision.barberiaId, s.barberia.id))).limit(1);
+  if (!p) return { error: "Pago no encontrado." };
+  if (p.monto === 0) return { error: "Este pago ya está anulado." };
+  const [u] = await db.select({ nombre: schema.usuarios.nombre }).from(schema.usuarios).where(eq(schema.usuarios.id, p.barberoId)).limit(1);
+  await db.transaction(async (tx) => {
+    await tx.update(schema.pagosComision).set({ monto: 0, nota: `${p.nota} (anulado: ${m}; era ${formatoDinero(p.monto)})`.slice(0, 200) }).where(eq(schema.pagosComision.id, p.id));
+    await registrar(tx, {
+      barberiaId: s.barberia.id, usuarioId: s.usuario.id, tipo: "equipo",
+      accion: `${s.usuario.nombre} anuló ${p.tipo === "renta" ? "el cobro de renta" : "el pago"} de ${formatoDinero(p.monto)} de ${u?.nombre ?? "una persona"}`,
+      detalle: { motivo: m, nota: p.nota },
+    });
+  });
+  revalidatePath("/equipo", "layout");
+  revalidatePath("/analitica", "layout");
+  return { ok: true };
+}
