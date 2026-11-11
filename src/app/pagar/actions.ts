@@ -3,6 +3,7 @@
 import { and, eq } from "drizzle-orm";
 import { db, schema } from "@/lib/db";
 import { pagosLinea } from "@/lib/db/schema";
+import { verificarPago } from "@/lib/pagos";
 import { stripe } from "@/lib/stripe";
 
 async function pagoPendiente(token: string) {
@@ -32,6 +33,13 @@ export async function elegirPropina(token: string, propina: number): Promise<{ o
 
 /** Estado del pago para la página del cliente (sin datos de la venta más allá de lo que ya ve). */
 export async function estadoPago(token: string): Promise<{ estado: string }> {
-  const [p] = await db.select({ estado: pagosLinea.estado }).from(pagosLinea).where(eq(pagosLinea.token, String(token).slice(0, 40))).limit(1);
-  return { estado: p?.estado ?? "desconocido" };
+  const t = String(token).slice(0, 40);
+  const [p] = await db.select({ estado: pagosLinea.estado, intento: pagosLinea.intento, barberiaId: pagosLinea.barberiaId }).from(pagosLinea).where(eq(pagosLinea.token, t)).limit(1);
+  if (!p) return { estado: "desconocido" };
+  if (p.estado === "pendiente") {
+    await verificarPago(p);
+    const [n] = await db.select({ estado: pagosLinea.estado }).from(pagosLinea).where(eq(pagosLinea.token, t)).limit(1);
+    return { estado: n?.estado ?? p.estado };
+  }
+  return { estado: p.estado };
 }

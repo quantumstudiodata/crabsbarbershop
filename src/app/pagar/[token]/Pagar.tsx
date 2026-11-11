@@ -18,12 +18,12 @@ const apariencia = {
 /** Página de pago del cliente: lo que paga, propina opcional y el formulario de Stripe. */
 export function Pagar(p: {
   token: string; negocio: string; estado: string; cuenta: string; secreto: string | null; llavePublica: string;
-  conceptos: Concepto[]; descuento: number; monto: number; propina: number; propinaFija: boolean; folio: string | null; tarjeta: string;
+  conceptos: Concepto[]; descuento: number; monto: number; propina: number; propinaFija: boolean; folio: string | null; tarjeta: string; encuesta: string | null; pagadoTxt: string | null;
 }) {
   const promesa = useMemo<Promise<Stripe | null> | null>(() => (p.llavePublica && p.cuenta ? loadStripe(p.llavePublica, { stripeAccount: p.cuenta, locale: "es-419" }) : null), [p.llavePublica, p.cuenta]);
   return (
     <main className="pg">
-      <header className="pg-cab"><span className="rv-logo" aria-hidden="true" /><span><b>{p.negocio}</b><small>Pago de tu servicio</small></span></header>
+      <header className="pg-cab"><span className="rv-logo" aria-hidden="true"><Icono n="cobro" /></span><span><b>{p.negocio}</b><small>Pago de tu servicio</small></span></header>
       {p.estado === "pagado" ? <Recibo {...p} />
         : p.estado === "reembolsado" ? <Aviso t="Este pago se devolvió" x="Si tienes dudas, pregunta en el negocio." />
         : p.estado === "cancelado" ? <Aviso t="Este cobro se canceló" x="Pide en el negocio un código nuevo para pagar." />
@@ -102,14 +102,29 @@ function Formulario(p: Parameters<typeof Pagar>[0]) {
 
 function Recibo(p: Parameters<typeof Pagar>[0]) {
   return (
-    <section className="pg-ok" role="status">
-      <span className="cqr-pal" aria-hidden="true"><Icono n="palomita" /></span>
-      <h1>Pago recibido</h1>
-      <b className="big">{formatoDinero(p.monto + p.propina)}</b>
-      <span className="muted">{p.tarjeta ? `Con ${p.tarjeta}` : "Gracias por tu visita"}{p.folio ? `, folio ${p.folio}` : ""}</span>
-      <Conceptos conceptos={p.conceptos} descuento={p.descuento} />
-      {p.propina > 0 && <small className="muted">Incluye {formatoDinero(p.propina)} de propina. ¡Gracias!</small>}
-    </section>
+    <>
+      <section className="pg-ok" role="status">
+        <span className="cqr-pal" aria-hidden="true"><Icono n="palomita" /></span>
+        <h1>Pago recibido</h1>
+        <b className="big">{formatoDinero(p.monto + p.propina)}</b>
+        <span className="muted">Confirmado por Stripe{p.tarjeta ? `, con ${p.tarjeta}` : ""}</span>
+      </section>
+      <section className="glass pg-comp" aria-label="Comprobante">
+        <b>Comprobante</b>
+        <div className="entre"><span className="muted">Negocio</span><span>{p.negocio}</span></div>
+        {p.folio && <div className="entre"><span className="muted">Folio</span><b>{p.folio}</b></div>}
+        {p.pagadoTxt && <div className="entre"><span className="muted">Fecha</span><span>{p.pagadoTxt}</span></div>}
+        <Conceptos conceptos={p.conceptos} descuento={p.descuento} />
+        {p.propina > 0 && <div className="entre"><span className="muted">Propina</span><span>{formatoDinero(p.propina)}</span></div>}
+        <div className="entre pg-tot"><span>Total pagado</span><b>{formatoDinero(p.monto + p.propina)}</b></div>
+        <small className="muted">Guarda esta página: es tu comprobante y siempre muestra el estado real del pago.</small>
+      </section>
+      {p.encuesta && (
+        <a className="glass pg-enc" href={`/e/${p.encuesta}`}>
+          <Icono n="estrella" /><span><b>¿Cómo te atendimos?</b><small>Son dos preguntas, menos de un minuto.</small></span><Icono n="derecha" />
+        </a>
+      )}
+    </>
   );
 }
 

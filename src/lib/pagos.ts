@@ -113,6 +113,22 @@ export async function actualizarCuenta(a: Stripe.Account) {
   await db.update(schema.barberias).set({ stripeEstado: estadoDeCuenta(a) }).where(eq(schema.barberias.stripeCuenta, a.id));
 }
 
+/**
+ * Respaldo del aviso de Stripe: el servidor le pregunta a Stripe si el pago ya se cobró.
+ * La respuesta viene de Stripe (no del navegador), así que es igual de confiable que el aviso.
+ */
+export async function verificarPago(p: { intento: string | null; estado: string; barberiaId: string }) {
+  if (p.estado !== "pendiente" || !p.intento || !process.env.STRIPE_SECRET_KEY) return;
+  try {
+    const [b] = await db.select({ cuenta: schema.barberias.stripeCuenta }).from(schema.barberias).where(eq(schema.barberias.id, p.barberiaId)).limit(1);
+    if (!b?.cuenta) return;
+    const pi = await stripe().paymentIntents.retrieve(p.intento, {}, { stripeAccount: b.cuenta });
+    if (pi.status === "succeeded") await confirmarPago(pi, b.cuenta);
+  } catch (err) {
+    console.error("verificar_pago", err);
+  }
+}
+
 /** Stripe devolvió un cobro (desde su panel o por nosotros). */
 export async function marcarReembolso(ch: Stripe.Charge) {
   const pi = typeof ch.payment_intent === "string" ? ch.payment_intent : ch.payment_intent?.id;

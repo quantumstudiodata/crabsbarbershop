@@ -11,14 +11,16 @@ export const dynamic = "force-dynamic";
 export async function POST(req: Request) {
   const secreto = process.env.STRIPE_WEBHOOK_SECRET;
   const firma = req.headers.get("stripe-signature");
-  if (!secreto || !firma || !process.env.STRIPE_SECRET_KEY) return new Response("Sin configurar", { status: 400 });
+  if (!secreto || !firma || !process.env.STRIPE_SECRET_KEY) { console.error("stripe_webhook_sin_config", { secreto: !!secreto, firma: !!firma }); return new Response("Sin configurar", { status: 400 }); }
   const cuerpo = await req.text();
   let ev: Stripe.Event;
   try {
     ev = stripe().webhooks.constructEvent(cuerpo, firma, secreto);
-  } catch {
+  } catch (err) {
+    console.error("stripe_webhook_firma", (err as Error)?.message);
     return new Response("Firma inválida", { status: 400 });
   }
+  console.log("stripe_webhook", ev.type, ev.account ?? "plataforma");
   try {
     if (ev.type === "payment_intent.succeeded" && ev.account) await confirmarPago(ev.data.object, ev.account);
     else if (ev.type === "account.updated") await actualizarCuenta(ev.data.object);

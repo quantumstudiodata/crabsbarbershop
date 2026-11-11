@@ -213,8 +213,13 @@ async function prepararQr(s: Sesion, plan: PlanVenta, propina: PropinaVenta, lin
 export async function estadoCobroQr(id: string): Promise<{ estado: string; folio?: string; total?: number; tarjeta?: string; propina?: number }> {
   const s = await requerirSesion();
   if (!/^[0-9a-f-]{36}$/.test(String(id))) return { estado: "desconocido" };
-  const [p] = await db.select().from(pagosLinea).where(and(eq(pagosLinea.id, id), eq(pagosLinea.barberiaId, s.barberia.id))).limit(1);
+  let [p] = await db.select().from(pagosLinea).where(and(eq(pagosLinea.id, id), eq(pagosLinea.barberiaId, s.barberia.id))).limit(1);
   if (!p) return { estado: "desconocido" };
+  if (p.estado === "pendiente") {
+    const { verificarPago } = await import("@/lib/pagos");
+    await verificarPago(p);
+    [p] = await db.select().from(pagosLinea).where(eq(pagosLinea.id, p.id)).limit(1);
+  }
   let folio: string | undefined;
   if (p.ventaId) [{ folio }] = await db.select({ folio: schema.ventas.folio }).from(schema.ventas).where(eq(schema.ventas.id, p.ventaId)).limit(1);
   return { estado: p.estado, folio, total: p.monto + p.propina, tarjeta: p.tarjeta, propina: p.propina };

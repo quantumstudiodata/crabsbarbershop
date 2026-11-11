@@ -1,9 +1,11 @@
-import { eq } from "drizzle-orm";
+import { and, eq } from "drizzle-orm";
 import type { Metadata } from "next";
 import { notFound } from "next/navigation";
 import { leerConfig } from "@/lib/agenda";
 import { NOMBRE_ESTADO } from "@/lib/citas";
 import { db, schema } from "@/lib/db";
+import { pagosLinea } from "@/lib/db/schema";
+import { verificarPago } from "@/lib/pagos";
 import { fechaLocal, horaCorta } from "@/lib/fechas";
 import { MiCita } from "./MiCita";
 
@@ -11,8 +13,14 @@ export const metadata: Metadata = { title: "Tu cita", robots: { index: false } }
 
 export default async function PaginaCita({ params }: { params: Promise<{ slug: string; token: string }> }) {
   const { slug, token } = await params;
-  const [c] = await db.select().from(schema.citas).where(eq(schema.citas.token, token.slice(0, 60))).limit(1);
+  let [c] = await db.select().from(schema.citas).where(eq(schema.citas.token, token.slice(0, 60))).limit(1);
   if (!c) notFound();
+  // Mientras el anticipo se confirma, el servidor le pregunta a Stripe por si su aviso aún no llega.
+  if (c.estado === "apartada") {
+    const pend = await db.select().from(pagosLinea).where(and(eq(pagosLinea.citaId, c.id), eq(pagosLinea.estado, "pendiente")));
+    for (const p of pend) await verificarPago(p);
+    if (pend.length) [c] = await db.select().from(schema.citas).where(eq(schema.citas.id, c.id)).limit(1);
+  }
   const [b] = await db.select().from(schema.barberias).where(eq(schema.barberias.id, c.barberiaId)).limit(1);
   if (!b || b.slug !== slug) notFound();
   const [u] = await db.select({ nombre: schema.usuarios.nombre, avatar: schema.usuarios.avatar }).from(schema.usuarios).where(eq(schema.usuarios.id, c.barberoId)).limit(1);
