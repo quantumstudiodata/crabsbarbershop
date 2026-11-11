@@ -174,10 +174,10 @@ function Asistente({ inicial, servicios, hoy, cerrar, alGuardar }: { inicial: Bo
         {paso === 3 && (
           <>
             <div className="fila-eg">
-              <div className="campo"><span>Fecha de inicio</span><CampoFecha valor={b.desde} cambiar={(f) => cambia({ desde: f })} etiqueta="Fecha de inicio" /></div>
-              <div className="campo"><span>Fecha de finalización</span><CampoFecha valor={b.hasta} min={b.desde} cambiar={(f) => cambia({ hasta: f })} vacio="Sin fecha de finalización" etiqueta="Fecha de finalización" /></div>
+              <div className="campo"><span>Empieza</span><CampoFecha valor={b.desde} cambiar={(f) => cambia({ desde: f })} etiqueta="Fecha de inicio" /></div>
+              <div className="campo"><span>Termina</span><CampoFecha valor={b.hasta} min={b.desde} cambiar={(f) => cambia({ hasta: f })} vacio="Sin fecha" etiqueta="Fecha de finalización" /></div>
             </div>
-            <small className="muted" style={{ marginTop: -6 }}>Sin fecha de finalización, sigue hasta que la pauses.</small>
+            <small className="muted" style={{ marginTop: -6 }}>Sin fecha de término, sigue activa hasta que la pauses.</small>
             <div className="campo"><span>Días aplicables</span>
               <div className="dias-p">{ORDEN_DIAS.map((d) => (
                 <button type="button" key={d} aria-pressed={b.dias.includes(d)} className={b.dias.includes(d) ? "on" : ""} onClick={() => cambia({ dias: b.dias.includes(d) ? b.dias.filter((x) => x !== d) : [...b.dias, d] })}>{DIAS_CORTOS[d]}</button>
@@ -240,7 +240,7 @@ function Asistente({ inicial, servicios, hoy, cerrar, alGuardar }: { inicial: Bo
 
         {error && <p className="aviso error" style={{ margin: 0 }}>{error}</p>}
         <div className="acciones-p">
-          {paso > 0 ? <button type="button" className="bt sec solo" onClick={() => { setError(null); setPaso(paso - 1); }}><Icono n="izquierda" />Anterior</button> : <span />}
+          {paso > 0 ? <button type="button" className="ck-atras" aria-label="Anterior" onClick={() => { setError(null); setPaso(paso - 1); }}><Icono n="izquierda" /></button> : <span />}
           {paso < 5
             ? <button type="button" className="bt" onClick={siguiente}>Siguiente<Fl /></button>
             : <button type="button" className="bt" disabled={pendiente} onClick={guardar}>{pendiente ? "Guardando…" : b.id ? "Guardar cambios" : "Crear promoción"}<Fl /></button>}

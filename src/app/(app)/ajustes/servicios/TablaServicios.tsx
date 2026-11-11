@@ -76,7 +76,7 @@ export function TablaServicios({ servicios: inicialS, categorias: inicialC, pued
     <>
       {res.error && <p className="aviso error">{res.error}</p>}
       {res.mensaje && <p className="aviso ok">{res.mensaje}</p>}
-      <p className="ayuda-txt"><Icono n="lista" className="ic" /> Arrastra categorías o servicios para cambiar su lugar. Así aparecen en Cobro.</p>
+      <p className="ayuda-txt pista-svc"><Icono n="lista" className="ic" />Arrastra para cambiar el orden en Cobro.</p>
 
       <div className="cats-s">
         {cats.map((c) => {
@@ -89,8 +89,7 @@ export function TablaServicios({ servicios: inicialS, categorias: inicialC, pued
                 draggable={puedeEditar} onDragStart={(e) => { setArrastra({ tipo: "c", id: c.id }); e.dataTransfer.effectAllowed = "move"; }} onDragEnd={soltar}>
                 {puedeEditar && <span className="asa-d" aria-hidden="true">⋮⋮</span>}
                 <span className={`flecha-c ${abierta ? "abierta" : ""}`} aria-hidden="true">›</span>
-                <span className="cat-t"><b>{c.nombre}</b>{c.descripcion && <small>{c.descripcion}</small>}</span>
-                {!c.activo && <span className="chip-e off"><i />Oculta en Cobro</span>}
+                <span className="cat-t"><b>{c.nombre}</b>{c.descripcion && <small>{c.descripcion}</small>}{!c.activo && <span className="chip-e off"><i />Oculta en Cobro</span>}</span>
                 <span className="muted cuenta-c">{lista.length} {lista.length === 1 ? "servicio" : "servicios"}</span>
                 {puedeEditar && <MenuPuntos etiqueta={`Opciones de ${c.nombre}`} items={[
                   { texto: "Editar categoría", icono: "editar", hacer: () => setEditCat({ id: c.id, nombre: c.nombre, descripcion: c.descripcion }) },
@@ -238,7 +237,7 @@ export function PantallaServicios(props: { servicios: Servicio[]; categorias: Ca
       <div className="entre cab-servicios" style={{ flexWrap: "wrap", gap: 12 }}>
         <div>
           <h1 className="titulo">Servicios</h1>
-          <p className="sub">{tab === "servicios" ? "El precio de aquí es el que se cobra." : "Precios especiales, descuentos y paquetes."}</p>
+          <p className="sub">{tab === "servicios" ? "El precio de cada servicio es el que aparece al cobrar." : "Precios especiales, descuentos y paquetes."}</p>
         </div>
         {props.puedeEditar && (tab === "servicios"
           ? <button type="button" className="bt" onClick={() => setNueva((n) => n + 1)}>Agregar categoría<span className="fl" aria-hidden="true"><Icono n="mas" /></span></button>

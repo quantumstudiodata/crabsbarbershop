@@ -3969,3 +3969,19 @@ html, body { overscroll-behavior-y: none; }
   .ag-izq .ag-nav { flex: 1 1 100%; }
 }
 .ag-comp > div.ag-comp-cab:first-child { display: flex; }
+/* Servicios en teléfono: sin desbordar, menos espacio y sin tarjeta dentro de tarjeta. */
+.pista-svc { display: flex; align-items: center; gap: 6px; margin: 0; font-size: 12.5px; }
+.pista-svc .ic { width: 15px; height: 15px; flex: none; }
+.cat-h2 .cat-t .chip-e { justify-self: start; margin-top: 3px; font-size: 11px; }
+.cat-s, .cat-h2 { min-width: 0; }
+@media (max-width: 760px) {
+  .ajustes .cab-servicios > div { min-width: 0; }
+  .ajustes .cab-servicios .sub { font-size: 13px; }
+  .ajustes .cab-servicios > .bt { padding: 6px 6px 6px 14px; font-size: 13px; gap: 8px; flex: none; }
+  .ajustes .cab-servicios > .bt .fl { width: 26px; height: 26px; }
+  .cat-s { padding: 4px; }
+  .cat-h2 { padding: 10px 10px; gap: 8px; }
+  .cat-h2 .cuenta-c { font-size: 12px; }
+  .ajustes > .pila:has(.cab-servicios) { gap: 14px !important; }
+}
+@media (max-width: 760px) { .cat-s > .cat-h2 { background: none; } }
