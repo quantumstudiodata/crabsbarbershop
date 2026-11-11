@@ -17,7 +17,7 @@ import { Ayuda } from "@/components/Ayuda";
 export const metadata = { title: "Equipo" };
 
 /** Equipo: una sola lista tranquila con lo que vendió cada persona en el mes y lo que tiene pendiente hoy. */
-export default async function Equipo({ searchParams }: { searchParams: Promise<{ mes?: string; archivados?: string; aviso?: string; error?: string }> }) {
+export default async function Equipo({ searchParams }: { searchParams: Promise<{ mes?: string; archivados?: string; aviso?: string; error?: string; pagar?: string }> }) {
   const se = await sesionEquipo();
   const q0 = await searchParams;
   const zona = se.barberia.zonaHoraria;
@@ -57,7 +57,7 @@ export default async function Equipo({ searchParams }: { searchParams: Promise<{
             {hayRentas && <span><small>Renta por cobrar</small><b>{formatoDinero(porCobrar)}</b></span>}
           </div>
         )}
-        {puedePagar && <RegistrarPago filas={cuentas.filter((c) => c.saldo > 0).map((c) => c.fila)} regreso={`/equipo${q}`} clase="eq2-pri eqa-bt" />}
+        {puedePagar && <RegistrarPago filas={cuentas.filter((c) => c.saldo > 0).map((c) => c.fila)} regreso={`/equipo${q}`} clase="eq2-pri eqa-bt" abrir={q0.pagar === "1"} />}
         <nav className="eqa-links" aria-label="Más de Equipo">
           {puedePagar && <Link href="/equipo/pagos">Historial de pagos</Link>}
           {revision.length > 0 && <Link href="/equipo/pagos#faltantes">{revision.length} {revision.length === 1 ? "faltante en revisión" : "faltantes en revisión"}</Link>}

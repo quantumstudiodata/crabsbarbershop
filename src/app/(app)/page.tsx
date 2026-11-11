@@ -13,7 +13,7 @@ import { fechaLarga, fechaLocal, horaCorta, lunesDe, nombreDia, sumarDias } from
 import { calcularMeta } from "@/lib/metas";
 import { cambio, formatoDinero, porcentaje } from "@/lib/money";
 import { serieHoy, type Movimiento } from "@/lib/series";
-import { AccionesEscritorio, AccionesMovil, type AccionInicio } from "./AccionesInicio";
+import { AccionesEscritorio, AccionesMovil, type AccionInicio, type Acciones } from "./AccionesInicio";
 import { AvisoCajaEmergente } from "./AvisoCaja";
 import { RefrescarConVentas } from "./RefrescarConVentas";
 import { UltimosServicios, type FilaUltimo } from "./UltimosServicios";
@@ -69,24 +69,46 @@ async function porLlegar(s: Sesion, hoy: string, zona: string, persona?: string)
   return filas.map((c) => ({ id: c.id, hora: horaCorta(c.inicio, zona), cliente: c.cliente, con: c.barbero.split(" ")[0], servicio: c.servicios.map((x) => x.nombre).join(" y ") }));
 }
 
-/** Acciones rápidas según los permisos. Cada una abre una pantalla que ya existe. */
-async function accionesDe(s: Sesion, turno: Turno | null | undefined, hoy: string, zona: string, citasHoy: number | null, barbero: boolean): Promise<AccionInicio[]> {
+/**
+ * Acciones rápidas según los permisos, en el orden que más usa cada rol. Cada persona puede reordenarlas u ocultarlas.
+ * Cada una abre una pantalla que ya existe.
+ */
+async function accionesDe(s: Sesion, turno: Turno | null | undefined, hoy: string, zona: string, citasHoy: number | null, barbero: boolean): Promise<Acciones> {
   const yo = s.usuario.id;
   const corteAtrasado = !!turno && turno.fechaOperativa < hoy;
-  const a: AccionInicio[] = [];
-  if (s.puede("ventas.registrar") || s.puede("ventas.registrar_otros")) a.push({ k: "cobrar", href: "/cobrar", texto: "Cobrar", corto: "Cobrar", icono: "cobro", principal: true, dato: turno ? `Caja abierta desde ${horaCorta(turno.abiertoEn, zona)}` : "Abre la caja al cobrar" });
-  if (s.barberia.usaCitas && s.puede("citas.modificar")) a.push({ k: "cita", href: "/citas?nueva=1", texto: "Nueva cita", corto: "Nueva cita", icono: "calendario", dato: citasHoy ? `${citasHoy} por llegar` : undefined });
-  if (barbero && citasHoy !== null) a.push({ k: "mias", href: `/citas?vista=lista&persona=${yo}`, texto: "Mis citas de hoy", corto: "Mis citas", icono: "reloj", dato: citasHoy ? `${citasHoy} por llegar` : "Sin pendientes" });
-  if (barbero) a.push({ k: "ventas", href: "/analitica/ventas", texto: "Mis ventas", corto: "Mis ventas", icono: "lista" });
-  if (!barbero && s.puede("gastos.registrar")) a.push({ k: "egreso", href: "/analitica/finanzas?egreso=1", texto: "Registrar egreso", corto: "Egreso", icono: "archivo" });
-  if (!barbero && s.puede("caja.operar") && turno) a.push({ k: "corte", href: "/cobrar?caja=cerrar", texto: "Corte de caja", corto: "Corte", icono: "candado", aviso: corteAtrasado, dato: corteAtrasado ? "Pendiente" : undefined });
-  if (s.puede("caja.retiros") && turno) a.push({ k: "retiro", href: "/cobrar?caja=retiro", texto: "Retiro de caja", corto: "Retiro", icono: "salida" });
-  if (!barbero && s.puede("equipo.pagar")) a.push({ k: "pago", href: "/equipo/pagos", texto: "Pago al equipo", corto: "Pago al equipo", icono: "efectivo" });
-  return a;
+  const todas: (AccionInicio & { ok: boolean })[] = [
+    { k: "cobrar", href: "/cobrar", texto: "Cobrar", corto: "Cobrar", icono: "cobro", principal: true, dato: turno ? `Caja abierta desde ${horaCorta(turno.abiertoEn, zona)}` : "Abre la caja al cobrar", ok: s.puede("ventas.registrar") || s.puede("ventas.registrar_otros") },
+    { k: "mias", href: `/citas?vista=lista&persona=${yo}`, texto: "Mis citas de hoy", corto: "Mis citas", icono: "reloj", dato: citasHoy ? `${citasHoy} por llegar` : "Sin pendientes", ok: barbero && citasHoy !== null },
+    { k: "corte", href: "/cobrar?caja=cerrar", texto: "Realizar corte de caja", corto: "Corte", icono: "candado", aviso: corteAtrasado, dato: corteAtrasado ? "Pendiente" : turno ? undefined : "Caja cerrada", ok: s.puede("caja.operar") && !!turno },
+    { k: "retiro", href: "/cobrar?caja=retiro", texto: "Registrar retiro de caja", corto: "Retiro", icono: "salida", ok: s.puede("caja.retiros") && !!turno },
+    { k: "cita", href: "/citas?nueva=1", texto: "Agendar cita a cliente", corto: "Nueva cita", icono: "calendario", dato: !barbero && citasHoy ? `${citasHoy} por llegar` : undefined, ok: s.barberia.usaCitas && s.puede("citas.modificar") },
+    { k: "egreso", href: "/analitica/finanzas?egreso=1", texto: "Registrar un egreso", corto: "Egreso", icono: "archivo", ok: s.puede("gastos.registrar") },
+    { k: "pago", href: "/equipo?pagar=1", texto: "Registrar pago o comisión", corto: "Pago al equipo", icono: "efectivo", ok: s.puede("equipo.pagar") },
+    { k: "ventas", href: "/analitica/ventas", texto: barbero ? "Ver mis ventas" : "Ver ventas", corto: barbero ? "Mis ventas" : "Ventas", icono: "lista", ok: true },
+    { k: "historial", href: "/equipo/pagos", texto: "Ver historial de pagos", corto: "Historial de pagos", icono: "historial", ok: s.puede("equipo.pagar") || s.puede("equipo.autorizar") },
+    { k: "correccion", href: "/analitica/cortes", texto: "Corregir un corte de caja", corto: "Corregir corte", icono: "editar", ok: s.puede("caja.corregir") && s.puede("cortes.ver") },
+    { k: "resenas", href: "/clientes/resenas", texto: "Ver reseñas", corto: "Reseñas", icono: "estrella", ok: s.barberia.usaCitas || s.puede("resenas.responder") },
+  ];
+  // Orden sugerido por rol: lo del día a día primero.
+  const PRIORIDAD: Record<string, string[]> = {
+    barbera: ["cobrar", "mias", "cita", "ventas", "resenas", "retiro", "corte"],
+    encargada: ["cobrar", "corte", "retiro", "cita", "egreso", "ventas", "pago", "correccion", "historial", "resenas"],
+    otro: ["cobrar", "corte", "egreso", "pago", "ventas", "cita", "retiro", "correccion", "historial", "resenas"],
+  };
+  const base = PRIORIDAD[barbero ? "barbera" : s.usuario.rol === "encargada" ? "encargada" : "otro"];
+  const rango = (k: string) => { const i = base.indexOf(k); return i < 0 ? 99 : i; };
+  const disponibles = todas.filter((x) => x.ok).sort((a, b) => rango(a.k) - rango(b.k)).map(({ ok: _, ...x }) => x);
+  const [u] = await db.select({ pref: schema.usuarios.accionesRapidas }).from(schema.usuarios).where(eq(schema.usuarios.id, yo)).limit(1);
+  const pref = u?.pref;
+  const ordenadas = pref?.orden.length
+    ? [...disponibles].sort((a, b) => { const ia = pref.orden.indexOf(a.k), ib = pref.orden.indexOf(b.k); return (ia < 0 ? 100 + rango(a.k) : ia) - (ib < 0 ? 100 + rango(b.k) : ib); })
+    : disponibles;
+  const ocultas = new Set(pref?.ocultas ?? []);
+  return { visibles: ordenadas.filter((x) => !ocultas.has(x.k)), todas: ordenadas.map((x) => ({ k: x.k, texto: x.texto, icono: x.icono, oculta: ocultas.has(x.k), fija: x.k === "cobrar" })), sugerido: disponibles.map((x) => x.k) };
 }
 
 type Vista = {
-  s: Sesion; hoy: string; zona: string; avisos: React.ReactNode; acciones: AccionInicio[]; barbero: boolean;
+  s: Sesion; hoy: string; zona: string; avisos: React.ReactNode; acciones: Acciones; barbero: boolean;
   total: number; servicios: number; clientes: number; previo: number; movs: Movimiento[];
   meta: { monto: number; ayuda?: string; nota?: string } | null;
   citas: Awaited<ReturnType<typeof porLlegar>>;
@@ -118,7 +140,7 @@ function InicioVista(v: Vista) {
           <span className="lab">{fechaLarga(hoy)}</span>
           <h1 className="titulo brillo">Hola, {s.usuario.nombre.split(" ")[0]}</h1>
         </div>
-        <AccionesEscritorio acciones={v.acciones} />
+        <AccionesEscritorio acciones={v.acciones.visibles} personalizar={v.acciones} />
       </div>
 
       {/* Teléfono */}
@@ -130,7 +152,7 @@ function InicioVista(v: Vista) {
         </div>
         {barra}
       </section>
-      <AccionesMovil acciones={v.acciones} />
+      <AccionesMovil acciones={v.acciones.visibles} personalizar={v.acciones} />
       {siguiente && (
         <section className="glass ini-sig solo-movil subir d2">
           <span className="lab">{v.barbero ? "Tu siguiente cita" : "Próxima cita"}</span>

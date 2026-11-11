@@ -1,13 +1,53 @@
 "use client";
 
 import Link from "next/link";
-import { useEffect, useRef, useState } from "react";
-import { Icono } from "@/components/Icono";
+import { useRouter } from "next/navigation";
+import { useEffect, useRef, useState, useTransition } from "react";
+import { Fl, Icono } from "@/components/Icono";
+import { Interruptor, Modal } from "@/components/ui";
+import { guardarAccionesRapidas } from "./acciones-usuario";
 
 export type AccionInicio = { k: string; href: string; texto: string; corto: string; icono: string; dato?: string; principal?: boolean; aviso?: boolean };
+export type Acciones = { visibles: AccionInicio[]; todas: { k: string; texto: string; icono: string; oculta: boolean; fija: boolean }[]; sugerido: string[] };
+
+/** Cada persona elige el orden de sus acciones rápidas y cuáles no quiere ver. Cobrar siempre está. */
+function Personalizar({ datos, cerrar }: { datos: Acciones; cerrar: () => void }) {
+  const router = useRouter();
+  const [lista, setLista] = useState(datos.todas);
+  const [error, setError] = useState<string | null>(null);
+  const [pend, iniciar] = useTransition();
+  const mover = (i: number, d: -1 | 1) => { const j = i + d; if (j < 0 || j >= lista.length) return; const n = [...lista]; [n[i], n[j]] = [n[j], n[i]]; setLista(n); };
+  const guardar = (orden: string[], ocultas: string[]) => iniciar(async () => { const r = await guardarAccionesRapidas(orden, ocultas); if (r.error) setError(r.error); else { router.refresh(); cerrar(); } });
+  return (
+    <Modal abierto cerrar={cerrar} etiqueta="Inicio" titulo="Acciones rápidas">
+      <div className="pila" style={{ gap: 12 }}>
+        <p className="muted" style={{ margin: 0, fontSize: 13 }}>Ordénalas como más te sirva y apaga las que no uses. Las primeras se ven directo; las demás, en Más acciones.</p>
+        <div className="ar-lista">
+          {lista.map((a, i) => (
+            <div key={a.k} className={`ar-fila ${a.oculta ? "apagada" : ""}`}>
+              <span className="ar-ic"><Icono n={a.icono} /></span>
+              <span className="ar-t">{a.texto}</span>
+              <span className="ar-mov">
+                <button type="button" className="icb" aria-label={`Subir ${a.texto}`} disabled={i === 0} onClick={() => mover(i, -1)}><Icono n="arriba" /></button>
+                <button type="button" className="icb" aria-label={`Bajar ${a.texto}`} disabled={i === lista.length - 1} onClick={() => mover(i, 1)}><Icono n="abajo" /></button>
+              </span>
+              {a.fija ? <span className="ar-fija">Siempre</span> : <Interruptor etiqueta={`Mostrar ${a.texto}`} checked={!a.oculta} onChange={(v) => setLista(lista.map((x) => (x.k === a.k ? { ...x, oculta: !v } : x)))} />}
+            </div>
+          ))}
+        </div>
+        {error && <p className="aviso error" style={{ margin: 0 }}>{error}</p>}
+        <div className="entre">
+          <button type="button" className="link-c" disabled={pend} onClick={() => guardar([], [])}>Usar el orden sugerido</button>
+          <button type="button" className="bt" disabled={pend} onClick={() => guardar(lista.map((x) => x.k), lista.filter((x) => x.oculta).map((x) => x.k))}>{pend ? "Guardando…" : "Guardar"}<Fl /></button>
+        </div>
+      </div>
+    </Modal>
+  );
+}
 
 /** Escritorio: grupo compacto a la derecha del saludo. Cobrar primero; lo que no cabe va en el botón de tres puntos. */
-export function AccionesEscritorio({ acciones }: { acciones: AccionInicio[] }) {
+export function AccionesEscritorio({ acciones, personalizar }: { acciones: AccionInicio[]; personalizar?: Acciones }) {
+  const [editar, setEditar] = useState(false);
   const visibles = acciones.slice(0, 4);
   const mas = acciones.slice(4);
   const [abierto, setAbierto] = useState(false);
@@ -32,19 +72,23 @@ export function AccionesEscritorio({ acciones }: { acciones: AccionInicio[] }) {
           {abierto && (
             <div className="menu ini-menu" role="menu">
               {mas.map((a) => <Link key={a.k} href={a.href} role="menuitem" className="it" onClick={() => setAbierto(false)}><Icono n={a.icono} />{a.texto}</Link>)}
+              {personalizar && <button type="button" role="menuitem" className="it" onClick={() => { setAbierto(false); setEditar(true); }}><Icono n="ajustes" />Personalizar acciones</button>}
             </div>
           )}
         </div>
       )}
+      {mas.length === 0 && personalizar && <button type="button" className="ini-pts" aria-label="Personalizar acciones rápidas" onClick={() => setEditar(true)}><Icono n="ajustes" /></button>}
+      {editar && personalizar && <Personalizar datos={personalizar} cerrar={() => setEditar(false)} />}
     </nav>
   );
 }
 
 /** Teléfono: lista de acciones en una tarjeta. Cobrar vive en la barra de abajo. Si son más de cuatro, el resto se despliega. */
-export function AccionesMovil({ acciones }: { acciones: AccionInicio[] }) {
+export function AccionesMovil({ acciones, personalizar }: { acciones: AccionInicio[]; personalizar?: Acciones }) {
   const sinCobrar = acciones.filter((a) => a.k !== "cobrar");
   const [abierto, setAbierto] = useState(false);
-  if (!sinCobrar.length) return null;
+  const [editar, setEditar] = useState(false);
+  if (!sinCobrar.length && !personalizar) return null;
   const directas = sinCobrar.length > 4 ? sinCobrar.slice(0, 3) : sinCobrar;
   const resto = sinCobrar.length > 4 ? sinCobrar.slice(3) : [];
   const fila = (a: AccionInicio) => (
@@ -61,6 +105,8 @@ export function AccionesMovil({ acciones }: { acciones: AccionInicio[] }) {
           {abierto && resto.map(fila)}
         </>
       )}
+      {personalizar && <button type="button" className="ini-pers" onClick={() => setEditar(true)}><Icono n="ajustes" />Personalizar</button>}
+      {editar && personalizar && <Personalizar datos={personalizar} cerrar={() => setEditar(false)} />}
     </section>
   );
 }

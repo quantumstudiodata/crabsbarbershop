@@ -1,6 +1,6 @@
 "use client";
 
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import { Avatar } from "@/components/Avatar";
 import { Fl, Icono } from "@/components/Icono";
 import { Modal } from "@/components/ui";
@@ -63,8 +63,10 @@ export function FormPago({ f, regreso }: { f: DatosFila; regreso: string }) {
 }
 
 /** Botón único de Equipo: elige a la persona y registra su pago o el cobro de su renta. */
-export function RegistrarPago({ filas, regreso, texto = "Registrar pago", clase = "eq2-pri" }: { filas: DatosFila[]; regreso: string; texto?: string; clase?: string }) {
-  const [abierto, setAbierto] = useState(false);
+export function RegistrarPago({ filas, regreso, texto = "Registrar pago", clase = "eq2-pri", abrir = false }: { filas: DatosFila[]; regreso: string; texto?: string; clase?: string; abrir?: boolean }) {
+  // Desde Acciones rápidas llega ya abierta; al cerrarla se queda en Equipo, para que se sepa dónde vive.
+  const [abierto, setAbierto] = useState(abrir);
+  useEffect(() => { if (abrir) try { history.replaceState(null, "", regreso); } catch { /* sin historial */ } }, [abrir, regreso]);
   const [elegida, setElegida] = useState<DatosFila | null>(filas.length === 1 ? filas[0] : null);
   const cerrar = () => { setAbierto(false); setElegida(filas.length === 1 ? filas[0] : null); };
   if (!filas.length) return null;

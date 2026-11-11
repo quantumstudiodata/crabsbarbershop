@@ -119,6 +119,8 @@ export const usuarios = pgTable(
     metaSemanal: integer("meta_semanal").notNull().default(0),
     // Horario propio por día (igual formato que el del negocio). Vacío: trabaja en el horario del negocio.
     horario: jsonb("horario").$type<Record<string, [string, string]> | null>(),
+    // Acciones rápidas de Inicio elegidas por la persona: en qué orden y cuáles oculta.
+    accionesRapidas: jsonb("acciones_rapidas").$type<{ orden: string[]; ocultas: string[] } | null>(),
     // Si aparece en la agenda y en las reservaciones en línea.
     atiendeCitas: boolean("atiende_citas").notNull().default(true),
     // Contraseña temporal cifrada, consultable por 30 minutos después de restablecerla.

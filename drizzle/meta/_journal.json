@@ -183,6 +183,13 @@
       "when": 1794409292025,
       "tag": "0025_comprobante_obligatorio",
       "breakpoints": true
+    },
+    {
+      "idx": 26,
+      "version": "7",
+      "when": 1794416101085,
+      "tag": "0026_acciones_rapidas",
+      "breakpoints": true
     }
   ]
 }
