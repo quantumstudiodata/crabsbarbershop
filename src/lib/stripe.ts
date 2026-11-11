@@ -37,6 +37,60 @@ export function estadoDeCuenta(a: Stripe.Account): "pendiente" | "activa" {
   return a.charges_enabled ? "activa" : "pendiente";
 }
 
+// Stripe ya no deja crear cuentas conectadas con la API v1: se crean y se revisan con Accounts v2.
+// Los cobros siguen siendo directos en la cuenta del negocio (encabezado Stripe-Account), igual que antes.
+const VERSION_V2 = process.env.STRIPE_V2_VERSION ?? "2026-09-30.endive";
+
+async function v2<T>(metodo: "GET" | "POST", ruta: string, cuerpo?: unknown, clave?: string): Promise<T> {
+  if (!process.env.STRIPE_SECRET_KEY) throw new Error("stripe_sin_llave");
+  const r = await fetch(`https://api.stripe.com${ruta}`, {
+    method: metodo,
+    headers: {
+      Authorization: `Bearer ${process.env.STRIPE_SECRET_KEY}`, "Stripe-Version": VERSION_V2,
+      ...(cuerpo ? { "Content-Type": "application/json" } : {}), ...(clave ? { "Idempotency-Key": clave } : {}),
+    },
+    body: cuerpo ? JSON.stringify(cuerpo) : undefined,
+    cache: "no-store",
+  });
+  const datos = await r.json().catch(() => ({}));
+  if (!r.ok) throw new Error(`stripe_v2 ${r.status} ${ruta}: ${JSON.stringify((datos as { error?: unknown }).error ?? datos).slice(0, 600)}`);
+  return datos as T;
+}
+
+/** Crea la cuenta del negocio: panel completo de Stripe, Stripe cobra sus comisiones y responde por saldos negativos. */
+export async function crearCuentaNegocio(b: { id: string; nombre: string }) {
+  const a = await v2<{ id: string }>("POST", "/v2/core/accounts", {
+    display_name: b.nombre.slice(0, 100),
+    identity: { country: "mx" },
+    dashboard: "full",
+    defaults: { responsibilities: { fees_collector: "stripe", losses_collector: "stripe" } },
+    configuration: { merchant: { capabilities: { card_payments: { requested: true } } } },
+    metadata: { barberiaId: b.id },
+  }, `cuenta-v2-${b.id}`);
+  return a.id;
+}
+
+/** Enlace de una sola vez para que el negocio llene sus datos en Stripe. */
+export async function enlaceAltaNegocio(cuenta: string, regreso: string, reintento: string) {
+  const l = await v2<{ url: string }>("POST", "/v2/core/account_links", {
+    account: cuenta,
+    use_case: { type: "account_onboarding", account_onboarding: { configurations: ["merchant"], return_url: regreso, refresh_url: reintento } },
+  });
+  return l.url;
+}
+
+/** La cuenta del negocio ya puede cobrar con tarjeta. */
+export async function estadoCuentaNegocio(cuenta: string): Promise<"pendiente" | "activa"> {
+  try {
+    const a = await v2<{ configuration?: { merchant?: { capabilities?: { card_payments?: { status?: string } } } } }>("GET", `/v2/core/accounts/${encodeURIComponent(cuenta)}?include=configuration.merchant`);
+    return a.configuration?.merchant?.capabilities?.card_payments?.status === "active" ? "activa" : "pendiente";
+  } catch (err) {
+    // Respaldo: las cuentas v2 también se pueden consultar con la API v1.
+    console.error(err);
+    return estadoDeCuenta(await stripe().accounts.retrieve(cuenta));
+  }
+}
+
 /** Intento de pago en la cuenta del negocio. El monto va en centavos de peso. */
 export async function crearIntento(cuenta: string, d: { monto: number; descripcion: string; metadata: Record<string, string>; clave: string }) {
   return stripe().paymentIntents.create({

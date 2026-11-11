@@ -50,7 +50,7 @@ export default async function ConfigurarNegocio({ searchParams }: { searchParams
       </div>
 
       {pagosDisponibles() && (
-        <PagosLinea estado={(b.stripeEstado as "sin" | "pendiente" | "activa") ?? "sin"} revisar={q.stripe === "volver" || q.stripe === "reintentar"} puede={edita("cobros")}
+        <PagosLinea estado={(b.stripeEstado as "sin" | "pendiente" | "activa") ?? "sin"} revisar={q.stripe === "volver" || q.stripe === "reintentar" || b.stripeEstado === "pendiente"} puede={edita("cobros")}
           cobradoMes={(await db.select({ m: sql<number>`coalesce(sum(${schema.pagosLinea.monto} + ${schema.pagosLinea.propina}), 0)::int` }).from(schema.pagosLinea)
             .where(and(eq(schema.pagosLinea.barberiaId, b.id), eq(schema.pagosLinea.estado, "pagado"), sql`${schema.pagosLinea.pagadoEn} >= date_trunc('month', now())`)))[0]?.m ?? 0} />
       )}
