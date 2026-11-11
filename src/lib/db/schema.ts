@@ -62,6 +62,10 @@ export const barberias = pgTable("barberias", {
   // Al cerrar la caja se pueden adjuntar fotos o archivos (comprobantes de transferencias, vouchers de tarjeta).
   usaEvidenciaCorte: boolean("usa_evidencia_corte").notNull().default(false),
   usaPromociones: boolean("usa_promociones").notNull().default(false),
+  // Pagos al equipo automáticos: cada periodo se da por pagado en su fecha de pago y se anota solo en Finanzas y la libreta.
+  pagosEquipoAuto: boolean("pagos_equipo_auto").notNull().default(false),
+  // Desde qué día se lleva la cuenta de lo pendiente al equipo (al encender los pagos automáticos). Vacío: desde su forma de pago.
+  pagosEquipoDesde: date("pagos_equipo_desde"),
   // Citas y reservaciones en línea. La dirección pública es /reservar/<slug>.
   usaCitas: boolean("usa_citas").notNull().default(false),
   slug: text("slug"),

@@ -93,7 +93,9 @@ export default async function Equipo({ searchParams }: { searchParams: Promise<{
             ))}
           </div>
         )}
-        {filas.length > 0 && <small className="eqa-nota">La barra muestra cuánto aporta cada persona a las ventas del mes. Lo que falta por pagar incluye lo pendiente de periodos anteriores.</small>}
+        {filas.length > 0 && <small className="eqa-nota">La barra muestra cuánto aporta cada persona a las ventas del mes. {se.barberia.pagosEquipoAuto
+          ? "Los pagos al equipo son automáticos: cada periodo se da por pagado en su fecha de pago. Registra a mano solo los anticipos."
+          : "Lo que falta por pagar incluye lo pendiente de periodos anteriores."}</small>}
       </section>
     </div>
   );

@@ -9,6 +9,7 @@ import { fechaLocal, finDeMes } from "@/lib/fechas";
 import { libretaAnio, libretaBarberos, libretaMes, mesesConDatos } from "@/lib/libreta";
 import { formatoDinero } from "@/lib/money";
 import { NavLibreta } from "./NavLibreta";
+import { liquidarAutomaticos } from "@/lib/pagosAuto";
 
 export const metadata = { title: "Datos" };
 
@@ -16,6 +17,7 @@ const $ = (c: number) => formatoDinero(c);
 
 export default async function Libreta({ searchParams }: { searchParams: Promise<{ vista?: string; mes?: string; anio?: string; semana?: string }> }) {
   const s = await requerirSesion();
+  await liquidarAutomaticos(s.barberia.id);
   if (!s.puede("reportes.exportar")) redirect("/");
   const q = await searchParams;
   const zona = s.barberia.zonaHoraria;

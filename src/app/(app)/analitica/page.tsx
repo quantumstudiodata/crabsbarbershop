@@ -14,6 +14,7 @@ import { diasEntre, fechaCorta, fechaLocal, inicioDeMes, sumarDias } from "@/lib
 import { cambio, formatoDinero, porcentaje } from "@/lib/money";
 import { type ConsultaPeriodo, leerPeriodo } from "@/lib/periodo";
 import { Ayuda } from "@/components/Ayuda";
+import { liquidarAutomaticos } from "@/lib/pagosAuto";
 
 export const metadata = { title: "Resumen" };
 
@@ -26,6 +27,7 @@ function Ir({ href, titulo }: { href: string; titulo: string }) {
 
 export default async function Resumen({ searchParams }: { searchParams: Promise<ConsultaPeriodo> }) {
   const s = await requerirSesion();
+  await liquidarAutomaticos(s.barberia.id);
   if (!s.puede("reportes.ver")) redirect(s.puede("ventas.ver_todas") ? "/analitica/ventas" : s.puede("cortes.ver") ? "/analitica/cortes" : s.puede("gastos.ver") ? "/analitica/finanzas" : "/");
   const q = await searchParams;
   const zona = s.barberia.zonaHoraria;

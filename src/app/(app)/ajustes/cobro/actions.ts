@@ -7,6 +7,7 @@ import { db, schema } from "@/lib/db";
 import { registrar } from "@/lib/historial";
 import { formatoDinero, leerPesos } from "@/lib/money";
 import { texto, volver } from "@/lib/volver";
+import { fechaLocal } from "@/lib/fechas";
 
 const R = "/ajustes/cobro";
 
@@ -177,6 +178,7 @@ const FUNCIONES = {
   evidencia: ["usaEvidenciaCorte", "Evidencias del corte de caja", "configuracion.caja"],
   comprobantes: ["usaComprobantes", "Registro de comprobantes", "configuracion.egresos"],
   periodicidad: ["usaPeriodicidad", "Periodicidad de gastos", "configuracion.egresos"],
+  pagosAuto: ["pagosEquipoAuto", "Pagos al equipo automáticos", "configuracion.egresos"],
 } as const;
 
 export async function alternarFuncion(clave: string) {
@@ -185,7 +187,9 @@ export async function alternarFuncion(clave: string) {
   const [campo, nombre, permiso] = f;
   const s = await requerirSesion(permiso);
   const antes = s.barberia[campo];
-  await db.update(schema.barberias).set({ [campo]: !antes }).where(eq(schema.barberias.id, s.barberia.id));
+  // Al encender los pagos automáticos, la cuenta del equipo empieza desde hoy: lo anterior no se paga solo.
+  const extra = campo === "pagosEquipoAuto" && !antes ? { pagosEquipoDesde: fechaLocal(new Date(), s.barberia.zonaHoraria) } : {};
+  await db.update(schema.barberias).set({ [campo]: !antes, ...extra }).where(eq(schema.barberias.id, s.barberia.id));
   await registrar(db, {
     barberiaId: s.barberia.id, usuarioId: s.usuario.id, tipo: "ajuste",
     accion: `${s.usuario.nombre} ${antes ? "apagó" : "encendió"} la función ${nombre}`,

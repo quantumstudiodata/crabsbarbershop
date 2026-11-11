@@ -8,6 +8,7 @@ import { NOMBRE_FORMA_PAGO, NOMBRE_FRECUENCIA, cuentaDe, frecuenciaDe, modalidad
 import { fechaCorta, fechaLarga, fechaLocal } from "@/lib/fechas";
 import { formatoDinero } from "@/lib/money";
 import { periodoMes } from "@/lib/periodo";
+import { liquidarAutomaticos } from "@/lib/pagosAuto";
 
 /** Quién entra a Equipo: quien ve los movimientos del equipo o registra sus pagos. */
 export async function sesionEquipo() {
@@ -36,7 +37,9 @@ export function mesElegido(q: { mes?: string }, zona: string) {
 
 /** Cuenta del periodo de pago en curso de cada persona: lo que se le debe (o debe de renta) y su desglose. */
 export async function cuentasEnCurso(barberiaId: string, zona: string, personas: { id: string; nombre: string; avatar: string }[], puedePagar: boolean) {
+  await liquidarAutomaticos(barberiaId);
   const hoy = fechaLocal(new Date(), zona);
+  const [cfg] = await db.select({ desde: s.barberias.pagosEquipoDesde }).from(s.barberias).where(eq(s.barberias.id, barberiaId)).limit(1);
   const reglas = await reglasDe(barberiaId);
   const periodos = new Map(personas.map((p) => { const r = elegirRegla(reglas, p.id, null, new Date()); return [p.id, { r, per: periodoDePago(r, hoy) }]; }));
   const inicio = [...[...periodos.values()].map((x) => x.per.desde), hoy].sort()[0];
@@ -52,7 +55,8 @@ export async function cuentasEnCurso(barberiaId: string, zona: string, personas:
     const c = await cuentaDe(barberiaId, p.id, per.desde, hasta, pagadas.filter((v) => v.fecha >= per.desde && v.fecha <= hasta));
     const renta = c.regla?.tipo === "renta";
     // Lo pendiente se acumula: lo que no se pagó en periodos anteriores se suma hasta que se registre un pago.
-    const inicioCuenta = [desdeRegla.get(p.id) ?? per.desde, tope].sort()[1];
+    // Con pagos automáticos (o una cuenta iniciada en cero), lo anterior a esa fecha ya no se acumula.
+    const inicioCuenta = [desdeRegla.get(p.id) ?? per.desde, tope, cfg?.desde ?? tope].sort()[2];
     const acum = inicioCuenta < per.desde
       ? await cuentaDe(barberiaId, p.id, inicioCuenta, hoy, (await ventasEntre(barberiaId, inicioCuenta, hoy, { zona, barberoId: p.id })).ventas.filter((v) => v.estado === "pagada"))
       : c;
