@@ -169,7 +169,32 @@ export function TarjetasQr({ nuevo, abrir, vistos }: { nuevo: CobroQrAbierto | n
   const pendientes = lista.filter((c) => !vistos.includes(c.id));
   const resueltos = hechos.filter((h) => !vistos.includes(h.c.id));
   if (!pendientes.length && !resueltos.length) return null;
+  const pago = resueltos.find((h) => h.estado === "pagado");
+  const otro = resueltos.find((h) => h.estado !== "pagado");
+  const proximo = [...pendientes].sort((a, b) => a.vence - b.vence)[0];
   return (
+    <>
+    {/* Teléfono: una pestaña pegada a la barra de Cobrar. Primero avisa del pago verificado; si no, del cobro en espera. */}
+    {pago ? (
+      <button type="button" className="tq-tab ok" onClick={() => { quitar(pago.c.id); abrir(pago.c); }}>
+        <span className="tq-tab-pal"><Icono n="palomita" /></span>
+        <span className="tq-tab-t"><b>{formatoDinero(pago.total ?? pago.c.total)}</b> pago verificado</span>
+        <span className="tq-tab-ver">Ver</span>
+      </button>
+    ) : otro ? (
+      <button type="button" className="tq-tab fin" onClick={() => quitar(otro.c.id)}>
+        <i />
+        <span className="tq-tab-t"><b>{formatoDinero(otro.total ?? otro.c.total)}</b> {otro.estado === "reembolsado" ? "pago devuelto" : "venció sin pago"}</span>
+        <span className="tq-tab-ver">Entendido</span>
+      </button>
+    ) : proximo ? (
+      <button type="button" className="tq-tab" onClick={() => abrir(proximo)}>
+        <i className="tq-punto" />
+        <span className="tq-tab-t">{pendientes.length > 1 ? <><b>{pendientes.length}</b> cobros con QR en espera</> : <><b>{formatoDinero(proximo.total)}</b> con QR en espera</>}</span>
+        <Restante vence={proximo.vence} />
+        <span className="tq-tab-ver">Ver</span>
+      </button>
+    ) : null}
     <div className="tq-pila" aria-live="polite">
       {resueltos.map((h) => (
         <button type="button" key={h.c.id} className={`tq ${h.estado === "pagado" ? "ok" : "fin"}`}
@@ -195,5 +220,13 @@ export function TarjetasQr({ nuevo, abrir, vistos }: { nuevo: CobroQrAbierto | n
         </button>
       ))}
     </div>
+    </>
   );
+}
+
+/** Minutos y segundos que le quedan al enlace, en vivo. */
+function Restante({ vence }: { vence: number }) {
+  const [ahora, setAhora] = useState(() => Date.now());
+  useEffect(() => { const t = setInterval(() => setAhora(Date.now()), 1000); return () => clearInterval(t); }, []);
+  return <span className="tq-tab-r" role="timer">{reloj(vence - ahora)}</span>;
 }

@@ -3676,10 +3676,26 @@ button.rv-opc:not(.on) .radio-p { background: none; border-color: rgba(43,58,71,
 .tq.fin .tq-x { display: grid; place-items: center; width: 46px; height: 46px; border-radius: 50%; background: rgba(30,45,60,.08); flex: none; }
 .tq.fin .tq-x .ic { width: 18px; height: 18px; color: var(--muted); }
 @keyframes tqEntra { from { opacity: 0; transform: translateY(10px) scale(.98); } to { opacity: 1; transform: none; } }
-@media (max-width: 640px) {
-  .tq-pila { left: 16px; right: 16px; width: auto; bottom: calc(118px + env(safe-area-inset-bottom)); }
-  .cobro:has(.tq-pila) { padding-bottom: 210px; }
+/* Teléfono: pestaña pegada a la barra de Cobrar en lugar de las tarjetas */
+.tq-tab { display: none; }
+@media (max-width: 760px) {
+  .tq-pila { display: none; }
+  .tq-tab { position: fixed; left: 22px; right: 22px; bottom: calc(46px + env(safe-area-inset-bottom, 0px)); z-index: 49; display: flex; align-items: center; gap: 10px; padding: 9px 16px 26px; border: 0; border-radius: 18px 18px 0 0; background: #2b3a47; color: #fff; font: inherit; font-size: 13.5px; text-align: left; cursor: pointer; animation: tqSube .3s cubic-bezier(.2,.9,.3,1.1) both; }
+  .tq-tab > i { width: 8px; height: 8px; border-radius: 50%; background: #9fb3c4; flex: none; }
+  .tq-tab .tq-punto { background: #9fb3c4; }
+  .tq-tab-t { flex: 1; min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; color: rgba(255,255,255,.85); }
+  .tq-tab-t b { color: #fff; font-weight: 700; }
+  .tq-tab-r { font: 600 12.5px var(--f-mono); background: rgba(255,255,255,.14); padding: 2px 8px; border-radius: 999px; }
+  .tq-tab-ver { font-weight: 700; }
+  .tq-tab.ok { background: #3c5163; }
+  .tq-tab-pal { display: grid; place-items: center; width: 22px; height: 22px; border-radius: 50%; background: #fff; color: #13171c; flex: none; animation: tqPop .45s cubic-bezier(.2,.9,.3,1.4) both; }
+  .tq-tab-pal .ic { width: 13px; height: 13px; stroke-width: 3; }
+  .tq-tab.fin { background: #4a525b; }
+  .cobro:has(.tq-tab) { padding-bottom: 140px; }
 }
+@keyframes tqSube { from { transform: translateY(100%); } to { transform: none; } }
+@keyframes tqPop { 0% { transform: scale(.3); } 100% { transform: scale(1); } }
+@media (prefers-reduced-motion: reduce) { .tq-tab, .tq-tab-pal { animation: none; } }
 @media (prefers-reduced-motion: reduce) { .tq, .tq-punto { animation: none; } }
 
 /* Estado "esperando el pago": punto que late y un brillo que recorre la píldora */
