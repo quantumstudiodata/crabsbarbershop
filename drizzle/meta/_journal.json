@@ -176,6 +176,13 @@
       "when": 1794392126662,
       "tag": "0024_rentas_auto",
       "breakpoints": true
+    },
+    {
+      "idx": 25,
+      "version": "7",
+      "when": 1794409292025,
+      "tag": "0025_comprobante_obligatorio",
+      "breakpoints": true
     }
   ]
 }

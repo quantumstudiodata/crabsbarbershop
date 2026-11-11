@@ -177,6 +177,7 @@ const FUNCIONES = {
   corte: ["corteObligatorio", "Cierre de caja obligatorio", "configuracion.caja"],
   evidencia: ["usaEvidenciaCorte", "Evidencias del corte de caja", "configuracion.caja"],
   comprobantes: ["usaComprobantes", "Registro de comprobantes", "configuracion.egresos"],
+  obligatorio: ["comprobanteObligatorio", "Comprobante obligatorio en egresos", "configuracion.egresos"],
   periodicidad: ["usaPeriodicidad", "Periodicidad de gastos", "configuracion.egresos"],
   pagosAuto: ["pagosEquipoAuto", "Pagos al equipo automáticos", "configuracion.egresos"],
   rentasAuto: ["rentasAuto", "Renta de silla automática", "configuracion.egresos"],

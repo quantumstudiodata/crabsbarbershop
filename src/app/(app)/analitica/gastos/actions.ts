@@ -37,10 +37,12 @@ export async function registrarEgreso(_: EstadoGasto, form: FormData): Promise<E
   const deCaja = texto(form, "deCaja") === "si";
   const hoy = fechaLocal(new Date(), s.barberia.zonaHoraria);
   const periodicidad = s.barberia.usaPeriodicidad && PERIODOS.includes(texto(form, "periodicidad")) ? texto(form, "periodicidad") : "unica";
-  const archivo = s.barberia.usaComprobantes ? String(form.get("comprobante") ?? "") : "";
+  // En efectivo no se adjunta comprobante: la evidencia es el efectivo.
+  const archivo = s.barberia.usaComprobantes && metodo !== METODOS.efectivo ? String(form.get("comprobante") ?? "") : "";
   const nombreArchivo = texto(form, "comprobanteNombre", 120) || "comprobante";
   if (archivo && (!TIPOS_ARCHIVO.test(archivo) || archivo.length > 2_800_000)) return { error: "El comprobante debe ser una foto o un PDF de máximo 2 MB." };
 
+  if (s.barberia.usaComprobantes && s.barberia.comprobanteObligatorio && metodo !== METODOS.efectivo && !archivo) return { error: "Adjunta el comprobante del pago para guardar el egreso." };
   if (!concepto) return { error: "Escribe el concepto del egreso." };
   if (!monto || monto <= 0) return { error: "Escribe una cantidad mayor a cero." };
   if (monto > 100_000_000) return { error: "La cantidad es demasiado grande. Revísala." };

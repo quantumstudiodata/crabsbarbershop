@@ -1,0 +1,1 @@
+ALTER TABLE "barberias" ADD COLUMN "comprobante_obligatorio" boolean DEFAULT false NOT NULL;

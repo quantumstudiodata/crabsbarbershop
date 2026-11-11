@@ -167,13 +167,16 @@ export function GastosFrecuentes({ gastos, categorias, metodos, puede }: { gasto
 }
 
 /** Qué información y opciones hay al registrar un egreso, como una lista de configuración. */
-export function OpcionesRegistro({ metodos, comprobantes, periodicidad, puede }: { metodos: string[]; comprobantes: boolean; periodicidad: boolean; puede: boolean }) {
+export function OpcionesRegistro({ metodos, comprobantes, obligatorio = false, periodicidad, puede }: { metodos: string[]; comprobantes: boolean; obligatorio?: boolean; periodicidad: boolean; puede: boolean }) {
   const [pendiente, iniciar] = useTransition();
   const [error, setError] = useState<string | null>(null);
   const [mets, setMets] = useState(metodos);
-  const [fun, setFun] = useState({ comprobantes, periodicidad });
-  const opciones: ["comprobantes" | "periodicidad", string, string][] = [
-    ["comprobantes", "Comprobantes", "Adjuntar fotografías o archivos a los egresos."],
+  const [fun, setFun] = useState({ comprobantes, obligatorio, periodicidad });
+  const opciones: ["comprobantes" | "obligatorio" | "periodicidad", string, string][] = [
+    ["comprobantes", "Comprobantes", "Adjuntar fotografías o archivos a los egresos. Los pagados en efectivo no lo piden: la evidencia es el efectivo."],
+    ...(fun.comprobantes ? [["obligatorio", "Comprobante obligatorio", fun.obligatorio
+      ? "Cada egreso pagado con transferencia o tarjeta necesita su comprobante para guardarse."
+      : "El comprobante es opcional: se puede guardar el egreso sin adjuntarlo."] as ["obligatorio", string, string]] : []),
     ["periodicidad", "Periodicidad de gastos", "Registrar gastos semanales, quincenales o mensuales."],
   ];
   return (

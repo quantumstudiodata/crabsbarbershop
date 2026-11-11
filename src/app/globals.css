@@ -3880,3 +3880,5 @@ html, body { overscroll-behavior-y: none; }
 .ev-mas { width: 58px; height: 72px; border-radius: 10px; border: 1.5px dashed rgba(60,81,99,.4); background: none; display: grid; place-content: center; justify-items: center; gap: 3px; font: 600 10.5px var(--f-body); color: #3c5163; cursor: pointer; }
 .ev-mas .ic { width: 16px; height: 16px; }
 .ck [hidden] { display: none !important; }
+.ck-acc > .fila { flex-wrap: nowrap; align-items: center; }
+.ck-acc .ac-link { white-space: nowrap; font-size: 13px; }

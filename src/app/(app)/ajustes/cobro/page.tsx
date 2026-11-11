@@ -122,7 +122,7 @@ export default async function ConfigurarNegocio({ searchParams }: { searchParams
               : <Resumen filas={[["Pagos al equipo", b.pagosEquipoAuto ? "Automáticos" : "Se registran a mano"], ["Renta de silla", b.rentasAuto ? "Automática" : "Se registra a mano"]]} />}
             <CategoriasEgresos categorias={cats} puede={edita("egresos")} />
             <GastosFrecuentes gastos={conceptos} categorias={cats.filter((c) => c.activo).map((c) => c.nombre)} metodos={b.metodosEgreso} puede={edita("egresos")} />
-            <OpcionesRegistro metodos={b.metodosEgreso} comprobantes={b.usaComprobantes} periodicidad={b.usaPeriodicidad} puede={edita("egresos")} />
+            <OpcionesRegistro metodos={b.metodosEgreso} comprobantes={b.usaComprobantes} obligatorio={b.comprobanteObligatorio} periodicidad={b.usaPeriodicidad} puede={edita("egresos")} />
           </div>
         } />
     </>

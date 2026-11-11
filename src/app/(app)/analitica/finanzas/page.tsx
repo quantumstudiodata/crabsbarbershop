@@ -184,7 +184,7 @@ export default async function Finanzas({ searchParams }: { searchParams: Promise
         </>
       )}
       <Movimientos abrirEgreso={q.egreso === "1"} dias={dias} registrar={s.puede("gastos.registrar")} hoy={hoy} cajaAbierta={!!turno} categorias={cats}
-        opciones={{ metodos: s.barberia.metodosEgreso, periodicidad: s.barberia.usaPeriodicidad, comprobantes: s.barberia.usaComprobantes, frecuentes: frecuentes.map(({ id, concepto, categoria, monto, metodo, periodicidad }) => ({ id, concepto, categoria, monto, metodo, periodicidad })) }}
+        opciones={{ metodos: s.barberia.metodosEgreso, periodicidad: s.barberia.usaPeriodicidad, comprobantes: s.barberia.usaComprobantes, obligatorio: s.barberia.comprobanteObligatorio, frecuentes: frecuentes.map(({ id, concepto, categoria, monto, metodo, periodicidad }) => ({ id, concepto, categoria, monto, metodo, periodicidad })) }}
         filtros={<BarraFiltros p={f.periodo} hoy={hoy} personas={[]} persona="" buscar={f.buscar} sinPeriodo="Todas las fechas" textoBuscar="Buscar"
           descarga={s.puede("reportes.exportar") ? `/api/exportar?tipo=gastos${f.periodo ? `&desde=${f.periodo.desde}&hasta=${f.periodo.hasta}` : ""}` : undefined}
           extra={verTodo ? <SelectorUrl nombre="tipo" valor={tipo} opciones={TIPOS.map(([valor, texto]) => ({ valor, texto }))} etiqueta="Tipo de movimiento" /> : undefined} />} />

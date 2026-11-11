@@ -6,7 +6,7 @@ import { useActionState, useEffect, useState, useTransition } from "react";
 import { Calendario } from "@/components/Calendario";
 import { Fl, Icono } from "@/components/Icono";
 import { Interruptor, Modal, Selector, sinReinicio } from "@/components/ui";
-import { formatoDinero } from "@/lib/money";
+import { formatoDinero, leerPesos } from "@/lib/money";
 import { cancelarEgreso, type EstadoGasto, registrarEgreso } from "./actions";
 
 export type FilaEgreso = { id: string; concepto: string; categoria: string; metodo: string; monto: number; cancelado: boolean; puedeCancelar: boolean; detalle: [string, string][]; comprobante?: { id: string; nombre: string } };
@@ -96,7 +96,7 @@ export function Egresos({ dias, hoy, cajaAbierta, puede, categorias, resumen, et
 const pct = (a: number, b: number) => (b ? `${Math.round((a / b) * 100)}%` : "0%");
 
 export type Frecuente = { id: string; concepto: string; categoria: string; monto: number; metodo: string; periodicidad: string };
-export type OpcionesEgreso = { periodicidad: boolean; comprobantes: boolean; frecuentes: Frecuente[]; metodos: string[] };
+export type OpcionesEgreso = { periodicidad: boolean; comprobantes: boolean; obligatorio?: boolean; frecuentes: Frecuente[]; metodos: string[] };
 const PERIODOS: [string, string][] = [["unica", "Una vez"], ["semanal", "Semanal"], ["quincenal", "Quincenal"], ["mensual", "Mensual"]];
 
 export function Nuevo({ hoy, cajaAbierta, categorias, cerrar, otro, opciones }: { hoy: string; cajaAbierta: boolean; categorias: Categoria[]; cerrar: () => void; otro: () => void; opciones: OpcionesEgreso }) {
@@ -118,79 +118,92 @@ export function Nuevo({ hoy, cajaAbierta, categorias, cerrar, otro, opciones }: 
   const [seguir, setSeguir] = useState(false);
   useEffect(() => { if (e.ok) { if (seguir) otro(); else cerrar(); } }, [e.ok, e.n, seguir, otro, cerrar]);
   const puedeCaja = metodo === "efectivo" && fecha === hoy && cajaAbierta;
+  // En efectivo no se adjunta comprobante: la evidencia es el efectivo.
+  const conComprobante = opciones.comprobantes && metodo !== "efectivo";
+  const faltaComprobante = conComprobante && !!opciones.obligatorio && !archivo;
+  const [paso, setPaso] = useState(1);
+  const total = 3;
+  const valido = paso === 1 ? concepto.trim().length > 0 : paso === 2 ? (leerPesos(monto) ?? 0) > 0 : !faltaComprobante;
+  const nombres = ["Qué se pagó", "Monto y forma de pago", conComprobante ? "Comprobante y detalle" : "Detalle"];
   return (
-    <Modal abierto cerrar={cerrar} etiqueta="Nuevo egreso" titulo="Registrar egreso" ancho>
-      <form onSubmit={sinReinicio(accion)} className="pila">
+    <Modal abierto cerrar={cerrar} etiqueta={`Paso ${paso} de ${total}`} titulo="Registrar egreso">
+      <form onSubmit={(x) => { if (paso < total) { x.preventDefault(); if (valido) setPaso(paso + 1); return; } sinReinicio(accion)(x); }} className="pila ck">
         <input type="hidden" name="metodo" value={metodo} />
         <input type="hidden" name="fecha" value={fecha} />
         <input type="hidden" name="categoria" value={categoria} />
         <input type="hidden" name="deCaja" value={puedeCaja && deCaja ? "si" : "no"} />
         <input type="hidden" name="periodicidad" value={periodo} />
-        {archivo && <><input type="hidden" name="comprobante" value={archivo.datos} /><input type="hidden" name="comprobanteNombre" value={archivo.nombre} /></>}
-        {opciones.frecuentes.length > 0 && (
-          <div className="pila-chica">
-            <span className="lab">Gastos frecuentes</span>
-            <div className="chips-cat">{opciones.frecuentes.map((f) => <button key={f.id} type="button" className={`chip-cat ${concepto === f.concepto ? "on" : ""}`} onClick={() => usar(f)}>{f.concepto}{f.monto ? ` ${formatoDinero(f.monto)}` : ""}</button>)}</div>
-          </div>
-        )}
-        {/* A. Información del egreso */}
-        <div className="bloque-eg">
-          <span className="lab">Información del egreso</span>
-          <label className="campo"><span>Concepto</span><input className="input" name="concepto" value={concepto} onChange={(x) => setConcepto(x.target.value)} placeholder="Ejemplo: Recibo de luz de octubre" required autoFocus maxLength={120} /></label>
+        {archivo && conComprobante && <><input type="hidden" name="comprobante" value={archivo.datos} /><input type="hidden" name="comprobanteNombre" value={archivo.nombre} /></>}
+        <div className="ck-pasos" aria-hidden="true">{Array.from({ length: total }, (_, i) => <i key={i} className={i < paso ? "on" : ""} />)}</div>
+        <span className="ck-lab">{nombres[paso - 1]}</span>
+
+        <div className="pila" hidden={paso !== 1}>
+          {opciones.frecuentes.length > 0 && (
+            <div className="pila-chica">
+              <span className="lab">Gastos frecuentes</span>
+              <div className="chips-cat">{opciones.frecuentes.map((f) => <button key={f.id} type="button" className={`chip-cat ${concepto === f.concepto ? "on" : ""}`} onClick={() => usar(f)}>{f.concepto}{f.monto ? ` ${formatoDinero(f.monto)}` : ""}</button>)}</div>
+            </div>
+          )}
+          <label className="campo"><span>Concepto</span><input className="input" name="concepto" value={concepto} onChange={(x) => setConcepto(x.target.value)} placeholder="Ejemplo: Recibo de luz de octubre" required maxLength={120} /></label>
+          <div className="campo"><span>Categoría</span><Selector etiqueta="Categoría" valor={categoria} onChange={setCategoria} opciones={categorias.map((c) => ({ valor: c.nombre, texto: c.nombre }))} /></div>
+        </div>
+
+        <div className="pila" hidden={paso !== 2}>
           <div className="fila-eg">
-            <label className="campo"><span>Cantidad</span><input className="input" name="monto" value={monto} onChange={(x) => setMonto(x.target.value)} inputMode="decimal" placeholder="$0" required /></label>
-            <div className="campo"><span>Categoría</span><Selector etiqueta="Categoría" valor={categoria} onChange={setCategoria} opciones={categorias.map((c) => ({ valor: c.nombre, texto: c.nombre }))} /></div>
+            <label className="campo"><span>Cantidad</span><input className="input grande" name="monto" value={monto} onChange={(x) => setMonto(x.target.value)} inputMode="decimal" placeholder="$0" required /></label>
             <div className="campo"><span>Fecha</span><Calendario fecha={fecha} hoy={hoy} elegir={setFecha} /></div>
           </div>
-        </div>
-        {/* B. Pago */}
-        <div className="bloque-eg">
-          <span className="lab">Método de pago</span>
-          <div className="seg metodos-eg" role="radiogroup" aria-label="Método de pago">
-            {opciones.metodos.includes("efectivo") && <button type="button" className={metodo === "efectivo" ? "on" : ""} onClick={() => setMetodo("efectivo")}><Icono n="efectivo" />Efectivo</button>}
-            {opciones.metodos.includes("transferencia") && <button type="button" className={metodo === "transferencia" ? "on" : ""} onClick={() => setMetodo("transferencia")}><Icono n="cobro" />Transferencia</button>}
-            {opciones.metodos.includes("tarjeta") && <button type="button" className={metodo === "tarjeta" ? "on" : ""} onClick={() => setMetodo("tarjeta")}><Icono n="tarjeta" />Tarjeta</button>}
+          <div className="campo"><span>Forma de pago</span>
+            <div className="seg metodos-eg" role="radiogroup" aria-label="Forma de pago">
+              {opciones.metodos.includes("efectivo") && <button type="button" className={metodo === "efectivo" ? "on" : ""} onClick={() => setMetodo("efectivo")}><Icono n="efectivo" />Efectivo</button>}
+              {opciones.metodos.includes("transferencia") && <button type="button" className={metodo === "transferencia" ? "on" : ""} onClick={() => setMetodo("transferencia")}><Icono n="enviar" />Transferencia</button>}
+              {opciones.metodos.includes("tarjeta") && <button type="button" className={metodo === "tarjeta" ? "on" : ""} onClick={() => setMetodo("tarjeta")}><Icono n="tarjeta" />Tarjeta</button>}
+            </div>
           </div>
+          {puedeCaja ? (
+            <label className="entre opcion-caja">
+              <span><b>Lo pagué con el efectivo de la caja</b><small>Se resta del efectivo que debe haber al hacer el corte de hoy.</small></span>
+              <Interruptor etiqueta="Lo pagué con el efectivo de la caja" checked={deCaja} onChange={setDeCaja} />
+            </label>
+          ) : (
+            <p className="ayuda-txt" style={{ margin: 0 }}>{metodo !== "efectivo" ? `Pagado con ${metodo}: no afecta el efectivo de la caja.` : fecha !== hoy ? "Es de otro día: no afecta el corte de hoy." : "La caja está cerrada: este gasto no afecta ningún corte."}</p>
+          )}
+          {opciones.periodicidad && <div className="campo"><span>Periodicidad del gasto</span><Selector etiqueta="Periodicidad del gasto" valor={periodo} onChange={setPeriodo} opciones={PERIODOS.map(([k, t]) => ({ valor: k, texto: t }))} /></div>}
         </div>
-        {/* C. Periodicidad */}
-        {opciones.periodicidad && (
-          <div className="bloque-eg">
-            <div className="campo"><span>Periodicidad del gasto</span><Selector etiqueta="Periodicidad del gasto" valor={periodo} onChange={setPeriodo} opciones={PERIODOS.map(([k, t]) => ({ valor: k, texto: t }))} /></div>
-          </div>
-        )}
-        {/* D. Comprobante y caja */}
-        <div className="bloque-eg">
-          <span className="lab">Comprobante y caja</span>
-          <div className="fila-eg">
-            {opciones.comprobantes && (
-              <div className="campo">
-                <label className="subir-arch">
-                  <input type="file" accept="image/*,application/pdf" capture="environment" onChange={async (x) => {
-                    const f = x.target.files?.[0]; setErrArchivo(null);
-                    if (!f) { setArchivo(null); return; }
-                    if (f.type === "application/pdf" && f.size > 2_000_000) { setErrArchivo("El PDF debe pesar menos de 2 MB."); return; }
-                    try { setArchivo({ datos: await prepararArchivo(f), nombre: f.name.slice(0, 100) }); } catch { setErrArchivo("No se pudo leer ese archivo."); }
-                  }} />
-                  <Icono n={archivo ? "palomita" : "archivo"} />{archivo ? archivo.nombre : "Adjuntar comprobante (opcional)"}
-                </label>
-                {errArchivo && <small style={{ color: "#a0525a" }}>{errArchivo}</small>}
-              </div>
-            )}
-            {puedeCaja ? (
-              <label className="entre opcion-caja">
-                <span><b>Lo pagué con el efectivo de la caja</b><small>Se resta del efectivo que debe haber al hacer el corte de hoy.</small></span>
-                <Interruptor etiqueta="Lo pagué con el efectivo de la caja" checked={deCaja} onChange={setDeCaja} />
+
+        <div className="pila" hidden={paso !== 3}>
+          {conComprobante && (
+            <div className="campo">
+              <span>Comprobante{opciones.obligatorio ? "" : " (opcional)"}</span>
+              <label className="subir-arch">
+                <input type="file" accept="image/*,application/pdf" onChange={async (x) => {
+                  const f = x.target.files?.[0]; setErrArchivo(null);
+                  if (!f) { setArchivo(null); return; }
+                  if (f.type === "application/pdf" && f.size > 2_000_000) { setErrArchivo("El PDF debe pesar menos de 2 MB."); return; }
+                  try { setArchivo({ datos: await prepararArchivo(f), nombre: f.name.slice(0, 100) }); } catch { setErrArchivo("No se pudo leer ese archivo."); }
+                }} />
+                <Icono n={archivo ? "palomita" : "camara"} />{archivo ? archivo.nombre : "Tomar foto o elegir archivo"}
               </label>
-            ) : (
-              <p className="ayuda-txt" style={{ margin: 0 }}>{metodo !== "efectivo" ? `Pagado con ${metodo}: no afecta el efectivo de la caja.` : fecha !== hoy ? "Es de otro día: no afecta el corte de hoy." : "La caja está cerrada: este gasto no afecta ningún corte."}</p>
-            )}
+              {errArchivo && <small style={{ color: "#a0525a" }}>{errArchivo}</small>}
+            </div>
+          )}
+          {metodo === "efectivo" && opciones.comprobantes && <p className="ayuda-txt" style={{ margin: 0 }}>Pagado en efectivo: no necesita comprobante.</p>}
+          <label className="campo"><span>Descripción (opcional)</span><textarea className="input" name="descripcion" rows={2} maxLength={500} placeholder="Algún detalle que ayude a recordarlo" /></label>
+          <div className="ck-con">
+            <div><span>{concepto || "Sin concepto"}</span><b className="num">{formatoDinero(leerPesos(monto) ?? 0)}</b></div>
+            <div><span className="muted">{categoria}, {metodo}</span><span className="muted">{fecha === hoy ? "Hoy" : fecha.split("-").reverse().join("/")}</span></div>
           </div>
         </div>
-        <label className="campo"><span>Descripción (opcional)</span><textarea className="input" name="descripcion" rows={2} maxLength={500} placeholder="Algún detalle que ayude a recordarlo" /></label>
+
         {e.error && <p className="aviso error">{e.error}</p>}
-        <div className="acciones">
-          <button className="bt sec solo" disabled={guardando} onClick={() => setSeguir(true)}>Guardar y agregar otro</button>
-          <button className="bt" disabled={guardando} onClick={() => setSeguir(false)}>{guardando ? "Guardando…" : "Guardar egreso"}<Fl /></button>
+        <div className="ck-acc">
+          {paso > 1 ? <button key="ant" type="button" className="bt sec" onClick={() => setPaso(paso - 1)}><Icono n="izquierda" />Anterior</button> : <span />}
+          {paso < total
+            ? <button key="sig" type="button" className="bt" disabled={!valido} onClick={() => setPaso(paso + 1)}>Siguiente<Fl /></button>
+            : <span className="fila" style={{ gap: 8 }}>
+                <button key="otro" type="submit" className="ac-link" disabled={guardando || !valido} onClick={() => setSeguir(true)}>Guardar y otro</button>
+                <button key="guardar" type="submit" className="bt" disabled={guardando || !valido} onClick={() => setSeguir(false)}>{guardando ? "Guardando…" : "Guardar"}<Fl /></button>
+              </span>}
         </div>
       </form>
     </Modal>

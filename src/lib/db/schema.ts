@@ -82,6 +82,8 @@ export const barberias = pgTable("barberias", {
   stripeCuenta: text("stripe_cuenta"),
   stripeEstado: text("stripe_estado").notNull().default("sin"),
   usaComprobantes: boolean("usa_comprobantes").notNull().default(true),
+  // Con comprobantes activos: si el comprobante es obligatorio en egresos pagados con transferencia o tarjeta.
+  comprobanteObligatorio: boolean("comprobante_obligatorio").notNull().default(false),
   usaPeriodicidad: boolean("usa_periodicidad").notNull().default(true),
   // Formas de pago que se pueden usar al registrar un egreso.
   metodosEgreso: text("metodos_egreso").array().notNull().default(sql`'{efectivo,transferencia,tarjeta}'::text[]`),
