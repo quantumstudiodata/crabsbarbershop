@@ -1,5 +1,6 @@
 "use client";
 
+import Link from "next/link";
 import { useState, useTransition } from "react";
 import { Fl, Icono } from "@/components/Icono";
 import { MenuPuntos } from "@/components/MenuPuntos";
@@ -42,7 +43,7 @@ export function Metodos({ metodos, qr = null }: { metodos: Metodo[]; qr?: "activ
           <div className={qr === "activa" ? "" : "apagada"}>
             <span><b className="met-qr"><Icono n="cuadros" />Pago con QR</b><small>{qr === "activa" ? "Se activó al conectar Stripe. El cliente paga desde su teléfono y Stripe confirma el pago." : qr === "pendiente" ? "Se activa solo cuando Stripe termine de revisar tu cuenta." : "Se activa solo al conectar Stripe en Pagos en línea."}</small></span>
             <span className={`chip-p ${qr === "activa" ? "si" : ""}`}>{qr === "activa" ? "Activo" : "Desactivado"}</span>
-            <span />
+            <Link href="/ajustes/pagos" className="icb" aria-label="Abrir Pagos en línea"><Icono n="derecha" /></Link>
           </div>
         )}
       </div>

@@ -249,7 +249,7 @@ export async function conectarStripe(): Promise<{ url?: string; error?: string }
       await registrar(db, { barberiaId: s.barberia.id, usuarioId: s.usuario.id, tipo: "ajuste", accion: `${s.usuario.nombre} empezó a conectar la cuenta de Stripe del negocio` });
     }
     const base = await origen();
-    return { url: await enlaceAltaNegocio(cuenta, `${base}${R}?stripe=volver`, `${base}${R}?stripe=reintentar`) };
+    return { url: await enlaceAltaNegocio(cuenta, `${base}/ajustes/pagos?stripe=volver`, `${base}/ajustes/pagos?stripe=reintentar`) };
   } catch (err) {
     console.error(err);
     return { error: "No se pudo abrir Stripe. Intenta de nuevo en un momento." };

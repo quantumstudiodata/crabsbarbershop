@@ -1,37 +1,78 @@
 "use client";
 
+import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { useEffect, useState, useTransition } from "react";
 import { Icono } from "@/components/Icono";
+import { IconosPago } from "@/components/IconosPago";
 import { formatoDinero } from "@/lib/money";
 import { conectarStripe, revisarStripe } from "./actions";
 
-/** Pagos en línea: cada negocio conecta su propia cuenta de Stripe y recibe su dinero directo. */
-export function PagosLinea({ estado, revisar, puede, cobradoMes }: { estado: "sin" | "pendiente" | "activa"; revisar: boolean; puede: boolean; cobradoMes: number }) {
+type Estado = "sin" | "pendiente" | "activa";
+const CHIP: Record<Estado, string> = { sin: "Sin conectar", pendiente: "Pendiente", activa: "Conectada" };
+
+/** Fila corta en Configuración del negocio que lleva a la sección de Pagos en línea. */
+export function FilaPagosLinea({ estado }: { estado: Estado }) {
+  return (
+    <Link href="/ajustes/pagos" className="glass pa-fila subir">
+      <span className="pm-qr"><Icono n="cuadros" /></span>
+      <span className="tx"><b>Pagos en línea</b><small>{estado === "activa" ? "Pago con QR y anticipos de citas." : estado === "pendiente" ? "Stripe está revisando tus datos." : "Actívalo para cobrar con QR y pedir anticipos de citas."}</small></span>
+      <span className={`pl-chip ${estado === "activa" ? "on" : ""}`}>{CHIP[estado]}</span>
+      <Icono n="derecha" />
+    </Link>
+  );
+}
+
+/** Sección de Pagos en línea: cada negocio conecta su propia cuenta de Stripe y recibe su dinero directo. */
+export function PagosLinea({ estado, revisar, puede, mes, usos }: {
+  estado: Estado; revisar: boolean; puede: boolean;
+  mes: { cobrado: number; qr: number; anticipos: number };
+  usos: { qr: boolean; anticipo: string };
+}) {
   const router = useRouter();
   const [pend, iniciar] = useTransition();
   const [error, setError] = useState<string | null>(null);
   useEffect(() => {
     // Al regresar de Stripe se consulta si la cuenta ya quedó lista.
-    if (revisar) iniciar(async () => { const r = await revisarStripe(); if (r.error) setError(r.error); router.replace("/ajustes/cobro"); router.refresh(); });
+    if (revisar) iniciar(async () => { const r = await revisarStripe(); if (r.error) setError(r.error); router.replace("/ajustes/pagos"); router.refresh(); });
   }, [revisar]); // eslint-disable-line react-hooks/exhaustive-deps
   const abrir = () => iniciar(async () => { setError(null); const r = await conectarStripe(); if (r.url) window.location.href = r.url; else setError(r.error ?? "No se pudo abrir Stripe."); });
-  const chip = { sin: "Sin conectar", pendiente: "Pendiente", activa: "Conectada" }[estado];
+  const boton = puede && estado !== "activa" && (
+    <button type="button" className="bt" disabled={pend} onClick={abrir}>{pend ? "Abriendo Stripe…" : estado === "sin" ? "Conectar con Stripe" : "Continuar en Stripe"}<span className="fl" aria-hidden="true"><Icono n="derecha" /></span></button>
+  );
   return (
-    <section className="glass pl-card subir" aria-label="Pagos en línea">
-      <div className="entre"><b>Pagos en línea</b><span className="pl-chip">{chip}</span></div>
-      {estado === "sin" && <span className="pl-t"><b>Conecta tu cuenta de Stripe</b><small>Para cobrar anticipos de citas y pagos con QR. Stripe te pide tus datos y tu cuenta bancaria; tarda unos minutos. El dinero llega directo a tu cuenta.</small></span>}
-      {estado === "pendiente" && <span className="pl-t"><b>Stripe está revisando tus datos</b><small>Mientras tanto no se pueden cobrar pagos en línea. Si te faltó algo, continúa donde te quedaste.</small></span>}
-      {estado === "activa" && (
-        <>
-          <span className="pl-t"><b>Ya recibes pagos en línea</b><small>En Cobro aparece Pago con QR y en Ajustes, Citas y agenda puedes pedir anticipo al reservar.</small></span>
-          <div className="pl-fila"><span>Cobrado en línea este mes</span><b>{formatoDinero(cobradoMes)}</b></div>
-        </>
-      )}
-      {error && <p className="aviso error" style={{ margin: 0 }}>{error}</p>}
-      {puede && estado !== "activa" && <button type="button" className="bt" disabled={pend} onClick={abrir}>{pend ? "Abriendo Stripe…" : estado === "sin" ? "Conectar con Stripe" : "Continuar en Stripe"}<span className="fl" aria-hidden="true"><Icono n="derecha" /></span></button>}
-      {estado === "activa" && <a className="eq2-link" href="https://dashboard.stripe.com" target="_blank" rel="noopener noreferrer">Abrir el panel de Stripe</a>}
-      <small className="pl-nota"><Icono n="candado" />Crabs nunca ve ni guarda datos de tarjetas. Un pago cuenta solo cuando Stripe lo confirma.</small>
-    </section>
+    <>
+      <section className="glass pl-card subir" aria-label="Cuenta de Stripe">
+        <div className="entre"><span className="pa-marca"><span className="pm-qr"><Icono n="cuadros" /></span><b>Stripe</b></span><span className={`pl-chip ${estado === "activa" ? "on" : ""}`}>{CHIP[estado]}</span></div>
+        {estado === "activa" ? (
+          <>
+            <div className="pl-fila"><span>Cobrado en línea este mes</span><b>{formatoDinero(mes.cobrado)}</b></div>
+            <div className="pl-fila"><span>Pagos con QR</span><b>{mes.qr}</b></div>
+            <div className="pl-fila"><span>Anticipos de citas</span><b>{mes.anticipos}</b></div>
+          </>
+        ) : (
+          <>
+            <span className="pl-t"><b>Cobra con tarjeta desde el teléfono del cliente</b><small>El dinero llega directo a tu cuenta bancaria. Stripe confirma cada pago.</small></span>
+            <div className="pa-pasos">
+              <div className={estado === "pendiente" ? "hecho" : ""}><i>{estado === "pendiente" ? <Icono n="palomita" /> : 1}</i><span>Conecta tu cuenta<small>Stripe te pide tus datos y tu cuenta bancaria.</small></span></div>
+              <div className={estado === "pendiente" ? "ahora" : ""}><i>2</i><span>Stripe revisa<small>{estado === "pendiente" ? "En revisión. Si te faltó algo, continúa donde te quedaste." : "Tarda unos minutos."}</small></span></div>
+              <div><i>3</i><span>Listo<small>Aparece Pago con QR en Cobro.</small></span></div>
+            </div>
+          </>
+        )}
+        <span className="sub-a pa-sub-t">{estado === "activa" ? "Con qué puede pagar el cliente" : "Tus clientes podrán pagar con"}</span>
+        <IconosPago />
+        {error && <p className="aviso error" style={{ margin: 0 }}>{error}</p>}
+        {boton}
+        {estado === "activa" && <a className="eq2-link" href="https://dashboard.stripe.com" target="_blank" rel="noopener noreferrer">Abrir el panel de Stripe</a>}
+        <small className="pl-nota"><Icono n="candado" />Crabs nunca ve ni guarda datos de tarjetas. Un pago cuenta solo cuando Stripe lo confirma.</small>
+      </section>
+      <section className="glass pl-card subir" aria-label="Dónde se usa">
+        <b className="pa-tit">Dónde se usa</b>
+        <div className="pl-fila"><span>Pago con QR en Cobro</span><b>{usos.qr ? "Activo" : "Al conectar"}</b></div>
+        <div className="pl-fila"><span>Anticipo al reservar una cita</span><b>{usos.anticipo}</b></div>
+        <Link href="/ajustes/citas" className="eq2-link">Configurar el anticipo en Citas y agenda</Link>
+      </section>
+    </>
   );
 }
