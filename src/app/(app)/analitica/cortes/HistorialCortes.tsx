@@ -13,7 +13,7 @@ export type Corte = {
   abrio: { nombre: string; avatar: string }; cerro: { nombre: string; avatar: string };
   metodos: { metodo: string; total: number }[]; total: number; ventas: number;
   fondo: number; ventasEfectivo: number; propinasEfectivo: number; entradas: number; retiros: number; gastos: number;
-  esperado: number; contado: number; diferencia: number; notas: string | null;
+  esperado: number; contado: number; diferencia: number; ajustado?: number; notas: string | null;
   movimientos: { hora: string; titulo: string; detalle: string; monto: number }[];
   ajustes: string[];
   evidencias: { id: string; etiqueta: string; nombre: string; tipo: string }[];
@@ -83,7 +83,7 @@ export function TablaCortes({ cortes, corregir }: { cortes: Corte[]; corregir: b
       </div>
       {/* Registrar ajuste cierra el comprobante y abre su ventana, para no encimar dos capas. */}
       <Detalle c={ver} cerrar={() => setVer(null)} ajustar={corregir ? (c) => { setVer(null); setAjuste(c); } : undefined} />
-      {ajuste && <Corregir id={ajuste.id} dia={ajuste.dia} abierto cerrar={() => setAjuste(null)} />}
+      {ajuste && <Corregir id={ajuste.id} dia={ajuste.dia} folio={ajuste.folio} diferencia={ajuste.diferencia + (ajuste.ajustado ?? 0)} abierto cerrar={() => setAjuste(null)} />}
     </>
   );
 }
@@ -98,7 +98,26 @@ function imprimir(folio: string) {
   window.print();
 }
 
+type Ev = Corte["evidencias"][number];
+
+/** Evidencia dentro de la app, con botón de regresar: en la app instalada una pestaña nueva no tiene cómo volver. */
+function Visor({ e, cerrar }: { e: Ev; cerrar: () => void }) {
+  const pdf = e.tipo === "application/pdf";
+  return (
+    <div className="visor-ev" role="dialog" aria-modal="true" aria-label={e.nombre}>
+      <div className="visor-cab">
+        <button type="button" className="visor-atras" onClick={cerrar}><Icono n="izquierda" />Regresar</button>
+        <span className="visor-t"><b>{e.etiqueta || "General"}</b><small>{e.nombre}</small></span>
+      </div>
+      <div className="visor-cuerpo">
+        {pdf ? <iframe src={`/api/evidencia/${e.id}`} title={e.nombre} /> : <img src={`/api/evidencia/${e.id}`} alt={e.nombre} />}
+      </div>
+    </div>
+  );
+}
+
 function Detalle({ c, cerrar, ajustar }: { c: Corte | null; cerrar: () => void; ajustar?: (c: Corte) => void }) {
+  const [foto, setFoto] = useState<Ev | null>(null);
   return (
     <Cajon abierto={!!c} cerrar={cerrar} titulo={c ? `Corte ${c.folio}` : ""}
       pie={c && <>{ajustar && <button type="button" className="enlace" onClick={() => ajustar(c)}>Registrar ajuste</button>}<button type="button" className="bt chico" onClick={() => imprimir(c.folio)}><Icono n="imprimir" />Imprimir</button></>}>
@@ -126,7 +145,7 @@ function Detalle({ c, cerrar, ajustar }: { c: Corte | null; cerrar: () => void; 
           )}
           {c.evidencias.length > 0 && (
             <div className="rc-sec rc-evid"><span className="lab">Evidencias</span>
-              {c.evidencias.map((e) => <div key={e.id}><span>{e.etiqueta || "General"}<small>{e.nombre}</small></span><a className="enlace" href={`/api/evidencia/${e.id}`} target="_blank" rel="noreferrer">Ver</a></div>)}
+              {c.evidencias.map((e) => <div key={e.id}><span>{e.etiqueta || "General"}<small>{e.nombre}</small></span><button type="button" className="enlace" onClick={() => setFoto(e)}>Ver</button></div>)}
             </div>
           )}
           {(c.notas || c.ajustes.length > 0) && (
@@ -137,6 +156,7 @@ function Detalle({ c, cerrar, ajustar }: { c: Corte | null; cerrar: () => void; 
           )}
         </div>
       )}
+      {foto && <Visor e={foto} cerrar={() => setFoto(null)} />}
     </Cajon>
   );
 }
