@@ -4041,3 +4041,4 @@ html, body { overscroll-behavior-y: none; }
 .ini-acc:has(.ini-menu) { position: relative; z-index: 60; }
 .ini-lista .ini-fila > span { white-space: nowrap; }
 .ini-lista .ini-fila > small { min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.ini-cab:has(.ini-menu) { position: relative; z-index: 60; }
