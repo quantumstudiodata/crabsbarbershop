@@ -9,11 +9,14 @@ import { fechaLocal, finDeMes } from "@/lib/fechas";
 import { libretaAnio, libretaBarberos, libretaMes, mesesConDatos } from "@/lib/libreta";
 import { formatoDinero } from "@/lib/money";
 import { NavLibreta } from "./NavLibreta";
+import { DeslizaSemana } from "./HojaSemana";
 import { liquidarAutomaticos } from "@/lib/pagosAuto";
 
 export const metadata = { title: "Datos" };
 
 const $ = (c: number) => formatoDinero(c);
+/** Montos de la hoja sin signo, como se anotan en la libreta. */
+const n = (c: number) => formatoDinero(c).replace("$", "");
 
 export default async function Libreta({ searchParams }: { searchParams: Promise<{ vista?: string; mes?: string; anio?: string; semana?: string }> }) {
   const s = await requerirSesion();
@@ -75,6 +78,9 @@ async function Mes({ barberiaId, mes, hoy, zona, semana }: { barberiaId: string;
   const renta = (id: string) => rentas.find((r) => r.id === id)?.monto ?? 0;
   const celda = (v: number, f: string) => (v ? $(v) : futuro(f) ? "" : <span className="chip-p">Sin datos</span>);
   const elegida = m.semanas.find((x) => x.numero === semana);
+  // La hoja abre en la semana pedida, si no en la de hoy, si no en la última con ventas.
+  const enHoja = elegida ?? m.semanas.find((x) => x.dias.some((d) => d.fecha === hoy)) ?? [...m.semanas].reverse().find((x) => x.total > 0) ?? m.semanas[0];
+  const iHoja = enHoja ? m.semanas.indexOf(enHoja) : -1;
   const url = (n?: number) => `/libreta?vista=mes&mes=${mes}${n ? `&semana=${n}` : ""}`;
   const egresos = (
     <div className="cuenta-c">
@@ -107,14 +113,14 @@ async function Mes({ barberiaId, mes, hoy, zona, semana }: { barberiaId: string;
 
       {!m.historico && (
         <section className="glass tabla-l pivote-l subir d1 solo-escritorio">
-          <div className="entre"><span className="lab">Por barbero y semana</span><span className="muted chico-t">Toca una semana para ver sus días</span></div>
+          <div className="entre"><span className="lab">Por barbero y semana</span><span className="muted chico-t">Toca una semana para abrir su hoja</span></div>
           <div className="desliza"><table>
             <thead><tr><th>Barbero</th>
-              {m.semanas.map((sem) => <th key={sem.numero} className={sem.numero === semana ? "activa" : ""}><Link href={url(sem.numero === semana ? undefined : sem.numero)} scroll={false}>Semana {sem.numero}<small>{rango(sem)}</small></Link></th>)}
+              {m.semanas.map((sem) => <th key={sem.numero} className={sem.numero === enHoja?.numero ? "activa" : ""}><Link href={url(sem.numero)} scroll={false}>Semana {sem.numero}<small>{rango(sem)}</small></Link></th>)}
               {conRenta && <th>Renta silla</th>}<th className="tot">Total</th></tr></thead>
             <tbody>{m.columnas.map((c) => (
               <tr key={c.clave}><td className="f">{c.nombre}{!c.comision && <small className="muted"> sueldo</small>}</td>
-                {m.semanas.map((sem) => <td key={sem.numero} className={sem.numero === semana ? "activa" : ""}>{celda(sem.valores[c.clave] ?? 0, sem.dias[0].fecha)}</td>)}
+                {m.semanas.map((sem) => <td key={sem.numero} className={sem.numero === enHoja?.numero ? "activa" : ""}>{celda(sem.valores[c.clave] ?? 0, sem.dias[0].fecha)}</td>)}
                 {conRenta && <td>{renta(c.clave) ? $(renta(c.clave)) : ""}</td>}
                 <td className="tot">{$(m.semanas.reduce((a, x) => a + (x.valores[c.clave] ?? 0), 0))}</td></tr>
             ))}</tbody>
@@ -126,46 +132,33 @@ async function Mes({ barberiaId, mes, hoy, zona, semana }: { barberiaId: string;
         </section>
       )}
 
-      {!m.historico && (
-        <section className="glass semanas-m solo-movil subir d1">
-          <span className="lab">Por barbero y semana</span>
-          <small className="muted">Toca una semana para ver sus días.</small>
-          {m.semanas.map((sem) => (
-            <Link key={sem.numero} href={url(sem.numero)} scroll={false} className="sem-m">
-              <span className="sem-t"><b>Semana {sem.numero}</b><small>{rango(sem)}</small></span>
-              <b className="num">{futuro(sem.dias[0].fecha) ? "" : $(sem.total)}</b>
-              <span className="sem-b">{m.columnas.filter((c) => (sem.valores[c.clave] ?? 0) > 0).map((c) => <small key={c.clave}>{c.nombre} {$(sem.valores[c.clave] ?? 0)}</small>)}</span>
-            </Link>
-          ))}
-        </section>
-      )}
-
-      {elegida && (
-        <div className="hoja-semana-m solo-movil">
-          <Link href={url()} scroll={false} className="velo-sem" aria-label="Cerrar" />
-          <section className="hoja-sem">
-            <div className="entre"><b>Semana {elegida.numero}, {rango(elegida)}</b><Link className="icb" href={url()} scroll={false} aria-label="Cerrar"><Icono n="cerrar" /></Link></div>
-            {elegida.dias.map((d) => (
-              <div key={d.fecha} className="dia-sem">
-                <div className="entre"><span>{d.etiqueta}</span><b className="num">{futuro(d.fecha) ? "" : $(d.total)}</b></div>
-                <div className="sem-b">{m.columnas.map((c) => <small key={c.clave}>{c.nombre} {(d.valores[c.clave] ?? 0) ? $(d.valores[c.clave] ?? 0) : futuro(d.fecha) ? "" : "Sin datos"}</small>)}</div>
-              </div>
-            ))}
-            <div className="entre tot-sem"><span>Total de la semana</span><b className="num">{$(elegida.total)}</b></div>
-          </section>
-        </div>
-      )}
-
-      {elegida && (
-        <section className="glass tabla-l subir solo-escritorio">
-          <div className="entre"><span className="lab">Semana {elegida.numero}, {rango(elegida)}, día por día</span><Link className="icb" href={url()} scroll={false} aria-label="Cerrar"><Icono n="cerrar" /></Link></div>
-          <div className="desliza"><table>
-            <thead><tr><th>Barbero</th>{elegida.dias.map((d) => <th key={d.fecha} className={d.fecha === hoy ? "activa" : ""}>{d.etiqueta.split(" ")[0]}<small>{dia(d.fecha)} {nombreMes.slice(0, 3)}</small></th>)}<th className="tot">Total</th></tr></thead>
-            <tbody>{m.columnas.map((c) => (
-              <tr key={c.clave}><td className="f">{c.nombre}</td>{elegida.dias.map((d) => <td key={d.fecha}>{celda(d.valores[c.clave] ?? 0, d.fecha)}</td>)}<td className="tot">{$(elegida.valores[c.clave] ?? 0)}</td></tr>
-            ))}</tbody>
-            <tfoot><tr><td className="f">Total</td>{elegida.dias.map((d) => <td key={d.fecha}>{futuro(d.fecha) ? "" : $(d.total)}</td>)}<td className="tot">{$(elegida.total)}</td></tr></tfoot>
-          </table></div>
+      {!m.historico && enHoja && (
+        <section className="glass lb subir d1" id="hoja" aria-label={`Libreta de la semana ${enHoja.numero}`}>
+          <div className="lb-cab">
+            <span className="tx"><small>Libreta de la semana</small><b>Semana {enHoja.numero}, {enHoja.dias.length > 1 ? "del " : ""}{rango(enHoja)}</b></span>
+            <span className="lb-nav">
+              {iHoja > 0 ? <Link href={url(m.semanas[iHoja - 1].numero)} scroll={false} aria-label="Semana anterior"><Icono n="izquierda" /></Link> : <span aria-hidden="true"><Icono n="izquierda" /></span>}
+              {iHoja < m.semanas.length - 1 ? <Link href={url(m.semanas[iHoja + 1].numero)} scroll={false} aria-label="Semana siguiente"><Icono n="derecha" /></Link> : <span aria-hidden="true"><Icono n="derecha" /></span>}
+            </span>
+          </div>
+          <DeslizaSemana anterior={iHoja > 0 ? url(m.semanas[iHoja - 1].numero) : undefined} siguiente={iHoja < m.semanas.length - 1 ? url(m.semanas[iHoja + 1].numero) : undefined}>
+            <div className="lb-hoja"><div className="lb-desliza"><table className="lb-t">
+              <thead><tr><th>Día</th>{m.columnas.map((c) => <th key={c.clave}>{c.nombre}{!c.comision && <small>sueldo</small>}</th>)}<th className="tt">Total</th></tr></thead>
+              <tbody>{enHoja.dias.map((d) => (
+                <tr key={d.fecha} className={d.fecha === hoy ? "hoy" : ""}>
+                  <td>{d.etiqueta.slice(0, 3)}<small>{dia(d.fecha)} {nombreMes.slice(0, 3)}</small></td>
+                  {m.columnas.map((c) => { const v = d.valores[c.clave] ?? 0; return futuro(d.fecha) ? <td key={c.clave} className="fu" /> : <td key={c.clave} className={v ? "" : "v"}>{v ? n(v) : "0"}</td>; })}
+                  <td className="tt">{futuro(d.fecha) ? "" : n(d.total)}</td>
+                </tr>
+              ))}</tbody>
+              <tfoot>
+                {enHoja.subtotal !== enHoja.total && <tr className="sub"><td>Subtotal comisión</td>{m.columnas.map((c) => <td key={c.clave}>{c.comision ? n(enHoja.valores[c.clave] ?? 0) : ""}</td>)}<td className="tt">{n(enHoja.subtotal)}</td></tr>}
+                <tr><td>Total</td>{m.columnas.map((c) => <td key={c.clave}>{n(enHoja.valores[c.clave] ?? 0)}</td>)}<td className="tt">{$(enHoja.total)}</td></tr>
+              </tfoot>
+            </table></div></div>
+          </DeslizaSemana>
+          <div className="lb-pie"><span className="solo-movil">Desliza para cambiar de semana</span><span className="solo-escritorio">Usa las flechas para cambiar de semana</span>
+            <span className="lb-dots">{m.semanas.map((x) => <Link key={x.numero} href={url(x.numero)} scroll={false} aria-label={`Semana ${x.numero}`} className={x.numero === enHoja.numero ? "on" : ""} />)}</span></div>
         </section>
       )}
     </>
