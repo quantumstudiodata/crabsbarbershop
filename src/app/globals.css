@@ -3678,7 +3678,7 @@ button.rv-opc:not(.on) .radio-p { background: none; border-color: rgba(43,58,71,
 @keyframes tqEntra { from { opacity: 0; transform: translateY(10px) scale(.98); } to { opacity: 1; transform: none; } }
 @media (max-width: 640px) {
   .tq-pila { left: 16px; right: 16px; width: auto; bottom: calc(118px + env(safe-area-inset-bottom)); }
-  .cobro:has(.tq-pila) { padding-bottom: 110px; }
+  .cobro:has(.tq-pila) { padding-bottom: 210px; }
 }
 @media (prefers-reduced-motion: reduce) { .tq, .tq-punto { animation: none; } }
 
@@ -3714,4 +3714,40 @@ button.rv-opc:not(.on) .radio-p { background: none; border-color: rgba(43,58,71,
 @media (prefers-reduced-motion: reduce) {
   .pal-fondo, .pal-aro, .pal-trazo, .pal-onda, .cqr-pulso, .cqr-boton.con::after, .cqr-est.espera::after { animation: none; }
   .pal-aro, .pal-trazo { stroke-dashoffset: 0; }
+}
+
+/* Cobro en el teléfono: caja en una línea, quién atiende arriba y lista rápida de servicios */
+.estado-m, .cob-m { display: none; }
+@media (max-width: 760px) {
+  .estado-c { display: none; }
+  .estado-m { position: relative; display: flex; align-items: center; gap: 10px; padding: 8px 8px 8px 14px; border-radius: 16px; background: rgba(255,255,255,.55); border: 1px solid rgba(255,255,255,.9); font-size: 13.5px; margin-bottom: 4px; }
+  .estado-m .vivo b { font-weight: 600; }
+  .em-pts { margin-left: auto; width: 34px; height: 34px; border-radius: 11px; display: grid; place-items: center; background: #fff; border: 1px solid var(--line); cursor: pointer; color: inherit; }
+  .em-pts .ic { width: 18px; height: 18px; }
+  .em-menu { right: 0; top: 100%; width: 210px; }
+  .cobro .buscador-d, .cobro .cat-cobro, .cobro .atendio-d { display: none !important; }
+  .cob-m { display: grid; gap: 14px; }
+  .cm-per { display: flex; gap: 14px; overflow-x: auto; scrollbar-width: none; padding: 5px; margin: -5px; }
+  .cm-per::-webkit-scrollbar { display: none; }
+  .cm-per button { display: grid; justify-items: center; gap: 5px; border: 0; background: none; padding: 0; font: 600 12.5px var(--f-body); color: var(--muted); cursor: pointer; }
+  .cm-per button .avatar { border: 2px solid transparent; box-shadow: 0 0 0 2px transparent; }
+  .cm-per button.on { color: var(--fg, #13171c); }
+  .cm-per button.on .avatar { box-shadow: 0 0 0 2px #fff, 0 0 0 4px #13171c; }
+  .cm-lista { display: grid; border-radius: 18px; overflow: hidden; background: rgba(255,255,255,.72); border: 1px solid rgba(255,255,255,.9); }
+  .cm-cat { padding: 9px 14px 6px; font: 500 10.5px var(--f-mono); letter-spacing: .14em; text-transform: uppercase; color: var(--muted); background: rgba(227,233,239,.6); }
+  .cm-grupo { display: grid; }
+  .cm-fila { display: flex; align-items: center; gap: 10px; padding: 9px 12px 9px 14px; border-top: 1px solid rgba(30,45,60,.06); }
+  .cm-cat + .cm-fila { border-top: 0; }
+  .cm-n { display: grid; flex: 1; min-width: 0; padding: 0; border: 0; background: none; text-align: left; color: inherit; font: inherit; cursor: pointer; }
+  .cm-n b { font-size: 14px; font-weight: 600; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+  .cm-n small { font-size: 11.5px; color: var(--muted); }
+  .cm-p { font-size: 14px; font-weight: 600; white-space: nowrap; }
+  .cm-p s { margin-right: 5px; font-size: 11.5px; font-weight: 500; color: var(--faint); }
+  .cm-add { width: 30px; height: 30px; border-radius: 50%; display: grid; place-items: center; border: 0; background: #e3e9ef; color: #13171c; cursor: pointer; flex: none; }
+  .cm-add .ic { width: 16px; height: 16px; }
+  .cm-step { display: inline-flex; align-items: center; gap: 2px; padding: 2px; border-radius: 999px; background: #13171c; color: #fff; flex: none; }
+  .cm-step button { width: 26px; height: 26px; border-radius: 50%; display: grid; place-items: center; border: 0; background: none; color: #fff; cursor: pointer; }
+  .cm-step button .ic { width: 14px; height: 14px; }
+  .cm-step b { min-width: 14px; text-align: center; font-size: 13px; }
+  .cm-fila.on .cm-n b { font-weight: 700; }
 }

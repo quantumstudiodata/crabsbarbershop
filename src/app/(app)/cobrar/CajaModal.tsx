@@ -26,6 +26,8 @@ const abrir = (v: Vista) => window.dispatchEvent(new CustomEvent("crabs:caja", {
 /** Línea discreta arriba de Cobro mientras la caja está abierta. */
 export function BarraCaja({ turno, folioVenta }: { turno: Turno; folioVenta: string }) {
   return (
+    <>
+    <CajaMovil turno={turno} />
     <div className="estado-c subir">
       <span className="vivo"><b>Caja abierta</b></span>
       <span className="meta-c">{turno.desde} - Abrió {turno.abrio} - Folio {folioVenta}</span>
@@ -35,6 +37,33 @@ export function BarraCaja({ turno, folioVenta }: { turno: Turno; folioVenta: str
         <button type="button" className="fantasma" onClick={() => abrir("gasto")}><Icono n="etiqueta" />Gasto</button>
         <button type="button" className="bt chico solo" onClick={() => abrir("corte")}><Icono n="candado" />Corte de caja</button>
       </span>
+    </div>
+    </>
+  );
+}
+
+/** Teléfono: la caja en una sola línea; Retiro, Gasto y Corte de caja viven en el botón de tres puntos. */
+function CajaMovil({ turno }: { turno: Turno }) {
+  const [menu, setMenu] = useState(false);
+  useEffect(() => {
+    if (!menu) return;
+    const fuera = (e: MouseEvent) => { if (!(e.target as HTMLElement).closest(".estado-m")) setMenu(false); };
+    document.addEventListener("mousedown", fuera);
+    return () => document.removeEventListener("mousedown", fuera);
+  }, [menu]);
+  const ir = (v: Vista) => { setMenu(false); abrir(v); };
+  return (
+    <div className="estado-m subir">
+      <span className="vivo"><b>Caja abierta</b></span>
+      <span className="muted">{formatoDinero(turno.esperado)} en caja</span>
+      <button type="button" className="em-pts" aria-label="Retiro, gasto o corte de caja" aria-haspopup="menu" aria-expanded={menu} onClick={() => setMenu((x) => !x)}><Icono n="puntos" /></button>
+      {menu && (
+        <div className="menu em-menu" role="menu">
+          <button type="button" role="menuitem" className="it" onClick={() => ir("retiro")}><Icono n="salida" />Retiro</button>
+          <button type="button" role="menuitem" className="it" onClick={() => ir("gasto")}><Icono n="etiqueta" />Gasto</button>
+          <button type="button" role="menuitem" className="it" onClick={() => ir("corte")}><Icono n="candado" />Corte de caja</button>
+        </div>
+      )}
     </div>
   );
 }

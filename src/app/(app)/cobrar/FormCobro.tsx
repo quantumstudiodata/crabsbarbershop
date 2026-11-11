@@ -198,11 +198,53 @@ export function FormCobro(p: {
     <form action={accion} className="cobro" ref={raiz}>
       <input type="hidden" name="datos" value={datos} />
       <div className="pila" style={{ gap: 22 }}>
-        <label className="con-icono buscador">
+        <label className="con-icono buscador buscador-d">
           <Icono n="buscar" />
           <input className="input" data-paso="" value={buscar} onChange={(e) => setBuscar(e.target.value)} placeholder="Buscar servicio" aria-label="Buscar servicio" autoComplete="off" />
         </label>
         {p.qr && <TarjetasQr nuevo={enEspera} abrir={abrirQr} vistos={vistos} />}
+
+        {/* Teléfono: quién atiende arriba y una lista rápida por categoría, con + o contador. */}
+        <div className="cob-m">
+          {personas.length > 1 && (
+            <section className="pila-chica">
+              <span className="lab">¿Quién atiende?</span>
+              <div className="cm-per" role="radiogroup" aria-label="Quién atiende">
+                {personas.map((e) => (
+                  <button type="button" key={e.id} role="radio" aria-checked={barbero === e.id} className={barbero === e.id ? "on" : ""} onClick={() => elegirBarbero(e.id)}>
+                    <Avatar avatar={e.avatar} nombre={e.nombre} t={44} /><span>{primerNombre(e.nombre)}</span>
+                  </button>
+                ))}
+              </div>
+            </section>
+          )}
+          <div className="cm-lista">
+            {[...new Set(p.servicios.map((x) => x.categoria))].map((c) => (
+              <div key={c} className="cm-grupo">
+                <span className="cm-cat">{c}</span>
+                {p.servicios.filter((x) => x.categoria === c).map((sv) => {
+                  const l = lineas.find((x) => x.servicioId === sv.id);
+                  const promo = precioPromo(sv);
+                  return (
+                    <div key={sv.id} className={`cm-fila ${l ? "on" : ""}`}>
+                      <button type="button" className="cm-n" onClick={() => (l ? cantidad(l.key, 1) : alternar(sv.id))}>
+                        <b>{sv.nombre}</b><small>{sv.duracionMin} min</small>
+                      </button>
+                      <span className="cm-p num">{promo !== null ? <><s>{formatoDinero(sv.precio)}</s>{formatoDinero(promo)}</> : formatoDinero(sv.precio)}</span>
+                      {l ? (
+                        <span className="cm-step">
+                          <button type="button" aria-label={`Quitar uno de ${sv.nombre}`} onClick={() => cantidad(l.key, -1)}><Icono n="minimizar" /></button>
+                          <b>{l.cantidad}</b>
+                          <button type="button" aria-label={`Agregar otro ${sv.nombre}`} onClick={() => cantidad(l.key, 1)}><Icono n="mas" /></button>
+                        </span>
+                      ) : <button type="button" className="cm-add" aria-label={`Agregar ${sv.nombre}`} onClick={() => alternar(sv.id)}><Icono n="mas" /></button>}
+                    </div>
+                  );
+                })}
+              </div>
+            ))}
+          </div>
+        </div>
 
         {categorias.length === 0 && <p className="muted">No hay servicios con ese nombre.</p>}
         {categorias.map((c) => (
@@ -229,7 +271,7 @@ export function FormCobro(p: {
           </section>
         ))}
 
-        <section className="pila-chica">
+        <section className="pila-chica atendio-d">
           <span className="lab">Atendió</span>
           <div className="personas-s" role="radiogroup" aria-label="Quién atendió">
             {personas.map((e) => (
