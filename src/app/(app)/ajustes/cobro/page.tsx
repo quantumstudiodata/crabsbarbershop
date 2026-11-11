@@ -1,6 +1,7 @@
-import { and, asc, eq } from "drizzle-orm";
+import { and, asc, eq, sql } from "drizzle-orm";
 import { pagosDisponibles } from "@/lib/stripe";
-import { FilaPagosLinea } from "./PagosLinea";
+import { PagosLinea } from "./PagosLinea";
+import { leerConfig } from "@/lib/agenda";
 import { AvisoUrl } from "@/components/Encabezado";
 import { requerirSesion } from "@/lib/auth";
 import { categoriasGasto, datosParaMeta } from "@/lib/datos";
@@ -21,8 +22,6 @@ export default async function ConfigurarNegocio({ searchParams }: { searchParams
   const s = await requerirSesion();
   if (!PERMISOS_CONFIG.some((p) => s.puede(p))) redirect("/?aviso=sin-permiso");
   const q = await searchParams;
-  // Los enlaces de Stripe anteriores regresaban aquí: ahora la cuenta se revisa en Pagos en línea.
-  if (q.stripe) redirect(`/ajustes/pagos?stripe=${q.stripe === "reintentar" ? "reintentar" : "volver"}`);
   const b = s.barberia;
   const [metodos, gente, cats, conceptos] = await Promise.all([
     db.select().from(schema.metodosPago).where(eq(schema.metodosPago.barberiaId, b.id)).orderBy(asc(schema.metodosPago.orden)),
@@ -41,6 +40,19 @@ export default async function ConfigurarNegocio({ searchParams }: { searchParams
   const edita = (p: "cobros" | "caja" | "metas" | "egresos") => s.puede(`configuracion.${p}`) && !s.vista;
   // Pago con QR no es una forma de pago guardada: se activa sola al conectar Stripe.
   const qr: "activa" | "pendiente" | "sin" | null = pagosDisponibles() ? ((b.stripeEstado as "sin" | "pendiente" | "activa") ?? "sin") : null;
+  // Pagos en línea: estado de Stripe, lo cobrado en el mes y dónde se usa.
+  const pagosEnLinea = async () => {
+    const [m] = await db.select({
+      cobrado: sql<number>`coalesce(sum(${schema.pagosLinea.monto} + ${schema.pagosLinea.propina}), 0)::int`,
+      qr: sql<number>`count(*) filter (where ${schema.pagosLinea.tipo} = 'venta')::int`,
+      anticipos: sql<number>`count(*) filter (where ${schema.pagosLinea.tipo} = 'cita')::int`,
+    }).from(schema.pagosLinea)
+      .where(and(eq(schema.pagosLinea.barberiaId, b.id), eq(schema.pagosLinea.estado, "pagado"), sql`${schema.pagosLinea.pagadoEn} >= date_trunc('month', now())`));
+    const p = leerConfig(b.citasConfig).pago;
+    const anticipo = !b.usaCitas ? "Agenda apagada" : p.modo === "anticipo_pct" ? `${p.valor / 100}% al reservar` : p.modo === "anticipo_fijo" ? `${$(p.valor)} al reservar` : p.modo === "completo" ? "Pago completo al reservar" : p.modo === "opcional" ? "Opcional" : "No se pide";
+    return <PagosLinea estado={qr!} revisar={edita("cobros") && (q.stripe === "volver" || q.stripe === "reintentar" || qr === "pendiente")} puede={edita("cobros")}
+      mes={m ?? { cobrado: 0, qr: 0, anticipos: 0 }} usos={{ qr: qr === "activa", anticipo }} />;
+  };
   const NOMBRE_MET: Record<string, string> = { efectivo: "Efectivo", transferencia: "Transferencia", tarjeta: "Tarjeta" };
   return (
     <>
@@ -50,16 +62,15 @@ export default async function ConfigurarNegocio({ searchParams }: { searchParams
         <p className="sub">Abre cada apartado para ver cómo está configurado.</p>
       </div>
 
-      {qr && <FilaPagosLinea estado={qr} />}
 
-      <Bloque numero={1} titulo="Cobros y métodos de pago" puedeEditar={edita("cobros")}
+      <Bloque numero={1} titulo="Cobros y métodos de pago" puedeEditar={edita("cobros")} abierto={!!q.stripe || qr === "pendiente"}
         resumen={`${activos.length + (qr === "activa" ? 1 : 0)} ${activos.length + (qr === "activa" ? 1 : 0) === 1 ? "forma de pago" : "formas de pago"}, descuentos hasta ${b.limiteDescuentoPct}% sin autorización, promociones ${b.usaPromociones ? "permitidas" : "apagadas"}`}
-        detalle={<Resumen filas={[
+        detalle={<><Resumen filas={[
           ["Formas de pago activas", [...activos.map((m) => m.nombre), ...(qr === "activa" ? ["Pago con QR"] : [])].join(", ") || "Ninguna"],
           ["Descuento sin autorización", `Hasta ${b.limiteDescuentoPct}%`],
           ["Descuentos", si(b.usaDescuentos)], ["Propinas", si(b.usaPropinas)], ["Dividir pago", si(b.usaDividirPago)],
           ["Promociones", b.usaPromociones ? `Permitidas, ${nPromos} ${nPromos === 1 ? "activa" : "activas"}` : "Apagadas"],
-        ]} />}>
+        ]} />{qr && await pagosEnLinea()}</>}>
         <Metodos qr={qr} metodos={metodos.map(({ id, nombre, descripcion, esEfectivo, activo }) => ({ id, nombre, descripcion, esEfectivo, activo }))} />
         <ReglasCobro descuento={b.limiteDescuentoPct} autorizan={autorizan} funciones={[
           { clave: "descuentos", nombre: "Descuentos", activa: b.usaDescuentos, encendida: "Aparecen al cobrar.", apagada: "No aparecen al cobrar." },

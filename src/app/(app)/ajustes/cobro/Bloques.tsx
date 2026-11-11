@@ -16,8 +16,10 @@ export function Bloque({ numero, titulo, resumen, detalle, puedeEditar, children
   numero: number; titulo: string; resumen: string; detalle?: React.ReactNode; puedeEditar: boolean; children?: React.ReactNode; abierto?: boolean;
 }) {
   const [editar, setEditar] = useState(false);
+  // Abierto solo al entrar (por ejemplo, al regresar de Stripe): recargar la página no lo vuelve a cerrar.
+  const [inicial] = useState(abierto);
   return (
-    <details className="glass bloque-cfg subir" open={abierto}>
+    <details className="glass bloque-cfg subir" open={inicial}>
       <summary>
         <span className="num-cfg">{numero}</span>
         <span className="tit-cfg"><b>{titulo}</b><small>{resumen}</small></span>
