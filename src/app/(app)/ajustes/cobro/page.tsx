@@ -110,13 +110,16 @@ export default async function ConfigurarNegocio({ searchParams }: { searchParams
       </a>
 
       <Bloque numero={5} titulo="Egresos y finanzas" puedeEditar={edita("egresos")}
-        resumen={`${cats.filter((c) => c.activo).length} categorías, ${conceptos.length} ${conceptos.length === 1 ? "gasto frecuente" : "gastos frecuentes"}, pagos al equipo ${b.pagosEquipoAuto ? "automáticos" : "a mano"}`}
+        resumen={`${cats.filter((c) => c.activo).length} categorías, ${conceptos.length} ${conceptos.length === 1 ? "gasto frecuente" : "gastos frecuentes"}, pagos al equipo ${b.pagosEquipoAuto ? "automáticos" : "a mano"}, renta ${b.rentasAuto ? "automática" : "a mano"}`}
         detalle={
           <div className="pila">
             {edita("egresos") ? <Funciones funciones={[{ clave: "pagosAuto", nombre: "Pagos al equipo automáticos", activa: b.pagosEquipoAuto,
-              encendida: "Cada periodo se da por pagado en su fecha de pago, con la forma de pago habitual de cada persona, y se anota solo en Finanzas y en la libreta. Los anticipos se registran a mano en Equipo. Las rentas de silla se siguen registrando a mano.",
-              apagada: "Cada pago se registra a mano en Equipo. Lo que no se registre se acumula como pendiente." }]} />
-              : <Resumen filas={[["Pagos al equipo", b.pagosEquipoAuto ? "Automáticos" : "Se registran a mano"]]} />}
+              encendida: "Cada periodo se da por pagado en su fecha de pago, con la forma de pago habitual de cada persona, y se anota solo en Finanzas y en la libreta. Los anticipos se registran a mano en Equipo.",
+              apagada: "Cada pago se registra a mano en Equipo. Lo que no se registre se acumula como pendiente." },
+              { clave: "rentasAuto", nombre: "Renta de silla automática", activa: b.rentasAuto,
+              encendida: "Cada renta se da por cobrada en su fecha límite y se anota sola como ingreso en Finanzas y en la libreta. Si alguien no paga, se corrige en el historial de pagos.",
+              apagada: "Cada cobro de renta se registra a mano en Equipo. Lo que no se registre se acumula como pendiente." }]} />
+              : <Resumen filas={[["Pagos al equipo", b.pagosEquipoAuto ? "Automáticos" : "Se registran a mano"], ["Renta de silla", b.rentasAuto ? "Automática" : "Se registra a mano"]]} />}
             <CategoriasEgresos categorias={cats} puede={edita("egresos")} />
             <GastosFrecuentes gastos={conceptos} categorias={cats.filter((c) => c.activo).map((c) => c.nombre)} metodos={b.metodosEgreso} puede={edita("egresos")} />
             <OpcionesRegistro metodos={b.metodosEgreso} comprobantes={b.usaComprobantes} periodicidad={b.usaPeriodicidad} puede={edita("egresos")} />

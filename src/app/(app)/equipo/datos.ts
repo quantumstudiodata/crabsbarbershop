@@ -39,7 +39,7 @@ export function mesElegido(q: { mes?: string }, zona: string) {
 export async function cuentasEnCurso(barberiaId: string, zona: string, personas: { id: string; nombre: string; avatar: string }[], puedePagar: boolean) {
   await liquidarAutomaticos(barberiaId);
   const hoy = fechaLocal(new Date(), zona);
-  const [cfg] = await db.select({ desde: s.barberias.pagosEquipoDesde }).from(s.barberias).where(eq(s.barberias.id, barberiaId)).limit(1);
+  const [cfg] = await db.select({ desde: s.barberias.pagosEquipoDesde, desdeRenta: s.barberias.rentasDesde }).from(s.barberias).where(eq(s.barberias.id, barberiaId)).limit(1);
   const reglas = await reglasDe(barberiaId);
   const periodos = new Map(personas.map((p) => { const r = elegirRegla(reglas, p.id, null, new Date()); return [p.id, { r, per: periodoDePago(r, hoy) }]; }));
   const inicio = [...[...periodos.values()].map((x) => x.per.desde), hoy].sort()[0];
@@ -56,7 +56,7 @@ export async function cuentasEnCurso(barberiaId: string, zona: string, personas:
     const renta = c.regla?.tipo === "renta";
     // Lo pendiente se acumula: lo que no se pagó en periodos anteriores se suma hasta que se registre un pago.
     // Con pagos automáticos (o una cuenta iniciada en cero), lo anterior a esa fecha ya no se acumula.
-    const inicioCuenta = [desdeRegla.get(p.id) ?? per.desde, tope, cfg?.desde ?? tope].sort()[2];
+    const inicioCuenta = [desdeRegla.get(p.id) ?? per.desde, tope, (renta ? cfg?.desdeRenta : cfg?.desde) ?? tope].sort()[2];
     const acum = inicioCuenta < per.desde
       ? await cuentaDe(barberiaId, p.id, inicioCuenta, hoy, (await ventasEntre(barberiaId, inicioCuenta, hoy, { zona, barberoId: p.id })).ventas.filter((v) => v.estado === "pagada"))
       : c;

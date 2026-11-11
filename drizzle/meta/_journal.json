@@ -169,6 +169,13 @@
       "when": 1794391508817,
       "tag": "0023_pagos_equipo_auto",
       "breakpoints": true
+    },
+    {
+      "idx": 24,
+      "version": "7",
+      "when": 1794392126662,
+      "tag": "0024_rentas_auto",
+      "breakpoints": true
     }
   ]
 }

@@ -66,6 +66,9 @@ export const barberias = pgTable("barberias", {
   pagosEquipoAuto: boolean("pagos_equipo_auto").notNull().default(false),
   // Desde qué día se lleva la cuenta de lo pendiente al equipo (al encender los pagos automáticos). Vacío: desde su forma de pago.
   pagosEquipoDesde: date("pagos_equipo_desde"),
+  // Renta de silla automática: cada periodo se da por cobrado en su fecha límite. Desde cuándo se lleva su cuenta.
+  rentasAuto: boolean("rentas_auto").notNull().default(false),
+  rentasDesde: date("rentas_desde"),
   // Citas y reservaciones en línea. La dirección pública es /reservar/<slug>.
   usaCitas: boolean("usa_citas").notNull().default(false),
   slug: text("slug"),

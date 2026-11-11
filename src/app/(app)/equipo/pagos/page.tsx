@@ -96,7 +96,7 @@ export default async function Pagos({ searchParams }: { searchParams: Promise<{ 
           <div className="glass eq2-lista">
             {pagos.slice(0, limite).map((x) => (
               <div key={x.id} className="eq2-fila sin">
-                <span><b>{x.tipo === "renta" ? `${x.nombre} pagó renta` : `Pago a ${x.nombre}`}</b><small>{dia(x.creadoEn)}, {x.nota.includes("Pago automático") ? x.nota.replace(/^.*?: /, "").replace("Pago automático", "pago automático") : <>registró {x.registro.split(" ")[0]}{x.nota ? `, ${x.nota}` : ""}</>}</small></span>
+                <span><b>{x.tipo === "renta" ? `${x.nombre} pagó renta` : `Pago a ${x.nombre}`}</b><small>{dia(x.creadoEn)}, {/(Pago|Renta) automática?/.test(x.nota) ? x.nota.replace(/^.*?: /, "").replace(/^(Pago|Renta)/, (m) => m.toLowerCase()) : <>registró {x.registro.split(" ")[0]}{x.nota ? `, ${x.nota}` : ""}</>}</small></span>
                 <span className="eq2-m"><b>{formatoDinero(x.monto)}</b></span>
               </div>
             ))}

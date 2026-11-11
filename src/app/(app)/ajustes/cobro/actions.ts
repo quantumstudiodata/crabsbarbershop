@@ -179,6 +179,7 @@ const FUNCIONES = {
   comprobantes: ["usaComprobantes", "Registro de comprobantes", "configuracion.egresos"],
   periodicidad: ["usaPeriodicidad", "Periodicidad de gastos", "configuracion.egresos"],
   pagosAuto: ["pagosEquipoAuto", "Pagos al equipo automáticos", "configuracion.egresos"],
+  rentasAuto: ["rentasAuto", "Renta de silla automática", "configuracion.egresos"],
 } as const;
 
 export async function alternarFuncion(clave: string) {
@@ -188,7 +189,8 @@ export async function alternarFuncion(clave: string) {
   const s = await requerirSesion(permiso);
   const antes = s.barberia[campo];
   // Al encender los pagos automáticos, la cuenta del equipo empieza desde hoy: lo anterior no se paga solo.
-  const extra = campo === "pagosEquipoAuto" && !antes ? { pagosEquipoDesde: fechaLocal(new Date(), s.barberia.zonaHoraria) } : {};
+  const hoy = fechaLocal(new Date(), s.barberia.zonaHoraria);
+  const extra = antes ? {} : campo === "pagosEquipoAuto" ? { pagosEquipoDesde: hoy } : campo === "rentasAuto" ? { rentasDesde: hoy } : {};
   await db.update(schema.barberias).set({ [campo]: !antes, ...extra }).where(eq(schema.barberias.id, s.barberia.id));
   await registrar(db, {
     barberiaId: s.barberia.id, usuarioId: s.usuario.id, tipo: "ajuste",
