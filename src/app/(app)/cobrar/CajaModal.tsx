@@ -310,7 +310,7 @@ function CortePasos({ turno, accion, cerrando, error, contado, setContado, limit
 
         {error && <p className="aviso error">{error}</p>}
         <div className="ck-acc">
-          {paso > 1 ? <button type="button" className="bt sec" onClick={() => setPaso(paso - 1)}><Icono n="izquierda" />Anterior</button> : <span />}
+          {paso > 1 ? <button type="button" className="ck-atras" aria-label="Anterior" onClick={() => setPaso(paso - 1)}><Icono n="izquierda" /></button> : <span />}
           {esCierre
             ? <button key="cerrar" type="submit" className="bt" disabled={cerrando || c === null || (conComprobantes && faltan > 0)}>{cerrando ? "Cerrando…" : "Cerrar caja"}<Fl /></button>
             : <button key="seguir" type="button" className="bt" disabled={!puedeSeguir} onClick={() => setPaso(paso + 1)}>{paso === 1 ? "Contar efectivo" : paso === 2 && conComprobantes ? "Comprobantes" : "Continuar"}<Fl /></button>}

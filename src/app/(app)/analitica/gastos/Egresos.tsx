@@ -197,11 +197,11 @@ export function Nuevo({ hoy, cajaAbierta, categorias, cerrar, otro, opciones }: 
 
         {e.error && <p className="aviso error">{e.error}</p>}
         <div className="ck-acc">
-          {paso > 1 ? <button key="ant" type="button" className="bt sec" onClick={() => setPaso(paso - 1)}><Icono n="izquierda" />Anterior</button> : <span />}
+          {paso > 1 ? <button key="ant" type="button" className="ck-atras" aria-label="Anterior" onClick={() => setPaso(paso - 1)}><Icono n="izquierda" /></button> : <span />}
           {paso < total
             ? <button key="sig" type="button" className="bt" disabled={!valido} onClick={() => setPaso(paso + 1)}>Siguiente<Fl /></button>
-            : <span className="fila" style={{ gap: 8 }}>
-                <button key="otro" type="submit" className="ac-link" disabled={guardando || !valido} onClick={() => setSeguir(true)}>Guardar y otro</button>
+            : <span className="ck-fin">
+                <button key="otro" type="submit" className="bt sec solo" disabled={guardando || !valido} onClick={() => setSeguir(true)}>Guardar y otro</button>
                 <button key="guardar" type="submit" className="bt" disabled={guardando || !valido} onClick={() => setSeguir(false)}>{guardando ? "Guardando…" : "Guardar"}<Fl /></button>
               </span>}
         </div>
