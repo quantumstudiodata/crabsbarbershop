@@ -16,21 +16,32 @@ function Personalizar({ datos, cerrar }: { datos: Acciones; cerrar: () => void }
   const [lista, setLista] = useState(datos.todas);
   const [error, setError] = useState<string | null>(null);
   const [pend, iniciar] = useTransition();
-  const mover = (i: number, d: -1 | 1) => { const j = i + d; if (j < 0 || j >= lista.length) return; const n = [...lista]; [n[i], n[j]] = [n[j], n[i]]; setLista(n); };
+  // Arrastre con el dedo o el ratón desde la asa: la fila se mueve a donde pase el puntero.
+  const filas = useRef<(HTMLDivElement | null)[]>([]);
+  const [arrastra, setArrastra] = useState<string | null>(null);
+  const empezar = (k: string) => (e: React.PointerEvent<HTMLElement>) => { e.preventDefault(); e.currentTarget.setPointerCapture(e.pointerId); setArrastra(k); };
+  const moverA = (e: React.PointerEvent<HTMLElement>) => {
+    if (!arrastra) return;
+    const y = e.clientY;
+    const desde = lista.findIndex((x) => x.k === arrastra);
+    let hacia = desde;
+    filas.current.forEach((el, i) => { if (!el) return; const r = el.getBoundingClientRect(); if (y > r.top && y < r.bottom) hacia = i; });
+    if (hacia !== desde) { const n = [...lista]; const [x] = n.splice(desde, 1); n.splice(hacia, 0, x); setLista(n); }
+  };
+  const soltar = () => setArrastra(null);
   const guardar = (orden: string[], ocultas: string[]) => iniciar(async () => { const r = await guardarAccionesRapidas(orden, ocultas); if (r.error) setError(r.error); else { router.refresh(); cerrar(); } });
   return (
     <Modal abierto cerrar={cerrar} etiqueta="Inicio" titulo="Acciones rápidas">
       <div className="pila" style={{ gap: 12 }}>
-        <p className="muted" style={{ margin: 0, fontSize: 13 }}>Ordénalas como más te sirva y apaga las que no uses. Las primeras se ven directo; las demás, en Más acciones.</p>
+        <p className="muted" style={{ margin: 0, fontSize: 13 }}>Arrastra desde los puntos para ordenarlas y apaga las que no uses. Las primeras se ven directo; las demás, en Más acciones.</p>
         <div className="ar-lista">
           {lista.map((a, i) => (
-            <div key={a.k} className={`ar-fila ${a.oculta ? "apagada" : ""}`}>
+            <div key={a.k} ref={(el) => { filas.current[i] = el; }} className={`ar-fila ${a.oculta ? "apagada" : ""} ${arrastra === a.k ? "arrastra" : ""}`}>
+              <span className="ar-asa" role="button" tabIndex={0} aria-label={`Mover ${a.texto}`}
+                onPointerDown={empezar(a.k)} onPointerMove={moverA} onPointerUp={soltar} onPointerCancel={soltar}
+                onKeyDown={(e) => { if (e.key !== "ArrowUp" && e.key !== "ArrowDown") return; e.preventDefault(); const j = i + (e.key === "ArrowUp" ? -1 : 1); if (j < 0 || j >= lista.length) return; const n = [...lista]; [n[i], n[j]] = [n[j], n[i]]; setLista(n); }}>⋮⋮</span>
               <span className="ar-ic"><Icono n={a.icono} /></span>
               <span className="ar-t">{a.texto}</span>
-              <span className="ar-mov">
-                <button type="button" className="icb" aria-label={`Subir ${a.texto}`} disabled={i === 0} onClick={() => mover(i, -1)}><Icono n="arriba" /></button>
-                <button type="button" className="icb" aria-label={`Bajar ${a.texto}`} disabled={i === lista.length - 1} onClick={() => mover(i, 1)}><Icono n="abajo" /></button>
-              </span>
               {a.fija ? <span className="ar-fija">Siempre</span> : <Interruptor etiqueta={`Mostrar ${a.texto}`} checked={!a.oculta} onChange={(v) => setLista(lista.map((x) => (x.k === a.k ? { ...x, oculta: !v } : x)))} />}
             </div>
           ))}
@@ -100,7 +111,7 @@ export function AccionesMovil({ acciones, personalizar }: { acciones: AccionInic
       {resto.length > 0 && (
         <>
           <button type="button" className="ini-fila" aria-expanded={abierto} onClick={() => setAbierto((x) => !x)}>
-            <Icono n="puntos" /><span>Más acciones</span><small>{resto.map((a) => a.corto.toLowerCase()).join(", ").replace(/^./, (c) => c.toUpperCase())}</small><Icono n={abierto ? "arriba" : "abajo"} />
+            <Icono n="puntos" /><span>{abierto ? "Menos acciones" : "Más acciones"}</span><small>{abierto ? "" : resto.length}</small><Icono n={abierto ? "arriba" : "abajo"} />
           </button>
           {abierto && resto.map(fila)}
         </>

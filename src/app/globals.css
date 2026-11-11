@@ -4042,3 +4042,7 @@ html, body { overscroll-behavior-y: none; }
 .ini-lista .ini-fila > span { white-space: nowrap; }
 .ini-lista .ini-fila > small { min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
 .ini-cab:has(.ini-menu) { position: relative; z-index: 60; }
+.ar-fila { grid-template-columns: auto auto minmax(0, 1fr) auto; touch-action: auto; }
+.ar-asa { cursor: grab; touch-action: none; user-select: none; color: var(--faint); letter-spacing: -3px; font-size: 16px; padding: 6px 8px 6px 2px; }
+.ar-asa:active { cursor: grabbing; }
+.ar-fila.arrastra { background: #fff; border-radius: 12px; box-shadow: 0 8px 20px -10px rgba(20,35,50,.45); position: relative; z-index: 2; }
