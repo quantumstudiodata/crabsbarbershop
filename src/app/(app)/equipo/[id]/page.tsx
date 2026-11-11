@@ -17,6 +17,7 @@ import { MesEquipo } from "../Partes";
 import { cuentasEnCurso, mesElegido, sesionEquipo } from "../datos";
 import { RegistrarPago } from "../Pago";
 import { CuentaFicha, type VistaCuenta } from "../CuentaFicha";
+import { Ayuda } from "@/components/Ayuda";
 
 export const metadata = { title: "Equipo" };
 
@@ -78,7 +79,7 @@ export default async function Ficha({ params, searchParams }: { params: Promise<
   const cifras: [string, string, React.ReactNode?, boolean?][] = renta
     ? [["Ventas atribuidas", formatoDinero(r.vendido)], ["Renta del mes", formatoDinero(cuenta.renta)], ["Recibido", formatoDinero(cuenta.rentaPagada)], [`Por cobrar ${enMes}`, formatoDinero(cuenta.rentaPendiente), periodoActual, cuenta.rentaPendiente > 0]]
     : [["Ventas atribuidas", formatoDinero(r.vendido)], [cuenta.sueldo ? "Le corresponde" : "Comisión generada", formatoDinero(cuenta.corresponde)], ["Pagado", formatoDinero(cuenta.pagado)], [`Por pagar ${enMes}`, formatoDinero(cuenta.saldo), periodoActual, cuenta.saldo > 0]];
-  cifras[0][2] = <>{r.servicios} {r.servicios === 1 ? "servicio" : "servicios"}{res.n ? <>, ★ {res.prom.toFixed(1)}</> : null}</>;
+  cifras[0][2] = <>{r.servicios} {r.servicios === 1 ? "servicio" : "servicios"}{res.n ? <><br />★ {res.prom.toFixed(1)} en {res.n} {res.n === 1 ? "reseña" : "reseñas"}</> : null}</>;
 
   const sinActividad = r.servicios === 0 && cuenta.corresponde === 0 && cuenta.pagado === 0 && cuenta.renta === 0;
   const pendLabel = renta ? "Por cobrar" : "Por pagar";
@@ -103,7 +104,6 @@ export default async function Ficha({ params, searchParams }: { params: Promise<
       <dt>Mes anterior</dt><dd>{formatoDinero(anterior.r.vendido)} en {mesAnt}</dd>
     </dl>
   );
-  const lapiz = se.puede("usuarios.editar") && <Link href={`/ajustes?editar=${u.id}`} className="eq2-lapiz" aria-label="Editar perfil" title="Editar perfil"><Icono n="editar" /></Link>;
 
   return (
     <div className="eq2 fa">
@@ -112,7 +112,7 @@ export default async function Ficha({ params, searchParams }: { params: Promise<
         <aside className="glass fa-perfil">
           <div className="fa-id">
             <Avatar avatar={u.avatar} nombre={u.nombre} t={72} />
-            <span><span className="eq2-nom"><h1>{u.nombre}</h1>{lapiz}</span><small>{puesto}{!u.activo && ", archivada"}</small><small className="fa-forma">{[cuenta.forma, sePaga].filter(Boolean).join(", ")}</small></span>
+            <span><span className="eq2-nom"><h1>{u.nombre}</h1></span><small>{puesto}{!u.activo && ", archivada"}</small><small className="fa-forma">{[cuenta.forma, sePaga].filter(Boolean).join(", ")}</small></span>
           </div>
           <div className="solo-escritorio fa-acc">{pagar}</div>
           <div className="fa-info solo-escritorio">{info}{se.puede("citas.horarios") && <Link href="/ajustes/citas?tab=horarios" className="eq2-link">Editar horario</Link>}</div>
@@ -124,14 +124,15 @@ export default async function Ficha({ params, searchParams }: { params: Promise<
           ) : (
             <>
               <section className="glass fa-cifras solo-escritorio">
-                {cifras.map(([t, v, sub, pend]) => <span key={t}><small className={pend ? "pend" : undefined}>{t}</small><b>{v}</b>{sub && <em>{sub}</em>}</span>)}
+                {cifras.map(([t, v, sub, pend]) => <span key={t}><small className={`${pend ? "pend" : ""} lab-ay`}>{t}{t === "Ventas atribuidas" && <Ayuda titulo="Ventas atribuidas">Total cobrado por los servicios que realizó, con cualquier forma de pago. Sobre esto se calcula su comisión.</Ayuda>}</small><b>{v}</b>{sub && <em>{sub}</em>}</span>)}
               </section>
-              <div className="solo-movil fa-mov"><CuentaFicha vistas={vistas} etiqueta={pendLabel}>{pagar}</CuentaFicha></div>
+              <div className="solo-movil fa-mov"><CuentaFicha vistas={vistas} etiqueta={pendLabel}>{pagar}</CuentaFicha>
+                <small className="fa-ayuda">Ventas atribuidas: total cobrado por sus servicios con cualquier forma de pago. Sobre esto se calcula su comisión.{res.n ? ` Calificación de clientes: ★ ${res.prom.toFixed(1)} en ${res.n} ${res.n === 1 ? "reseña" : "reseñas"}.` : ""}</small></div>
             </>
           )}
           <div className="fa-dos">
             <section className="glass fa-card">
-              <div className="entre"><span className="lab">Lo que más hace</span>{r.servicios > 0 && <Link className="eq2-link" href={`/analitica/ventas?persona=${u.id}&periodo=mes&mes=${m.mes}`}>Ver actividad</Link>}</div>
+              <span className="lab">Lo que más hace</span>
               {r.top.length ? <div className="eq2-tabla">{r.top.slice(0, 5).map((t) => <div key={t.nombre}><span>{t.nombre}</span><b>{t.veces}</b></div>)}</div> : <Vacio icono="lista" titulo="Sin servicios este mes" texto="Cuando atienda a su primer cliente del mes, aquí verás lo que más hace." />}
             </section>
             <section className="glass fa-card">

@@ -9,10 +9,28 @@ import { registrarPago } from "../analitica/equipo/actions";
 export type DatosFila = {
   id: string; nombre: string; avatar: string; modalidad: string; frecuencia: string; periodo: string; semana: string;
   renta: boolean; monto: string; estado: string; parcial: boolean; detalle: [string, string][]; puedePagar: boolean;
+  /** Forma de pago habitual de la persona: efectivo | transferencia | otro. */
+  forma?: string;
 };
+
+const FORMAS = [["efectivo", "Efectivo"], ["transferencia", "Transferencia"], ["otro", "Otro"]] as const;
+
+/** Elegir la forma de pago con fichas, en lugar de una lista del navegador. */
+function Formas({ name, valor, cambiar }: { name: string; valor: string; cambiar: (v: string) => void }) {
+  return (
+    <div className="pg-formas" role="radiogroup" aria-label="Forma de pago">
+      <input type="hidden" name={name} value={valor} />
+      {FORMAS.map(([k, t]) => <button type="button" key={k} role="radio" aria-checked={valor === k} className={valor === k ? "on" : ""} onClick={() => cambiar(k)}>{t}</button>)}
+    </div>
+  );
+}
 
 /** Desglose del periodo en curso y, con permiso, el registro del pago (o del cobro de renta). */
 export function FormPago({ f, regreso }: { f: DatosFila; regreso: string }) {
+  const [forma, setForma] = useState(f.forma ?? "efectivo");
+  const [dos, setDos] = useState(false);
+  const [forma2, setForma2] = useState(f.forma === "transferencia" ? "efectivo" : "transferencia");
+  const [monto, setMonto] = useState("");
   return (
     <div className="pila">
       <dl className="eq-desg">{f.detalle.map(([k, v]) => <div key={k}><dt>{k}</dt><dd>{v}</dd></div>)}</dl>
@@ -22,8 +40,19 @@ export function FormPago({ f, regreso }: { f: DatosFila; regreso: string }) {
           <input type="hidden" name="semana" value={f.semana} />
           <input type="hidden" name="regreso" value={regreso} />
           <input type="hidden" name="tipo" value={f.renta ? "renta" : "pago"} />
-          <div className="tarjeta-m">
-            <label className="campo"><span>{f.renta ? "Monto recibido" : "Monto pagado"}</span><input className="input grande" name="monto" inputMode="decimal" placeholder={f.monto} required /></label>
+          <div className="tarjeta-m pila">
+            <div className="campo"><span>{f.renta ? "Forma en que pagó" : "Forma de pago"}</span><Formas name="forma" valor={forma} cambiar={setForma} /></div>
+            <label className="campo"><span>{dos ? "Monto con esta forma" : f.renta ? "Monto recibido" : "Monto pagado"}</span>
+              <span className="pg-monto"><input className="input grande" name="monto" inputMode="decimal" placeholder={f.monto} value={monto} onChange={(e) => setMonto(e.target.value)} required />
+                {!dos && <button type="button" className="bt sec chico" onClick={() => setMonto(f.monto.replace(/[^\d.]/g, ""))}>Todo {f.monto}</button>}</span>
+            </label>
+            {dos ? (
+              <>
+                <div className="campo"><span>Segunda forma de pago</span><Formas name="forma2" valor={forma2} cambiar={setForma2} /></div>
+                <label className="campo"><span>Monto con la segunda forma</span><input className="input grande" name="monto2" inputMode="decimal" placeholder="$0" required /></label>
+                <button type="button" className="ac-link" style={{ justifySelf: "start" }} onClick={() => setDos(false)}>Usar una sola forma de pago</button>
+              </>
+            ) : <button type="button" className="ac-link" style={{ justifySelf: "start" }} onClick={() => setDos(true)}><Icono n="mas" />Pagar con dos formas de pago</button>}
             <label className="campo"><span>Nota</span><input className="input" name="nota" placeholder="Opcional" /></label>
           </div>
           <div className="acciones"><button className="bt">{f.renta ? "Registrar cobro" : "Registrar pago"}<Fl /></button></div>

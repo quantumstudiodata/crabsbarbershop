@@ -42,26 +42,40 @@ export async function cuentasEnCurso(barberiaId: string, zona: string, personas:
   const inicio = [...[...periodos.values()].map((x) => x.per.desde), hoy].sort()[0];
   const { ventas } = await ventasEntre(barberiaId, inicio, hoy, { zona });
   const pagadas = ventas.filter((v) => v.estado === "pagada");
+  // Desde cuándo se lleva la cuenta de cada persona: su primera forma de pago (como máximo, un año atrás).
+  const tope = fechaLocal(new Date(Date.now() - 365 * 86400000), zona);
+  const desdeRegla = new Map((await db.select({ id: s.reglasComision.barberoId, desde: sql<Date>`min(${s.reglasComision.vigenteDesde})` }).from(s.reglasComision)
+    .where(eq(s.reglasComision.barberiaId, barberiaId)).groupBy(s.reglasComision.barberoId)).map((x) => [x.id, fechaLocal(new Date(x.desde), zona)]));
   return Promise.all(personas.map(async (p) => {
     const { r, per } = periodos.get(p.id)!;
     const hasta = per.hasta > hoy ? hoy : per.hasta;
     const c = await cuentaDe(barberiaId, p.id, per.desde, hasta, pagadas.filter((v) => v.fecha >= per.desde && v.fecha <= hasta));
     const renta = c.regla?.tipo === "renta";
-    const saldo = renta ? c.rentaPendiente : c.saldo;
+    // Lo pendiente se acumula: lo que no se pagó en periodos anteriores se suma hasta que se registre un pago.
+    const inicioCuenta = [desdeRegla.get(p.id) ?? per.desde, tope].sort()[1];
+    const acum = inicioCuenta < per.desde
+      ? await cuentaDe(barberiaId, p.id, inicioCuenta, hoy, (await ventasEntre(barberiaId, inicioCuenta, hoy, { zona, barberoId: p.id })).ventas.filter((v) => v.estado === "pagada"))
+      : c;
+    // Se redondea a pesos: lo que se paga al equipo no lleva centavos.
+    const saldo = Math.round((renta ? acum.rentaPendiente : acum.saldo) / 100) * 100;
+    const saldoPeriodo = renta ? c.rentaPendiente : c.saldo;
+    const anteriores = Math.max(saldo - saldoPeriodo, 0);
     const pagado = renta ? c.rentaPagada : c.pagado;
     const periodo = per.desde === per.hasta ? fechaLarga(per.desde) : `Del ${fechaCorta(per.desde)} al ${fechaCorta(per.hasta)}`;
     const frecuencia = NOMBRE_FRECUENCIA[frecuenciaDe(r)] ?? "Semanal";
     const fila = {
-      id: p.id, nombre: p.nombre, avatar: p.avatar, modalidad: modalidadCorta(c.regla), frecuencia,
+      id: p.id, nombre: p.nombre, avatar: p.avatar, modalidad: modalidadCorta(c.regla), frecuencia, forma: r?.formaPago ?? "efectivo",
       periodo, semana: hoy, renta, monto: formatoDinero(saldo), parcial: pagado > 0 && saldo > 0,
       estado: saldo <= 0 ? (renta ? "Cubierta" : "Al corriente") : pagado > 0 ? "Pago parcial" : "Pendiente",
       puedePagar: puedePagar && saldo > 0,
       detalle: (renta
-        ? [["Periodo", periodo], ["Fecha límite", fechaLarga(per.pago)], ["Renta del periodo", formatoDinero(c.renta)], ["Recibido", formatoDinero(c.rentaPagada)], ["Pendiente", formatoDinero(c.rentaPendiente)]]
+        ? [["Periodo", periodo], ["Fecha límite", fechaLarga(per.pago)], ["Renta del periodo", formatoDinero(c.renta)], ["Recibido", formatoDinero(c.rentaPagada)],
+          ...(anteriores ? [["De periodos anteriores", formatoDinero(anteriores)]] : []), ["Pendiente", formatoDinero(saldo)]]
         : [["Periodo", periodo], ["Fecha de pago", fechaLarga(per.pago)], ["Forma de pago", NOMBRE_FORMA_PAGO[r?.formaPago ?? "efectivo"] ?? "Efectivo de caja"], ["Ventas atribuidas", formatoDinero(c.vendido)],
           ...(c.comision ? [["Comisión generada", formatoDinero(c.comision)]] : []), ...(c.sueldo ? [["Sueldo del periodo", formatoDinero(c.sueldo)]] : []),
-          ["Pagos registrados", formatoDinero(c.pagado)], ...(c.faltantes ? [["Faltantes autorizados", `−${formatoDinero(c.faltantes)}`]] : []), ["Saldo pendiente", formatoDinero(c.saldo)]]) as [string, string][],
+          ["Pagos registrados", formatoDinero(c.pagado)], ...(c.faltantes ? [["Faltantes autorizados", `−${formatoDinero(c.faltantes)}`]] : []),
+          ...(anteriores ? [["De periodos anteriores", formatoDinero(anteriores)]] : []), ["Saldo pendiente", formatoDinero(saldo)]]) as [string, string][],
     };
-    return { id: p.id, renta, saldo, fila, sinRegla: !c.regla, pago: per.pago, frecuencia, modalidad: modalidadCorta(c.regla) };
+    return { id: p.id, renta, saldo, anteriores, fila, sinRegla: !c.regla, pago: per.pago, frecuencia, modalidad: modalidadCorta(c.regla) };
   }));
 }

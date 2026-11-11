@@ -13,6 +13,7 @@ import { db, schema as t } from "@/lib/db";
 import { diasEntre, fechaCorta, fechaLocal, inicioDeMes, sumarDias } from "@/lib/fechas";
 import { cambio, formatoDinero, porcentaje } from "@/lib/money";
 import { type ConsultaPeriodo, leerPeriodo } from "@/lib/periodo";
+import { Ayuda } from "@/components/Ayuda";
 
 export const metadata = { title: "Resumen" };
 
@@ -98,7 +99,7 @@ export default async function Resumen({ searchParams }: { searchParams: Promise<
       <div className="rs-esc solo-escritorio">
       <section className={`rs-com subir ${meta > 0 ? "" : "sin-meta"}`} aria-label="Resultado comercial">
         <div className="rs-ventas">
-          <span className="lab">{p.tipo === "mes" ? `Ventas de ${nombreP.toLowerCase()}, del 1 al ${Number(hastaV.slice(8))}` : `Ventas, ${p.etiqueta}`}</span>
+          <span className="lab lab-ay">{p.tipo === "mes" ? `Ventas netas de ${nombreP.toLowerCase()}` : `Ventas netas, ${p.etiqueta}`}<Ayuda titulo="Ventas netas">Lo cobrado por servicios en el periodo, ya con descuentos aplicados. No incluye propinas ni ventas canceladas.</Ayuda></span>
           <b className="rs-big">{$(r.netas)}</b>
           {v !== null && <span className="rs-chip">{v === 0 ? "Igual" : `${Math.abs(v)}% ${v > 0 ? "más" : "menos"}`} que {p.tipo === "mes" ? "el mes anterior a esta fecha" : "el periodo anterior"}</span>}
           <div className="rs-mini">
@@ -161,7 +162,7 @@ export default async function Resumen({ searchParams }: { searchParams: Promise<
           {r.porBarbero.length ? r.porBarbero.map((b) => (
             <div key={b.id} className="rs-barra"><span>{b.nombre.split(" ")[0]}</span><i><em style={{ width: `${Math.max((b.monto / totalVentas) * 100, 2)}%` }} /></i><b>{$(b.monto)}</b></div>
           )) : <p className="muted rs-vacio">Sin ventas en estas fechas.</p>}
-          <small className="rs-nota">Es lo que se cobró por sus servicios, no lo que recibió cada quien.</small>
+          <small className="rs-nota">Total cobrado por los servicios que realizó cada persona. No corresponde a lo que se le paga.</small>
         </section>
         {pendientes.length > 0 && (
           <section className="glass rs-card subir d2" aria-label="Requiere atención">
@@ -176,7 +177,7 @@ export default async function Resumen({ searchParams }: { searchParams: Promise<
       {/* Teléfono: la cifra del mes arriba y cada sección cerrada con su cifra clave; se abre al tocarla. */}
       <div className="rs-mov solo-movil">
         <section className="glass rs-mh">
-          <span className="lab">{p.tipo === "mes" ? `${nombreP}, del 1 al ${Number(hastaV.slice(8))}` : p.etiqueta}</span>
+          <span className="lab lab-ay">{p.tipo === "mes" ? `Ventas netas de ${nombreP.toLowerCase()}` : `Ventas netas, ${p.etiqueta}`}<Ayuda titulo="Ventas netas">Lo cobrado por servicios en el periodo, ya con descuentos aplicados. No incluye propinas ni ventas canceladas.</Ayuda></span>
           <div className="rs-mh-f">
             <span><b className="rs-big">{$(r.netas)}</b>{v !== null && <small>{v === 0 ? "Igual" : `${Math.abs(v)}% ${v > 0 ? "más" : "menos"}`} que {p.tipo === "mes" ? `${nombrePrev.toLowerCase()} a esta fecha` : "el periodo anterior"}</small>}</span>
             {meta > 0 && <span className="anillo-m rs-mini-anillo" role="img" aria-label={`${pct}% de la meta`} style={{ ["--p" as string]: Math.min(pct, 100) }}><span>{pct}%</span></span>}
@@ -214,7 +215,7 @@ export default async function Resumen({ searchParams }: { searchParams: Promise<
                 <i className="rs-mp-b"><em style={{ width: `${Math.max((b.monto / totalVentas) * 100, 2)}%` }} /></i>
               </div>
             ); })}
-            <small className="rs-nota">Ventas atribuidas: lo cobrado por sus servicios, no lo que recibió cada quien.</small>
+            <small className="rs-nota">Ventas atribuidas: total cobrado por los servicios que realizó cada persona. No corresponde a lo que se le paga.</small>
           </div>
         </details>
         {pendientes.length > 0 && (

@@ -17,6 +17,7 @@ import { AccionesEscritorio, AccionesMovil, type AccionInicio } from "./Acciones
 import { AvisoCajaEmergente } from "./AvisoCaja";
 import { RefrescarConVentas } from "./RefrescarConVentas";
 import { UltimosServicios, type FilaUltimo } from "./UltimosServicios";
+import { verificadosDe, type Verificado } from "@/lib/pagos";
 
 type Q = { aviso?: string; error?: string };
 type Sesion = Awaited<ReturnType<typeof requerirSesion>>;
@@ -32,10 +33,12 @@ function comparacion(hoy: number, previo: number, dia: string) {
 }
 
 /** Lo último cobrado, con su detalle al tocarlo. */
-function filasUltimos(ventas: Venta[], gente: Gente, hoy: string, zona: string): FilaUltimo[] {
+function filasUltimos(ventas: Venta[], gente: Gente, hoy: string, zona: string, ver: Map<string, Verificado>): FilaUltimo[] {
   return ventas.map((v) => {
     const quien = gente.find((e) => e.id === v.conceptos[0]?.barberoId);
+    const st = ver.get(v.id);
     return {
+      verificado: st ? (st.estado === "reembolsado" ? "devuelto" : "si") : undefined,
       id: v.id, folio: v.folio, cancelada: v.estado === "cancelada", monto: formatoDinero(v.total),
       t: v.fecha === hoy ? horaCorta(v.creadoEn, zona) : v.fecha === sumarDias(hoy, -1) ? "Ayer" : `${v.fecha.slice(8)}/${v.fecha.slice(5, 7)}`,
       servicios: v.conceptos.map((c) => c.nombre).join(", "), quien: v.conceptos[0]?.barbero ?? "", avatar: quien?.avatar ?? "iniciales",
@@ -45,6 +48,7 @@ function filasUltimos(ventas: Venta[], gente: Gente, hoy: string, zona: string):
         ...(v.conceptos.some((c) => c.descuento) ? [["Descuento", v.conceptos.filter((c) => c.descuento).map((c) => `${formatoDinero(c.descuento)} en ${c.nombre}`).join("; ")] as [string, string]] : []),
         ...(v.propinas.length ? [["Propina", v.propinas.map((x) => formatoDinero(x.monto)).join(" y ")] as [string, string]] : []),
         ["Pago", v.pagos.map((pg) => `${pg.metodo} ${formatoDinero(pg.monto)}`).join(" y ") || "Sin pago"],
+        ...(st ? [["Verificado por Stripe", `${st.estado === "reembolsado" ? "Pago devuelto al cliente" : "Pago confirmado"}${st.tarjeta ? `, ${st.tarjeta}` : ""}${st.referencia ? `, referencia ${st.referencia}` : ""}`] as [string, string]] : []),
         ["Registró", v.registradaPor.split(" ")[0]],
         ["Cuándo", `${fechaLarga(v.fecha)}, ${horaCorta(v.creadoEn, zona)}`],
         ...(v.estado === "cancelada" ? [["Cancelada", v.motivoCancelacion ?? ""] as [string, string]] : []),
@@ -102,7 +106,7 @@ function InicioVista(v: Vista) {
     <div key={e.id} className="ini-eq">
       <Avatar avatar={e.avatar} nombre={e.nombre} t={28} />
       <span>{e.nombre.split(" ")[0]}{e.id === s.usuario.id && v.barbero && <small className="muted"> (tú)</small>}</span>
-      <span className="ini-eq-m"><b>{formatoDinero(e.monto)}</b>{e.meta ? <small className="muted">de {formatoDinero(e.meta)}</small> : e.servicios ? <small className="muted">{e.servicios} {e.servicios === 1 ? "servicio" : "servicios"}</small> : null}</span>
+      <span className="ini-eq-m"><b>{formatoDinero(e.monto)}</b>{e.meta ? <small className="muted">meta del día {formatoDinero(e.meta)}</small> : e.servicios ? <small className="muted">{e.servicios} {e.servicios === 1 ? "servicio" : "servicios"}</small> : null}</span>
     </div>
   )) : <p className="muted ini-vacio">Todavía no hay personas que atiendan.</p>;
   return (
@@ -134,7 +138,7 @@ function InicioVista(v: Vista) {
         </section>
       )}
       <section className="glass ini-card ini-eq-m-card solo-movil subir d2">
-        <div className="entre"><span className="lab">Equipo hoy</span>{v.verVentas && <Link className="ini-link" href="/analitica/ventas">Ventas</Link>}</div>
+        <div className="entre"><span className="lab">Equipo hoy</span>{v.verVentas && <Link className="ini-link" href="/analitica/ventas">Ver ventas</Link>}</div>
         {listaEquipo}
       </section>
 
@@ -238,7 +242,7 @@ export default async function Inicio({ searchParams }: { searchParams: Promise<Q
       total={total} servicios={conceptos.length} clientes={deHoy.length} previo={previo}
       movs={pagadas.map((v) => ({ creadoEn: v.creadoEn, fecha: v.fecha, monto: v.total }))}
       meta={meta} citas={citas} equipo={filasEq}
-      ultimos={filasUltimos(ventas.slice(0, 5), equipo, hoy, zona)}
+      ultimos={filasUltimos(ventas.slice(0, 5), equipo, hoy, zona, await verificadosDe(ventas.slice(0, 5).map((v) => v.id)))}
       verMas={{ href: "/analitica", texto: "Ver semana y mes en Analítica" }} verVentas={s.puede("ventas.ver_todas")} />
   );
 }
@@ -279,7 +283,7 @@ async function InicioBarbero({ s, hoy, zona, turno, avisos }: { s: Sesion; hoy: 
       movs={mios.map((c) => ({ creadoEn: c.creadoEn, fecha: c.fecha, monto: c.precioCobrado }))}
       meta={s.barberia.usaMetas ? { monto: Math.max(metaHoy, 1), ayuda: mia?.aplica ? "Sale de la meta mensual del negocio y de tu forma de pago." : "Refleja tu meta de ventas y cuánto llevas de ella." } : null}
       citas={citas} equipo={filasEq}
-      ultimos={filasUltimos(todas.slice(0, 5), gente, hoy, zona)}
+      ultimos={filasUltimos(todas.slice(0, 5), gente, hoy, zona, await verificadosDe(todas.slice(0, 5).map((v) => v.id)))}
       verMas={{ href: "/analitica/ventas", texto: "Ver tu semana y mes en Ventas" }} verVentas />
   );
 }

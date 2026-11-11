@@ -3,23 +3,17 @@ import { AvisoUrl } from "@/components/Encabezado";
 import { BarraFiltros } from "@/components/BarraFiltros";
 import { Paginacion } from "@/components/Paginacion";
 import { requerirSesion } from "@/lib/auth";
-import { and, inArray } from "drizzle-orm";
-import { db } from "@/lib/db";
-import { Avatar } from "@/components/Avatar";
-import { Ayuda } from "@/components/Ayuda";
+import { inArray } from "drizzle-orm";
+import { verificadosDe } from "@/lib/pagos";
 import { MINUTOS_CORRECCION } from "@/lib/caja";
 import { cajaDe, diasYTotalVentas, idsVentas, equipoConVentas, metodosActivos, ventasEntre } from "@/lib/datos";
 import { condicionVentas, type ConsultaFiltros, leerFiltros, paginaDeRegistros, rangoDePagina, urlDescarga } from "@/lib/filtros";
 import { esMovil } from "@/lib/dispositivo";
 import { schema } from "@/lib/db";
-import { lunesDe } from "@/lib/fechas";
 import { fechaLarga, fechaLocal, horaCorta } from "@/lib/fechas";
 import { formatoDinero } from "@/lib/money";
-import { leerPeriodo } from "@/lib/periodo";
 import { HistorialVentas, type DiaVentas } from "@/components/HistorialVentas";
 import { CabeceraVentas, periodoEncabezado } from "@/components/CabeceraPeriodo";
-import { Pagar } from "./Pagar";
-import { cuentaDe } from "@/lib/equipo";
 
 export const metadata = { title: "Ventas" };
 
@@ -56,9 +50,7 @@ export default async function Ventas({ searchParams }: { searchParams: Promise<Q
     : { ventas: [] };
   const dias = r.dias;
   // Ventas cobradas en línea: Stripe confirmó el pago (cobro con QR o anticipo de cita).
-  const enLinea = ventas.length ? await db.select({ ventaId: schema.pagosLinea.ventaId, estado: schema.pagosLinea.estado, pagadoEn: schema.pagosLinea.pagadoEn }).from(schema.pagosLinea)
-    .where(and(inArray(schema.pagosLinea.ventaId, ventas.map((v) => v.id)), inArray(schema.pagosLinea.estado, ["pagado", "reembolsado"]))) : [];
-  const stripeDe = new Map(enLinea.map((x) => [x.ventaId, x]));
+  const stripeDe = await verificadosDe(ventas.map((v) => v.id));
   const puedeCancelar = s.puede("ventas.cancelar");
   // El barbero puede anular sus propios cobros durante los primeros minutos, mientras la caja sigue abierta.
   const turno = verTodas ? null : await cajaDe(s);
@@ -78,7 +70,10 @@ export default async function Ventas({ searchParams }: { searchParams: Promise<Q
       filas: delDia.map((v) => ({
         id: v.id, folio: v.folio, hora: horaCorta(v.creadoEn, zona), monto: monto(v), cancelada: v.estado === "cancelada",
         servicios: propios(v).map((c) => c.nombre).join(", "),
-        stripe: stripeDe.has(v.id) ? { reembolsado: stripeDe.get(v.id)!.estado === "reembolsado", confirmado: stripeDe.get(v.id)!.pagadoEn ? `${fechaLarga(fechaLocal(stripeDe.get(v.id)!.pagadoEn!, zona))}, ${horaCorta(stripeDe.get(v.id)!.pagadoEn!, zona)}` : "Sí" } : undefined,
+        stripe: (() => {
+          const st = stripeDe.get(v.id);
+          return st ? { reembolsado: st.estado === "reembolsado", tarjeta: st.tarjeta, referencia: st.referencia, confirmado: st.pagadoEn ? `${fechaLarga(fechaLocal(st.pagadoEn, zona))}, ${horaCorta(st.pagadoEn, zona)}` : "Sí" } : undefined;
+        })(),
         detalle: [
           ["Servicios", propios(v).map((c) => `${c.nombre} con ${c.barbero.split(" ")[0]}, ${formatoDinero(c.precioCobrado)}`).join("; ")],
           ...(v.conceptos.some((c) => c.descuento) ? [["Descuento", v.conceptos.filter((c) => c.descuento).map((c) => `${formatoDinero(c.descuento)} en ${c.nombre}`).join("; ")] as [string, string]] : []),
@@ -97,10 +92,6 @@ export default async function Ventas({ searchParams }: { searchParams: Promise<Q
       })),
     };
   });
-  const elegida = equipo.find((e) => e.id === persona);
-  // La cuenta de una persona se mide en el periodo elegido, o en el mes en curso si se ve todo.
-  const rango = p ?? leerPeriodo({ periodo: "mes" }, hoy);
-  const cuenta = elegida ? await cuentaDe(s.barberia.id, elegida.id, rango.desde, rango.hasta > hoy ? hoy : rango.hasta, (await ventasEntre(s.barberia.id, rango.desde, rango.hasta, { zona, barberoId: elegida.id })).ventas.filter((v) => v.estado === "pagada")) : null;
   const qs = new URLSearchParams(Object.entries(q).filter(([k, v]) => v && k !== "aviso" && k !== "error") as [string, string][]).toString();
   const regreso = `/analitica/ventas${qs ? `?${qs}` : ""}`;
 
@@ -108,31 +99,6 @@ export default async function Ventas({ searchParams }: { searchParams: Promise<Q
     <>
       <AvisoUrl aviso={q.aviso} error={q.error} />
       <CabeceraVentas barberiaId={s.barberia.id} zona={zona} hoy={hoy} persona={verTodas ? persona || undefined : s.usuario.id} propias={!verTodas} {...periodoEncabezado(p, hoy)} />
-      {verTodas && elegida && cuenta && (
-        <section className="glass panel subir">
-          <div className="entre">
-            <span className="persona"><Avatar avatar={elegida.avatar} nombre={elegida.nombre} t={44} /><span><b>{elegida.nombre}</b><small className="muted" style={{ display: "block" }}>{cuenta.forma}</small></span></span>
-            {s.puede("equipo.pagar") && <Pagar id={elegida.id} nombre={elegida.nombre} semana={lunesDe(rango.hasta > hoy ? hoy : rango.hasta)} renta={cuenta.renta > 0} pendiente={formatoDinero(cuenta.renta > 0 ? cuenta.rentaPendiente : cuenta.saldo)} regreso={regreso} />}
-          </div>
-          <div className="cifras">
-            <div><span className="lab">Ventas generadas</span><b>{formatoDinero(cuenta.vendido)}</b></div>
-            {cuenta.renta > 0 ? (
-              <>
-                <div><span className="lab">Renta de silla</span><b>{formatoDinero(cuenta.renta)}</b></div>
-                <div><span className="lab">Renta pagada</span><b>{formatoDinero(cuenta.rentaPagada)}</b></div>
-                <div><span className="lab">Estado</span>{cuenta.rentaPendiente > 0 ? <b style={{ color: "var(--warn)" }}>Faltan {formatoDinero(cuenta.rentaPendiente)}</b> : <span className="cubierto"><i>✓</i>Renta cubierta</span>}</div>
-              </>
-            ) : (
-              <>
-                <div><span className="lab">Le corresponde<Ayuda titulo="Le corresponde">Su comisión en estas fechas, más su sueldo si tiene uno.</Ayuda></span><b>{formatoDinero(cuenta.corresponde)}</b></div>
-                <div><span className="lab">Pagado</span><b>{formatoDinero(cuenta.pagado)}</b></div>
-                {cuenta.faltantes > 0 && <div><span className="lab">Faltantes de caja<Ayuda titulo="Faltantes de caja">Faltantes de cortes de caja ya autorizados. Solo lo autorizado se resta de lo que se le paga.</Ayuda></span><b>−{formatoDinero(cuenta.faltantes)}</b></div>}
-                <div><span className="lab">Por pagar</span>{cuenta.saldo > 0 ? <b>{formatoDinero(cuenta.saldo)}</b> : <span className="cubierto"><i>✓</i>Al corriente</span>}</div>
-              </>
-            )}
-          </div>
-        </section>
-      )}
 
       <div className="tit-fuera subir d1"><span className="lab">Historial de ventas</span><span className="muted">{resumen.ventas} {resumen.ventas === 1 ? "venta" : "ventas"}, {formatoDinero(resumen.monto)}</span></div>
       <section className="glass panel-hist subir d1">

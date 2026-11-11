@@ -12,6 +12,7 @@ import { formatoDinero } from "@/lib/money";
 import { MesEquipo } from "./Partes";
 import { RegistrarPago } from "./Pago";
 import { cuentasEnCurso, mesElegido, personasEquipo, sesionEquipo } from "./datos";
+import { Ayuda } from "@/components/Ayuda";
 
 export const metadata = { title: "Equipo" };
 
@@ -49,7 +50,7 @@ export default async function Equipo({ searchParams }: { searchParams: Promise<{
       <AvisoUrl aviso={q0.aviso} error={q0.error} />
       <aside className="glass eqa-res">
         <div className="entre"><span className="lab">{m.nombre}</span><MesEquipo mes={m.mes} hoy={m.hoy} /></div>
-        <span className="eqa-total"><small>Ventas atribuidas</small><b>{formatoDinero(total.vendido)}</b><em>{total.servicios} {total.servicios === 1 ? "servicio" : "servicios"}{cal?.n ? `, ★ ${cal.prom.toFixed(1)}` : ""}</em></span>
+        <span className="eqa-total"><small className="lab-ay">Ventas atribuidas<Ayuda titulo="Ventas atribuidas">Total cobrado por los servicios que realizó el equipo, con cualquier forma de pago. No corresponde a lo que se le paga a cada persona.</Ayuda></small><b>{formatoDinero(total.vendido)}</b><em>{total.servicios} {total.servicios === 1 ? "servicio" : "servicios"}</em>{cal?.n ? <em>★ {cal.prom.toFixed(1)} de calificación en {cal.n} {cal.n === 1 ? "reseña" : "reseñas"}</em> : null}</span>
         {(hayEquipo || hayRentas) && (
           <div className="eqa-pend">
             {hayEquipo && <span><small>Por pagar al equipo</small><b>{formatoDinero(porPagar)}</b></span>}
@@ -60,7 +61,6 @@ export default async function Equipo({ searchParams }: { searchParams: Promise<{
         <nav className="eqa-links" aria-label="Más de Equipo">
           {puedePagar && <Link href="/equipo/pagos">Historial de pagos</Link>}
           {revision.length > 0 && <Link href="/equipo/pagos#faltantes">{revision.length} {revision.length === 1 ? "faltante en revisión" : "faltantes en revisión"}</Link>}
-          {se.puede("ventas.ver_todas") && <Link href="/analitica/ventas">Estadísticas completas</Link>}
           {archivadas.length > 0 && <Link href={urlArch} className="sutil">{verArch ? "Ocultar archivados" : `Archivados (${archivadas.length})`}</Link>}
         </nav>
       </aside>
@@ -75,7 +75,7 @@ export default async function Equipo({ searchParams }: { searchParams: Promise<{
                 <Avatar avatar={p.avatar} nombre={p.nombre} t={38} />
                 <span><b>{p.nombre}</b><small>{!c || c.sinRegla ? "Sin forma de pago" : `${c.modalidad}, ${c.frecuencia.toLowerCase()}`}</small>
                   <i className="eqa-barra" aria-hidden="true"><i style={{ width: `${Math.max((p.r.vendido / maxV) * 100, 2)}%` }} /></i></span>
-                <span className="eq2-m"><b>{formatoDinero(p.r.vendido)}</b>{pend && <small className="pend">{pend}</small>}</span>
+                <span className="eq2-m"><b>{formatoDinero(p.r.vendido)}</b><small>en ventas</small>{pend && <small className="pend">{pend}</small>}</span>
                 <Icono n="derecha" />
               </Link>
             );
@@ -93,7 +93,7 @@ export default async function Equipo({ searchParams }: { searchParams: Promise<{
             ))}
           </div>
         )}
-        {filas.length > 0 && <small className="eqa-nota">La barra muestra cuánto aporta cada persona a las ventas del mes. Lo pendiente es del periodo de pago en curso.</small>}
+        {filas.length > 0 && <small className="eqa-nota">La barra muestra cuánto aporta cada persona a las ventas del mes. Lo que falta por pagar incluye lo pendiente de periodos anteriores.</small>}
       </section>
     </div>
   );

@@ -3796,3 +3796,41 @@ html, body { overscroll-behavior-y: none; }
 @media (prefers-reduced-motion: reduce) { .capa.encadenada > .modal { animation: none; } }
 /* Horario del negocio: las horas caben dentro de la tarjeta */
 .horas-ed .campo-f-b { justify-content: center; padding-inline: 8px; font-size: 14px; }
+/* Marca pequeña de pago con QR verificado en Últimos servicios */
+.vs-mini { display: inline-flex; align-items: center; gap: 2px; margin-left: 6px; padding: 0 6px 0 4px; border-radius: 999px; background: #e3e9ef; color: #3c5163; font-size: 10.5px; font-weight: 600; font-style: normal; line-height: 1.6; vertical-align: 1px; }
+.vs-mini .ic { width: 10px !important; height: 10px !important; stroke-width: 2.8; color: inherit !important; transform: none !important; }
+.vs-mini.dev { background: #ececec; color: #5b6470; }
+.lab-ay { display: inline-flex; align-items: center; gap: 6px; }
+.vs-viva { width: 7px; height: 7px; border-radius: 50%; background: #4b6274; margin-left: 4px; animation: cqrPulso 1.4s ease-in-out infinite; }
+/* Registrar pago: formas de pago con fichas y monto con atajo de "Todo" */
+.pg-formas { display: flex; gap: 6px; flex-wrap: wrap; }
+.pg-formas button { padding: 9px 14px; border-radius: 999px; border: 1px solid var(--line); background: rgba(255,255,255,.8); font: inherit; font-size: 13.5px; font-weight: 600; color: inherit; cursor: pointer; }
+.pg-formas button.on { background: #13171c; color: #fff; border-color: #13171c; }
+.pg-monto { display: flex; gap: 8px; align-items: center; }
+.pg-monto .input { flex: 1; min-width: 0; }
+.pg-monto .bt { flex: none; white-space: nowrap; }
+
+/* Equipo en el teléfono: lista y ficha más compactas */
+@media (max-width: 760px) {
+  .eq2-fila { padding: 10px 14px; gap: 10px; }
+  .eq2-fila .avatar { width: 32px !important; height: 32px !important; }
+  .eq2-fila > span b { font-size: 14px; }
+  .eq2-fila > span small { font-size: 11.5px; }
+  .eq2-m b { font-size: 14px; } .eq2-m small { font-size: 11px; }
+  .eqa-total b { font-size: 36px; }
+  .fa-id { grid-template-columns: 48px minmax(0, 1fr); padding-left: 2px; }
+  .fa-id > .avatar, .fa-id > :first-child { width: 48px !important; height: 48px !important; }
+  .fa-id .avatar svg { width: 46%; height: 46%; }
+  .fa-id h1 { font-size: 18px; }
+  .fa-id small { font-size: 12px; }
+  .fa-pend b { font-size: 36px; }
+  .fa-ren > div { padding: 8px 0; font-size: 13px; }
+  .fa-card .lab { font-size: 10.5px; }
+  .eq2-tabla > div { font-size: 13px; }
+  .fa-ayuda { display: block; margin-top: 8px; padding: 0 4px; font-size: 11.5px; line-height: 1.45; color: var(--faint); }
+}
+/* Botón de registrar pago: píldora clara con ícono, sin ocupar todo el ancho */
+.fa-cuenta .eqa-bt, .fa-acc .eqa-bt { width: auto; justify-self: start; height: 40px; padding: 0 18px 0 14px; display: inline-flex; align-items: center; gap: 8px; background: #e3e9ef; color: #13171c; box-shadow: none; border: 1px solid rgba(30,45,60,.1); }
+.fa-cuenta .eqa-bt::before, .fa-acc .eqa-bt::before { content: "+"; font-size: 18px; font-weight: 500; line-height: 1; }
+.fa-acc .eqa-bt { justify-self: stretch; justify-content: center; }
+.hist-linea.ultimo-l .srv small { white-space: normal; }

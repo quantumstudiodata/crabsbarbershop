@@ -129,6 +129,16 @@ export async function verificarPago(p: { intento: string | null; estado: string;
   }
 }
 
+export type Verificado = { estado: string; tarjeta: string; referencia: string; pagadoEn: Date | null };
+
+/** Pagos en línea ya confirmados por Stripe de unas ventas: para marcarlas como verificadas. */
+export async function verificadosDe(ventaIds: string[]): Promise<Map<string, Verificado>> {
+  if (!ventaIds.length) return new Map();
+  const filas = await db.select({ ventaId: pagosLinea.ventaId, estado: pagosLinea.estado, tarjeta: pagosLinea.tarjeta, intento: pagosLinea.intento, pagadoEn: pagosLinea.pagadoEn })
+    .from(pagosLinea).where(and(inArray(pagosLinea.ventaId, ventaIds), inArray(pagosLinea.estado, ["pagado", "reembolsado"])));
+  return new Map(filas.map((f) => [f.ventaId!, { estado: f.estado, tarjeta: f.tarjeta, referencia: f.intento ?? "", pagadoEn: f.pagadoEn }]));
+}
+
 /** Minutos que vale el enlace de un cobro con QR. */
 export const VIGENCIA_QR_MIN = 30;
 

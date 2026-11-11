@@ -13,7 +13,7 @@ export type FilaVenta = {
   /** Cancelar (quien tiene permiso) o anular (el propio barbero en sus primeros minutos). */
   accion?: { tipo: "cancelar" | "anular"; hasta?: string };
   /** Pago en línea confirmado por Stripe (cobro con QR o anticipo). */
-  stripe?: { confirmado: string; reembolsado: boolean };
+  stripe?: { confirmado: string; reembolsado: boolean; tarjeta: string; referencia: string };
   /** Si quien ve puede modificar la venta. */
   edicion?: DatosEdicion;
 };
@@ -41,7 +41,7 @@ export function HistorialVentas({ dias, regreso, opciones, sinMarco }: { dias: D
                 {abierta === f.id && (
                   <div className="hist-det">
                     {f.detalle.map(([k, v]) => <span key={k}><small>{k}</small>{v}</span>)}
-                    {f.stripe && <VerificadoStripe ventaId={f.id} confirmado={f.stripe.confirmado} />}
+                    {f.stripe && <VerificadoStripe ventaId={f.id} {...f.stripe} />}
                     {(f.accion || (f.edicion && opciones)) && (
                       <span className="anular">
                         <small>{f.accion?.tipo === "anular" ? "¿Te equivocaste?" : "Corregir la venta"}</small>

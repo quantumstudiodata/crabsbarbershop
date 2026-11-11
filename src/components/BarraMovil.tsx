@@ -36,6 +36,16 @@ export function TituloMovil({ negocio, nombre, fecha, items, grupos }: { negocio
   const seccion = enCobro ? "Cobro" : items.find((i) => i.href !== "/" && enSeccion(ruta, i))?.texto
     ?? (ruta.startsWith("/historial") ? "Historial" : ruta.startsWith("/ajustes") ? "Ajustes" : ruta.startsWith("/soporte") ? "Soporte" : ruta === "/" ? null : "");
   const grupo = grupoDe(ruta, grupos);
+  // Al llegar a una pestaña que está fuera de la vista (por ejemplo Finanzas, al final), el menú se desliza hasta ella.
+  const sub = useRef<HTMLElement>(null);
+  useEffect(() => {
+    const a = sub.current?.querySelector<HTMLElement>('a[aria-current="page"]');
+    if (!a || !sub.current) return;
+    const n = sub.current;
+    const destino = a.offsetLeft - (n.clientWidth - a.offsetWidth) / 2;
+    const reducir = window.matchMedia("(prefers-reduced-motion: reduce)").matches;
+    n.scrollTo({ left: Math.max(0, destino), behavior: reducir ? "auto" : "smooth" });
+  }, [ruta]);
   return (
     <div className="titulo-m">
       <div className="fila-tm">
@@ -45,7 +55,7 @@ export function TituloMovil({ negocio, nombre, fecha, items, grupos }: { negocio
           : <span className="saludo-m"><small>{negocio}</small><b key={seccion || "Inicio"} className="entra-m">{seccion || "Inicio"}</b></span>}
       </div>
       {grupo && (
-        <nav className="sub-m" aria-label="Pestañas de la sección">
+        <nav ref={sub} className="sub-m" aria-label="Pestañas de la sección">
           {grupo.items.map(([h, t]) => (
             <Link key={h} href={h} aria-current={pestanaActiva(ruta, h, grupo.items) ? "page" : undefined}>{t}</Link>
           ))}

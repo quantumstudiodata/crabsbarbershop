@@ -14,7 +14,11 @@ export async function registrarPago(form: FormData) {
   const barberoId = texto(form, "barberoId", 40);
   const semanaTxt = texto(form, "semana", 10);
   const tipo = texto(form, "tipo") === "renta" ? "renta" : "pago";
-  const monto = leerPesos(texto(form, "monto"));
+  // Puede pagarse con una o dos formas de pago; cada una queda como un pago con su forma en la nota.
+  const FORMAS: Record<string, string> = { efectivo: "Efectivo de caja", transferencia: "Transferencia", otro: "Otro" };
+  const partes = [1, 2].map((i) => ({ monto: leerPesos(texto(form, i === 1 ? "monto" : "monto2")), forma: FORMAS[texto(form, i === 1 ? "forma" : "forma2")] ?? "" }))
+    .filter((x) => x.monto && x.monto > 0) as { monto: number; forma: string }[];
+  const monto = partes.reduce((a, x) => a + x.monto, 0);
   const nota = texto(form, "nota", 200);
   // La fecha con la que se agrupa el pago: el lunes de la semana (Ventas) o el cierre del periodo (Equipo).
   const semana = esFechaValida(semanaTxt) ? semanaTxt : null;
@@ -25,11 +29,14 @@ export async function registrarPago(form: FormData) {
     .where(and(eq(schema.usuarios.id, barberoId), eq(schema.usuarios.barberiaId, s.barberia.id))).limit(1);
   if (!u) volver(ruta, { error: "No se encontró a esa persona." });
   await db.transaction(async (tx) => {
-    await tx.insert(schema.pagosComision).values({ barberiaId: s.barberia.id, barberoId: u.id, tipo, monto, semana, nota, usuarioId: s.usuario.id });
+    for (const x of partes) {
+      const n = [x.forma, nota].filter(Boolean).join(": ");
+      await tx.insert(schema.pagosComision).values({ barberiaId: s.barberia.id, barberoId: u.id, tipo, monto: x.monto, semana: semana!, nota: n.slice(0, 200), usuarioId: s.usuario.id });
+    }
     await registrar(tx, {
       barberiaId: s.barberia.id, usuarioId: s.usuario.id, tipo: "equipo",
       accion: tipo === "pago" ? `${s.usuario.nombre} registró un pago de ${formatoDinero(monto)} a ${u.nombre}` : `Se registró que ${u.nombre} pagó ${formatoDinero(monto)} de renta de silla`,
-      detalle: { semana, nota },
+      detalle: { semana, nota, formas: partes.map((x) => `${x.forma || "Sin forma"} ${formatoDinero(x.monto)}`).join(" y ") },
     });
   });
   revalidatePath("/analitica/ventas");
