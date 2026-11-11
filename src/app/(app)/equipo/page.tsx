@@ -73,10 +73,10 @@ export default async function Equipo({ searchParams }: { searchParams: Promise<{
             return (
               <Link key={p.id} href={`/equipo/${p.id}${q}`} className="eq2-fila">
                 <Avatar avatar={p.avatar} nombre={p.nombre} t={38} />
-                <span><b>{p.nombre}</b><small>{!c || c.sinRegla ? "Sin forma de pago" : `${c.modalidad}, ${c.frecuencia.toLowerCase()}`}</small>
-                  <i className="eqa-barra" aria-hidden="true"><i style={{ width: `${Math.max((p.r.vendido / maxV) * 100, 2)}%` }} /></i></span>
+                <span><b>{p.nombre}</b><small>{!c || c.sinRegla ? "Sin forma de pago" : `${c.modalidad}, ${c.frecuencia.toLowerCase()}`}</small></span>
                 <span className="eq2-m"><b>{formatoDinero(p.r.vendido)}</b><small>en ventas</small>{pend && <small className="pend">{pend}</small>}</span>
                 <Icono n="derecha" />
+                <i className="eqa-barra eq2-barra-fila" aria-hidden="true"><i style={{ width: `${Math.max((p.r.vendido / maxV) * 100, 2)}%` }} /></i>
               </Link>
             );
           }) : <Vacio icono="persona" titulo="Todavía no hay personas que atiendan" texto="Da de alta a tu equipo en Ajustes, Usuarios, y aquí verás lo que vende cada persona." />}

@@ -3985,3 +3985,7 @@ html, body { overscroll-behavior-y: none; }
   .ajustes > .pila:has(.cab-servicios) { gap: 14px !important; }
 }
 @media (max-width: 760px) { .cat-s > .cat-h2 { background: none; } }
+/* Equipo: la barra de ventas va en su propia fila, debajo del nombre y los montos. */
+.eq2-fila:has(> .eq2-barra-fila) { row-gap: 8px; }
+.eq2-fila > .avatar { grid-row: 1; }
+.eq2-fila > .eq2-barra-fila { grid-column: 2 / 4; grid-row: 2; margin: 0; width: 100%; }
