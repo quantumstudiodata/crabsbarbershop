@@ -145,3 +145,25 @@ export async function modificarVenta(_: EstadoModificar, form: FormData): Promis
   revalidatePath("/", "layout");
   return { ok: true, n: Date.now() };
 }
+
+export type ConsultaStripe = { estado: "cobrado" | "reembolsado" | "parcial" | "pendiente" | "error"; monto?: number; reembolsado?: number; tarjeta?: string; referencia?: string; consultado?: string };
+
+/** Consulta en vivo a Stripe el pago en línea de una venta: lo que responde Stripe, no lo que guardó la app. */
+export async function consultarPagoStripe(ventaId: string): Promise<ConsultaStripe> {
+  const s = await requerirSesion();
+  if (!/^[0-9a-f-]{36}$/.test(String(ventaId)) || !s.barberia.stripeCuenta) return { estado: "error" };
+  const [p] = await db.select().from(schema.pagosLinea).where(and(eq(schema.pagosLinea.ventaId, ventaId), eq(schema.pagosLinea.barberiaId, s.barberia.id))).limit(1);
+  if (!p?.intento) return { estado: "error" };
+  try {
+    const { stripe, tarjetaDe } = await import("@/lib/stripe");
+    const pi = await stripe().paymentIntents.retrieve(p.intento, { expand: ["latest_charge"] }, { stripeAccount: s.barberia.stripeCuenta });
+    const ch = typeof pi.latest_charge === "object" ? pi.latest_charge : null;
+    const reemb = ch?.amount_refunded ?? 0;
+    const estado = pi.status !== "succeeded" ? "pendiente" : reemb >= (ch?.amount ?? pi.amount) ? "reembolsado" : reemb > 0 ? "parcial" : "cobrado";
+    const hora = new Intl.DateTimeFormat("es-MX", { timeZone: s.barberia.zonaHoraria, hour: "2-digit", minute: "2-digit", hour12: false }).format(new Date());
+    return { estado, monto: pi.amount_received || pi.amount, reembolsado: reemb, tarjeta: tarjetaDe(pi), referencia: pi.id, consultado: hora };
+  } catch (err) {
+    console.error("consultar_pago_stripe", err);
+    return { estado: "error" };
+  }
+}

@@ -3,7 +3,8 @@ import { AvisoUrl } from "@/components/Encabezado";
 import { BarraFiltros } from "@/components/BarraFiltros";
 import { Paginacion } from "@/components/Paginacion";
 import { requerirSesion } from "@/lib/auth";
-import { inArray } from "drizzle-orm";
+import { and, inArray } from "drizzle-orm";
+import { db } from "@/lib/db";
 import { Avatar } from "@/components/Avatar";
 import { Ayuda } from "@/components/Ayuda";
 import { MINUTOS_CORRECCION } from "@/lib/caja";
@@ -54,6 +55,10 @@ export default async function Ventas({ searchParams }: { searchParams: Promise<Q
     ? await ventasEntre(s.barberia.id, r.desde, r.hasta, { zona, condiciones: soloIds ? [...condiciones, inArray(schema.ventas.id, soloIds.length ? soloIds : ["00000000-0000-0000-0000-000000000000"])] : condiciones })
     : { ventas: [] };
   const dias = r.dias;
+  // Ventas cobradas en línea: Stripe confirmó el pago (cobro con QR o anticipo de cita).
+  const enLinea = ventas.length ? await db.select({ ventaId: schema.pagosLinea.ventaId, estado: schema.pagosLinea.estado, pagadoEn: schema.pagosLinea.pagadoEn }).from(schema.pagosLinea)
+    .where(and(inArray(schema.pagosLinea.ventaId, ventas.map((v) => v.id)), inArray(schema.pagosLinea.estado, ["pagado", "reembolsado"]))) : [];
+  const stripeDe = new Map(enLinea.map((x) => [x.ventaId, x]));
   const puedeCancelar = s.puede("ventas.cancelar");
   // El barbero puede anular sus propios cobros durante los primeros minutos, mientras la caja sigue abierta.
   const turno = verTodas ? null : await cajaDe(s);
@@ -73,6 +78,7 @@ export default async function Ventas({ searchParams }: { searchParams: Promise<Q
       filas: delDia.map((v) => ({
         id: v.id, folio: v.folio, hora: horaCorta(v.creadoEn, zona), monto: monto(v), cancelada: v.estado === "cancelada",
         servicios: propios(v).map((c) => c.nombre).join(", "),
+        stripe: stripeDe.has(v.id) ? { reembolsado: stripeDe.get(v.id)!.estado === "reembolsado", confirmado: stripeDe.get(v.id)!.pagadoEn ? `${fechaLarga(fechaLocal(stripeDe.get(v.id)!.pagadoEn!, zona))}, ${horaCorta(stripeDe.get(v.id)!.pagadoEn!, zona)}` : "Sí" } : undefined,
         detalle: [
           ["Servicios", propios(v).map((c) => `${c.nombre} con ${c.barbero.split(" ")[0]}, ${formatoDinero(c.precioCobrado)}`).join("; ")],
           ...(v.conceptos.some((c) => c.descuento) ? [["Descuento", v.conceptos.filter((c) => c.descuento).map((c) => `${formatoDinero(c.descuento)} en ${c.nombre}`).join("; ")] as [string, string]] : []),

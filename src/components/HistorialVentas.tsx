@@ -5,12 +5,15 @@ import { CancelarVenta } from "@/app/(app)/analitica/ventas/CancelarVenta";
 import { type DatosEdicion, ModificarVenta, type Opciones } from "@/app/(app)/analitica/ventas/ModificarVenta";
 import { formatoDinero } from "@/lib/money";
 import { Icono } from "./Icono";
+import { VerificadoStripe } from "./VerificadoStripe";
 
 export type FilaVenta = {
   id: string; folio: string; hora: string; servicios: string; monto: number; cancelada: boolean;
   detalle: [string, string][];
   /** Cancelar (quien tiene permiso) o anular (el propio barbero en sus primeros minutos). */
   accion?: { tipo: "cancelar" | "anular"; hasta?: string };
+  /** Pago en línea confirmado por Stripe (cobro con QR o anticipo). */
+  stripe?: { confirmado: string; reembolsado: boolean };
   /** Si quien ve puede modificar la venta. */
   edicion?: DatosEdicion;
 };
@@ -30,7 +33,7 @@ export function HistorialVentas({ dias, regreso, opciones, sinMarco }: { dias: D
               <div key={f.id} className={`hist-fila ${f.cancelada ? "cancelada" : ""} ${abierta === f.id ? "abierta" : ""}`}>
                 <button type="button" className="hist-linea" aria-expanded={abierta === f.id} onClick={() => setAbierta(abierta === f.id ? null : f.id)}>
                   <span className="t">{f.hora}</span>
-                  <span className="srv">{f.servicios}</span>
+                  <span className="srv">{f.stripe && <i className={`vs-chip ${f.stripe.reembolsado ? "dev" : ""}`} title={f.stripe.reembolsado ? "Pago en línea devuelto" : "Pago verificado por Stripe"}><Icono n="palomita" />{f.stripe.reembolsado ? "Devuelto" : "Stripe"}</i>}{f.servicios}</span>
                   <span className="folio">{f.folio}</span>
                   <span className="num">{formatoDinero(f.monto)}</span>
                   <Icono n="abajo" />
@@ -38,6 +41,7 @@ export function HistorialVentas({ dias, regreso, opciones, sinMarco }: { dias: D
                 {abierta === f.id && (
                   <div className="hist-det">
                     {f.detalle.map(([k, v]) => <span key={k}><small>{k}</small>{v}</span>)}
+                    {f.stripe && <VerificadoStripe ventaId={f.id} confirmado={f.stripe.confirmado} />}
                     {(f.accion || (f.edicion && opciones)) && (
                       <span className="anular">
                         <small>{f.accion?.tipo === "anular" ? "¿Te equivocaste?" : "Corregir la venta"}</small>
