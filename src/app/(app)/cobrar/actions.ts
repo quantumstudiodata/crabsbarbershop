@@ -18,7 +18,8 @@ import { pagosLinea } from "@/lib/db/schema";
 /** Identificador de la forma de pago "Pago con QR" (no es una forma de pago guardada del negocio). */
 const QR = "qr";
 
-export type EstadoCobro = { ok?: boolean; error?: string; folio?: string; total?: number; encuesta?: string | null; qr?: { id: string; url: string; total: number } };
+export type EstadoCobro = { ok?: boolean; error?: string; folio?: string; total?: number; encuesta?: string | null; qr?: CobroQrAbierto };
+export type CobroQrAbierto = { id: string; url: string; total: number; vence: number; detalle?: string };
 
 type Entrada = {
   clave: string;
@@ -186,7 +187,7 @@ async function prepararQr(s: Sesion, plan: PlanVenta, propina: PropinaVenta, lin
   // Doble clic: si ya hay un cobro con QR pendiente para esta misma venta, se reutiliza.
   const [previo] = await db.select().from(pagosLinea)
     .where(and(eq(pagosLinea.barberiaId, b.id), eq(pagosLinea.estado, "pendiente"), sql`${pagosLinea.plan}->'plan'->>'clave' = ${plan.clave}`)).limit(1);
-  if (previo) return { qr: { id: previo.id, url: `${base}/pagar/${previo.token}`, total: previo.monto + previo.propina } };
+  if (previo && Date.now() - previo.creadoEn.getTime() < 25 * 60000) return { qr: { id: previo.id, url: `${base}/pagar/${previo.token}`, total: previo.monto + previo.propina, vence: previo.creadoEn.getTime() + 30 * 60000 } };
   const equipo = await equipoQueAtiende(b.id);
   const nombre = (id: string) => equipo.find((x) => x.id === id)?.nombre.split(" ")[0] ?? "";
   const token = randomBytes(12).toString("base64url");
@@ -202,27 +203,60 @@ async function prepararQr(s: Sesion, plan: PlanVenta, propina: PropinaVenta, lin
       metadata: { pagoId: pago.id, barberiaId: b.id, tipo: "venta" }, clave: `qr-${pago.id}`,
     });
     await db.update(pagosLinea).set({ intento: pi.id }).where(eq(pagosLinea.id, pago.id));
-    return { qr: { id: pago.id, url: `${base}/pagar/${token}`, total: plan.total - anticipo + propinaFija } };
+    return { qr: { id: pago.id, url: `${base}/pagar/${token}`, total: plan.total - anticipo + propinaFija, vence: Date.now() + 30 * 60000 } };
   } catch (err) {
     console.error(err);
     return { error: "No se pudo preparar el cobro con QR. Revisa la conexión con Stripe e intenta otra vez." };
   }
 }
 
-/** Estado de un cobro con QR, para la ventana que espera el pago. */
-export async function estadoCobroQr(id: string): Promise<{ estado: string; folio?: string; total?: number; tarjeta?: string; propina?: number }> {
+export type EstadoQr = { estado: string; folio?: string; total?: number; tarjeta?: string; propina?: number; confirmado?: string; referencia?: string };
+
+/** Estado de un cobro con QR, para la ventana que espera el pago. Si sigue pendiente, se le pregunta a Stripe. */
+export async function estadoCobroQr(id: string): Promise<EstadoQr> {
   const s = await requerirSesion();
   if (!/^[0-9a-f-]{36}$/.test(String(id))) return { estado: "desconocido" };
   let [p] = await db.select().from(pagosLinea).where(and(eq(pagosLinea.id, id), eq(pagosLinea.barberiaId, s.barberia.id))).limit(1);
   if (!p) return { estado: "desconocido" };
   if (p.estado === "pendiente") {
-    const { verificarPago } = await import("@/lib/pagos");
-    await verificarPago(p);
+    const { verificarPago, vencerSiToca } = await import("@/lib/pagos");
+    if (!(await vencerSiToca(p))) await verificarPago(p);
     [p] = await db.select().from(pagosLinea).where(eq(pagosLinea.id, p.id)).limit(1);
   }
+  return datosQr(p, s.barberia.zonaHoraria);
+}
+
+async function datosQr(p: typeof pagosLinea.$inferSelect, zona: string): Promise<EstadoQr> {
   let folio: string | undefined;
   if (p.ventaId) [{ folio }] = await db.select({ folio: schema.ventas.folio }).from(schema.ventas).where(eq(schema.ventas.id, p.ventaId)).limit(1);
-  return { estado: p.estado, folio, total: p.monto + p.propina, tarjeta: p.tarjeta, propina: p.propina };
+  const confirmado = p.pagadoEn ? new Intl.DateTimeFormat("es-MX", { timeZone: zona, hour: "2-digit", minute: "2-digit", second: "2-digit", hour12: false }).format(p.pagadoEn) : undefined;
+  return { estado: p.estado, folio, total: p.monto + p.propina, tarjeta: p.tarjeta, propina: p.propina, confirmado, referencia: p.estado === "pagado" ? p.intento ?? undefined : undefined };
+}
+
+const detalleQr = (d: unknown) => {
+  const c = ((d as { conceptos?: { nombre: string; con: string }[] })?.conceptos ?? []);
+  return `${c.map((x) => x.nombre).join(", ")}${c[0]?.con ? ` con ${c[0].con}` : ""}`;
+};
+
+/**
+ * Cobros con QR en espera de quien cobra (o de todo el negocio, para quien ve todas las ventas).
+ * También avisa cuáles de los que se estaban siguiendo ya se resolvieron (pagados, cancelados o vencidos).
+ */
+export async function cobrosQrEnEspera(seguidos: string[] = []): Promise<{ pendientes: CobroQrAbierto[]; resueltos: (EstadoQr & { id: string; detalle: string })[] }> {
+  const s = await requerirSesion();
+  if (!s.barberia.stripeCuenta) return { pendientes: [], resueltos: [] };
+  const { verificarPago, vencerSiToca, VIGENCIA_QR_MIN } = await import("@/lib/pagos");
+  const propios = s.puede("ventas.ver_todas") ? [] : [eq(pagosLinea.creadoPor, s.usuario.id)];
+  const pend = await db.select().from(pagosLinea)
+    .where(and(eq(pagosLinea.barberiaId, s.barberia.id), eq(pagosLinea.tipo, "venta"), eq(pagosLinea.estado, "pendiente"), ...propios)).limit(10);
+  for (const p of pend) if (!(await vencerSiToca(p))) await verificarPago(p);
+  const ids = [...new Set([...pend.map((p) => p.id), ...seguidos.filter((x) => /^[0-9a-f-]{36}$/.test(x)).slice(0, 20)])];
+  const ahora = ids.length ? await db.select().from(pagosLinea).where(and(eq(pagosLinea.barberiaId, s.barberia.id), inArray(pagosLinea.id, ids))) : [];
+  const base = await origen();
+  const pendientes = ahora.filter((p) => p.estado === "pendiente").sort((a, b) => a.creadoEn.getTime() - b.creadoEn.getTime())
+    .map((p) => ({ id: p.id, url: `${base}/pagar/${p.token}`, total: p.monto + p.propina, vence: p.creadoEn.getTime() + VIGENCIA_QR_MIN * 60000, detalle: detalleQr(p.detalle) }));
+  const resueltos = await Promise.all(ahora.filter((p) => p.estado !== "pendiente" && seguidos.includes(p.id)).map(async (p) => ({ id: p.id, detalle: detalleQr(p.detalle), ...(await datosQr(p, s.barberia.zonaHoraria)) })));
+  return { pendientes, resueltos };
 }
 
 /** Cancela un cobro con QR que todavía no se paga (al cerrar la ventana). */

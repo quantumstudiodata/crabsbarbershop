@@ -33,7 +33,7 @@ export function HistorialVentas({ dias, regreso, opciones, sinMarco }: { dias: D
               <div key={f.id} className={`hist-fila ${f.cancelada ? "cancelada" : ""} ${abierta === f.id ? "abierta" : ""}`}>
                 <button type="button" className="hist-linea" aria-expanded={abierta === f.id} onClick={() => setAbierta(abierta === f.id ? null : f.id)}>
                   <span className="t">{f.hora}</span>
-                  <span className="srv">{f.stripe && <i className={`vs-chip ${f.stripe.reembolsado ? "dev" : ""}`} title={f.stripe.reembolsado ? "Pago en línea devuelto" : "Pago verificado por Stripe"}><Icono n="palomita" />{f.stripe.reembolsado ? "Devuelto" : "Stripe"}</i>}{f.servicios}</span>
+                  <span className="srv">{f.stripe && <i className={`vs-chip ${f.stripe.reembolsado ? "dev" : ""}`} title={f.stripe.reembolsado ? "Pago en línea devuelto" : "Pago verificado por Stripe"}><Icono n="palomita" />{f.stripe.reembolsado ? "Devuelto" : "Verificado por Stripe"}</i>}<span className="srv-t">{f.servicios}</span></span>
                   <span className="folio">{f.folio}</span>
                   <span className="num">{formatoDinero(f.monto)}</span>
                   <Icono n="abajo" />

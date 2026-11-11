@@ -2,7 +2,7 @@ import { eq } from "drizzle-orm";
 import { notFound } from "next/navigation";
 import { db, schema } from "@/lib/db";
 import { pagosLinea } from "@/lib/db/schema";
-import { verificarPago } from "@/lib/pagos";
+import { vencerSiToca, verificarPago } from "@/lib/pagos";
 import { stripe } from "@/lib/stripe";
 import { formatoDinero } from "@/lib/money";
 import { Pagar } from "./Pagar";
@@ -18,7 +18,7 @@ export default async function PaginaPago({ params }: { params: Promise<{ token: 
   const t = String(token).slice(0, 40);
   let [p] = await db.select().from(pagosLinea).where(eq(pagosLinea.token, t)).limit(1);
   if (!p || p.tipo !== "venta") notFound();
-  if (p.estado === "pendiente") { await verificarPago(p); [p] = await db.select().from(pagosLinea).where(eq(pagosLinea.token, t)).limit(1); }
+  if (p.estado === "pendiente") { if (!(await vencerSiToca(p))) await verificarPago(p); [p] = await db.select().from(pagosLinea).where(eq(pagosLinea.token, t)).limit(1); }
   const [b] = await db.select({ nombre: schema.barberias.nombre, cuenta: schema.barberias.stripeCuenta, zona: schema.barberias.zonaHoraria }).from(schema.barberias).where(eq(schema.barberias.id, p.barberiaId)).limit(1);
   if (!b) notFound();
   const d = p.detalle as Detalle;

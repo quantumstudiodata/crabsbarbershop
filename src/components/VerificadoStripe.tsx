@@ -23,7 +23,7 @@ export function VerificadoStripe({ ventaId, confirmado }: { ventaId: string; con
             <span><small>Estado en Stripe</small>{TXT[r.estado]}</span>
             {r.monto !== undefined && <span><small>Monto cobrado</small>{formatoDinero(r.monto)}{r.reembolsado ? `, devuelto ${formatoDinero(r.reembolsado)}` : ""}</span>}
             {r.tarjeta && <span><small>Tarjeta</small>{r.tarjeta}</span>}
-            {r.referencia && <span className="vs-ref"><small>Referencia de Stripe</small>{r.referencia}</span>}
+            {r.referencia && <span className="vs-ref"><small>Referencia de Stripe</small><code>{r.referencia}</code></span>}
           </>
         )}
       </span>

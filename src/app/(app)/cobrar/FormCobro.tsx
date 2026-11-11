@@ -1,13 +1,13 @@
 "use client";
 
 import { EncuestaQR } from "@/components/EncuestaQR";
-import { useActionState, useEffect, useMemo, useRef, useState } from "react";
+import { useActionState, useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { Avatar } from "@/components/Avatar";
 import { Fl, Icono } from "@/components/Icono";
 import { Selector } from "@/components/ui";
 import { formatoDinero, leerPesos } from "@/lib/money";
-import { registrarVenta, type EstadoCobro } from "./actions";
-import { CobroQR } from "./CobroQR";
+import { registrarVenta, type CobroQrAbierto, type EstadoCobro } from "./actions";
+import { CobroQR, CobrosEnEspera } from "./CobroQR";
 import { aplicarPromos, descuentoDe, momentoEn, participa, vigente, type Promo } from "@/lib/promociones";
 
 type Servicio = { id: string; nombre: string; duracionMin: number; precio: number; categoria: string };
@@ -47,7 +47,10 @@ export function FormCobro(p: {
   const [motivo, setMotivo] = useState("");
   const [propina, setPropina] = useState<{ tipo: "pct" | "fijo"; valor: string } | null>(null);
   const [ultima, setUltima] = useState<{ folio: string; total: number; encuesta?: string | null } | null>(null);
-  const [cobroQr, setCobroQr] = useState<{ id: string; url: string; total: number } | null>(null);
+  const [cobroQr, setCobroQr] = useState<CobroQrAbierto | null>(null);
+  // Cobro con QR que se dejó en espera al cerrar su ventana: pasa a la lista de cobros en espera.
+  const [enEspera, setEnEspera] = useState<CobroQrAbierto | null>(null);
+  const abrirQr = useCallback((c: CobroQrAbierto) => setCobroQr(c), []);
   const qrVisto = useRef<string | null>(null);
   // "Pago con QR" aparece junto a las formas de pago del negocio, pero no es una de ellas: no entra al efectivo de la caja.
   const metodosVista = p.qr ? [...p.metodos, { id: "qr", nombre: "Pago con QR", esEfectivo: false }] : p.metodos;
@@ -71,7 +74,7 @@ export function FormCobro(p: {
       setHoja(false);
       limpiar();
     }
-    if (estado.qr && estado.qr.id !== qrVisto.current) { qrVisto.current = estado.qr.id; setCobroQr(estado.qr); }
+    if (estado.qr && estado.qr.id !== qrVisto.current) { qrVisto.current = estado.qr.id; setCobroQr({ ...estado.qr, detalle: detalleVenta }); }
   }, [estado]);
 
   /** Mueve el foco al paso más cercano en una dirección (flechas) o al siguiente en orden (Enter). */
@@ -128,6 +131,7 @@ export function FormCobro(p: {
   }, []);
 
   const conServicio = lineas.map((l) => ({ ...l, s: p.servicios.find((x) => x.id === l.servicioId)! })).filter((l) => l.s);
+  const detalleVenta = `${conServicio.map((l) => l.s.nombre).join(", ")}${conServicio[0] ? ` con ${(p.equipo.find((e) => e.id === conServicio[0].barberoId)?.nombre ?? "").split(" ")[0]}` : ""}`;
   const lista = conServicio.reduce((a, l) => a + l.s.precio * l.cantidad, 0);
   // Promociones: cada unidad cuenta como un servicio; el servidor vuelve a calcular todo al cobrar.
   const momento = momentoEn(p.zona ?? "America/Monterrey");
@@ -192,6 +196,7 @@ export function FormCobro(p: {
     <form action={accion} className="cobro" ref={raiz}>
       <input type="hidden" name="datos" value={datos} />
       <div className="pila" style={{ gap: 22 }}>
+        {p.qr && <CobrosEnEspera nuevo={enEspera} abrir={abrirQr} />}
         <label className="con-icono buscador">
           <Icono n="buscar" />
           <input className="input" data-paso="" value={buscar} onChange={(e) => setBuscar(e.target.value)} placeholder="Buscar servicio" aria-label="Buscar servicio" autoComplete="off" />
@@ -391,10 +396,10 @@ export function FormCobro(p: {
         </div>
       </aside>
       {cobroQr && (
-        <CobroQR cobro={cobroQr}
-          detalle={`${conServicio.map((l) => l.s.nombre).join(", ")}${conServicio[0] ? ` con ${(p.equipo.find((e) => e.id === conServicio[0].barberoId)?.nombre ?? "").split(" ")[0]}` : ""}`}
-          listo={(r) => { setCobroQr(null); setUltima({ folio: r.folio, total: r.total }); setHoja(false); limpiar(); }}
-          cerrar={() => { setCobroQr(null); setClave(nuevaClave()); }} />
+        <CobroQR key={cobroQr.id} cobro={cobroQr} detalle={cobroQr.detalle ?? ""}
+          listo={(r) => { const propio = cobroQr.id === qrVisto.current; setCobroQr(null); setUltima({ folio: r.folio, total: r.total }); setHoja(false); if (propio) limpiar(); }}
+          cerrar={() => { const propio = cobroQr.id === qrVisto.current; setEnEspera(cobroQr); setCobroQr(null); if (propio) { setHoja(false); limpiar(); } }}
+          cancelado={() => { setCobroQr(null); setClave(nuevaClave()); }} />
       )}
     </form>
   );

@@ -129,6 +129,29 @@ export async function verificarPago(p: { intento: string | null; estado: string;
   }
 }
 
+/** Minutos que vale el enlace de un cobro con QR. */
+export const VIGENCIA_QR_MIN = 30;
+
+/**
+ * Un cobro con QR que pasó su vigencia sin pagarse se cancela (en Stripe y aquí).
+ * Antes se pregunta a Stripe: si el cliente pagó justo a tiempo, la venta se registra.
+ */
+export async function vencerSiToca(p: { id: string; tipo: string; intento: string | null; estado: string; barberiaId: string; creadoEn: Date }) {
+  if (p.tipo !== "venta" || p.estado !== "pendiente" || Date.now() - p.creadoEn.getTime() < VIGENCIA_QR_MIN * 60000) return false;
+  await verificarPago(p);
+  const [n] = await db.select({ estado: pagosLinea.estado }).from(pagosLinea).where(eq(pagosLinea.id, p.id)).limit(1);
+  if (n?.estado !== "pendiente") return false;
+  try {
+    const [b] = await db.select({ cuenta: schema.barberias.stripeCuenta }).from(schema.barberias).where(eq(schema.barberias.id, p.barberiaId)).limit(1);
+    if (p.intento && b?.cuenta) await stripe().paymentIntents.cancel(p.intento, { cancellation_reason: "abandoned" }, { stripeAccount: b.cuenta });
+  } catch (err) {
+    console.error("vencer_qr", err);
+    return false;
+  }
+  await db.update(pagosLinea).set({ estado: "cancelado" }).where(and(eq(pagosLinea.id, p.id), eq(pagosLinea.estado, "pendiente")));
+  return true;
+}
+
 /** Stripe devolvió un cobro (desde su panel o por nosotros). */
 export async function marcarReembolso(ch: Stripe.Charge) {
   const pi = typeof ch.payment_intent === "string" ? ch.payment_intent : ch.payment_intent?.id;

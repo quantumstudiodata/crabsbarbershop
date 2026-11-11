@@ -3624,11 +3624,42 @@ button.rv-opc:not(.on) .radio-p { background: none; border-color: rgba(43,58,71,
 .pg-enc .ic { width: 20px; height: 20px; flex: none; }
 
 /* Pago en línea verificado por Stripe: chip en la fila y caja al abrir la venta */
-.vs-chip { display: inline-flex; align-items: center; gap: 3px; margin-right: 7px; padding: 2px 7px 2px 5px; border-radius: 999px; background: #e3e9ef; color: #3c5163; font: 600 10.5px/1.4 var(--f-sans, inherit); font-style: normal; vertical-align: 1px; }
+.vs-chip { display: inline-flex; align-items: center; gap: 3px; margin-right: 7px; padding: 2px 7px 2px 5px; border-radius: 999px; background: #e3e9ef; color: #3c5163; font-size: 11px; font-weight: 600; line-height: 1.4; font-style: normal; white-space: nowrap; flex: none; vertical-align: 1px; }
 .vs-chip .ic { width: 11px !important; height: 11px !important; color: inherit !important; transform: none !important; stroke-width: 2.6; }
 .vs-chip.dev { background: #ececec; color: #5b6470; }
 .vs-caja { flex-basis: 100%; display: grid; gap: 10px; padding: 12px 14px; border-radius: 14px; background: rgba(227,233,239,.7); border: 1px solid rgba(60,81,99,.14); }
 .vs-tit { display: flex; align-items: center; gap: 7px; color: #3c5163; }
 .vs-tit .ic { width: 15px; height: 15px; }
 .vs-grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(150px, 1fr)); gap: 10px 20px; }
-.vs-ref { overflow-wrap: anywhere; font-family: var(--f-mono); font-size: 12px; }
+.vs-ref code { overflow-wrap: anywhere; font-family: var(--f-mono); font-size: 12px; }
+.vs-caja .vs-grid small { display: block; }
+
+/* Cobros con QR en espera (pantalla de Cobro) */
+.cqr-espera { display: grid; gap: 8px; padding: 14px; border-radius: 20px; }
+.cqr-espera .lab { font: 500 11px var(--f-mono); letter-spacing: .14em; text-transform: uppercase; color: var(--muted); }
+.cqr-fila { display: flex; align-items: center; gap: 12px; width: 100%; padding: 10px 12px; border: 1px solid var(--line); border-radius: 14px; background: rgba(255,255,255,.7); font: inherit; color: inherit; text-align: left; cursor: pointer; }
+.cqr-fila-t { display: grid; flex: 1; min-width: 0; }
+.cqr-fila-t small { color: var(--muted); overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.cqr-vence { font: 500 12px var(--f-mono); color: #3c5163; background: #e3e9ef; border-radius: 999px; padding: 3px 9px; white-space: nowrap; }
+.cqr-fila .ic { width: 16px; height: 16px; color: var(--faint); }
+.cqr-pulso { width: 9px; height: 9px; border-radius: 50%; background: #4b6274; flex: none; animation: cqrPulso 1.6s ease-in-out infinite; }
+@keyframes cqrPulso { 0%,100% { opacity: 1; } 50% { opacity: .3; } }
+@media (prefers-reduced-motion: reduce) { .cqr-pulso { animation: none; } }
+.cqr-venc { margin: 0; font-size: 13px; }
+.cqr-cancelar { justify-self: center; color: var(--muted); font-size: 13px; }
+.cqr-vs { text-align: left; width: 100%; }
+
+/* Ventas en el teléfono: el chip de Stripe va debajo del servicio para no cortar el texto */
+.hist-linea .srv:has(> .srv-t) { display: flex; align-items: center; min-width: 0; }
+.hist-linea .srv-t { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; min-width: 0; }
+@media (max-width: 640px) {
+  .hist-linea .srv:has(.vs-chip) { flex-direction: column; align-items: flex-start; gap: 3px; }
+  .hist-linea .srv .vs-chip { order: 2; margin-right: 0; }
+}
+
+/* Caja verificada dentro del aviso de pago recibido: etiqueta a la izquierda, dato a la derecha */
+.cqr-ok .cqr-vs { gap: 10px; }
+.cqr-ok .cqr-vs .vs-grid { grid-template-columns: 1fr; gap: 8px; }
+.cqr-ok .cqr-vs .vs-grid > span { display: flex; justify-content: space-between; align-items: baseline; gap: 14px; font-size: 14px; text-align: right; }
+.cqr-ok .cqr-vs .vs-grid small { display: inline; flex: none; font-size: 13px; color: var(--muted); text-align: left; }
+.cqr-ok .cqr-vs > small { text-align: left; font-size: 12.5px; }
