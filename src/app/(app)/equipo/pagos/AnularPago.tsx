@@ -2,7 +2,7 @@
 
 import { useRouter } from "next/navigation";
 import { useState, useTransition } from "react";
-import { MenuPuntos } from "@/components/MenuPuntos";
+import { Icono } from "@/components/Icono";
 import { Modal } from "@/components/ui";
 import { anularPagoEquipo } from "../../analitica/equipo/actions";
 
@@ -15,7 +15,7 @@ export function AnularPago({ id, texto }: { id: string; texto: string }) {
   const [pend, iniciar] = useTransition();
   return (
     <>
-      <MenuPuntos etiqueta={`Opciones de ${texto}`} items={[{ texto: "Anular registro", icono: "basura", peligro: true, hacer: () => setAbierto(true) }]} />
+      <button type="button" className="pg-anular" aria-label={`Anular: ${texto}`} title="Anular registro" onClick={() => setAbierto(true)}><Icono n="basura" /></button>
       <Modal abierto={abierto} cerrar={() => setAbierto(false)} etiqueta="Historial de pagos" titulo="¿Anular este registro?">
         <div className="pila">
           <p className="muted" style={{ margin: 0 }}>{texto}. Queda en el historial en cero y el monto vuelve a contar como pendiente.</p>
