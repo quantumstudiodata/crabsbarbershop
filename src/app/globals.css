@@ -3920,3 +3920,5 @@ html, body { overscroll-behavior-y: none; }
 .met-qr .ic { width: 15px; height: 15px; color: #3c5163; }
 .eg-chips .chipf { padding: 6px 12px; font-size: 13px; border-radius: 999px; gap: 6px; }
 .eg-chips .chipf:not(.on-suave) { color: var(--faint); }
+/* El avatar también es un span: no hereda el acomodo del texto de la ficha. */
+.fa-id > .avatar { display: inline-grid; place-items: center; justify-items: center; gap: 0; }
