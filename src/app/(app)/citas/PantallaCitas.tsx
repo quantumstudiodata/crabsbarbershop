@@ -5,7 +5,7 @@ import { useRouter } from "next/navigation";
 import { useEffect, useMemo, useRef, useState, useTransition } from "react";
 import { Avatar } from "@/components/Avatar";
 import { Fl, Icono } from "@/components/Icono";
-import { Modal, Selector } from "@/components/ui";
+import { Interruptor, Modal, Selector } from "@/components/ui";
 import { aHora, aMin, type Horario } from "@/lib/agenda";
 import { formatoDinero } from "@/lib/money";
 import {
@@ -446,7 +446,9 @@ export function EditarHorario({ persona, negocio, cerrar, avisar }: { persona: P
   );
 }
 
-export function EditarRotacion({ equipo, actual, dia, cerrar, avisar }: { equipo: Persona[]; actual: Rot | null; dia: string; cerrar: () => void; avisar: (r: Res) => void }) {
+export function EditarRotacion({ equipo: todos, actual, dia, cerrar, avisar, excluir = [] }: { equipo: Persona[]; actual: Rot | null; dia: string; cerrar: () => void; avisar: (r: Res) => void; excluir?: string[] }) {
+  // Quien ya tiene descanso fijo no aparece: cada persona tiene un solo modo de descanso.
+  const equipo = todos.filter((e) => !excluir.includes(e.id));
   const [p1, setP1] = useState(actual?.persona1 ?? equipo[0]?.id ?? "");
   const [p2, setP2] = useState(actual?.persona2 ?? equipo[1]?.id ?? "");
   const [d1, setD1] = useState(String(actual?.dia1 ?? 1));
@@ -462,6 +464,8 @@ export function EditarRotacion({ equipo, actual, dia, cerrar, avisar }: { equipo
     <Modal abierto cerrar={cerrar} etiqueta="Horarios" titulo="Descanso rotativo">
       <div className="pila" style={{ gap: 12 }}>
         <p className="muted" style={{ margin: 0, fontSize: 13 }}>En la semana de inicio, la primera persona descansa el primer día y la segunda el segundo día. La semana siguiente se invierte, y así sucesivamente.</p>
+        {excluir.length > 0 && <small className="ac-nota">No aparecen quienes ya tienen descanso fijo.</small>}
+        {equipo.length < 2 && <p className="aviso" style={{ margin: 0 }}>Se necesitan dos personas sin descanso fijo para la rotación.</p>}
         <div className="fila-eg">
           <div className="campo"><span>Primera persona</span><Selector etiqueta="Primera persona" valor={p1} onChange={setP1} opciones={personas} /></div>
           <div className="campo"><span>Descansa el</span><Selector etiqueta="Primer día" valor={d1} onChange={setD1} opciones={dias} /></div>
@@ -478,7 +482,7 @@ export function EditarRotacion({ equipo, actual, dia, cerrar, avisar }: { equipo
         {error && <p className="aviso error" style={{ margin: 0 }}>{error}</p>}
         <div className="entre">
           {actual ? <button type="button" className="link-c peligro-t" disabled={pend} onClick={() => iniciar(async () => { avisar(await quitarRotacion()); cerrar(); })}>Quitar descanso rotativo</button> : <span />}
-          <button type="button" className="bt" disabled={pend} onClick={() => iniciar(async () => { const r = await guardarRotacion({ persona1: p1, persona2: p2, dia1: Number(d1), dia2: Number(d2), semanaInicio: inicio, activo: true }); if (r.error) setError(r.error); else { avisar(r); cerrar(); } })}>Guardar<Fl /></button>
+          <button type="button" className="bt" disabled={pend || equipo.length < 2} onClick={() => iniciar(async () => { const r = await guardarRotacion({ persona1: p1, persona2: p2, dia1: Number(d1), dia2: Number(d2), semanaInicio: inicio, activo: true }); if (r.error) setError(r.error); else { avisar(r); cerrar(); } })}>Guardar<Fl /></button>
         </div>
       </div>
     </Modal>
@@ -490,23 +494,27 @@ export function NuevoBloqueo({ equipo, dia, cerrar, avisar, personaInicial = "" 
   const [fecha, setFecha] = useState(dia);
   const [desde, setDesde] = useState("14:00");
   const [hasta, setHasta] = useState("15:00");
+  const [todoDia, setTodoDia] = useState(false);
   const [motivo, setMotivo] = useState("");
   const [error, setError] = useState<string | null>(null);
   const [pend, iniciar] = useTransition();
   return (
-    <Modal abierto cerrar={cerrar} etiqueta="Horarios" titulo="Bloquear horario">
+    <Modal abierto cerrar={cerrar} etiqueta="Horarios" titulo="Bloquear horario o día">
       <div className="pila" style={{ gap: 12 }}>
         <div className="fila-eg">
           <div className="campo"><span>A quién</span><Selector etiqueta="A quién" valor={quien} onChange={setQuien} opciones={[{ valor: "", texto: "Todo el negocio" }, ...equipo.map((e) => ({ valor: e.id, texto: primer(e.nombre) }))]} /></div>
           <div className="campo"><span>Día</span><CampoFecha valor={fecha} cambiar={setFecha} etiqueta="Día" /></div>
         </div>
-        <div className="fila-eg horario-p">
-          <div className="campo"><span>De</span><CampoHora valor={desde} cambiar={setDesde} etiqueta="Desde" /></div>
-          <div className="campo"><span>A</span><CampoHora valor={hasta} cambiar={setHasta} etiqueta="Hasta" /></div>
-        </div>
-        <label className="campo"><span>Motivo (opcional)</span><input className="input" value={motivo} onChange={(e) => setMotivo(e.target.value)} maxLength={120} placeholder="Ejemplo: comida, cita médica" /></label>
+        <div className="ac-sw"><span><b>Todo el día</b><small>Para días festivos, vacaciones o cuando el negocio no abre.</small></span><Interruptor etiqueta="Todo el día" checked={todoDia} onChange={setTodoDia} /></div>
+        {!todoDia && (
+          <div className="fila-eg horario-p">
+            <div className="campo"><span>De</span><CampoHora valor={desde} cambiar={setDesde} etiqueta="Desde" /></div>
+            <div className="campo"><span>A</span><CampoHora valor={hasta} cambiar={setHasta} etiqueta="Hasta" /></div>
+          </div>
+        )}
+        <label className="campo"><span>Motivo (opcional)</span><input className="input" value={motivo} onChange={(e) => setMotivo(e.target.value)} maxLength={120} placeholder={todoDia ? "Ejemplo: día festivo, vacaciones" : "Ejemplo: comida, cita médica"} /></label>
         {error && <p className="aviso error" style={{ margin: 0 }}>{error}</p>}
-        <div className="acciones"><button type="button" className="bt" disabled={pend} onClick={() => iniciar(async () => { const r = await bloquearHorario({ usuarioId: quien || null, fecha, desde, hasta, motivo }); if (r.error) setError(r.error); else { avisar(r); cerrar(); } })}>Bloquear<Fl /></button></div>
+        <div className="acciones"><button type="button" className="bt" disabled={pend} onClick={() => iniciar(async () => { const r = await bloquearHorario({ usuarioId: quien || null, fecha, desde: todoDia ? "00:00" : desde, hasta: todoDia ? "23:59" : hasta, motivo }); if (r.error) setError(r.error); else { avisar(r); cerrar(); } })}>Bloquear<Fl /></button></div>
       </div>
     </Modal>
   );
@@ -539,14 +547,14 @@ function Compartir({ enlace, cerrar }: { enlace: string; cerrar: () => void }) {
   };
   return (
     <Flotante cerrar={cerrar} className="ag-comp" rol="dialog">
-      <div><b>Compartir reservaciones</b><small>Permite que tus clientes agenden directamente.</small></div>
+      <div className="ag-comp-cab"><span><b>Compartir reservaciones</b><small>Permite que tus clientes agenden directamente.</small></span><button type="button" className="icb" onClick={cerrar} aria-label="Cerrar"><Icono n="cerrar" /></button></div>
       <div className="ag-enl"><small>Enlace público</small>
         <div><span>{corto}</span><button type="button" className="icb" onClick={copiar} aria-label="Copiar enlace"><Icono n={copiado ? "palomita" : "copiar"} /></button></div>
         {copiado && <small className="ag-ok">Enlace copiado. Compártelo por WhatsApp o redes sociales.</small>}
       </div>
       <button type="button" className="ag-op" aria-expanded={!!qr} onClick={verQr}><span><Icono n="cuadros" /></span><span><b>{qr ? "Ocultar código QR" : "Mostrar código QR"}</b><small>Para imprimir o mostrar en el establecimiento</small></span></button>
       {qr && <div className="qr ag-qr" dangerouslySetInnerHTML={{ __html: qr }} />}
-      <a className="ag-op" href={enlace} target="_blank" rel="noopener noreferrer"><span><Icono n="ojo" /></span><span><b>Ver página de reservaciones</b><small>Abrir la página como la ve el cliente</small></span></a>
+      <a className="ag-op" href={`${enlace}?desde=agenda`}><span><Icono n="ojo" /></span><span><b>Ver página de reservaciones</b><small>Abrir la página como la ve el cliente</small></span></a>
     </Flotante>
   );
 }

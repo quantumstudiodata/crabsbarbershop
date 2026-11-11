@@ -19,13 +19,16 @@ export async function generateMetadata({ params }: { params: Promise<{ slug: str
   return { title: b ? `Reservar en ${b.nombre}` : "Reservaciones", description: b ? `Agenda tu cita en ${b.nombre} en línea.` : undefined };
 }
 
-export default async function PaginaReservar({ params }: { params: Promise<{ slug: string }> }) {
+export default async function PaginaReservar({ params, searchParams }: { params: Promise<{ slug: string }>; searchParams: Promise<{ desde?: string }> }) {
   const b = await cargar((await params).slug);
+  const desde = (await searchParams).desde;
+  const regreso = desde === "ajustes" ? { href: "/ajustes/citas?tab=reservaciones", texto: "Regresar a Ajustes" } : desde === "agenda" ? { href: "/citas", texto: "Regresar a la agenda" } : null;
   if (!b) notFound();
   const config = leerConfig(b.citasConfig);
   if (!b.usaCitas || !config.enLinea || b.estadoCuenta !== "activa") {
     return (
       <main className="reserva">
+        {regreso && <a href={regreso.href} className="rv-regreso">{regreso.texto}</a>}
         <header className="rv-cab"><b>{b.nombre}</b></header>
         <section className="rv-tarjeta"><h1>Las reservaciones en línea no están disponibles</h1><p className="muted">Comunícate directamente con el negocio para agendar tu cita.</p></section>
       </main>
@@ -56,6 +59,7 @@ export default async function PaginaReservar({ params }: { params: Promise<{ slu
       opciones={{ elegir: config.elegirBarbero, cualquiera: config.cualquierBarbero, varios: config.variosServicios, maxDias: config.anticipacionMaxDias }}
       pago={{ modo: config.pago.modo, ejemplo: montoAPagar(10000, config.pago), politica: config.politicaCancelacion, reembolso: config.politicaReembolso, regla: config.pago, apartarMin: config.apartarMin }}
       enLinea={cobraEnLinea(b) ? { llave: process.env.NEXT_PUBLIC_STRIPE_PUBLISHABLE_KEY!, cuenta: b.stripeCuenta! } : null}
+      regreso={regreso}
     />
   );
 }

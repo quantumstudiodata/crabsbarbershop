@@ -156,6 +156,9 @@ export async function guardarRotacion(d: { persona1: string; persona2: string; d
   if (!FECHA.test(d.semanaInicio)) return { error: "Elige la semana de inicio." };
   const equipo = await equipoAgenda(s.barberia.id);
   if (![d.persona1, d.persona2].every((p) => equipo.some((e) => e.id === p))) return { error: "Elige personas que atiendan citas." };
+  // Una persona tiene un solo modo de descanso.
+  const fijo = leerConfig(s.barberia.citasConfig).descansosFijos.find((f) => f.persona === d.persona1 || f.persona === d.persona2);
+  if (fijo) return { error: `${equipo.find((e) => e.id === fijo.persona)?.nombre.split(" ")[0] ?? "Esa persona"} ya tiene descanso fijo. Quítaselo para incluirla en la rotación.` };
   const x = new Date(`${d.semanaInicio}T12:00:00Z`); x.setUTCDate(x.getUTCDate() - ((x.getUTCDay() + 6) % 7));
   const lunes = x.toISOString().slice(0, 10);
   await db.transaction(async (tx) => {
@@ -175,10 +178,34 @@ export async function quitarRotacion(): Promise<Res> {
   return { mensaje: "Se quitó el descanso rotativo." };
 }
 
+/** Descanso fijo por persona. Quien está en el descanso rotativo no puede tener también descanso fijo. */
+export async function guardarDescansosFijos(lista: { persona: string; dias: number[] }[]): Promise<Res> {
+  const s = await requerirSesion("citas.horarios");
+  if (s.vista) return { error: "En la vista previa no se guardan cambios." };
+  const equipo = await equipoAgenda(s.barberia.id);
+  const [rot] = await db.select({ p1: schema.rotacionesDescanso.persona1, p2: schema.rotacionesDescanso.persona2 }).from(schema.rotacionesDescanso).where(eq(schema.rotacionesDescanso.barberiaId, s.barberia.id)).limit(1);
+  const limpia: { persona: string; dias: number[] }[] = [];
+  for (const x of (Array.isArray(lista) ? lista : []).slice(0, 50)) {
+    const e = equipo.find((p) => p.id === x?.persona);
+    if (!e) return { error: "Elige personas que atiendan citas." };
+    const dias = [...new Set((x.dias ?? []).filter((n) => Number.isInteger(n) && n >= 0 && n <= 6))].sort();
+    if (!dias.length) return { error: `Elige al menos un día de descanso para ${e.nombre.split(" ")[0]}.` };
+    if (dias.length > 5) return { error: "Deja al menos dos días de trabajo a la semana." };
+    if (rot && (rot.p1 === e.id || rot.p2 === e.id)) return { error: `${e.nombre.split(" ")[0]} ya está en el descanso rotativo.` };
+    if (limpia.some((y) => y.persona === e.id)) continue;
+    limpia.push({ persona: e.id, dias });
+  }
+  const config = leerConfig({ ...leerConfig(s.barberia.citasConfig), descansosFijos: limpia });
+  await db.update(schema.barberias).set({ citasConfig: config }).where(eq(schema.barberias.id, s.barberia.id));
+  await registrar(db, { barberiaId: s.barberia.id, usuarioId: s.usuario.id, tipo: "ajuste", accion: `${s.usuario.nombre} cambió los descansos fijos` });
+  revalidatePath("/", "layout");
+  return { mensaje: "Descanso fijo guardado." };
+}
+
 export async function bloquearHorario(d: { usuarioId: string | null; fecha: string; desde: string; hasta: string; motivo: string }): Promise<Res> {
   const s = await requerirSesion("citas.horarios");
   if (s.vista) return { error: "En la vista previa no se guardan cambios." };
-  if (!FECHA.test(d.fecha) || !HORA.test(d.desde) || !HORA.test(d.hasta) || aMin(d.desde) >= aMin(d.hasta)) return { error: "Revisa el día y las horas." };
+  if (!FECHA.test(d.fecha) || !HORA.test(d.desde) || !(HORA.test(d.hasta) || d.hasta === "24:00") || aMin(d.desde) >= aMin(d.hasta)) return { error: "Revisa el día y las horas." };
   if (d.usuarioId) {
     const equipo = await equipoAgenda(s.barberia.id);
     if (!equipo.some((e) => e.id === d.usuarioId)) return { error: "Elige a quién se le bloquea." };
@@ -235,14 +262,14 @@ export async function guardarConfigCitas(d: {
 }
 
 /** Interruptores de Ajustes, Horarios. Apagar uno no borra lo configurado: solo deja de aplicarse en la agenda y en las reservaciones. */
-export async function guardarInterruptorHorarios(clave: "usaHorarioPersona" | "usaRotacion" | "usaBloqueos", valor: boolean): Promise<Res> {
+export async function guardarInterruptorHorarios(clave: "usaHorarioPersona" | "usaRotacion" | "usaBloqueos" | "usaDescansoFijo", valor: boolean): Promise<Res> {
   const s = await requerirSesion();
   if (!s.puede("citas.horarios") && !s.puede("configuracion.citas")) return { error: "No tienes permiso para cambiar los horarios." };
   if (s.vista) return { error: "En la vista previa no se guardan cambios." };
-  if (!["usaHorarioPersona", "usaRotacion", "usaBloqueos"].includes(clave)) return { error: "Opción no válida." };
+  if (!["usaHorarioPersona", "usaRotacion", "usaBloqueos", "usaDescansoFijo"].includes(clave)) return { error: "Opción no válida." };
   const config = leerConfig({ ...leerConfig(s.barberia.citasConfig), [clave]: !!valor });
   await db.update(schema.barberias).set({ citasConfig: config }).where(eq(schema.barberias.id, s.barberia.id));
-  const nombre = { usaHorarioPersona: "los horarios por persona", usaRotacion: "el descanso rotativo", usaBloqueos: "el bloqueo de horarios" }[clave];
+  const nombre = { usaHorarioPersona: "los horarios por persona", usaRotacion: "el descanso rotativo", usaBloqueos: "el bloqueo de horarios", usaDescansoFijo: "el descanso fijo por persona" }[clave];
   await registrar(db, { barberiaId: s.barberia.id, usuarioId: s.usuario.id, tipo: "ajuste", accion: `${s.usuario.nombre} ${valor ? "activó" : "desactivó"} ${nombre}` });
   revalidatePath("/", "layout");
   return { mensaje: valor ? "Activado." : "Desactivado. Lo configurado se conserva." };

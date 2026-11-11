@@ -2,7 +2,7 @@ import { and, asc, eq, gt } from "drizzle-orm";
 import { cobraEnLinea } from "@/lib/stripe";
 import { redirect } from "next/navigation";
 import { requerirSesion } from "@/lib/auth";
-import { descansosDeSemana, leerConfig, type Horario } from "@/lib/agenda";
+import { aMin, descansosDeSemana, instante, leerConfig, type Horario } from "@/lib/agenda";
 import { equipoAgenda, rotacionesDe } from "@/lib/citas";
 import { db, schema } from "@/lib/db";
 import { fechaLocal, horaCorta } from "@/lib/fechas";
@@ -21,6 +21,15 @@ export default async function AjustesCitasPagina({ searchParams }: { searchParam
   const b = s.barberia;
   const zona = b.zonaHoraria;
   const hoy = fechaLocal(new Date(), zona);
+  // "Días que cierra el negocio" ahora son bloqueos de todo el día: los que falten por llegar se pasan una sola vez.
+  if (b.diasCerrados.length) {
+    const futuros = b.diasCerrados.filter((f) => f >= hoy);
+    await db.transaction(async (tx) => {
+      for (const f of futuros) await tx.insert(schema.bloqueosAgenda).values({ barberiaId: b.id, usuarioId: null, inicio: new Date(instante(f, 0, zona)), fin: new Date(instante(f, aMin("23:59"), zona)), motivo: "Día cerrado", creadoPor: s.usuario.id });
+      await tx.update(schema.barberias).set({ diasCerrados: [] }).where(eq(schema.barberias.id, b.id));
+    });
+    b.diasCerrados = [];
+  }
   const [equipo, rots, bloqueos, servicios, gente] = await Promise.all([
     equipoAgenda(b.id),
     rotacionesDe(b.id),
@@ -30,7 +39,7 @@ export default async function AjustesCitasPagina({ searchParams }: { searchParam
   ]);
   const nombre = (id: string) => equipo.find((e) => e.id === id)?.nombre ?? "";
   const quienes = (p: Permiso) => [...new Set(gente.filter((u) => permisosDe(u.rol, u.extra, u.quitados, u.puesto).has(p)).map((u) => u.nombre.split(" ")[0]))].join(", ") || "Nadie";
-  const tab = q.tab === "reservaciones" || q.tab === "pagina" ? q.tab : "horarios";
+  const tab = q.tab === "reservaciones" || q.tab === "pagina" ? "reservaciones" : "horarios";
   return (
     <AjustesCitas
       tab={tab} negocio={b.nombre} origen="crabsbarber.shop" puedeConfig={puedeConfig} puedeHorarios={puedeHorarios} hoy={hoy} cobraEnLinea={cobraEnLinea(b)}

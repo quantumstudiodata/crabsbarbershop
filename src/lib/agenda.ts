@@ -22,7 +22,12 @@ export type ConfigCitas = {
   usaHorarioPersona: boolean;
   usaRotacion: boolean;
   usaBloqueos: boolean;
+  // Descanso fijo: una persona descansa siempre los mismos días de la semana (0 domingo a 6 sábado).
+  usaDescansoFijo: boolean;
+  descansosFijos: DescansoFijo[];
 };
+
+export type DescansoFijo = { persona: string; dias: number[] };
 
 export const CONFIG_CITAS: ConfigCitas = {
   enLinea: false,
@@ -31,7 +36,7 @@ export const CONFIG_CITAS: ConfigCitas = {
   pago: { modo: "sin_pago", valor: 0 }, cancelarHorasAntes: 2,
   politicaCancelacion: "Puedes cancelar o cambiar tu cita hasta 2 horas antes.",
   politicaReembolso: "", apartarMin: 10,
-  usaHorarioPersona: true, usaRotacion: true, usaBloqueos: true,
+  usaHorarioPersona: true, usaRotacion: true, usaBloqueos: true, usaDescansoFijo: true, descansosFijos: [],
 };
 
 export function leerConfig(raw: unknown): ConfigCitas {
@@ -56,6 +61,11 @@ export function leerConfig(raw: unknown): ConfigCitas {
     usaHorarioPersona: r.usaHorarioPersona ?? d.usaHorarioPersona,
     usaRotacion: r.usaRotacion ?? d.usaRotacion,
     usaBloqueos: r.usaBloqueos ?? d.usaBloqueos,
+    usaDescansoFijo: r.usaDescansoFijo ?? d.usaDescansoFijo,
+    descansosFijos: Array.isArray(r.descansosFijos)
+      ? r.descansosFijos.filter((x) => x && typeof x.persona === "string" && Array.isArray(x.dias)).slice(0, 50)
+        .map((x) => ({ persona: x.persona, dias: [...new Set(x.dias.filter((n) => Number.isInteger(n) && n >= 0 && n <= 6))].sort() })).filter((x) => x.dias.length)
+      : [],
   };
 }
 
@@ -115,12 +125,13 @@ export function descansosDeSemana(r: Rotacion, fecha: string): { dia: number; pe
 }
 
 /** Horario de trabajo de una persona en una fecha (minutos del día), o null si no trabaja. */
-export function ventanaDelDia(fecha: string, negocio: Horario, cerrados: string[], propio: Horario | null, rots: Rotacion[], persona: string): [number, number] | null {
+export function ventanaDelDia(fecha: string, negocio: Horario, cerrados: string[], propio: Horario | null, rots: Rotacion[], persona: string, fijos: DescansoFijo[] = []): [number, number] | null {
   if (cerrados.includes(fecha)) return null;
   const d = String(diaSemana(fecha));
   const n = negocio[d];
   if (!n) return null;
   if (descansaPorRotacion(rots, persona, fecha)) return null;
+  if (fijos.some((f) => f.persona === persona && f.dias.includes(Number(d)))) return null;
   let ini = aMin(n[0]), fin = aMin(n[1]);
   if (propio) {
     const p = propio[d];

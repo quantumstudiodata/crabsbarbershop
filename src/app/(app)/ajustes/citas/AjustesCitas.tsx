@@ -5,12 +5,11 @@ import { useRouter } from "next/navigation";
 import { useState, useTransition } from "react";
 import { Avatar } from "@/components/Avatar";
 import { Fl, Icono } from "@/components/Icono";
-import { Interruptor, Selector } from "@/components/ui";
+import { Interruptor, Modal, Selector } from "@/components/ui";
 import type { ConfigCitas as Config, Horario, ModoPago } from "@/lib/agenda";
 import { formatoDinero } from "@/lib/money";
-import { guardarConfigCitas, guardarInterruptorHorarios, quitarBloqueo, type Res } from "../../citas/actions";
+import { guardarConfigCitas, guardarDescansosFijos, guardarInterruptorHorarios, quitarBloqueo, type Res } from "../../citas/actions";
 import { EditarHorario, EditarRotacion, EditorSemana, NuevoBloqueo, type Bloqueo, type Persona, type Rot } from "../../citas/PantallaCitas";
-import { CampoFecha } from "@/components/Calendario";
 
 const DIAS = ["Dom", "Lun", "Mar", "Mié", "Jue", "Vie", "Sáb"];
 const DIAS_L = ["domingo", "lunes", "martes", "miércoles", "jueves", "viernes", "sábado"];
@@ -19,7 +18,7 @@ const MODOS: [ModoPago, string][] = [["sin_pago", "Sin pago"], ["opcional", "Pag
 const primer = (n: string) => n.split(" ")[0];
 const hora = (t: string) => (t.endsWith(":00") ? String(Number(t.slice(0, 2))) : t.replace(/^0/, ""));
 const lista = (xs: string[]) => (xs.length < 2 ? xs.join("") : `${xs.slice(0, -1).join(", ")} y ${xs[xs.length - 1]}`);
-type Tab = "horarios" | "reservaciones" | "pagina";
+type Tab = "horarios" | "reservaciones";
 
 export function AjustesCitas(p: {
   tab: Tab; negocio: string; origen: string; puedeConfig: boolean; puedeHorarios: boolean; cobraEnLinea: boolean;
@@ -37,7 +36,7 @@ export function AjustesCitas(p: {
   });
   const [d, setD] = useState(base);
   const [sucio, setSucio] = useState(false);
-  const tabs = ([["horarios", "Horarios"], ...(p.puedeConfig ? [["reservaciones", "Reservaciones"], ["pagina", "Página de citas"]] : [])] as [Tab, string][]);
+  const tabs = ([["horarios", "Horarios"], ...(p.puedeConfig ? [["reservaciones", "Reservaciones en línea"]] : [])] as [Tab, string][]);
   const [tab, setTab] = useState<Tab>(tabs.some(([k]) => k === p.tab) ? p.tab : "horarios");
   const [res, setRes] = useState<Res>({});
   const [pend, iniciar] = useTransition();
@@ -64,8 +63,17 @@ export function AjustesCitas(p: {
         <div className="ac-dos">
           <div className="ac-col">
             <section className="glass ac-card">
-              <div className="ac-sw"><span><b>Reservas en línea</b><small>Permite que los clientes agenden desde un enlace</small></span><Interruptor etiqueta="Reservas en línea" checked={d.enLinea} onChange={() => cambia({ enLinea: !d.enLinea })} /></div>
-              <div className="ac-enl"><span>{p.origen}/reservar/<b>{d.slug || "tu-negocio"}</b></span>{d.slug && <Copiar texto={`https://${p.origen}/reservar/${d.slug}`} />}</div>
+              <div className="ac-sw"><span><b>Citas y agenda</b><small>Muestra la sección de citas al equipo</small></span><Interruptor etiqueta="Citas y agenda" checked={d.usaCitas} onChange={() => cambia({ usaCitas: !d.usaCitas })} /></div>
+              <div className="ac-sw"><span><b>Página de reservaciones</b><small>{d.enLinea ? "Publicada: los clientes reservan desde el enlace" : "Sin publicar: solo el equipo agenda citas"}</small></span><Interruptor etiqueta="Página de reservaciones" checked={d.enLinea} onChange={() => cambia({ enLinea: !d.enLinea })} /></div>
+              <span className="lab">Dirección de la página</span>
+              <span className="con-prefijo"><em>{p.origen}/reservar/</em><input className="input" value={d.slug} onChange={(e) => cambia({ slug: e.target.value.toLowerCase().replace(/[^a-z0-9-]/g, "") })} maxLength={40} aria-label="Dirección de la página" /></span>
+              <small className="ac-nota">De 3 a 40 letras, números o guiones. Si la cambias, el enlace anterior deja de funcionar.</small>
+              {p.inicial.slug && p.inicial.config.enLinea && (
+                <div className="fila" style={{ gap: 14 }}>
+                  <a className="eq2-link" href={`/reservar/${p.inicial.slug}?desde=ajustes`}>Ver página</a>
+                  <Copiar texto={`https://${p.origen}/reservar/${p.inicial.slug}`} conTexto />
+                </div>
+              )}
             </section>
             <section className="glass ac-card">
               <span className="lab">Cuándo se puede reservar</span>
@@ -93,28 +101,6 @@ export function AjustesCitas(p: {
               <span className="lab">Quién puede</span>
               {p.quien.map(([t, q]) => <div key={t} className="ac-fila"><span>{t}</span><b>{q}</b></div>)}
               <small className="ac-nota">Se cambia en Usuarios, con los permisos de cada puesto o persona.</small>
-            </section>
-          </div>
-          <Vista negocio={p.negocio} servicios={p.servicios} politica={d.politicaCancelacion} activa={d.enLinea && d.usaCitas} />
-        </div>
-      )}
-      {tab === "pagina" && (
-        <div className="ac-dos">
-          <div className="ac-col">
-            <section className="glass ac-card">
-              <div className="ac-sw"><span><b>Citas y agenda</b><small>Muestra la sección Citas en el menú del equipo</small></span><Interruptor etiqueta="Citas y agenda" checked={d.usaCitas} onChange={() => cambia({ usaCitas: !d.usaCitas })} /></div>
-              <div className="ac-sw"><span><b>Página de reservaciones publicada</b><small>Los clientes reservan desde la página pública del negocio</small></span><Interruptor etiqueta="Página publicada" checked={d.enLinea} onChange={() => cambia({ enLinea: !d.enLinea })} /></div>
-            </section>
-            <section className="glass ac-card">
-              <span className="lab">Dirección de la página</span>
-              <span className="con-prefijo"><em>{p.origen}/reservar/</em><input className="input" value={d.slug} onChange={(e) => cambia({ slug: e.target.value.toLowerCase().replace(/[^a-z0-9-]/g, "") })} maxLength={40} aria-label="Dirección de la página" /></span>
-              <small className="ac-nota">De 3 a 40 letras, números o guiones. Si la cambias, el enlace anterior deja de funcionar.</small>
-              {p.inicial.slug && p.inicial.config.enLinea && (
-                <div className="fila" style={{ gap: 14 }}>
-                  <a className="eq2-link" href={`/reservar/${p.inicial.slug}`} target="_blank" rel="noopener noreferrer">Ver página</a>
-                  <Copiar texto={`https://${p.origen}/reservar/${p.inicial.slug}`} conTexto />
-                </div>
-              )}
             </section>
           </div>
           <Vista negocio={p.negocio} servicios={p.servicios} politica={d.politicaCancelacion} activa={d.enLinea && d.usaCitas} />
@@ -167,12 +153,16 @@ function Horarios(p: {
   avisar: (r: Res) => void; guardar: () => void; guardando: boolean; sucio: boolean;
 }) {
   const [editarNegocio, setEditarNegocio] = useState(false);
-  const [abierto, setAbierto] = useState<"persona" | "rot" | "bloq" | null>(null);
+  const [abierto, setAbierto] = useState<"persona" | "rot" | "fijo" | "bloq" | null>(null);
   const [editar, setEditar] = useState<Persona | null>(null);
   const [rot, setRot] = useState(false);
   const [bloq, setBloq] = useState(false);
-  const [nuevoCerrado, setNuevoCerrado] = useState("");
-  const [sw, setSw] = useState({ usaHorarioPersona: p.inicial.config.usaHorarioPersona, usaRotacion: p.inicial.config.usaRotacion, usaBloqueos: p.inicial.config.usaBloqueos });
+  const [sw, setSw] = useState({ usaHorarioPersona: p.inicial.config.usaHorarioPersona, usaRotacion: p.inicial.config.usaRotacion, usaBloqueos: p.inicial.config.usaBloqueos, usaDescansoFijo: p.inicial.config.usaDescansoFijo });
+  const [fijo, setFijo] = useState<{ persona: string; dias: number[]; nuevo: boolean } | null>(null);
+  const fijos = p.inicial.config.descansosFijos;
+  // Cada persona tiene un solo modo de descanso: los de la rotación no pueden tener descanso fijo y al revés.
+  const enRotacion = p.rotacion ? [p.rotacion.persona1, p.rotacion.persona2] : [];
+  const libresFijo = p.equipo.filter((e) => !enRotacion.includes(e.id) && !fijos.some((f) => f.persona === e.id));
   const [pend, iniciar] = useTransition();
   const puedeSw = p.puedeHorarios || p.puedeConfig;
   const cambiarSw = (k: keyof typeof sw) => { const v = !sw[k]; setSw({ ...sw, [k]: v }); iniciar(async () => { const r = await guardarInterruptorHorarios(k, v); if (r.error) setSw((x) => ({ ...x, [k]: !v })); p.avisar(r); }); };
@@ -186,7 +176,7 @@ function Horarios(p: {
     const iguales = dias.every((x) => b[String(x)][0] === b[String(dias[0])][0] && b[String(x)][1] === b[String(dias[0])][1]);
     return `${h ? "" : "Igual que el negocio: "}${DIAS[dias[0]]} a ${DIAS[dias[dias.length - 1]]}${iguales ? `, ${b[String(dias[0])][0]} a ${b[String(dias[0])][1]}` : ""}`;
   };
-  const fila = (k: keyof typeof sw, titulo: string, texto: string, estado: string, cual: "persona" | "rot" | "bloq", cuerpo: React.ReactNode) => (
+  const fila = (k: keyof typeof sw, titulo: string, texto: string, estado: string, cual: "persona" | "rot" | "fijo" | "bloq", cuerpo: React.ReactNode) => (
     <div className="ac-hrow">
       <div className="ac-sw">
         <span><b>{titulo}</b><small>{texto}</small>
@@ -203,13 +193,6 @@ function Horarios(p: {
         {editarNegocio ? (
           <div className="pila" style={{ gap: 14 }}>
             <EditorSemana valor={p.d.horario} onChange={(h) => p.cambia({ horario: h })} />
-            <div className="campo"><span>Días que cierra el negocio</span>
-              <div className="cerrados-c">
-                {p.d.diasCerrados.map((f) => <span key={f} className="chip-cerr">{f.split("-").reverse().join("/")}<button type="button" aria-label="Quitar" onClick={() => p.cambia({ diasCerrados: p.d.diasCerrados.filter((x) => x !== f) })}><Icono n="cerrar" /></button></span>)}
-                <span className="agrega-cerr"><CampoFecha valor={nuevoCerrado} cambiar={setNuevoCerrado} etiqueta="Día cerrado" />
-                  <button type="button" className="bt sec chico" disabled={!nuevoCerrado} onClick={() => { p.cambia({ diasCerrados: [...new Set([...p.d.diasCerrados, nuevoCerrado])].sort() }); setNuevoCerrado(""); }}>Agregar</button></span>
-              </div>
-            </div>
             <div className="acciones"><button type="button" className="bt" disabled={p.guardando || !p.sucio} onClick={p.guardar}>{p.guardando ? "Guardando…" : "Guardar horario"}<Fl /></button></div>
           </div>
         ) : (
@@ -217,7 +200,7 @@ function Horarios(p: {
             <div className="ac-semana">
               {ORDEN.map((x) => { const h = p.d.horario[String(x)]; return <span key={x} className={h ? "" : "cerr"}><b>{DIAS[x]}</b><small>{h ? `${hora(h[0])} a ${hora(h[1])}` : "Cerrado"}</small></span>; })}
             </div>
-            {p.d.diasCerrados.length > 0 && <small className="ac-nota">También cierra: {lista(p.d.diasCerrados.slice(0, 6).map((f) => f.split("-").reverse().slice(0, 2).join("/")))}{p.d.diasCerrados.length > 6 ? " y más" : ""}.</small>}
+            <small className="ac-nota">Para un día festivo o vacaciones, usa Bloqueo de horarios con la opción Todo el día.</small>
           </>
         )}
       </section>
@@ -236,19 +219,63 @@ function Horarios(p: {
             <span className="ac-pt"><b>{p.rotacion ? "Esta semana" : "Sin configurar"}</b><small>{p.rotacion ? lista(p.rotacion.estaSemana.map((x) => `${nom(x.persona)} descansa el ${DIAS_L[x.dia]}`)) : "Dos personas se turnan dos días de descanso cada semana."}</small></span>
             {p.puedeHorarios && <button type="button" className="ac-link" onClick={() => setRot(true)}>{p.rotacion ? "Editar" : "Configurar"}</button>}
           </div>)}
-        {fila("usaBloqueos", "Bloqueo de horarios", "Permite bloquear fechas y horarios para el negocio o una persona",
+        {fila("usaDescansoFijo", "Descanso fijo por persona", "Una persona descansa siempre los mismos días de la semana",
+          fijos.length ? lista(fijos.map((f) => `${nom(f.persona)} descansa ${lista(f.dias.map((x) => DIAS_L[x]))}`)) : "Sin descansos fijos", "fijo",
+          <>{fijos.map((f) => (
+            <div key={f.persona} className="ac-p">
+              <span className="ac-pt"><b>{nom(f.persona)}</b><small>Descansa {lista(f.dias.map((x) => DIAS_L[x]))}</small></span>
+              {p.puedeHorarios && <button type="button" className="ac-link" onClick={() => setFijo({ ...f, nuevo: false })}>Editar</button>}
+            </div>
+          ))}
+          {p.puedeHorarios && (libresFijo.length
+            ? <button type="button" className="ac-link ac-mas" onClick={() => setFijo({ persona: libresFijo[0].id, dias: [], nuevo: true })}><Icono n="mas" />Agregar descanso fijo</button>
+            : <small className="ac-nota">{p.equipo.length && p.equipo.every((e) => enRotacion.includes(e.id)) ? "Todas las personas ya tienen descanso rotativo. Para darle descanso fijo a alguien, primero sácala de la rotación." : "Todas las personas ya tienen un descanso asignado."}</small>)}</>)}
+        {fila("usaBloqueos", "Bloqueo de horarios", "Bloquea unas horas o el día completo, para todo el negocio o para una persona",
           p.bloqueos.length ? `${p.bloqueos.length} ${p.bloqueos.length === 1 ? "bloqueo próximo" : "bloqueos próximos"}` : "Sin bloqueos próximos", "bloq",
           <>{p.bloqueos.map((x) => (
             <div key={x.id} className="ac-p">
-              <span className="ac-pt"><b>{x.persona}</b><small>{x.fecha.split("-").reverse().slice(0, 2).join("/")}, {x.desde} a {x.hasta}{x.motivo ? `, ${x.motivo}` : ""}</small></span>
+              <span className="ac-pt"><b>{x.persona}</b><small>{x.fecha.split("-").reverse().slice(0, 2).join("/")}, {x.desde === "00:00" && x.hasta === "23:59" ? "todo el día" : `${x.desde} a ${x.hasta}`}{x.motivo ? `, ${x.motivo}` : ""}</small></span>
               {p.puedeHorarios && <button type="button" className="icb" disabled={pend} aria-label="Quitar bloqueo" onClick={() => iniciar(async () => p.avisar(await quitarBloqueo(x.id)))}><Icono n="basura" /></button>}
             </div>
-          ))}{p.puedeHorarios && <button type="button" className="ac-link ac-mas" onClick={() => setBloq(true)}><Icono n="mas" />Bloquear horario</button>}</>)}
+          ))}{p.puedeHorarios && <button type="button" className="ac-link ac-mas" onClick={() => setBloq(true)}><Icono n="mas" />Bloquear horario o día</button>}</>)}
       </section>
       <small className="ac-nota">Apagar un interruptor no borra lo configurado: solo deja de aplicarse en la agenda y en las reservaciones.</small>
       {editar && <EditarHorario persona={editar} negocio={p.d.horario} cerrar={() => setEditar(null)} avisar={p.avisar} />}
-      {rot && <EditarRotacion equipo={p.equipo} actual={p.rotacion} dia={p.hoy} cerrar={() => setRot(false)} avisar={p.avisar} />}
+      {rot && <EditarRotacion equipo={p.equipo} excluir={fijos.map((f) => f.persona)} actual={p.rotacion} dia={p.hoy} cerrar={() => setRot(false)} avisar={p.avisar} />}
+      {fijo && <EditarDescansoFijo actual={fijo} opciones={fijo.nuevo ? libresFijo : p.equipo.filter((e) => e.id === fijo.persona)} lista={fijos} cerrar={() => setFijo(null)} avisar={p.avisar} />}
       {bloq && <NuevoBloqueo equipo={p.equipo} dia={p.hoy} cerrar={() => setBloq(false)} avisar={p.avisar} />}
     </div>
+  );
+}
+
+/** Descanso fijo de una persona: los días de la semana que siempre descansa. */
+function EditarDescansoFijo({ actual, opciones, lista: todos, cerrar, avisar }: { actual: { persona: string; dias: number[]; nuevo: boolean }; opciones: Persona[]; lista: { persona: string; dias: number[] }[]; cerrar: () => void; avisar: (r: Res) => void }) {
+  const [persona, setPersona] = useState(actual.persona);
+  const [dias, setDias] = useState<number[]>(actual.dias);
+  const [error, setError] = useState<string | null>(null);
+  const [pend, iniciar] = useTransition();
+  const guardarLista = (nueva: { persona: string; dias: number[] }[]) => iniciar(async () => { const r = await guardarDescansosFijos(nueva); if (r.error) setError(r.error); else { avisar(r); cerrar(); } });
+  return (
+    <Modal abierto cerrar={cerrar} etiqueta="Horarios" titulo="Descanso fijo">
+      <div className="pila" style={{ gap: 14 }}>
+        <div className="campo"><span>Persona</span>
+          {actual.nuevo
+            ? <Selector etiqueta="Persona" valor={persona} onChange={setPersona} opciones={opciones.map((e) => ({ valor: e.id, texto: primer(e.nombre), icono: <Avatar avatar={e.avatar} nombre={e.nombre} t={18} /> }))} />
+            : <b>{primer(opciones[0]?.nombre ?? "")}</b>}
+        </div>
+        <small className="ac-nota">Solo aparecen quienes no están en el descanso rotativo.</small>
+        <div className="campo"><span>Descansa los</span>
+          <div className="dias-fijo" role="group" aria-label="Días de descanso">
+            {ORDEN.map((x) => <button key={x} type="button" aria-pressed={dias.includes(x)} className={`chipf ${dias.includes(x) ? "on-suave" : ""}`} onClick={() => setDias(dias.includes(x) ? dias.filter((y) => y !== x) : [...dias, x])}>{DIAS[x]}</button>)}
+          </div>
+        </div>
+        <small className="ac-nota">Esos días no aparece en la agenda ni en las reservaciones.</small>
+        {error && <p className="aviso error" style={{ margin: 0 }}>{error}</p>}
+        <div className="entre">
+          {!actual.nuevo ? <button type="button" className="link-c peligro-t" disabled={pend} onClick={() => guardarLista(todos.filter((f) => f.persona !== actual.persona))}>Quitar descanso fijo</button> : <span />}
+          <button type="button" className="bt" disabled={pend || !dias.length || !persona} onClick={() => guardarLista([...todos.filter((f) => f.persona !== persona), { persona, dias }])}>Guardar<Fl /></button>
+        </div>
+      </div>
+    </Modal>
   );
 }

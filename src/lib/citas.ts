@@ -63,7 +63,7 @@ export async function disponibilidadDia(b: Barberia, fecha: string, duracion: nu
   const mapa = new Map<number, string[]>();
   for (const e of equipo) {
     if (persona && e.id !== persona) continue;
-    const ventana = ventanaDelDia(fecha, b.horario as Horario, b.diasCerrados, config.usaHorarioPersona ? (e.horario as Horario | null) : null, config.usaRotacion ? rots : [], e.id);
+    const ventana = ventanaDelDia(fecha, b.horario as Horario, b.diasCerrados, config.usaHorarioPersona ? (e.horario as Horario | null) : null, config.usaRotacion ? rots : [], e.id, config.usaDescansoFijo ? config.descansosFijos : []);
     for (const m of horariosLibres({ fecha, zona, ahora, duracion, config, ventana, persona: e.id, ocupados })) mapa.set(m, [...(mapa.get(m) ?? []), e.id]);
   }
   return [...mapa.entries()].sort((a, b) => a[0] - b[0]).map(([minuto, personas]) => ({ minuto, personas }));
@@ -168,7 +168,7 @@ export async function diasConLugar(b: Barberia, fechas: string[], duracion: numb
   const r: Record<string, boolean> = {};
   for (const fecha of fechas) {
     r[fecha] = equipo.some((e) => (!persona || e.id === persona)
-      && horariosLibres({ fecha, zona, ahora, duracion, config, ventana: ventanaDelDia(fecha, b.horario as Horario, b.diasCerrados, config.usaHorarioPersona ? (e.horario as Horario | null) : null, config.usaRotacion ? rots : [], e.id), persona: e.id, ocupados }).length > 0);
+      && horariosLibres({ fecha, zona, ahora, duracion, config, ventana: ventanaDelDia(fecha, b.horario as Horario, b.diasCerrados, config.usaHorarioPersona ? (e.horario as Horario | null) : null, config.usaRotacion ? rots : [], e.id, config.usaDescansoFijo ? config.descansosFijos : []), persona: e.id, ocupados }).length > 0);
   }
   return r;
 }

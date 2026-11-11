@@ -24,6 +24,8 @@ export function Reservar(p: {
   opciones: { elegir: boolean; cualquiera: boolean; varios: boolean; maxDias: number };
   pago: { modo: string; ejemplo: { minimo: number }; politica: string; reembolso: string; regla: ConfigCitas["pago"]; apartarMin: number };
   enLinea: { llave: string; cuenta: string } | null;
+  // Cuando el equipo abre la página desde la app: un botón para volver.
+  regreso?: { href: string; texto: string } | null;
 }) {
   const router = useRouter();
   const [paso, setPaso] = useState(0);
@@ -88,6 +90,7 @@ export function Reservar(p: {
 
   return (
     <main className="reserva">
+      {p.regreso && <a href={p.regreso.href} className="rv-regreso"><Icono n="izquierda" />{p.regreso.texto}</a>}
       <header className="rv-cab">
         {paso > 0 ? <button type="button" className="icb" onClick={() => ir(paso - 1)} aria-label="Regresar"><Icono n="izquierda" /></button> : <span className="rv-logo" aria-hidden="true"><Icono n="calendario" /></span>}
         <span className="rv-tit"><b>{p.negocio}</b><small>Paso {paso + 1} de 8, {PASOS[paso]}</small></span>
