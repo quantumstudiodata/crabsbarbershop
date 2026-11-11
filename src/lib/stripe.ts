@@ -74,7 +74,7 @@ export async function crearCuentaNegocio(b: { id: string; nombre: string }) {
 export async function enlaceAltaNegocio(cuenta: string, regreso: string, reintento: string) {
   const l = await v2<{ url: string }>("POST", "/v2/core/account_links", {
     account: cuenta,
-    use_case: { type: "account_onboarding", account_onboarding: { configurations: ["merchant"], return_url: regreso, refresh_url: reintento } },
+    use_case: { type: "account_onboarding", account_onboarding: { return_url: regreso, refresh_url: reintento } },
   });
   return l.url;
 }
