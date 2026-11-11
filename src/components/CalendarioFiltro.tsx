@@ -37,6 +37,9 @@ export function CalendarioFiltro({ p, hoy, todas = "Todas las fechas", conTodas 
   }, [abierto]);
 
   const ir = (s: Seleccion) => {
+    // Sin cambios, solo se cierra: no se vuelve a cargar la página.
+    const igual = (!s && !p) || (!!s && !!p && s.desde === p.desde && s.hasta === p.hasta);
+    if (igual) { setAbierto(false); return; }
     const n = new URLSearchParams(params.toString());
     for (const k of ["periodo", "fecha", "mes", "anio", "desde", "hasta", "pagina"]) n.delete(k);
     if (s) {

@@ -3767,3 +3767,32 @@ button.rv-opc:not(.on) .radio-p { background: none; border-color: rgba(43,58,71,
   .cm-step b { min-width: 14px; text-align: center; font-size: 13px; }
   .cm-fila.on .cm-n b { font-weight: 700; }
 }
+
+/* Filas con interruptor: el interruptor siempre a la derecha, nunca debajo del texto */
+.entre:has(> .sw), .entre:has(> span > .sw), .entre:has(> [data-sucio] > .sw) { flex-wrap: nowrap; align-items: center; }
+.entre:has(> .sw) > :first-child, .entre:has(> span > .sw) > :first-child, .entre:has(> [data-sucio] > .sw) > :first-child { flex: 1; min-width: 0; }
+
+/* Sin el rebote del navegador al llegar arriba o abajo de la página */
+html, body { overscroll-behavior-y: none; }
+
+/* Campos de fecha y hora con el diseño de la página */
+.cf-campo { position: relative; min-width: 0; }
+.campo-f-b { display: flex; align-items: center; gap: 8px; width: 100%; text-align: left; cursor: pointer; color: inherit; font: inherit; }
+.campo-f-b .ic { width: 16px; height: 16px; color: var(--muted); flex: none; }
+.campo-f-b span { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.campo-f-b.vacio span { color: var(--faint); }
+.lista-horas { width: 180px; padding: 6px; }
+.lh-c { display: grid; gap: 2px; max-height: 260px; overflow-y: auto; scrollbar-width: thin; }
+.lh-c button { padding: 9px 12px; border: 0; border-radius: 10px; background: none; text-align: left; font: inherit; color: inherit; cursor: pointer; }
+.lh-c button:hover { background: var(--accent-soft); }
+.lh-c button.ext { background: #13171c; color: #fff; }
+.modal:focus { outline: none; }
+.menu.acciones-m.arriba { top: auto; bottom: 100%; margin-top: 0; margin-bottom: 8px; }
+
+/* Al pasar de una ventana a otra: el fondo se queda y la nueva entra deslizándose suave */
+.capa.encadenada { animation: none; }
+.capa.encadenada > .modal { animation: cambioVentana .28s cubic-bezier(.2,.8,.2,1) both; }
+@keyframes cambioVentana { from { opacity: 0; transform: translateX(18px) scale(.99); } to { opacity: 1; transform: none; } }
+@media (prefers-reduced-motion: reduce) { .capa.encadenada > .modal { animation: none; } }
+/* Horario del negocio: las horas caben dentro de la tarjeta */
+.horas-ed .campo-f-b { justify-content: center; padding-inline: 8px; font-size: 14px; }

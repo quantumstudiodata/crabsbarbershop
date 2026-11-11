@@ -5,11 +5,12 @@ import { useRouter } from "next/navigation";
 import { useState, useTransition } from "react";
 import { Avatar } from "@/components/Avatar";
 import { Fl, Icono } from "@/components/Icono";
-import { Interruptor } from "@/components/ui";
+import { Interruptor, Selector } from "@/components/ui";
 import type { ConfigCitas as Config, Horario, ModoPago } from "@/lib/agenda";
 import { formatoDinero } from "@/lib/money";
 import { guardarConfigCitas, guardarInterruptorHorarios, quitarBloqueo, type Res } from "../../citas/actions";
 import { EditarHorario, EditarRotacion, EditorSemana, NuevoBloqueo, type Bloqueo, type Persona, type Rot } from "../../citas/PantallaCitas";
+import { CampoFecha } from "@/components/Calendario";
 
 const DIAS = ["Dom", "Lun", "Mar", "Mié", "Jue", "Vie", "Sáb"];
 const DIAS_L = ["domingo", "lunes", "martes", "miércoles", "jueves", "viernes", "sábado"];
@@ -78,7 +79,7 @@ export function AjustesCitas(p: {
               <div className="ac-sw"><span>Puede reservar con quien esté libre</span><Interruptor etiqueta="Quien esté libre" checked={d.cualquierBarbero} onChange={() => cambia({ cualquierBarbero: !d.cualquierBarbero })} /></div>
               <div className="ac-sw"><span>Puede reservar varios servicios</span><Interruptor etiqueta="Varios servicios" checked={d.variosServicios} onChange={() => cambia({ variosServicios: !d.variosServicios })} /></div>
               <label className="ac-fila"><span>Pago al reservar</span>
-                <select className="ac-sel" value={d.pagoModo} onChange={(e) => cambia({ pagoModo: e.target.value as ModoPago })}>{MODOS.map(([k, t]) => <option key={k} value={k}>{t}</option>)}</select></label>
+                <Selector etiqueta="Forma de pago al reservar" valor={d.pagoModo} onChange={(v) => cambia({ pagoModo: v as ModoPago })} opciones={MODOS.map(([k, t]) => ({ valor: k, texto: t }))} /></label>
               {(d.pagoModo === "anticipo_pct" || d.pagoModo === "anticipo_fijo") && <Num etiqueta={d.pagoModo === "anticipo_pct" ? "Porcentaje del anticipo" : "Cantidad del anticipo"} valor={d.pagoValor} unidad={d.pagoModo === "anticipo_pct" ? "%" : "pesos"} onChange={(v) => cambia({ pagoValor: v })} />}
               {d.pagoModo !== "sin_pago" && !p.cobraEnLinea && <small className="ac-nota">Para cobrar en línea, conecta Stripe en Configuración del negocio. Mientras tanto las reservaciones se guardan sin pago y el cliente paga en el negocio.</small>}
             </section>
@@ -205,7 +206,7 @@ function Horarios(p: {
             <div className="campo"><span>Días que cierra el negocio</span>
               <div className="cerrados-c">
                 {p.d.diasCerrados.map((f) => <span key={f} className="chip-cerr">{f.split("-").reverse().join("/")}<button type="button" aria-label="Quitar" onClick={() => p.cambia({ diasCerrados: p.d.diasCerrados.filter((x) => x !== f) })}><Icono n="cerrar" /></button></span>)}
-                <span className="agrega-cerr"><input className="input" type="date" value={nuevoCerrado} onChange={(e) => setNuevoCerrado(e.target.value)} aria-label="Día cerrado" />
+                <span className="agrega-cerr"><CampoFecha valor={nuevoCerrado} cambiar={setNuevoCerrado} etiqueta="Día cerrado" />
                   <button type="button" className="bt sec chico" disabled={!nuevoCerrado} onClick={() => { p.cambia({ diasCerrados: [...new Set([...p.d.diasCerrados, nuevoCerrado])].sort() }); setNuevoCerrado(""); }}>Agregar</button></span>
               </div>
             </div>

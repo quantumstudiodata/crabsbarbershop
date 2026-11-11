@@ -1,10 +1,13 @@
 "use client";
 
-import { useEffect, useId, useRef, useState } from "react";
+import { useEffect, useId, useLayoutEffect, useRef, useState, startTransition } from "react";
 import { createPortal } from "react-dom";
 import { Icono } from "./Icono";
 
 /** Ventana emergente. Se cierra con Esc o tocando fuera. */
+// Cuándo se cerró la última ventana: si otra se abre enseguida, el fondo no vuelve a aparecer y la ventana entra con un cambio suave.
+let ultimoCierre = 0;
+
 export function Modal({ abierto, cerrar, etiqueta, titulo, ancho, sinX, children }: {
   abierto: boolean; cerrar: () => void; etiqueta?: string; titulo: React.ReactNode; ancho?: boolean; sinX?: boolean; children: React.ReactNode;
 }) {
@@ -20,14 +23,26 @@ export function Modal({ abierto, cerrar, etiqueta, titulo, ancho, sinX, children
     const previo = document.activeElement as HTMLElement | null;
     const tecla = (e: KeyboardEvent) => { if (e.key === "Escape") { e.stopPropagation(); alCerrar.current(); } };
     document.addEventListener("keydown", tecla);
-    const foco = ref.current?.querySelector<HTMLElement>("[autofocus], input:not([type=hidden]), button:not(.cerrar-x)");
-    foco?.focus();
+    // En el teléfono no se enfoca un campo de texto al abrir: así no aparece el teclado hasta que la persona toca el campo.
+    const tactil = window.matchMedia("(pointer: coarse)").matches;
+    const foco = ref.current?.querySelector<HTMLElement>(tactil ? "button:not(.cerrar-x), [role=radio], a" : "[autofocus], input:not([type=hidden]), button:not(.cerrar-x)");
+    if (tactil) {
+      const a = document.activeElement as HTMLElement | null;
+      if (a && ref.current?.contains(a) && /^(INPUT|TEXTAREA|SELECT)$/.test(a.tagName)) a.blur();
+      ref.current?.focus({ preventScroll: true });
+    } else foco?.focus();
     return () => { document.removeEventListener("keydown", tecla); previo?.focus?.(); };
   }, [abierto, montado]);
+  const [encadenada, setEncadenada] = useState(false);
+  useLayoutEffect(() => {
+    if (!abierto) return;
+    setEncadenada(Date.now() - ultimoCierre < 350);
+    return () => { ultimoCierre = Date.now(); };
+  }, [abierto]);
   if (!abierto || !montado) return null;
   return createPortal(
-    <div className="capa" onMouseDown={(e) => { if (e.target === e.currentTarget) cerrar(); }}>
-      <div ref={ref} className={`modal ${ancho ? "ancho" : ""}`} role="dialog" aria-modal="true" aria-labelledby={id}>
+    <div className={`capa ${encadenada ? "encadenada" : ""}`} onMouseDown={(e) => { if (e.target === e.currentTarget) cerrar(); }}>
+      <div ref={ref} tabIndex={-1} className={`modal ${ancho ? "ancho" : ""}`} role="dialog" aria-modal="true" aria-labelledby={id}>
         <div className="modal-h">
           <div>
             {etiqueta && <span className="lab">{etiqueta}</span>}
@@ -41,6 +56,16 @@ export function Modal({ abierto, cerrar, etiqueta, titulo, ancho, sinX, children
     document.body,
   );
 }
+
+/**
+ * Envía un formulario a su acción sin el reinicio automático de React: los interruptores y lo escrito
+ * se quedan como el usuario los dejó (por ejemplo, si el servidor responde con un error).
+ */
+export const sinReinicio = (accion: (d: FormData) => void) => (x: React.FormEvent<HTMLFormElement>) => {
+  x.preventDefault();
+  const datos = new FormData(x.currentTarget, (x.nativeEvent as SubmitEvent).submitter);
+  startTransition(() => accion(datos));
+};
 
 export function Interruptor({ name, checked, defaultChecked, onChange, etiqueta, disabled, value = "si" }: {
   name?: string; checked?: boolean; defaultChecked?: boolean; onChange?: (v: boolean) => void; etiqueta: string; disabled?: boolean; value?: string;
@@ -73,7 +98,9 @@ export function Selector({ name, opciones, valor, inicial, onChange, etiqueta, c
   const abrir = () => {
     const r = boton.current?.getBoundingClientRect();
     if (!r) return;
-    const arriba = window.innerHeight - r.bottom < Math.min(300, opciones.length * 44 + 20) && r.top > window.innerHeight - r.bottom;
+    // En el teléfono se descuenta la barra de abajo para que la lista no quede debajo de ella.
+    const alto = window.innerHeight - (window.matchMedia("(max-width: 760px)").matches && !document.querySelector(".capa") ? 100 : 0);
+    const arriba = alto - r.bottom < Math.min(300, opciones.length * 44 + 20) && r.top > alto - r.bottom;
     // La lista nunca se sale de la pantalla: si no cabe a la derecha, se recorre hacia la izquierda.
     const ancho = Math.min(Math.max(r.width, 200), window.innerWidth - 16);
     const x = Math.max(8, Math.min(r.left, window.innerWidth - ancho - 8));

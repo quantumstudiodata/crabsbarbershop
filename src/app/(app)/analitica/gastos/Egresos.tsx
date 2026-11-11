@@ -5,7 +5,7 @@ import { prepararArchivo } from "@/lib/archivo";
 import { useActionState, useEffect, useState, useTransition } from "react";
 import { Calendario } from "@/components/Calendario";
 import { Fl, Icono } from "@/components/Icono";
-import { Interruptor, Modal, Selector } from "@/components/ui";
+import { Interruptor, Modal, Selector, sinReinicio } from "@/components/ui";
 import { formatoDinero } from "@/lib/money";
 import { cancelarEgreso, type EstadoGasto, registrarEgreso } from "./actions";
 
@@ -120,7 +120,7 @@ export function Nuevo({ hoy, cajaAbierta, categorias, cerrar, otro, opciones }: 
   const puedeCaja = metodo === "efectivo" && fecha === hoy && cajaAbierta;
   return (
     <Modal abierto cerrar={cerrar} etiqueta="Nuevo egreso" titulo="Registrar egreso" ancho>
-      <form action={accion} className="pila">
+      <form onSubmit={sinReinicio(accion)} className="pila">
         <input type="hidden" name="metodo" value={metodo} />
         <input type="hidden" name="fecha" value={fecha} />
         <input type="hidden" name="categoria" value={categoria} />
@@ -202,7 +202,7 @@ export function Cancelar({ f, cerrar }: { f: FilaEgreso; cerrar: () => void }) {
   useEffect(() => { if (e.ok) cerrar(); }, [e.ok, e.n, cerrar]);
   return (
     <Modal abierto cerrar={cerrar} etiqueta="Cancelar egreso" titulo={`¿Cancelar ${f.concepto}?`}>
-      <form action={accion} className="pila">
+      <form onSubmit={sinReinicio(accion)} className="pila">
         <input type="hidden" name="id" value={f.id} />
         <p className="muted">{formatoDinero(f.monto)}. No se borra: queda tachado, con tu nombre y el motivo, y deja de contar.</p>
         <label className="campo"><span>Motivo</span><input className="input" name="motivo" placeholder="Ejemplo: se registró dos veces" required autoFocus /></label>

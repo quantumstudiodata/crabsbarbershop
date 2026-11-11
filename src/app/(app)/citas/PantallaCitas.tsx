@@ -12,6 +12,7 @@ import {
   agendarCita, bloquearHorario, cambiarEstadoCita, horariosCita, cancelarCita, guardarHorarioPersona, guardarRotacion, horariosAgenda, quitarBloqueo, quitarRotacion, reprogramarCita, type Res,
 } from "./actions";
 import { NuevaCita } from "./NuevaCita";
+import { CampoFecha, CampoHora } from "@/components/Calendario";
 
 export type CitaVista = {
   id: string; folio: string; cliente: string; telefono: string; barberoId: string; barbero: string; indiferente: boolean;
@@ -375,7 +376,7 @@ function Agendar({ equipo, servicios, dia, hoy, cerrar, avisar, cambiar }: { equ
           <div className="campo"><span>Atiende</span>
             <Selector etiqueta="Quién atiende" valor={persona} onChange={setPersona} opciones={[...(cambiar ? [] : [{ valor: "", texto: "Cualquiera" }]), ...equipo.map((e) => ({ valor: e.id, texto: primer(e.nombre), icono: <Avatar avatar={e.avatar} nombre={e.nombre} t={18} /> }))]} />
           </div>
-          <label className="campo"><span>Día</span><input className="input" type="date" min={hoy} value={fecha} onChange={(e) => setFecha(e.target.value)} /></label>
+          <div className="campo"><span>Día</span><CampoFecha valor={fecha} min={hoy} cambiar={setFecha} etiqueta="Día" /></div>
         </div>
         <div className="campo"><span>Hora</span>
           {libres === null ? <small className="muted">{cambiar ? "Buscando horarios…" : "Elige los servicios para ver los horarios libres."}</small>
@@ -413,9 +414,9 @@ export function EditorSemana({ valor, onChange }: { valor: Horario; onChange: (h
             <button type="button" className={`dia-b ${v ? "on" : ""}`} aria-pressed={!!v} onClick={() => { const n = { ...valor }; if (v) delete n[String(d)]; else n[String(d)] = ["10:00", "20:00"]; onChange(n); }}>{DIAS[d]}</button>
             {v ? (
               <span className="horas-ed">
-                <input className="input" type="time" value={v[0]} onChange={(e) => onChange({ ...valor, [String(d)]: [e.target.value, v[1]] })} aria-label={`Entrada ${DIAS_L[d]}`} />
+                <CampoHora valor={v[0]} cambiar={(h) => onChange({ ...valor, [String(d)]: [h, v[1]] })} etiqueta={`Entrada ${DIAS_L[d]}`} />
                 <span className="muted">a</span>
-                <input className="input" type="time" value={v[1]} onChange={(e) => onChange({ ...valor, [String(d)]: [v[0], e.target.value] })} aria-label={`Salida ${DIAS_L[d]}`} />
+                <CampoHora valor={v[1]} cambiar={(h) => onChange({ ...valor, [String(d)]: [v[0], h] })} etiqueta={`Salida ${DIAS_L[d]}`} />
               </span>
             ) : <small className="muted">Cerrado</small>}
           </div>
@@ -469,7 +470,7 @@ export function EditarRotacion({ equipo, actual, dia, cerrar, avisar }: { equipo
           <div className="campo"><span>Segunda persona</span><Selector etiqueta="Segunda persona" valor={p2} onChange={setP2} opciones={personas} /></div>
           <div className="campo"><span>Descansa el</span><Selector etiqueta="Segundo día" valor={d2} onChange={setD2} opciones={dias} /></div>
         </div>
-        <label className="campo"><span>Semana de inicio</span><input className="input" type="date" value={inicio} onChange={(e) => setInicio(e.target.value)} /></label>
+        <div className="campo"><span>Semana de inicio</span><CampoFecha valor={inicio} cambiar={setInicio} etiqueta="Semana de inicio" /></div>
         <div className="ejemplo-p rot-ej">
           <span><small>Semana del {Number(lunes.slice(8))} {MESES[Number(lunes.slice(5, 7)) - 1]}</small><span>{n(p1)} descansa el {DIAS_L[Number(d1)]}, {n(p2)} el {DIAS_L[Number(d2)]}</span></span>
           <span><small>Semana siguiente</small><span>{n(p1)} descansa el {DIAS_L[Number(d2)]}, {n(p2)} el {DIAS_L[Number(d1)]}</span></span>
@@ -497,11 +498,11 @@ export function NuevoBloqueo({ equipo, dia, cerrar, avisar, personaInicial = "" 
       <div className="pila" style={{ gap: 12 }}>
         <div className="fila-eg">
           <div className="campo"><span>A quién</span><Selector etiqueta="A quién" valor={quien} onChange={setQuien} opciones={[{ valor: "", texto: "Todo el negocio" }, ...equipo.map((e) => ({ valor: e.id, texto: primer(e.nombre) }))]} /></div>
-          <label className="campo"><span>Día</span><input className="input" type="date" value={fecha} onChange={(e) => setFecha(e.target.value)} /></label>
+          <div className="campo"><span>Día</span><CampoFecha valor={fecha} cambiar={setFecha} etiqueta="Día" /></div>
         </div>
         <div className="fila-eg horario-p">
-          <label className="campo"><span>De</span><input className="input" type="time" value={desde} onChange={(e) => setDesde(e.target.value)} /></label>
-          <label className="campo"><span>A</span><input className="input" type="time" value={hasta} onChange={(e) => setHasta(e.target.value)} /></label>
+          <div className="campo"><span>De</span><CampoHora valor={desde} cambiar={setDesde} etiqueta="Desde" /></div>
+          <div className="campo"><span>A</span><CampoHora valor={hasta} cambiar={setHasta} etiqueta="Hasta" /></div>
         </div>
         <label className="campo"><span>Motivo (opcional)</span><input className="input" value={motivo} onChange={(e) => setMotivo(e.target.value)} maxLength={120} placeholder="Ejemplo: comida, cita médica" /></label>
         {error && <p className="aviso error" style={{ margin: 0 }}>{error}</p>}

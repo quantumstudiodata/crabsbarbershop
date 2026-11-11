@@ -41,7 +41,8 @@ function Flotante({ ancla, className, children, label }: { ancla: React.RefObjec
     const r = ancla.current?.getBoundingClientRect();
     if (!r) return;
     const alto = ref.current?.offsetHeight ?? 360, ancho = ref.current?.offsetWidth ?? 310;
-    const arriba = r.bottom + 8 + alto > window.innerHeight && r.top - 8 - alto > 0;
+    const limite = window.innerHeight - (window.matchMedia("(max-width: 760px)").matches && !document.querySelector(".capa") ? 100 : 0);
+    const arriba = r.bottom + 8 + alto > limite && r.top - 8 - alto > 0;
     setPos({ x: Math.max(8, Math.min(r.left, window.innerWidth - ancho - 8)), y: arriba ? r.top - 8 - alto : r.bottom + 8, arriba });
   }, [ancla]);
   return createPortal(
@@ -141,5 +142,85 @@ export function MenuAnio({ anio, activo, hoy, elegir, desde = 2023 }: { anio: st
         </div>
       )}
     </Desplegable>
+  );
+}
+
+const hora12 = (hm: string) => {
+  if (!/^\d{2}:\d{2}$/.test(hm)) return "";
+  const [h, m] = hm.split(":").map(Number);
+  return `${((h + 11) % 12) + 1}:${String(m).padStart(2, "0")} ${h < 12 ? "a.m." : "p.m."}`;
+};
+
+/**
+ * Campo de fecha con el diseño de la página (en lugar del calendario del navegador).
+ * Con `vacio` se puede dejar sin fecha. Con `name`, manda el valor en el formulario.
+ */
+export function CampoFecha({ valor, cambiar, min, max, vacio, name, etiqueta = "Fecha" }: {
+  valor: string; cambiar?: (f: string) => void; min?: string; max?: string; vacio?: string; name?: string; etiqueta?: string;
+}) {
+  const { abierto, setAbierto, caja } = useVentana();
+  const [interno, setInterno] = useState(valor);
+  const actual = cambiar ? valor : interno;
+  const base = actual || min || new Date().toISOString().slice(0, 10);
+  const [mes, setMes] = useState(() => ({ y: Number(base.slice(0, 4)), m: Number(base.slice(5, 7)) - 1 }));
+  const poner = (f: string) => { if (cambiar) cambiar(f); else setInterno(f); setAbierto(false); };
+  const primero = new Date(Date.UTC(mes.y, mes.m, 1)).getUTCDay();
+  const vacios = (primero + 6) % 7;
+  const diasMes = new Date(Date.UTC(mes.y, mes.m + 1, 0)).getUTCDate();
+  const mesAnt = mes.m === 0 ? { y: mes.y - 1, m: 11 } : { y: mes.y, m: mes.m - 1 };
+  const mesSig = mes.m === 11 ? { y: mes.y + 1, m: 0 } : { y: mes.y, m: mes.m + 1 };
+  const fuera = (f: string) => (!!min && f < min) || (!!max && f > max);
+  return (
+    <div className="cf-campo" ref={caja}>
+      {name && <input type="hidden" name={name} value={actual} />}
+      <button type="button" className={`input campo-f-b ${actual ? "" : "vacio"}`} aria-label={etiqueta} aria-expanded={abierto} onClick={() => setAbierto((x) => !x)}>
+        <Icono n="calendario" /><span>{actual ? fechaTexto(actual) : vacio ?? "Elegir fecha"}</span>
+      </button>
+      {abierto && (
+        <Flotante ancla={caja} className="calendario" label={etiqueta}>
+          <div className="entre">
+            <button type="button" className="icb" onClick={() => setMes(mesAnt)} aria-label="Mes anterior" disabled={!!min && aFecha(mesAnt.y, mesAnt.m, new Date(Date.UTC(mesAnt.y, mesAnt.m + 1, 0)).getUTCDate()) < min}><Icono n="izquierda" /></button>
+            <b style={{ textTransform: "capitalize" }}>{MESES[mes.m]} {mes.y}</b>
+            <button type="button" className="icb" onClick={() => setMes(mesSig)} aria-label="Mes siguiente" disabled={!!max && aFecha(mesSig.y, mesSig.m, 1) > max}><Icono n="derecha" /></button>
+          </div>
+          <div className="rejilla">
+            {D.map((d, i) => <span className="d" key={i}>{d}</span>)}
+            {Array.from({ length: vacios }, (_, i) => <span key={`v${i}`} />)}
+            {Array.from({ length: diasMes }, (_, i) => {
+              const f = aFecha(mes.y, mes.m, i + 1);
+              return <button type="button" key={f} className={f === actual ? "ext" : ""} disabled={fuera(f)} onClick={() => poner(f)} aria-label={fechaTexto(f)}>{i + 1}</button>;
+            })}
+          </div>
+          {vacio !== undefined && actual && <button type="button" className="enlace" style={{ justifySelf: "start" }} onClick={() => poner("")}>{vacio}</button>}
+        </Flotante>
+      )}
+    </div>
+  );
+}
+
+/** Campo de hora con el diseño de la página: una lista de horas que flota bajo el campo. */
+export function CampoHora({ valor, cambiar, paso = 15, desde = "06:00", hasta = "23:45", etiqueta = "Hora" }: {
+  valor: string; cambiar: (h: string) => void; paso?: number; desde?: string; hasta?: string; etiqueta?: string;
+}) {
+  const { abierto, setAbierto, caja } = useVentana();
+  const lista = useRef<HTMLDivElement>(null);
+  const aMin = (h: string) => Number(h.slice(0, 2)) * 60 + Number(h.slice(3, 5));
+  const horas: string[] = [];
+  for (let m = aMin(desde); m <= aMin(hasta); m += paso) horas.push(`${String(Math.floor(m / 60)).padStart(2, "0")}:${String(m % 60).padStart(2, "0")}`);
+  if (valor && !horas.includes(valor)) horas.push(valor), horas.sort();
+  useEffect(() => { if (abierto) lista.current?.querySelector(".ext")?.scrollIntoView({ block: "center" }); }, [abierto]);
+  return (
+    <div className="cf-campo" ref={caja}>
+      <button type="button" className="input campo-f-b" aria-label={etiqueta} aria-expanded={abierto} onClick={() => setAbierto((x) => !x)}>
+        <span>{hora12(valor) || "Elegir"}</span>
+      </button>
+      {abierto && (
+        <Flotante ancla={caja} className="calendario lista-horas" label={etiqueta}>
+          <div ref={lista} className="lh-c">
+            {horas.map((h) => <button type="button" key={h} className={h === valor ? "ext" : ""} onClick={() => { cambiar(h); setAbierto(false); }}>{hora12(h)}</button>)}
+          </div>
+        </Flotante>
+      )}
+    </div>
   );
 }

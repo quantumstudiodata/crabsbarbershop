@@ -76,7 +76,11 @@ export function BarraInferior({ items }: { items: ItemNav[]; mas?: Mas }) {
     f();
     const t = setTimeout(() => setLista(true), 50);
     window.addEventListener("resize", f);
-    return () => { clearTimeout(t); window.removeEventListener("resize", f); };
+    // Si la barra estaba oculta (por ejemplo al salir de Cobro), se vuelve a medir cuando aparece y cambia de tamaño.
+    const obs = typeof ResizeObserver !== "undefined" && nav.current ? new ResizeObserver(f) : null;
+    if (obs && nav.current) obs.observe(nav.current);
+    const r = requestAnimationFrame(() => requestAnimationFrame(f));
+    return () => { clearTimeout(t); cancelAnimationFrame(r); obs?.disconnect(); window.removeEventListener("resize", f); };
   }, [ruta]);
   return (
     <div className={`barra-inf ${lista ? "lista" : ""}`}>

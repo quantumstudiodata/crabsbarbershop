@@ -1,6 +1,6 @@
 "use client";
 
-import { useActionState, useEffect, useState } from "react";
+import { startTransition, useActionState, useEffect, useState } from "react";
 import { Fl, Icono } from "@/components/Icono";
 import { Interruptor } from "@/components/ui";
 import { type BarberoMeta, metaDelNegocio } from "@/lib/metas";
@@ -41,7 +41,9 @@ function FormGuardar({ children, className, conBoton = true }: { children: React
   useEffect(() => { if (e.ok) setSucio(false); }, [e.ok, e.n]);
   const marcar = (x: React.SyntheticEvent) => { const t = x.target as HTMLElement; if (t.closest(".billetes button, input[type=range], [data-sucio]")) setSucio(true); };
   return (
-    <form action={accion} className={className} onChange={marcar} onClick={marcar}>
+    // Se envía sin el reinicio automático del formulario: así los interruptores no regresan a su estado anterior al guardar.
+    <form className={className} onChange={marcar} onClick={marcar}
+      onSubmit={(x) => { x.preventDefault(); const datos = new FormData(x.currentTarget); startTransition(() => accion(datos)); }}>
       {children}
       {e.error && !sucio && <p className="aviso error">{e.error}</p>}
       {e.ok && !sucio && !guardando && <p className="confirma" key={e.n}><Icono n="palomita" />Cambios guardados.</p>}

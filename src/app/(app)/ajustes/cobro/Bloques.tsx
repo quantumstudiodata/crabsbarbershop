@@ -4,7 +4,7 @@ import { useActionState, useEffect, useState, useTransition } from "react";
 import { alternarCategoria, crearCategoria, eliminarCategoriaGasto, renombrarCategoriaGasto, type EstadoGasto } from "@/app/(app)/analitica/gastos/actions";
 import { MenuPuntos } from "@/components/MenuPuntos";
 import { Fl, Icono } from "@/components/Icono";
-import { Interruptor, Modal, Selector } from "@/components/ui";
+import { Interruptor, Modal, Selector, sinReinicio } from "@/components/ui";
 import { formatoDinero } from "@/lib/money";
 import { agregarConcepto, alternarFuncion, alternarMetodoEgreso, type EstadoAjuste, quitarConcepto } from "./actions";
 
@@ -71,7 +71,7 @@ export function CategoriasEgresos({ categorias, puede }: { categorias: Categoria
       {aviso.mensaje && !aviso.error && <p className="confirma" key={aviso.n}><Icono n="palomita" />{aviso.mensaje}</p>}
       {nueva && (
         <Modal abierto cerrar={() => setNueva(false)} etiqueta="Egresos" titulo="Agregar categoría">
-          <form action={accion} className="pila">
+          <form onSubmit={sinReinicio(accion)} className="pila">
             <label className="campo"><span>Nombre de la categoría</span><input className="input" name="nombre" maxLength={40} required autoFocus placeholder="Ejemplo: Productos de limpieza" /></label>
             {e.error && <p className="aviso error">{e.error}</p>}
             <div className="acciones"><button className="bt" disabled={guardando}>{guardando ? "Guardando…" : "Guardar"}<Fl /></button></div>
@@ -111,7 +111,7 @@ function FormGasto({ g, categorias, metodos, cerrar }: { g: Gasto | null; catego
   useEffect(() => { if (e.ok) cerrar(); }, [e.ok, e.n, cerrar]);
   return (
     <Modal abierto cerrar={cerrar} etiqueta="Gastos frecuentes" titulo={g ? g.concepto : "Agregar gasto frecuente"}>
-      <form action={accion} className="pila">
+      <form onSubmit={sinReinicio(accion)} className="pila">
         {g && <input type="hidden" name="id" value={g.id} />}
         <input type="hidden" name="categoria" value={categoria} />
         <input type="hidden" name="metodo" value={metodo} />

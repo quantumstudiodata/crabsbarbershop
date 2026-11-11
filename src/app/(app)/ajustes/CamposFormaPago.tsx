@@ -2,6 +2,8 @@
 
 import { useState } from "react";
 import { formatoDinero, leerPesos } from "@/lib/money";
+import { CampoFecha } from "@/components/Calendario";
+import { Selector } from "@/components/ui";
 
 export type TipoPago = "porcentaje" | "fijo" | "renta" | "sueldo" | "mixto";
 export type FormaActual = {
@@ -79,27 +81,24 @@ export function CamposFormaPago({ actual, conRenta = true }: { actual: FormaActu
         </div>
         <div className="dos-p">
           {frecuencia === "semana" && (
-            <label className="campo"><span>Día de corte</span>
-              <select className="input" name="pagoCorte" defaultValue={String(actual?.diaCorte ?? 0)}>{DIAS.map((d, i) => <option key={d} value={i}>{d}</option>)}</select>
-            </label>
+            <div className="campo"><span>Día de corte</span>
+              <Selector name="pagoCorte" etiqueta="Día de corte" inicial={String(actual?.diaCorte ?? 0)} opciones={DIAS.map((d, i) => ({ valor: String(i), texto: d }))} />
+            </div>
           )}
-          <label className="campo"><span>Día de pago</span>
-            <select className="input" name="pagoDia" defaultValue={String(actual?.diaPago ?? (frecuencia === "semana" ? 1 : 0))}>
-              <option value="0">{frecuencia === "servicio" ? "Al terminar el servicio" : "El día del corte"}</option>
-              {[1, 2, 3].map((n) => <option key={n} value={n}>{n === 1 ? "Un día después" : `${n} días después`}</option>)}
-            </select>
-          </label>
+          <div className="campo"><span>Día de pago</span>
+            <Selector key={frecuencia} name="pagoDia" etiqueta="Día de pago" inicial={String(actual?.diaPago ?? (frecuencia === "semana" ? 1 : 0))}
+              opciones={[{ valor: "0", texto: frecuencia === "servicio" ? "Al terminar el servicio" : "El día del corte" }, ...[1, 2, 3].map((n) => ({ valor: String(n), texto: n === 1 ? "Un día después" : `${n} días después` }))]} />
+          </div>
         </div>
-        <label className="campo"><span>Forma de pago habitual</span>
-          <select className="input" name="pagoForma" defaultValue={actual?.formaPago ?? "efectivo"}>
-            <option value="efectivo">Efectivo de caja</option><option value="transferencia">Transferencia</option><option value="otro">Otro</option>
-          </select>
-        </label>
+        <div className="campo"><span>Forma de pago habitual</span>
+          <Selector name="pagoForma" etiqueta="Forma de pago habitual" inicial={actual?.formaPago ?? "efectivo"}
+            opciones={[{ valor: "efectivo", texto: "Efectivo de caja" }, { valor: "transferencia", texto: "Transferencia" }, { valor: "otro", texto: "Otro" }]} />
+        </div>
         {actual && (
-          <label className="campo vig-p"><span>Vigente desde</span>
-            <input className="input" type="date" name="pagoVigente" min={hoyLocal()} defaultValue={hoyLocal()} />
+          <div className="campo vig-p"><span>Vigente desde</span>
+            <CampoFecha name="pagoVigente" valor={hoyLocal()} min={hoyLocal()} etiqueta="Vigente desde" />
             <small>Las nuevas condiciones aplican desde esa fecha. Los pagos y saldos anteriores no cambian.</small>
-          </label>
+          </div>
         )}
         <p className="ejemplo">
           {tipo === "porcentaje" && <>Con un servicio de {formatoDinero(EJEMPLO)}, le corresponden <b>{comision}</b>.</>}

@@ -8,6 +8,7 @@ import { Interruptor, Modal } from "@/components/ui";
 import { formatoDinero, leerPesos } from "@/lib/money";
 import { DIAS_CORTOS, NOMBRE_TIPO, descuentoDe, estadoPromo, textoBeneficio, textoVigencia, type Promo, type TipoPromo } from "@/lib/promociones";
 import { eliminarPromocion, guardarPromocion, pausarPromocion, type BorradorPromo, type ResultadoPromo } from "./promos-actions";
+import { CampoFecha, CampoHora } from "@/components/Calendario";
 
 type Servicio = { id: string; nombre: string; categoria: string; precio: number; activo: boolean };
 
@@ -173,8 +174,8 @@ function Asistente({ inicial, servicios, hoy, cerrar, alGuardar }: { inicial: Bo
         {paso === 3 && (
           <>
             <div className="fila-eg">
-              <label className="campo"><span>Fecha de inicio</span><input className="input" type="date" value={b.desde} onChange={(e) => cambia({ desde: e.target.value })} /></label>
-              <label className="campo"><span>Fecha de finalización</span><input className="input" type="date" value={b.hasta} min={b.desde} onChange={(e) => cambia({ hasta: e.target.value })} /></label>
+              <div className="campo"><span>Fecha de inicio</span><CampoFecha valor={b.desde} cambiar={(f) => cambia({ desde: f })} etiqueta="Fecha de inicio" /></div>
+              <div className="campo"><span>Fecha de finalización</span><CampoFecha valor={b.hasta} min={b.desde} cambiar={(f) => cambia({ hasta: f })} vacio="Sin fecha de finalización" etiqueta="Fecha de finalización" /></div>
             </div>
             <small className="muted" style={{ marginTop: -6 }}>Sin fecha de finalización, sigue hasta que la pauses.</small>
             <div className="campo"><span>Días aplicables</span>
@@ -185,8 +186,8 @@ function Asistente({ inicial, servicios, hoy, cerrar, alGuardar }: { inicial: Bo
             <label className="opcion-caja"><span><b>Solo en un horario</b><small>Si está apagado, aplica todo el día.</small></span><Interruptor etiqueta="Solo en un horario" checked={b.conHorario} onChange={() => cambia({ conHorario: !b.conHorario })} /></label>
             {b.conHorario && (
               <div className="fila-eg horario-p">
-                <label className="campo"><span>De</span><input className="input" type="time" value={b.horaDesde} onChange={(e) => cambia({ horaDesde: e.target.value })} /></label>
-                <label className="campo"><span>A</span><input className="input" type="time" value={b.horaHasta} onChange={(e) => cambia({ horaHasta: e.target.value })} /></label>
+                <div className="campo"><span>De</span><CampoHora valor={b.horaDesde} cambiar={(h) => cambia({ horaDesde: h })} etiqueta="Desde" /></div>
+                <div className="campo"><span>A</span><CampoHora valor={b.horaHasta} cambiar={(h) => cambia({ horaHasta: h })} etiqueta="Hasta" /></div>
               </div>
             )}
           </>

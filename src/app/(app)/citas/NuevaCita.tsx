@@ -6,6 +6,7 @@ import { Icono } from "@/components/Icono";
 import { aHora, type Horario } from "@/lib/agenda";
 import { formatoDinero } from "@/lib/money";
 import { agendarCita, horariosAgenda, type Res } from "./actions";
+import { CampoFecha } from "@/components/Calendario";
 
 type Persona = { id: string; nombre: string };
 type Servicio = { id: string; nombre: string; categoria: string; precio: number; duracionMin: number };
@@ -146,7 +147,7 @@ export function NuevaCita({ equipo, servicios, dia, hoy, horario, cerrados, cerr
               </div>
               <div className="nc-campo">
                 <div className="entre"><span>Día</span><button type="button" className="nc-otra" aria-expanded={otra} onClick={() => setOtra(!otra)}><Icono n="calendario" />Otra fecha</button></div>
-                {otra ? <input className="input" type="date" min={hoy} value={fecha} onChange={(e) => e.target.value && setFecha(e.target.value)} aria-label="Fecha de la cita" />
+                {otra ? <CampoFecha valor={fecha} min={hoy} cambiar={(f) => f && setFecha(f)} etiqueta="Fecha de la cita" />
                   : <div className="nc-dias">
                     {(dias.includes(fecha) ? dias : [fecha, ...dias.slice(0, 5)]).map((f) => (
                       <button type="button" key={f} className={fecha === f ? "on" : ""} aria-pressed={fecha === f} onClick={() => setFecha(f)}>

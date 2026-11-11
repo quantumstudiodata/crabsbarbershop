@@ -1,10 +1,12 @@
 "use client";
 
+import { useHaciaArriba } from "@/components/MenuPuntos";
+
 import { useActionState, useEffect, useRef, useState, useTransition } from "react";
 import { Avatar } from "@/components/Avatar";
 import { Ayuda } from "@/components/Ayuda";
 import { Fl, Icono } from "@/components/Icono";
-import { Interruptor, Modal, Selector } from "@/components/ui";
+import { Interruptor, Modal, Selector, sinReinicio } from "@/components/ui";
 import { formatoDinero } from "@/lib/money";
 import type { Rol } from "@/lib/permisos";
 import { CamposFormaPago, type FormaActual } from "./CamposFormaPago";
@@ -116,6 +118,7 @@ function Ficha({ p, props, cerrar, editar }: { p: Persona; props: Props; cerrar:
 function MenuAcciones({ p, acciones }: { p: Persona; acciones: { clave: () => void; desactivar: () => void; reactivar: () => void; eliminar: () => void } }) {
   const [abierto, setAbierto] = useState(false);
   const caja = useRef<HTMLDivElement>(null);
+  const { menu, arriba } = useHaciaArriba(abierto);
   useEffect(() => {
     if (!abierto) return;
     const fuera = (e: MouseEvent) => { if (!caja.current?.contains(e.target as Node)) setAbierto(false); };
@@ -127,7 +130,7 @@ function MenuAcciones({ p, acciones }: { p: Persona; acciones: { clave: () => vo
     <div ref={caja} style={{ position: "relative" }}>
       <button type="button" className="icb" aria-label={`Acciones para ${p.nombre}`} aria-haspopup="menu" aria-expanded={abierto} onClick={() => setAbierto((a) => !a)}>⋯</button>
       {abierto && (
-        <div className="menu acciones-m" role="menu">
+        <div ref={menu} className={`menu acciones-m ${arriba ? "arriba" : ""}`} role="menu">
           {p.activo ? (
             <>
               <button type="button" role="menuitem" className="it" onClick={ir(acciones.clave)}><Icono n="llave" />Restablecer contraseña</button>
@@ -172,7 +175,7 @@ function EditarPersona({ p, props, cerrar }: { p: Persona; props: Props; cerrar:
   const rol = elegido?.rol ?? p.rol;
   return (
     <Modal abierto cerrar={cerrar} etiqueta={p.yo ? "Mis permisos" : "Editar usuario"} titulo={p.nombre} ancho>
-      <form action={accion} className="pila">
+      <form onSubmit={sinReinicio(accion)} className="pila">
         <input type="hidden" name="id" value={p.id} />
         <span className="paso-t">Datos del usuario</span>
         <label className="campo"><span>Nombre completo</span><input className="input" name="nombre" defaultValue={p.nombre} /></label>
@@ -216,7 +219,7 @@ function AltaUsuario({ props, cerrar, alGuardar }: { props: Props; cerrar: () =>
   const primerNombre = nombre.trim().split(/\s+/)[0] ?? "";
   return (
     <Modal abierto cerrar={cerrar} etiqueta={`Paso ${paso} de 2`} titulo={paso === 1 ? "Agregar usuario" : barbero ? "Cómo se le paga" : `Remuneración de ${primerNombre}`} ancho>
-      <form action={accion} className="pila">
+      <form onSubmit={sinReinicio(accion)} className="pila">
         <div className="pila" style={{ display: paso === 1 ? undefined : "none" }}>
           <label className="campo"><span>Nombre completo</span><input className="input" name="nombre" value={nombre} onChange={(x) => setNombre(x.target.value)} placeholder="Ejemplo: Ana Martínez López" required /></label>
           <div className="campo"><span>Puesto</span><SelectorPuesto opciones={opciones} valor={puesto} cambiar={(o) => { setPuesto(o.valor); setMarcados(new Set(o.permisos)); }} /></div>
