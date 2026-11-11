@@ -4,15 +4,30 @@ import { useEffect, useId, useRef, useState } from "react";
 import { createPortal } from "react-dom";
 import QRCode from "qrcode";
 import { Icono } from "@/components/Icono";
+import { PalomitaAnimada } from "@/components/PalomitaAnimada";
+import { Modal } from "@/components/ui";
 import { formatoDinero } from "@/lib/money";
-import { cancelarCobroQr, cobrosQrEnEspera, estadoCobroQr, type CobroQrAbierto, type EstadoQr } from "./actions";
+import { cancelarCobroQr, cobrosQrEnEspera, estadoCobroQr, type CobroQrAbierto, type CobroQrHoy, type EstadoQr } from "./actions";
 
-const hora = (ms: number) => new Date(ms).toLocaleTimeString("es-MX", { hour: "2-digit", minute: "2-digit", hour12: false });
-const faltan = (ms: number) => Math.max(0, Math.ceil((ms - Date.now()) / 60000));
+const VIGENCIA_MS = 30 * 60000;
+const reloj = (ms: number) => { const s = Math.max(0, Math.round(ms / 1000)); return `${Math.floor(s / 60)}:${String(s % 60).padStart(2, "0")}`; };
+
+/** Cuenta regresiva de la vigencia del enlace, con una barra que se vacía. */
+function Vigencia({ vence }: { vence: number }) {
+  const [ahora, setAhora] = useState(() => Date.now());
+  useEffect(() => { const t = setInterval(() => setAhora(Date.now()), 1000); return () => clearInterval(t); }, []);
+  const resta = Math.max(0, vence - ahora);
+  return (
+    <span className="cqr-vig" role="timer" aria-label={`El enlace vence en ${Math.ceil(resta / 60000)} minutos`}>
+      <span className="cqr-vig-t"><Icono n="reloj" />Enlace vigente<b>{reloj(resta)}</b></span>
+      <span className="cqr-vig-b"><i style={{ transform: `scaleX(${Math.min(1, resta / VIGENCIA_MS)})` }} /></span>
+    </span>
+  );
+}
 
 /**
  * Cobro con QR: el cliente escanea y paga en su teléfono. La venta se registra sola cuando Stripe confirma el pago.
- * Cerrar la ventana no cancela el cobro: el enlace vale 30 minutos y el cobro queda en espera en la pantalla de Cobro.
+ * Cerrar la ventana no cancela el cobro: el enlace vale 30 minutos y el cobro se sigue desde el botón QR de Cobro.
  */
 export function CobroQR({ cobro, detalle, listo, cerrar, cancelado }: {
   cobro: CobroQrAbierto; detalle: string;
@@ -23,7 +38,6 @@ export function CobroQR({ cobro, detalle, listo, cerrar, cancelado }: {
   const [copiado, setCopiado] = useState(false);
   const [aviso, setAviso] = useState<string | null>(null);
   const [montado, setMontado] = useState(false);
-  const [, tic] = useState(0);
   const id = useId();
   useEffect(() => setMontado(true), []);
   useEffect(() => {
@@ -31,7 +45,7 @@ export function CobroQR({ cobro, detalle, listo, cerrar, cancelado }: {
   }, [cobro.url]);
   useEffect(() => {
     if (estado.estado !== "pendiente" && !(estado.estado === "pagado" && !estado.folio)) return;
-    const consultar = async () => { const r = await estadoCobroQr(cobro.id).catch(() => null); if (r) setEstado(r); tic((x) => x + 1); };
+    const consultar = async () => { const r = await estadoCobroQr(cobro.id).catch(() => null); if (r) setEstado(r); };
     consultar();
     const t = setInterval(consultar, 2500);
     return () => clearInterval(t);
@@ -56,7 +70,7 @@ export function CobroQR({ cobro, detalle, listo, cerrar, cancelado }: {
         <div className="modal-c">
           {pagado ? (
             <div className="cqr-ok" role="status">
-              <span className="cqr-pal"><Icono n="palomita" /></span>
+              <PalomitaAnimada />
               <b className="big">{formatoDinero(estado.total ?? cobro.total)}</b>
               <span>{detalle}<br />Folio {estado.folio}</span>
               <span className="vs-caja cqr-vs">
@@ -66,26 +80,26 @@ export function CobroQR({ cobro, detalle, listo, cerrar, cancelado }: {
                   {estado.tarjeta && <span><small>Tarjeta</small>{estado.tarjeta}</span>}
                   <span><small>Cobrado</small>{formatoDinero(estado.total ?? cobro.total)}</span>
                   {(estado.propina ?? 0) > 0 && <span><small>Propina incluida</small>{formatoDinero(estado.propina!)}</span>}
-                  {estado.referencia && <span className="vs-ref"><small>Referencia de Stripe</small><code>{estado.referencia}</code></span>}
+                  {estado.referencia && <span className="vs-ref"><small>Referencia</small><code>{estado.referencia}</code></span>}
                 </span>
-                <small className="muted">La venta ya está registrada. Stripe confirmó el pago, no el teléfono del cliente.</small>
               </span>
-              <button type="button" className="bt grande" onClick={() => listo({ folio: estado.folio!, total: estado.total ?? cobro.total })}>Nuevo cobro</button>
+              <button type="button" className="bt cqr-nuevo" onClick={() => listo({ folio: estado.folio!, total: estado.total ?? cobro.total })}><Icono n="mas" />Nuevo cobro</button>
             </div>
           ) : terminado ? (
             <div className="cqr-c">
               <b className="big">{formatoDinero(cobro.total)}</b>
               <span className="muted">{detalle}</span>
-              <span className="cqr-est"><i />{estado.estado === "reembolsado" ? "El pago se devolvió al cliente" : "El enlace se canceló o venció sin pago"}</span>
-              <small className="cqr-nota">No se registró ninguna venta. Si el cliente todavía quiere pagar, haz un cobro nuevo.</small>
+              <span className="cqr-est fin">{estado.estado === "reembolsado" ? "El pago se devolvió al cliente" : "El enlace se canceló o venció sin pago"}</span>
+              <small className="cqr-nota">No se registró ninguna venta. Si el cliente desea pagar, genera un cobro nuevo.</small>
             </div>
           ) : (
             <div className="cqr-c">
               <span className="cqr-qr" dangerouslySetInnerHTML={{ __html: svg }} />
               <b className="big">{formatoDinero(cobro.total)}</b>
               <span className="muted">{detalle}</span>
-              <span className="cqr-est" aria-live="polite"><i />{estado.estado === "pagado" ? "Pago recibido, registrando la venta…" : "Esperando el pago del cliente"}</span>
-              <small className="cqr-nota">Puedes cerrar esta ventana: el cobro sigue activo hasta las {hora(cobro.vence)} ({faltan(cobro.vence)} min) y te avisamos en Cobro cuando Stripe confirme el pago.</small>
+              <span className="cqr-est espera" aria-live="polite"><i />{estado.estado === "pagado" ? "Pago recibido, registrando la venta" : "Esperando el pago del cliente"}</span>
+              <Vigencia vence={cobro.vence} />
+              <small className="cqr-nota">Puedes cerrar esta ventana sin cancelar el cobro. Su estado se consulta en el botón QR de Cobro y la confirmación aparecerá en cuanto Stripe valide el pago.</small>
               {aviso && <p className="aviso error" style={{ margin: 0 }}>{aviso}</p>}
               <div className="cqr-acc">
                 <button type="button" className="ac-link" onClick={copiar}><Icono n={copiado ? "palomita" : "copiar"} />{copiado ? "Enlace copiado" : "Copiar enlace"}</button>
@@ -101,13 +115,16 @@ export function CobroQR({ cobro, detalle, listo, cerrar, cancelado }: {
   );
 }
 
+const ESTADO_HOY: Record<string, string> = { pagado: "Pagado", cancelado: "Sin pago", reembolsado: "Devuelto" };
+
 /**
- * Cobros con QR que siguen esperando el pago. Se actualiza sola; cuando Stripe confirma uno, abre el aviso de pago recibido.
- * `nuevo` agrega a la lista el cobro que se acaba de dejar en espera al cerrar la ventana.
+ * Botón QR junto al buscador de Cobro: muestra cuántos cobros con QR esperan pago y abre la lista de hoy
+ * (en espera, pagados y sin pago). Cuando Stripe confirma uno, abre el aviso de pago recibido.
  */
-export function CobrosEnEspera({ nuevo, abrir }: { nuevo: CobroQrAbierto | null; abrir: (c: CobroQrAbierto) => void }) {
+export function CobrosQr({ nuevo, abrir }: { nuevo: CobroQrAbierto | null; abrir: (c: CobroQrAbierto) => void }) {
   const [lista, setLista] = useState<CobroQrAbierto[]>([]);
-  const [aviso, setAviso] = useState<string | null>(null);
+  const [hoy, setHoy] = useState<CobroQrHoy[]>([]);
+  const [panel, setPanel] = useState(false);
   const seguidos = useRef<Map<string, CobroQrAbierto>>(new Map());
   const [, tic] = useState(0);
   useEffect(() => {
@@ -120,11 +137,11 @@ export function CobrosEnEspera({ nuevo, abrir }: { nuevo: CobroQrAbierto | null;
       if (!r || !vivo) return;
       for (const p of r.pendientes) seguidos.current.set(p.id, p);
       setLista(r.pendientes);
+      setHoy(r.hoy);
       for (const x of r.resueltos) {
         const c = seguidos.current.get(x.id);
         seguidos.current.delete(x.id);
-        if (x.estado === "pagado" && c) abrir(c);
-        else if (x.estado === "cancelado" && c) setAviso(`El cobro de ${formatoDinero(c.total)} venció sin pago.`);
+        if (x.estado === "pagado" && c) { setPanel(false); abrir(c); }
       }
       tic((n) => n + 1);
     };
@@ -132,19 +149,35 @@ export function CobrosEnEspera({ nuevo, abrir }: { nuevo: CobroQrAbierto | null;
     const t = setInterval(consultar, 4000);
     return () => { vivo = false; clearInterval(t); };
   }, [abrir]);
-  if (!lista.length && !aviso) return null;
+  if (!lista.length && !hoy.length) return null;
+  const ver = (c: CobroQrAbierto) => { setPanel(false); abrir(c); };
   return (
-    <section className="glass cqr-espera" aria-label="Cobros con QR en espera">
-      {lista.length > 0 && <span className="lab">Cobros con QR en espera</span>}
-      {lista.map((c) => (
-        <button type="button" key={c.id} className="cqr-fila" onClick={() => abrir(c)}>
-          <span className="cqr-pulso" aria-hidden="true" />
-          <span className="cqr-fila-t"><b>{formatoDinero(c.total)}</b><small>{c.detalle || "Cobro con QR"}</small></span>
-          <span className="cqr-vence">{faltan(c.vence)} min</span>
-          <Icono n="derecha" />
-        </button>
-      ))}
-      {aviso && <p className="muted cqr-venc" role="status">{aviso} <button type="button" className="ac-link" onClick={() => setAviso(null)}>Entendido</button></p>}
-    </section>
+    <>
+      <button type="button" className={`cqr-boton ${lista.length ? "con" : ""}`} onClick={() => setPanel(true)}
+        aria-label={lista.length ? `${lista.length} cobros con QR en espera` : "Cobros con QR de hoy"}>
+        <Icono n="cuadros" /><span>QR</span>{lista.length > 0 && <b>{lista.length}</b>}
+      </button>
+      <Modal abierto={panel} cerrar={() => setPanel(false)} etiqueta="Cobros con QR" titulo="Hoy">
+        <div className="cqr-panel">
+          {lista.length > 0 && <span className="lab">En espera de pago</span>}
+          {lista.map((c) => (
+            <button type="button" key={c.id} className="cqr-fila" onClick={() => ver(c)}>
+              <span className="cqr-pulso" aria-hidden="true" />
+              <span className="cqr-fila-t"><b>{formatoDinero(c.total)}</b><small>{c.detalle || "Cobro con QR"}</small></span>
+              <span className="cqr-vence">{reloj(c.vence - Date.now())}</span>
+              <Icono n="derecha" />
+            </button>
+          ))}
+          {hoy.length > 0 && <span className="lab">Resueltos hoy</span>}
+          {hoy.map((c) => (
+            <div key={c.id} className={`cqr-fila hecho ${c.estado}`}>
+              <span className="cqr-fila-t"><b>{formatoDinero(c.total)}</b><small>{c.hora}{c.detalle ? `, ${c.detalle}` : ""}</small></span>
+              <span className="cqr-hoy-est">{c.estado === "pagado" && <Icono n="palomita" />}{ESTADO_HOY[c.estado] ?? c.estado}{c.folio ? <small>{c.folio}</small> : null}</span>
+            </div>
+          ))}
+          {!lista.length && !hoy.length && <p className="muted">Hoy no hay cobros con QR.</p>}
+        </div>
+      </Modal>
+    </>
   );
 }

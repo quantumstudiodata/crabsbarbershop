@@ -7,7 +7,7 @@ import { Fl, Icono } from "@/components/Icono";
 import { Selector } from "@/components/ui";
 import { formatoDinero, leerPesos } from "@/lib/money";
 import { registrarVenta, type CobroQrAbierto, type EstadoCobro } from "./actions";
-import { CobroQR, CobrosEnEspera } from "./CobroQR";
+import { CobroQR, CobrosQr } from "./CobroQR";
 import { aplicarPromos, descuentoDe, momentoEn, participa, vigente, type Promo } from "@/lib/promociones";
 
 type Servicio = { id: string; nombre: string; duracionMin: number; precio: number; categoria: string };
@@ -196,11 +196,13 @@ export function FormCobro(p: {
     <form action={accion} className="cobro" ref={raiz}>
       <input type="hidden" name="datos" value={datos} />
       <div className="pila" style={{ gap: 22 }}>
-        {p.qr && <CobrosEnEspera nuevo={enEspera} abrir={abrirQr} />}
-        <label className="con-icono buscador">
-          <Icono n="buscar" />
-          <input className="input" data-paso="" value={buscar} onChange={(e) => setBuscar(e.target.value)} placeholder="Buscar servicio" aria-label="Buscar servicio" autoComplete="off" />
-        </label>
+        <div className="cob-busca">
+          <label className="con-icono buscador">
+            <Icono n="buscar" />
+            <input className="input" data-paso="" value={buscar} onChange={(e) => setBuscar(e.target.value)} placeholder="Buscar servicio" aria-label="Buscar servicio" autoComplete="off" />
+          </label>
+          {p.qr && <CobrosQr nuevo={enEspera} abrir={abrirQr} />}
+        </div>
 
         {categorias.length === 0 && <p className="muted">No hay servicios con ese nombre.</p>}
         {categorias.map((c) => (

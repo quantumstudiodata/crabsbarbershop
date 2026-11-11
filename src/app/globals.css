@@ -3575,7 +3575,7 @@ a.eq2-fila:hover { background: rgba(255,255,255,.45); }
 .cqr-nota { font-size: 12.5px; color: var(--faint); max-width: 330px; line-height: 1.45; }
 .cqr-acc { display: flex; gap: 18px; flex-wrap: wrap; justify-content: center; }
 .cqr-ok { padding: 12px 0 4px; } .cqr-ok > span:not(.cqr-pal) { font-size: 13.5px; color: var(--muted); line-height: 1.5; } .cqr-ok small { font-size: 12.5px; color: var(--faint); }
-.cqr-ok .bt { width: 100%; margin-top: 6px; }
+.cqr-ok .bt { margin-top: 6px; }
 .cqr-pal { width: 72px; height: 72px; border-radius: 22px; background: #13171c; color: #fff; display: grid; place-items: center; }
 .cqr-pal .ic { width: 34px; height: 34px; stroke-width: 2.4; }
 /* Página de pago del cliente */
@@ -3634,21 +3634,6 @@ button.rv-opc:not(.on) .radio-p { background: none; border-color: rgba(43,58,71,
 .vs-ref code { overflow-wrap: anywhere; font-family: var(--f-mono); font-size: 12px; }
 .vs-caja .vs-grid small { display: block; }
 
-/* Cobros con QR en espera (pantalla de Cobro) */
-.cqr-espera { display: grid; gap: 8px; padding: 14px; border-radius: 20px; }
-.cqr-espera .lab { font: 500 11px var(--f-mono); letter-spacing: .14em; text-transform: uppercase; color: var(--muted); }
-.cqr-fila { display: flex; align-items: center; gap: 12px; width: 100%; padding: 10px 12px; border: 1px solid var(--line); border-radius: 14px; background: rgba(255,255,255,.7); font: inherit; color: inherit; text-align: left; cursor: pointer; }
-.cqr-fila-t { display: grid; flex: 1; min-width: 0; }
-.cqr-fila-t small { color: var(--muted); overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
-.cqr-vence { font: 500 12px var(--f-mono); color: #3c5163; background: #e3e9ef; border-radius: 999px; padding: 3px 9px; white-space: nowrap; }
-.cqr-fila .ic { width: 16px; height: 16px; color: var(--faint); }
-.cqr-pulso { width: 9px; height: 9px; border-radius: 50%; background: #4b6274; flex: none; animation: cqrPulso 1.6s ease-in-out infinite; }
-@keyframes cqrPulso { 0%,100% { opacity: 1; } 50% { opacity: .3; } }
-@media (prefers-reduced-motion: reduce) { .cqr-pulso { animation: none; } }
-.cqr-venc { margin: 0; font-size: 13px; }
-.cqr-cancelar { justify-self: center; color: var(--muted); font-size: 13px; }
-.cqr-vs { text-align: left; width: 100%; }
-
 /* Ventas en el teléfono: el chip de Stripe va debajo del servicio para no cortar el texto */
 .hist-linea .srv:has(> .srv-t) { display: flex; align-items: center; min-width: 0; }
 .hist-linea .srv-t { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; min-width: 0; }
@@ -3663,3 +3648,65 @@ button.rv-opc:not(.on) .radio-p { background: none; border-color: rgba(43,58,71,
 .cqr-ok .cqr-vs .vs-grid > span { display: flex; justify-content: space-between; align-items: baseline; gap: 14px; font-size: 14px; text-align: right; }
 .cqr-ok .cqr-vs .vs-grid small { display: inline; flex: none; font-size: 13px; color: var(--muted); text-align: left; }
 .cqr-ok .cqr-vs > small { text-align: left; font-size: 12.5px; }
+
+/* Botón QR junto al buscador de Cobro */
+.cob-busca { display: flex; gap: 10px; align-items: stretch; }
+.cob-busca .buscador { flex: 1; min-width: 0; }
+.cqr-boton { position: relative; display: inline-flex; align-items: center; gap: 6px; padding: 0 16px; min-height: 48px; border-radius: 16px; border: 1px solid var(--line); background: rgba(255,255,255,.75); font: inherit; font-weight: 600; color: inherit; cursor: pointer; flex: none; }
+.cqr-boton .ic { width: 18px; height: 18px; }
+.cqr-boton b { display: grid; place-items: center; min-width: 20px; height: 20px; padding: 0 6px; border-radius: 999px; background: #13171c; color: #fff; font-size: 11.5px; }
+.cqr-boton.con::after { content: ""; position: absolute; inset: -1px; border-radius: 16px; border: 1.5px solid #4b6274; opacity: 0; animation: cqrHalo 2.4s ease-out infinite; pointer-events: none; }
+@keyframes cqrHalo { 0% { opacity: .55; transform: scale(1); } 100% { opacity: 0; transform: scale(1.12); } }
+
+/* Panel de cobros con QR de hoy */
+.cqr-panel { display: grid; gap: 8px; }
+.cqr-panel .lab { margin-top: 6px; font: 500 11px var(--f-mono); letter-spacing: .14em; text-transform: uppercase; color: var(--muted); }
+.cqr-fila { display: flex; align-items: center; gap: 12px; width: 100%; padding: 11px 13px; border: 1px solid var(--line); border-radius: 14px; background: rgba(255,255,255,.75); font: inherit; color: inherit; text-align: left; cursor: pointer; }
+.cqr-fila.hecho { cursor: default; background: rgba(255,255,255,.45); }
+.cqr-fila.cancelado .cqr-fila-t b, .cqr-fila.reembolsado .cqr-fila-t b { color: var(--muted); text-decoration: line-through; }
+.cqr-fila-t { display: grid; flex: 1; min-width: 0; }
+.cqr-fila-t small { color: var(--muted); overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.cqr-vence { font: 500 12px var(--f-mono); color: #3c5163; background: #e3e9ef; border-radius: 999px; padding: 3px 9px; white-space: nowrap; }
+.cqr-fila > .ic { width: 16px; height: 16px; color: var(--faint); }
+.cqr-pulso { width: 9px; height: 9px; border-radius: 50%; background: #4b6274; flex: none; animation: cqrPulso 1.6s ease-in-out infinite; }
+@keyframes cqrPulso { 0%,100% { opacity: 1; } 50% { opacity: .3; } }
+.cqr-hoy-est { display: grid; justify-items: end; font-size: 13px; font-weight: 600; color: #3c5163; white-space: nowrap; }
+.cqr-hoy-est .ic { display: none; }
+.cqr-hoy-est small { font: 500 11px var(--f-mono); color: var(--muted); }
+.cqr-fila.cancelado .cqr-hoy-est, .cqr-fila.reembolsado .cqr-hoy-est { color: var(--muted); }
+.cqr-cancelar { justify-self: center; color: var(--muted); font-size: 13px; }
+.cqr-vs { text-align: left; width: 100%; }
+
+/* Estado "esperando el pago": punto que late y un brillo que recorre la píldora */
+.cqr-est.espera { position: relative; overflow: hidden; }
+.cqr-est.espera::after { content: ""; position: absolute; inset: 0; background: linear-gradient(100deg, transparent 20%, rgba(255,255,255,.55) 50%, transparent 80%); transform: translateX(-100%); animation: cqrBrillo 2.6s ease-in-out infinite; }
+@keyframes cqrBrillo { 0% { transform: translateX(-100%); } 60%, 100% { transform: translateX(100%); } }
+.cqr-est.fin i { display: none; }
+
+/* Vigencia del enlace: reloj y barra que se vacía */
+.cqr-vig { display: grid; gap: 6px; width: min(100%, 300px); }
+.cqr-vig-t { display: flex; align-items: center; justify-content: center; gap: 6px; font-size: 12.5px; color: var(--muted); }
+.cqr-vig-t .ic { width: 14px; height: 14px; }
+.cqr-vig-t b { font: 600 13px var(--f-mono); color: #13171c; margin-left: 2px; }
+.cqr-vig-b { height: 4px; border-radius: 999px; background: rgba(30,45,60,.1); overflow: hidden; }
+.cqr-vig-b i { display: block; height: 100%; background: #4b6274; border-radius: inherit; transform-origin: left; transition: transform 1s linear; }
+
+/* Botón "Nuevo cobro" compacto */
+.cqr-nuevo { display: inline-flex; align-items: center; gap: 8px; padding: 12px 22px; border-radius: 999px; width: auto; }
+.cqr-nuevo .ic { width: 16px; height: 16px; }
+
+/* Palomita animada de pago confirmado */
+.pal-anim { position: relative; display: inline-grid; place-items: center; }
+.pal-anim svg { position: relative; overflow: visible; }
+.pal-fondo { fill: #e3e9ef; transform-origin: 42px 42px; animation: palFondo .45s cubic-bezier(.2,.9,.3,1.3) both; }
+.pal-aro { fill: none; stroke: #13171c; stroke-width: 3; stroke-linecap: round; stroke-dasharray: 239; stroke-dashoffset: 239; transform: rotate(-90deg); transform-origin: 42px 42px; animation: palAro .6s .1s cubic-bezier(.65,0,.35,1) forwards; }
+.pal-trazo { fill: none; stroke: #13171c; stroke-width: 4.5; stroke-linecap: round; stroke-linejoin: round; stroke-dasharray: 50; stroke-dashoffset: 50; animation: palTrazo .38s .62s cubic-bezier(.65,0,.35,1) forwards; }
+.pal-onda { position: absolute; inset: 0; border-radius: 50%; border: 2px solid #4b6274; opacity: 0; animation: palOnda .9s .85s ease-out; }
+@keyframes palFondo { from { transform: scale(.6); opacity: 0; } to { transform: scale(1); opacity: 1; } }
+@keyframes palAro { to { stroke-dashoffset: 0; } }
+@keyframes palTrazo { to { stroke-dashoffset: 0; } }
+@keyframes palOnda { 0% { opacity: .5; transform: scale(1); } 100% { opacity: 0; transform: scale(1.45); } }
+@media (prefers-reduced-motion: reduce) {
+  .pal-fondo, .pal-aro, .pal-trazo, .pal-onda, .cqr-pulso, .cqr-boton.con::after, .cqr-est.espera::after { animation: none; }
+  .pal-aro, .pal-trazo { stroke-dashoffset: 0; }
+}

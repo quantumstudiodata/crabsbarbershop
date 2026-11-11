@@ -242,9 +242,11 @@ const detalleQr = (d: unknown) => {
  * Cobros con QR en espera de quien cobra (o de todo el negocio, para quien ve todas las ventas).
  * También avisa cuáles de los que se estaban siguiendo ya se resolvieron (pagados, cancelados o vencidos).
  */
-export async function cobrosQrEnEspera(seguidos: string[] = []): Promise<{ pendientes: CobroQrAbierto[]; resueltos: (EstadoQr & { id: string; detalle: string })[] }> {
+export type CobroQrHoy = { id: string; estado: string; total: number; detalle: string; hora: string; folio?: string };
+
+export async function cobrosQrEnEspera(seguidos: string[] = []): Promise<{ pendientes: CobroQrAbierto[]; resueltos: (EstadoQr & { id: string; detalle: string })[]; hoy: CobroQrHoy[] }> {
   const s = await requerirSesion();
-  if (!s.barberia.stripeCuenta) return { pendientes: [], resueltos: [] };
+  if (!s.barberia.stripeCuenta) return { pendientes: [], resueltos: [], hoy: [] };
   const { verificarPago, vencerSiToca, VIGENCIA_QR_MIN } = await import("@/lib/pagos");
   const propios = s.puede("ventas.ver_todas") ? [] : [eq(pagosLinea.creadoPor, s.usuario.id)];
   const pend = await db.select().from(pagosLinea)
@@ -256,7 +258,18 @@ export async function cobrosQrEnEspera(seguidos: string[] = []): Promise<{ pendi
   const pendientes = ahora.filter((p) => p.estado === "pendiente").sort((a, b) => a.creadoEn.getTime() - b.creadoEn.getTime())
     .map((p) => ({ id: p.id, url: `${base}/pagar/${p.token}`, total: p.monto + p.propina, vence: p.creadoEn.getTime() + VIGENCIA_QR_MIN * 60000, detalle: detalleQr(p.detalle) }));
   const resueltos = await Promise.all(ahora.filter((p) => p.estado !== "pendiente" && seguidos.includes(p.id)).map(async (p) => ({ id: p.id, detalle: detalleQr(p.detalle), ...(await datosQr(p, s.barberia.zonaHoraria)) })));
-  return { pendientes, resueltos };
+  // Cobros con QR de hoy ya resueltos (pagados, vencidos o cancelados), para revisar desde Cobro.
+  const zona = s.barberia.zonaHoraria;
+  const fmt = new Intl.DateTimeFormat("es-MX", { timeZone: zona, hour: "2-digit", minute: "2-digit", hour12: false });
+  const dia = new Intl.DateTimeFormat("en-CA", { timeZone: zona });
+  const hoyTxt = dia.format(new Date());
+  const recientes = await db.select({ id: pagosLinea.id, estado: pagosLinea.estado, monto: pagosLinea.monto, propina: pagosLinea.propina, detalle: pagosLinea.detalle, creadoEn: pagosLinea.creadoEn, folio: schema.ventas.folio })
+    .from(pagosLinea).leftJoin(schema.ventas, eq(schema.ventas.id, pagosLinea.ventaId))
+    .where(and(eq(pagosLinea.barberiaId, s.barberia.id), eq(pagosLinea.tipo, "venta"), sql`${pagosLinea.creadoEn} > now() - interval '24 hours'`, sql`${pagosLinea.estado} <> 'pendiente'`, ...propios))
+    .orderBy(sql`${pagosLinea.creadoEn} desc`).limit(20);
+  const hoy = recientes.filter((x) => dia.format(x.creadoEn) === hoyTxt)
+    .map((x) => ({ id: x.id, estado: x.estado, total: x.monto + x.propina, detalle: detalleQr(x.detalle), hora: fmt.format(x.creadoEn), folio: x.folio ?? undefined }));
+  return { pendientes, resueltos, hoy };
 }
 
 /** Cancela un cobro con QR que todavía no se paga (al cerrar la ventana). */

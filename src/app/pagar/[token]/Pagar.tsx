@@ -5,6 +5,7 @@ import { loadStripe, type Stripe } from "@stripe/stripe-js";
 import { useRouter } from "next/navigation";
 import { useEffect, useMemo, useState } from "react";
 import { Icono } from "@/components/Icono";
+import { PalomitaAnimada } from "@/components/PalomitaAnimada";
 import { formatoDinero } from "@/lib/money";
 import { elegirPropina, estadoPago } from "../actions";
 
@@ -104,7 +105,7 @@ function Recibo(p: Parameters<typeof Pagar>[0]) {
   return (
     <>
       <section className="pg-ok" role="status">
-        <span className="cqr-pal" aria-hidden="true"><Icono n="palomita" /></span>
+        <PalomitaAnimada />
         <h1>Pago recibido</h1>
         <b className="big">{formatoDinero(p.monto + p.propina)}</b>
         <span className="muted">Confirmado por Stripe{p.tarjeta ? `, con ${p.tarjeta}` : ""}</span>
