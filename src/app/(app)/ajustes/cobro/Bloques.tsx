@@ -48,14 +48,15 @@ export function CategoriasEgresos({ categorias, puede }: { categorias: Categoria
   const [nueva, setNueva] = useState(false);
   const [renombrar, setRenombrar] = useState<{ c: Categoria; nombre: string } | null>(null);
   const [borrar, setBorrar] = useState<Categoria | null>(null);
+  const [todas, setTodas] = useState(false);
   useEffect(() => { if (e.ok) { setNueva(false); setAviso(e); } }, [e.ok, e.n, e]);
   const hacer = (f: () => Promise<EstadoGasto>, despues?: () => void) => iniciar(async () => { const r = await f(); setAviso(r); if (!r.error) despues?.(); });
   return (
     <section className="sub-cfg">
-      <div className="entre"><span><b>Categorías de egresos</b><small>Archivar una categoría no cambia los egresos que ya la usan.</small></span>
+      <div className="entre"><span><b>Categorías</b><small>{categorias.filter((c) => c.activo).length} en uso. Archivar una no cambia los egresos que ya la usan.</small></span>
         {puede && <button type="button" className="bt sec solo chico" onClick={() => setNueva(true)}><Icono n="mas" />Agregar categoría</button>}</div>
       <div className="lista-cfg">
-        {categorias.map((c) => (
+        {(todas ? categorias : categorias.slice(0, 5)).map((c) => (
           <div key={c.id} className={c.activo ? "" : "apagada"}>
             <span><b>{c.nombre}</b></span>
             <span className={`chip-p ${c.activo ? "si" : ""}`}>{c.activo ? "En uso" : "Archivada"}</span>
@@ -67,6 +68,7 @@ export function CategoriasEgresos({ categorias, puede }: { categorias: Categoria
           </div>
         ))}
       </div>
+      {categorias.length > 5 && <button type="button" className="link-c ver-mas" onClick={() => setTodas(!todas)}>{todas ? "Ver menos" : `Ver todas (${categorias.length})`}</button>}
       {aviso.error && <p className="aviso error" style={{ margin: 0 }}>{aviso.error}</p>}
       {aviso.mensaje && !aviso.error && <p className="confirma" key={aviso.n}><Icono n="palomita" />{aviso.mensaje}</p>}
       {nueva && (
@@ -101,7 +103,7 @@ export function CategoriasEgresos({ categorias, puede }: { categorias: Categoria
 
 type Gasto = { id: string; concepto: string; categoria: string; monto: number; metodo: string; periodicidad: string };
 const METODOS: [string, string][] = [["efectivo", "Efectivo"], ["transferencia", "Transferencia"], ["tarjeta", "Tarjeta"]];
-const PERIODOS: [string, string][] = [["", "Sin periodicidad"], ["semanal", "Semanal"], ["quincenal", "Quincenal"], ["mensual", "Mensual"]];
+const PERIODOS: [string, string][] = [["", "Sin periodicidad"], ["diaria", "Diaria"], ["semanal", "Semanal"], ["quincenal", "Quincenal"], ["mensual", "Mensual"]];
 
 function FormGasto({ g, categorias, metodos, cerrar }: { g: Gasto | null; categorias: string[]; metodos: string[]; cerrar: () => void }) {
   const [e, accion, guardando] = useActionState<EstadoAjuste, FormData>(agregarConcepto, {});
@@ -134,7 +136,7 @@ export function GastosFrecuentes({ gastos, categorias, metodos, puede }: { gasto
   const [pendiente, iniciar] = useTransition();
   return (
     <section className="sub-cfg">
-      <div className="entre"><span><b>Gastos frecuentes</b><small>Guarda gastos que registras habitualmente para no tener que llenar los mismos datos cada vez.</small></span>
+      <div className="entre"><span><b>Gastos frecuentes</b><small>Aparecen como atajo al registrar un egreso, con sus datos ya llenos.</small></span>
         {puede && gastos.length > 0 && <button type="button" className="bt sec solo chico" onClick={() => setForm({ g: null })}><Icono n="mas" />Crear gasto frecuente</button>}</div>
       {gastos.length === 0 ? (
         <div className="vacio-cfg">
@@ -173,34 +175,34 @@ export function OpcionesRegistro({ metodos, comprobantes, obligatorio = false, p
   const [mets, setMets] = useState(metodos);
   const [fun, setFun] = useState({ comprobantes, obligatorio, periodicidad });
   const opciones: ["comprobantes" | "obligatorio" | "periodicidad", string, string][] = [
-    ["comprobantes", "Comprobantes", "Adjuntar fotografías o archivos a los egresos. Los pagados en efectivo no lo piden: la evidencia es el efectivo."],
+    ["comprobantes", "Comprobantes", fun.comprobantes ? "Se puede adjuntar foto o archivo a los egresos con transferencia o tarjeta. En efectivo no se pide." : "Los egresos se registran sin adjuntar comprobante."],
     ...(fun.comprobantes ? [["obligatorio", "Comprobante obligatorio", fun.obligatorio
       ? "Cada egreso pagado con transferencia o tarjeta necesita su comprobante para guardarse."
       : "El comprobante es opcional: se puede guardar el egreso sin adjuntarlo."] as ["obligatorio", string, string]] : []),
-    ["periodicidad", "Periodicidad de gastos", "Registrar gastos semanales, quincenales o mensuales."],
+    ["periodicidad", "Periodicidad", fun.periodicidad ? "Cada egreso puede marcarse como diario, semanal, quincenal o mensual." : "Todos los egresos se registran como de una sola vez."],
   ];
   return (
     <section className="sub-cfg">
-      <span><b>Opciones de registro</b><small>Configura qué información y opciones estarán disponibles al registrar egresos.</small></span>
-      <div className="lista-cfg">
-        <div className="titulo-l"><span><b>Métodos de pago</b><small>Solo el efectivo que sale de la caja afecta el corte.</small></span></div>
-        {METODOS.map(([k, t]) => (
-          <label key={k} className={`sangria ${mets.includes(k) ? "" : "apagada"}`}>
-            <span><b>{t}</b></span>
-            <span className={`chip-p ${mets.includes(k) ? "si" : ""}`}>{mets.includes(k) ? "Activo" : "Apagado"}</span>
-            <Interruptor etiqueta={`${t} para egresos`} checked={mets.includes(k)} disabled={!puede}
-              onChange={() => {
+      <span><b>Al registrar un egreso</b><small>Qué se pide y qué opciones aparecen.</small></span>
+      <div className="eg-formas">
+        <span className="sub-a">Formas de pago permitidas</span>
+        <div className="eg-chips" role="group" aria-label="Formas de pago para egresos">
+          {METODOS.map(([k, t]) => (
+            <button key={k} type="button" aria-pressed={mets.includes(k)} disabled={!puede || pendiente} className={`chipf ${mets.includes(k) ? "on-suave" : ""}`}
+              onClick={() => {
                 // Cambia al momento; si el servidor no lo acepta, regresa a como estaba.
                 const antes = mets;
                 setMets(mets.includes(k) ? mets.filter((x) => x !== k) : [...mets, k]);
                 iniciar(async () => { const r = await alternarMetodoEgreso(k); setError(r.error ?? null); if (r.error) setMets(antes); });
-              }} />
-          </label>
-        ))}
+              }}>{mets.includes(k) && <Icono n="palomita" />}{t}</button>
+          ))}
+        </div>
+        <small className="muted">Solo el efectivo que sale de la caja afecta el corte.</small>
+      </div>
+      <div className="lista-cfg sin-chip">
         {opciones.map(([k, t, d]) => (
-          <label key={k} className={fun[k] ? "" : "apagada"}>
+          <label key={k} className={`${fun[k] ? "" : "apagada"} ${k === "obligatorio" ? "sangria" : ""}`}>
             <span><b>{t}</b><small>{d}</small></span>
-            <span className={`chip-p ${fun[k] ? "si" : ""}`}>{fun[k] ? "Activo" : "Apagado"}</span>
             <Interruptor etiqueta={t} checked={fun[k]} disabled={!puede} onChange={() => { setFun({ ...fun, [k]: !fun[k] }); iniciar(async () => { await alternarFuncion(k); }); }} />
           </label>
         ))}

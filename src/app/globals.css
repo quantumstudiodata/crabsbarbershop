@@ -3912,3 +3912,11 @@ html, body { overscroll-behavior-y: none; }
 .aj-op.on .aj-ic { background: var(--ink); color: #fff; }
 .aj-res { display: flex; justify-content: space-between; align-items: center; gap: 10px; flex-wrap: wrap; padding: 12px 14px; border-radius: 14px; background: rgba(255,255,255,.6); border: 1px solid var(--line); font-size: 13px; }
 .aj-cambio { display: inline-flex; align-items: center; gap: 6px; } .aj-cambio s { color: var(--faint); } .aj-cambio .ic { width: 14px; height: 14px; color: var(--faint); }
+.lista-cfg.sin-chip > label, .lista-cfg.sin-chip > div { grid-template-columns: minmax(0, 1fr) auto; }
+.eg-formas { display: grid; gap: 8px; }
+.eg-chips { display: flex; flex-wrap: wrap; gap: 8px; }
+.eg-chips .chipf .ic { width: 14px; height: 14px; }
+.met-qr { display: inline-flex; align-items: center; gap: 6px; }
+.met-qr .ic { width: 15px; height: 15px; color: #3c5163; }
+.eg-chips .chipf { padding: 6px 12px; font-size: 13px; border-radius: 999px; gap: 6px; }
+.eg-chips .chipf:not(.on-suave) { color: var(--faint); }

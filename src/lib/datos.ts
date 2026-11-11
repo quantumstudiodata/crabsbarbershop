@@ -454,10 +454,11 @@ export async function datosParaMeta(barberiaId: string, zona: string, hoy: strin
       .where(and(eq(s.remuneraciones.barberiaId, barberiaId), isNull(s.remuneraciones.vigenteHasta), eq(s.usuarios.activo, true))),
   ]);
   // Gastos frecuentes llevados a lo que cuestan en un mes; los de una sola vez no cuentan.
-  const POR_MES: Record<string, number> = { semanal: 52 / 12, quincenal: 2, mensual: 1 };
+  // Los diarios cuentan los días de trabajo del mes.
+  const dias = diasHabilesDelMes(hoy.slice(0, 7));
+  const POR_MES: Record<string, number> = { diaria: dias, semanal: 52 / 12, quincenal: 2, mensual: 1 };
   const fijos = frecuentes.filter((f) => f.monto > 0 && POR_MES[f.periodicidad]).map((f) => ({ concepto: f.concepto, mensual: Math.round(f.monto * POR_MES[f.periodicidad]) }));
   // Sueldos del resto del equipo (administración, recepción...): también son un gasto del mes.
-  const dias = diasHabilesDelMes(hoy.slice(0, 7));
   for (const { r, nombre, rol } of rems) {
     if (rol === "barbera" || rol === "encargada") continue;
     const mensual = costoMensual({ ...r, modalidad: r.modalidad as Modalidad }, dias);

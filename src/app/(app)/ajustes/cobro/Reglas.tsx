@@ -83,9 +83,9 @@ export function CajaConfig({ apertura, corte, fondo, diferencia, evidencia }: { 
   return (
     <div className="pila">
       <Funciones alCambiar={(k, v) => { if (k === "apertura") setManual(v); if (k === "corte") setObligatorio(v); }} funciones={[
-        { clave: "apertura", nombre: "Apertura de caja", activa: apertura, encendida: "Alguien abre la caja contando el fondo inicial.", apagada: "La caja se abre sola con el fondo inicial sugerido al primer cobro del día." },
-        { clave: "evidencia", nombre: "Evidencias del corte de caja", activa: evidencia, encendida: "Al cerrar la caja se pueden adjuntar fotos o archivos de las transferencias y los pagos con tarjeta.", apagada: "El corte se hace sin adjuntar evidencias." },
-        { clave: "corte", nombre: "Cierre de caja obligatorio", activa: corte, encendida: "No se puede cobrar con la caja de un día anterior abierta: primero se hace el corte.", apagada: "Se puede seguir cobrando sin cerrar la caja del día anterior." },
+        { clave: "apertura", nombre: "Apertura de caja", activa: apertura, encendida: "Al empezar el día, quien está en turno cuenta el efectivo del cajón y lo anota como fondo inicial antes del primer cobro.", apagada: "No hay que abrir la caja: se abre sola con el fondo inicial sugerido en cuanto se hace el primer cobro del día." },
+        { clave: "evidencia", nombre: "Evidencias del corte de caja", activa: evidencia, encendida: "Al cerrar la caja se adjuntan fotos o archivos de las transferencias y los pagos con tarjeta. Los pagos con QR no lo necesitan: Stripe los confirma.", apagada: "El corte se hace sin adjuntar evidencias." },
+        { clave: "corte", nombre: "Cierre de caja obligatorio", activa: corte, encendida: "Si la caja de un día anterior sigue abierta, no se puede cobrar hasta hacer su corte.", apagada: "Se puede cobrar aunque la caja del día anterior siga abierta; el corte se hace después." },
       ]} />
       {!obligatorio && <p className="aviso-riesgo">Sin cierre obligatorio, las ventas de varios días pueden quedar en un mismo corte y es más difícil saber cuándo faltó o sobró dinero.</p>}
       <FormGuardar className="pila">

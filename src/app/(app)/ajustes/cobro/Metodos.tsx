@@ -9,7 +9,7 @@ import { alternarMetodo, eliminarMetodo, guardarMetodo } from "./actions";
 type Metodo = { id: string; nombre: string; descripcion: string; esEfectivo: boolean; activo: boolean };
 
 /** Formas de pago en una lista compacta. Las acciones aparecen en el menú de tres puntos. */
-export function Metodos({ metodos }: { metodos: Metodo[] }) {
+export function Metodos({ metodos, qr = null }: { metodos: Metodo[]; qr?: "activa" | "pendiente" | "sin" | null }) {
   const [lista, setLista] = useState(metodos);
   const [form, setForm] = useState<{ id?: string; nombre: string; descripcion: string } | null>(null);
   const [borrar, setBorrar] = useState<Metodo | null>(null);
@@ -38,6 +38,13 @@ export function Metodos({ metodos }: { metodos: Metodo[] }) {
             ]} />
           </div>
         ))}
+        {qr && (
+          <div className={qr === "activa" ? "" : "apagada"}>
+            <span><b className="met-qr"><Icono n="cuadros" />Pago con QR</b><small>{qr === "activa" ? "Se activó al conectar Stripe. El cliente paga desde su teléfono y Stripe confirma el pago." : qr === "pendiente" ? "Se activa solo cuando Stripe termine de revisar tu cuenta." : "Se activa solo al conectar Stripe en Pagos en línea."}</small></span>
+            <span className={`chip-p ${qr === "activa" ? "si" : ""}`}>{qr === "activa" ? "Activo" : "Desactivado"}</span>
+            <span />
+          </div>
+        )}
       </div>
       {aviso.error && <p className="aviso error">{aviso.error}</p>}
       {aviso.ok && <p className="confirma" key={aviso.ok}><Icono n="palomita" />{aviso.ok}</p>}

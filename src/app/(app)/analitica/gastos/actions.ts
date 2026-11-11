@@ -18,7 +18,7 @@ const listo = (mensaje: string): EstadoGasto => {
 };
 
 const METODOS = { efectivo: "efectivo", transferencia: "transferencia", tarjeta: "tarjeta" } as const;
-const PERIODOS = ["unica", "semanal", "quincenal", "mensual"];
+const PERIODOS = ["unica", "diaria", "semanal", "quincenal", "mensual"];
 const TIPOS_ARCHIVO = /^data:(image\/(jpeg|png|webp)|application\/pdf);base64,/;
 
 /**

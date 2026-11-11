@@ -77,7 +77,7 @@ export async function cambiarModeloCaja(valor: string): Promise<EstadoAjuste> {
   return { ok: true, n: Date.now() };
 }
 
-const PERIODOS_G = ["semanal", "quincenal", "mensual"];
+const PERIODOS_G = ["diaria", "semanal", "quincenal", "mensual"];
 const METODOS_G = ["efectivo", "transferencia", "tarjeta"];
 
 /** Guarda un gasto frecuente (nuevo o editado). Es solo una plantilla: no genera egresos por sí solo. */

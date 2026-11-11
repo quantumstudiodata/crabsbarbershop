@@ -8,8 +8,6 @@ import { db, schema } from "@/lib/db";
 import { fechaLocal } from "@/lib/fechas";
 import { formatoDinero } from "@/lib/money";
 import { NOMBRE_ROL, PERMISOS_CONFIG, permisosDe } from "@/lib/permisos";
-import { leerConfig } from "@/lib/agenda";
-import { Icono } from "@/components/Icono";
 import { redirect } from "next/navigation";
 import { Funciones } from "./Funciones";
 import { Metodos } from "./Metodos";
@@ -36,10 +34,11 @@ export default async function ConfigurarNegocio({ searchParams }: { searchParams
   const nPromos = (await db.select({ hasta: schema.promociones.hasta, pausada: schema.promociones.pausada, desde: schema.promociones.desde }).from(schema.promociones).where(eq(schema.promociones.barberiaId, b.id)))
     .filter((x) => !x.pausada && x.desde <= hoyN && (!x.hasta || x.hasta >= hoyN)).length;
   const $ = (c: number) => formatoDinero(c);
-  const cfgCitas = leerConfig(b.citasConfig);
   const si = (v: boolean) => (v ? "Activo" : "Apagado");
   const activos = metodos.filter((m) => m.activo);
   const edita = (p: "cobros" | "caja" | "metas" | "egresos") => s.puede(`configuracion.${p}`) && !s.vista;
+  // Pago con QR no es una forma de pago guardada: se activa sola al conectar Stripe.
+  const qr: "activa" | "pendiente" | "sin" | null = pagosDisponibles() ? ((b.stripeEstado as "sin" | "pendiente" | "activa") ?? "sin") : null;
   const NOMBRE_MET: Record<string, string> = { efectivo: "Efectivo", transferencia: "Transferencia", tarjeta: "Tarjeta" };
   return (
     <>
@@ -56,17 +55,21 @@ export default async function ConfigurarNegocio({ searchParams }: { searchParams
       )}
 
       <Bloque numero={1} titulo="Cobros y métodos de pago" puedeEditar={edita("cobros")}
-        resumen={`${activos.length} ${activos.length === 1 ? "forma de pago" : "formas de pago"}, descuentos hasta ${b.limiteDescuentoPct}% sin autorización`}
+        resumen={`${activos.length + (qr === "activa" ? 1 : 0)} ${activos.length + (qr === "activa" ? 1 : 0) === 1 ? "forma de pago" : "formas de pago"}, descuentos hasta ${b.limiteDescuentoPct}% sin autorización, promociones ${b.usaPromociones ? "permitidas" : "apagadas"}`}
         detalle={<Resumen filas={[
-          ["Formas de pago activas", activos.map((m) => m.nombre).join(", ") || "Ninguna"],
+          ["Formas de pago activas", [...activos.map((m) => m.nombre), ...(qr === "activa" ? ["Pago con QR"] : [])].join(", ") || "Ninguna"],
           ["Descuento sin autorización", `Hasta ${b.limiteDescuentoPct}%`],
           ["Descuentos", si(b.usaDescuentos)], ["Propinas", si(b.usaPropinas)], ["Dividir pago", si(b.usaDividirPago)],
+          ["Promociones", b.usaPromociones ? `Permitidas, ${nPromos} ${nPromos === 1 ? "activa" : "activas"}` : "Apagadas"],
         ]} />}>
-        <Metodos metodos={metodos.map(({ id, nombre, descripcion, esEfectivo, activo }) => ({ id, nombre, descripcion, esEfectivo, activo }))} />
+        <Metodos qr={qr} metodos={metodos.map(({ id, nombre, descripcion, esEfectivo, activo }) => ({ id, nombre, descripcion, esEfectivo, activo }))} />
         <ReglasCobro descuento={b.limiteDescuentoPct} autorizan={autorizan} funciones={[
           { clave: "descuentos", nombre: "Descuentos", activa: b.usaDescuentos, encendida: "Aparecen al cobrar.", apagada: "No aparecen al cobrar." },
           { clave: "propinas", nombre: "Propinas", activa: b.usaPropinas, encendida: "Aparecen al cobrar.", apagada: "No aparecen al cobrar." },
           { clave: "dividir", nombre: "Dividir pago", activa: b.usaDividirPago, encendida: "Un cliente puede pagar con dos formas de pago.", apagada: "Cada venta se paga con una sola forma." },
+        ]} />
+        <Funciones funciones={[
+          { clave: "promociones", nombre: "Promociones", activa: b.usaPromociones, encendida: `Se crean en Servicios, pestaña Promociones, y se aplican solas al cobrar. ${nPromos} ${nPromos === 1 ? "activa" : "activas"} hoy.`, apagada: "No se aplican promociones al cobrar." },
         ]} />
       </Bloque>
 
@@ -93,23 +96,7 @@ export default async function ConfigurarNegocio({ searchParams }: { searchParams
         <MetaMensual metaMensual={Math.round(b.metaMensual / 100)} datosMeta={await datosParaMeta(b.id, b.zonaHoraria, fechaLocal(new Date(), b.zonaHoraria))} />
       </Bloque>
 
-      <Bloque numero={4} titulo="Promociones" puedeEditar={edita("cobros")}
-        resumen={b.usaPromociones ? `Permitidas, ${nPromos} ${nPromos === 1 ? "promoción activa" : "promociones activas"}` : "Apagadas"}
-        detalle={<>
-          <p className="muted" style={{ margin: 0, fontSize: 13 }}>Permite ofrecer descuentos y promociones en los servicios del negocio. Se crean en Servicios, en la pestaña Promociones.</p>
-          <Resumen filas={[["Permitir promociones", si(b.usaPromociones)], ["Promociones activas", String(nPromos)]]} />
-        </>}>
-        <Funciones funciones={[
-          { clave: "promociones", nombre: "Permitir promociones", activa: b.usaPromociones, encendida: "Se pueden crear promociones en Servicios y se aplican al cobrar.", apagada: "No se aplican promociones al cobrar." },
-        ]} />
-      </Bloque>
-
-      <a href="/ajustes/citas" className="glass ac-aviso">
-        <span><b>Citas y agenda</b><small>{b.usaCitas ? `Agenda activa${cfgCitas.enLinea ? ", reservaciones en línea activas" : ", sin reservaciones en línea"}` : "Apagada"}. Ahora tiene su propia sección en Ajustes.</small></span>
-        <span className="eq2-ir">Abrir<Icono n="derecha" /></span>
-      </a>
-
-      <Bloque numero={5} titulo="Egresos y finanzas" puedeEditar={edita("egresos")}
+      <Bloque numero={4} titulo="Egresos y finanzas" puedeEditar={edita("egresos")}
         resumen={`${cats.filter((c) => c.activo).length} categorías, ${conceptos.length} ${conceptos.length === 1 ? "gasto frecuente" : "gastos frecuentes"}, pagos al equipo ${b.pagosEquipoAuto ? "automáticos" : "a mano"}, renta ${b.rentasAuto ? "automática" : "a mano"}`}
         detalle={
           <div className="pila">

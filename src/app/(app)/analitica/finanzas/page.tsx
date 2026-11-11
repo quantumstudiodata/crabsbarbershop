@@ -79,7 +79,7 @@ export default async function Finanzas({ searchParams }: { searchParams: Promise
   const comps = gastos.length ? await db.select({ id: t.comprobantes.id, gastoId: t.comprobantes.gastoId, nombre: t.comprobantes.nombre }).from(t.comprobantes)
     .where(and(eq(t.comprobantes.barberiaId, bId), inArray(t.comprobantes.gastoId, gastos.map((x) => x.g.id)))) : [];
 
-  const PER: Record<string, string> = { semanal: "semanal", quincenal: "quincenal", mensual: "mensual" };
+  const PER: Record<string, string> = { diaria: "diaria", semanal: "semanal", quincenal: "quincenal", mensual: "mensual" };
   const todosLosDias: DiaMovimientos[] = r.dias.map((d) => {
     const movs: (Movimiento & { t: number })[] = [];
     const v = ventasDia.find((x) => x.d === d);
