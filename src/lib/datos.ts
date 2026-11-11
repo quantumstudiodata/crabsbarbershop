@@ -56,7 +56,7 @@ export async function cajaOAbrir(se: { barberia: typeof s.barberias.$inferSelect
 
 export async function movimientosDeTurno(barberiaId: string, turnoId: string, fondoInicial: number) {
   const [cobros] = await db
-    .select({ total: sql<number>`coalesce(sum(${s.pagos.monto}),0)::int` })
+    .select({ total: sql<number>`coalesce(sum(${s.pagos.monto}),0)::int`, ventas: sql<number>`count(distinct ${s.ventas.id})::int` })
     .from(s.pagos)
     .innerJoin(s.ventas, eq(s.ventas.id, s.pagos.ventaId))
     .where(and(eq(s.ventas.barberiaId, barberiaId), eq(s.ventas.turnoId, turnoId), eq(s.ventas.estado, "pagada"), eq(s.pagos.esEfectivo, true)));
@@ -114,6 +114,7 @@ export async function movimientosDeTurno(barberiaId: string, turnoId: string, fo
     otrosCobros: otrosPorMetodo.reduce((a, x) => a + x.total, 0),
     otrosPorMetodo,
     ventas: conteoVentas.n,
+    ventasEfectivo: cobros.ventas,
     propinasTotal: propinas.total,
     movimientos: movs,
     gastos: gastosCaja,

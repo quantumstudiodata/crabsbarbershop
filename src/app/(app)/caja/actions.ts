@@ -23,6 +23,8 @@ const listo = (mensaje: string): EstadoCaja => {
   return { ok: true, mensaje, n: Date.now() };
 };
 
+const EN_LINEA = ["Pago con QR", "Anticipo en línea"];
+
 export async function abrirCaja(_: EstadoCaja, form: FormData): Promise<EstadoCaja> {
   const s = await requerirSesion();
   if (!s.puede("caja.operar")) return { error: "No tienes permiso para abrir la caja." };
@@ -109,7 +111,8 @@ export async function cerrarCaja(_: EstadoCaja, form: FormData): Promise<EstadoC
   const datos = await movimientosDeTurno(s.barberia.id, turno.id, turno.fondoInicial);
   // Con la función activa, cada forma de pago (que no sea efectivo) con cobros necesita su evidencia.
   if (s.barberia.usaEvidenciaCorte) {
-    const faltan = datos.otrosPorMetodo.filter((x) => x.total > 0 && !evidencias.some((e) => e.etiqueta === x.metodo)).map((x) => x.metodo.toLowerCase());
+    // Los cobros con QR y los anticipos en línea ya están verificados por Stripe: no piden comprobante.
+    const faltan = datos.otrosPorMetodo.filter((x) => x.total > 0 && !EN_LINEA.includes(x.metodo) && !evidencias.some((e) => e.etiqueta === x.metodo)).map((x) => x.metodo.toLowerCase());
     if (faltan.length) return { error: `Adjunta la evidencia de ${faltan.join(" y ")} para cerrar la caja.` };
   }
   const r = compararConteo(datos.esperado, contado, formatoDinero);

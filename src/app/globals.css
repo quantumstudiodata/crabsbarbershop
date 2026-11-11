@@ -3836,3 +3836,47 @@ html, body { overscroll-behavior-y: none; }
 .hist-linea.ultimo-l .srv small { white-space: normal; }
 .an-pago { font-size: 12px; color: var(--muted); }
 .tachado { color: var(--faint); font-weight: 600; }
+
+/* Corte de caja por pasos */
+.ck-pasos { display: flex; gap: 6px; }
+.ck-pasos i { flex: 1; height: 4px; border-radius: 9px; background: rgba(30,45,60,.12); transition: background .3s; }
+.ck-pasos i.on { background: #3c5163; }
+.ck-lab { font: 500 10.5px var(--f-mono); letter-spacing: .14em; text-transform: uppercase; color: var(--muted); }
+.ck-chips { display: flex; gap: 6px; flex-wrap: wrap; }
+.ck-chips span { padding: 5px 11px; border-radius: 999px; background: rgba(255,255,255,.8); border: 1px solid var(--line); font-size: 12.5px; color: #3c5163; }
+.ck-res { display: grid; grid-template-columns: 150px minmax(0, 1fr); gap: 16px; align-items: center; }
+.ck-anillo { position: relative; width: 150px; height: 150px; }
+.ck-anillo svg { width: 150px; height: 150px; }
+.ck-anillo > span { position: absolute; inset: 0; display: grid; place-content: center; text-align: center; }
+.ck-anillo small { font-size: 10.5px; line-height: 1.2; color: var(--muted); }
+.ck-anillo b { font: 800 22px var(--f-display); font-variant-numeric: tabular-nums; }
+.ck-ley { display: grid; gap: 10px; }
+.ck-ley > div { display: grid; grid-template-columns: 10px minmax(0, 1fr) auto; gap: 8px; align-items: center; font-size: 13.5px; }
+.ck-ley i { width: 10px; height: 10px; border-radius: 3px; }
+.ck-ley small { display: block; font-size: 11.5px; color: var(--faint); }
+.ck-ley b { font-variant-numeric: tabular-nums; }
+.ck-con { display: grid; gap: 7px; padding: 12px 14px; border-radius: 16px; background: rgba(255,255,255,.6); border: 1px solid var(--line); font-size: 13.5px; }
+.ck-con > div { display: flex; justify-content: space-between; gap: 10px; }
+.ck-con > div > span:last-child { text-align: right; }
+.ck-con .t { border-top: 1px solid var(--line); padding-top: 8px; font-weight: 700; }
+.ck-acc { display: flex; justify-content: space-between; gap: 10px; }
+.ck-acc .bt.sec .ic { width: 15px; height: 15px; }
+@media (max-width: 400px) { .ck-res { grid-template-columns: 1fr; justify-items: center; } .ck-ley { width: 100%; } }
+/* Comprobantes agrupados por forma de pago */
+.ev-grupos { display: grid; gap: 10px; }
+.ev-g { display: grid; gap: 10px; padding: 14px; border-radius: 18px; background: rgba(255,255,255,.85); border: 1px solid var(--line); }
+.ev-h { display: flex; align-items: center; gap: 10px; }
+.ev-ic { width: 32px; height: 32px; border-radius: 10px; display: grid; place-items: center; background: #3c5163; color: #fff; flex: none; }
+.ev-ic .ic { width: 16px; height: 16px; }
+.ev-t { flex: 1; min-width: 0; display: grid; } .ev-t b { font-size: 14.5px; } .ev-t small { font-size: 11.5px; color: var(--faint); }
+.ev-est { font-size: 11.5px; font-weight: 600; padding: 4px 10px; border-radius: 999px; background: #e3e9ef; color: #3c5163; white-space: nowrap; }
+.ev-est.ok { background: #13171c; color: #fff; }
+.ev-tiras { display: flex; gap: 8px; flex-wrap: wrap; }
+.ev-tira { position: relative; width: 58px; height: 72px; border-radius: 10px; overflow: hidden; background: #e3e9ef; }
+.ev-tira img { width: 100%; height: 100%; object-fit: cover; display: block; }
+.ev-pdf { display: grid; place-items: center; width: 100%; height: 100%; font: 600 11px var(--f-mono); color: #3c5163; }
+.ev-tira button { position: absolute; top: 3px; right: 3px; width: 20px; height: 20px; border-radius: 50%; border: 0; display: grid; place-items: center; background: rgba(19,23,28,.7); color: #fff; cursor: pointer; padding: 0; }
+.ev-tira button .ic { width: 11px; height: 11px; }
+.ev-mas { width: 58px; height: 72px; border-radius: 10px; border: 1.5px dashed rgba(60,81,99,.4); background: none; display: grid; place-content: center; justify-items: center; gap: 3px; font: 600 10.5px var(--f-body); color: #3c5163; cursor: pointer; }
+.ev-mas .ic { width: 16px; height: 16px; }
+.ck [hidden] { display: none !important; }
