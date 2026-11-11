@@ -5,9 +5,8 @@ import { createPortal } from "react-dom";
 import QRCode from "qrcode";
 import { Icono } from "@/components/Icono";
 import { PalomitaAnimada } from "@/components/PalomitaAnimada";
-import { Modal } from "@/components/ui";
 import { formatoDinero } from "@/lib/money";
-import { cancelarCobroQr, cobrosQrEnEspera, estadoCobroQr, type CobroQrAbierto, type CobroQrHoy, type EstadoQr } from "./actions";
+import { cancelarCobroQr, cobrosQrEnEspera, estadoCobroQr, type CobroQrAbierto, type EstadoQr } from "./actions";
 
 const VIGENCIA_MS = 30 * 60000;
 const reloj = (ms: number) => { const s = Math.max(0, Math.round(ms / 1000)); return `${Math.floor(s / 60)}:${String(s % 60).padStart(2, "0")}`; };
@@ -90,7 +89,6 @@ export function CobroQR({ cobro, detalle, listo, cerrar, cancelado }: {
               <b className="big">{formatoDinero(cobro.total)}</b>
               <span className="muted">{detalle}</span>
               <span className="cqr-est fin">{estado.estado === "reembolsado" ? "El pago se devolvió al cliente" : "El enlace se canceló o venció sin pago"}</span>
-              <small className="cqr-nota">No se registró ninguna venta. Si el cliente desea pagar, genera un cobro nuevo.</small>
             </div>
           ) : (
             <div className="cqr-c">
@@ -99,7 +97,6 @@ export function CobroQR({ cobro, detalle, listo, cerrar, cancelado }: {
               <span className="muted">{detalle}</span>
               <span className="cqr-est espera" aria-live="polite"><i />{estado.estado === "pagado" ? "Pago recibido, registrando la venta" : "Esperando el pago del cliente"}</span>
               <Vigencia vence={cobro.vence} />
-              <small className="cqr-nota">Puedes cerrar esta ventana sin cancelar el cobro. Su estado se consulta en el botón QR de Cobro y la confirmación aparecerá en cuanto Stripe valide el pago.</small>
               {aviso && <p className="aviso error" style={{ margin: 0 }}>{aviso}</p>}
               <div className="cqr-acc">
                 <button type="button" className="ac-link" onClick={copiar}><Icono n={copiado ? "palomita" : "copiar"} />{copiado ? "Enlace copiado" : "Copiar enlace"}</button>
@@ -115,18 +112,37 @@ export function CobroQR({ cobro, detalle, listo, cerrar, cancelado }: {
   );
 }
 
-const ESTADO_HOY: Record<string, string> = { pagado: "Pagado", cancelado: "Sin pago", reembolsado: "Devuelto" };
+/** Mini QR de la tarjeta flotante. */
+function MiniQr({ url }: { url: string }) {
+  const [svg, setSvg] = useState("");
+  useEffect(() => { QRCode.toString(url, { type: "svg", margin: 0, color: { dark: "#13171c", light: "#ffffff" } }).then(setSvg).catch(() => setSvg("")); }, [url]);
+  return <span className="tq-mini" dangerouslySetInnerHTML={{ __html: svg }} />;
+}
+
+/** Anillo con la cuenta regresiva de la vigencia del enlace. */
+function Anillo({ vence }: { vence: number }) {
+  const [ahora, setAhora] = useState(() => Date.now());
+  useEffect(() => { const t = setInterval(() => setAhora(Date.now()), 1000); return () => clearInterval(t); }, []);
+  const resta = Math.max(0, vence - ahora);
+  const c = 2 * Math.PI * 20;
+  return (
+    <span className="tq-anillo" role="timer" aria-label={`Vence en ${Math.ceil(resta / 60000)} minutos`}>
+      <svg viewBox="0 0 46 46"><circle cx="23" cy="23" r="20" className="tq-pista" /><circle cx="23" cy="23" r="20" className="tq-avance" strokeDasharray={c} strokeDashoffset={c * (1 - Math.min(1, resta / VIGENCIA_MS))} /></svg>
+      <span>{reloj(resta)}</span>
+    </span>
+  );
+}
+
+type Resuelto = { c: CobroQrAbierto; estado: string; total?: number; folio?: string };
 
 /**
- * Botón QR junto al buscador de Cobro: muestra cuántos cobros con QR esperan pago y abre la lista de hoy
- * (en espera, pagados y sin pago). Cuando Stripe confirma uno, abre el aviso de pago recibido.
+ * Tarjetas flotantes de los cobros con QR: mientras esperan pago muestran el QR pequeño y el tiempo que queda;
+ * cuando Stripe verifica el pago cambian a "Pago verificado". Al tocarlas se abre el QR o la confirmación, y la tarjeta se quita.
  */
-export function CobrosQr({ nuevo, abrir }: { nuevo: CobroQrAbierto | null; abrir: (c: CobroQrAbierto) => void }) {
+export function TarjetasQr({ nuevo, abrir, vistos }: { nuevo: CobroQrAbierto | null; abrir: (c: CobroQrAbierto) => void; vistos: string[] }) {
   const [lista, setLista] = useState<CobroQrAbierto[]>([]);
-  const [hoy, setHoy] = useState<CobroQrHoy[]>([]);
-  const [panel, setPanel] = useState(false);
+  const [hechos, setHechos] = useState<Resuelto[]>([]);
   const seguidos = useRef<Map<string, CobroQrAbierto>>(new Map());
-  const [, tic] = useState(0);
   useEffect(() => {
     if (nuevo) { seguidos.current.set(nuevo.id, nuevo); setLista((xs) => (xs.some((x) => x.id === nuevo.id) ? xs : [...xs, nuevo])); }
   }, [nuevo]);
@@ -137,47 +153,47 @@ export function CobrosQr({ nuevo, abrir }: { nuevo: CobroQrAbierto | null; abrir
       if (!r || !vivo) return;
       for (const p of r.pendientes) seguidos.current.set(p.id, p);
       setLista(r.pendientes);
-      setHoy(r.hoy);
+      const nuevos: Resuelto[] = [];
       for (const x of r.resueltos) {
         const c = seguidos.current.get(x.id);
         seguidos.current.delete(x.id);
-        if (x.estado === "pagado" && c) { setPanel(false); abrir(c); }
+        if (c) nuevos.push({ c, estado: x.estado, total: x.total, folio: x.folio });
       }
-      tic((n) => n + 1);
+      if (nuevos.length) setHechos((hs) => [...hs.filter((h) => !nuevos.some((n) => n.c.id === h.c.id)), ...nuevos]);
     };
     consultar();
     const t = setInterval(consultar, 4000);
     return () => { vivo = false; clearInterval(t); };
-  }, [abrir]);
-  if (!lista.length && !hoy.length) return null;
-  const ver = (c: CobroQrAbierto) => { setPanel(false); abrir(c); };
+  }, []);
+  const quitar = (id: string) => setHechos((hs) => hs.filter((h) => h.c.id !== id));
+  const pendientes = lista.filter((c) => !vistos.includes(c.id));
+  const resueltos = hechos.filter((h) => !vistos.includes(h.c.id));
+  if (!pendientes.length && !resueltos.length) return null;
   return (
-    <>
-      <button type="button" className={`cqr-boton ${lista.length ? "con" : ""}`} onClick={() => setPanel(true)}
-        aria-label={lista.length ? `${lista.length} cobros con QR en espera` : "Cobros con QR de hoy"}>
-        <Icono n="cuadros" /><span>QR</span>{lista.length > 0 && <b>{lista.length}</b>}
-      </button>
-      <Modal abierto={panel} cerrar={() => setPanel(false)} etiqueta="Cobros con QR" titulo="Hoy">
-        <div className="cqr-panel">
-          {lista.length > 0 && <span className="lab">En espera de pago</span>}
-          {lista.map((c) => (
-            <button type="button" key={c.id} className="cqr-fila" onClick={() => ver(c)}>
-              <span className="cqr-pulso" aria-hidden="true" />
-              <span className="cqr-fila-t"><b>{formatoDinero(c.total)}</b><small>{c.detalle || "Cobro con QR"}</small></span>
-              <span className="cqr-vence">{reloj(c.vence - Date.now())}</span>
-              <Icono n="derecha" />
-            </button>
-          ))}
-          {hoy.length > 0 && <span className="lab">Resueltos hoy</span>}
-          {hoy.map((c) => (
-            <div key={c.id} className={`cqr-fila hecho ${c.estado}`}>
-              <span className="cqr-fila-t"><b>{formatoDinero(c.total)}</b><small>{c.hora}{c.detalle ? `, ${c.detalle}` : ""}</small></span>
-              <span className="cqr-hoy-est">{c.estado === "pagado" && <Icono n="palomita" />}{ESTADO_HOY[c.estado] ?? c.estado}{c.folio ? <small>{c.folio}</small> : null}</span>
-            </div>
-          ))}
-          {!lista.length && !hoy.length && <p className="muted">Hoy no hay cobros con QR.</p>}
-        </div>
-      </Modal>
-    </>
+    <div className="tq-pila" aria-live="polite">
+      {resueltos.map((h) => (
+        <button type="button" key={h.c.id} className={`tq ${h.estado === "pagado" ? "ok" : "fin"}`}
+          onClick={() => { quitar(h.c.id); if (h.estado === "pagado") abrir(h.c); }}>
+          {h.estado === "pagado" ? <PalomitaAnimada t={46} /> : <span className="tq-x"><Icono n="cerrar" /></span>}
+          <span className="tq-t">
+            <span className="tq-lab">{h.estado === "pagado" ? "Pago verificado" : h.estado === "reembolsado" ? "Pago devuelto" : "Venció sin pago"}</span>
+            <b>{formatoDinero(h.total ?? h.c.total)}</b>
+            <small>{h.estado === "pagado" ? h.folio ? `Folio ${h.folio}, ver confirmación` : "Ver confirmación" : h.c.detalle || "Cobro con QR"}</small>
+          </span>
+          {h.estado === "pagado" && <Icono n="derecha" />}
+        </button>
+      ))}
+      {pendientes.map((c) => (
+        <button type="button" key={c.id} className="tq" onClick={() => abrir(c)} aria-label={`Ver el QR del cobro de ${formatoDinero(c.total)}`}>
+          <MiniQr url={c.url} />
+          <span className="tq-t">
+            <span className="tq-lab"><i className="tq-punto" />Esperando pago</span>
+            <b>{formatoDinero(c.total)}</b>
+            <small>{c.detalle || "Cobro con QR"}</small>
+          </span>
+          <Anillo vence={c.vence} />
+        </button>
+      ))}
+    </div>
   );
 }

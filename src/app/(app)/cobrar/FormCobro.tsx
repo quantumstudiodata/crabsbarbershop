@@ -7,7 +7,7 @@ import { Fl, Icono } from "@/components/Icono";
 import { Selector } from "@/components/ui";
 import { formatoDinero, leerPesos } from "@/lib/money";
 import { registrarVenta, type CobroQrAbierto, type EstadoCobro } from "./actions";
-import { CobroQR, CobrosQr } from "./CobroQR";
+import { CobroQR, TarjetasQr } from "./CobroQR";
 import { aplicarPromos, descuentoDe, momentoEn, participa, vigente, type Promo } from "@/lib/promociones";
 
 type Servicio = { id: string; nombre: string; duracionMin: number; precio: number; categoria: string };
@@ -51,6 +51,8 @@ export function FormCobro(p: {
   // Cobro con QR que se dejó en espera al cerrar su ventana: pasa a la lista de cobros en espera.
   const [enEspera, setEnEspera] = useState<CobroQrAbierto | null>(null);
   const abrirQr = useCallback((c: CobroQrAbierto) => setCobroQr(c), []);
+  // Cobros con QR que ya se vieron resueltos en su ventana: no repiten tarjeta flotante.
+  const [vistos, setVistos] = useState<string[]>([]);
   const qrVisto = useRef<string | null>(null);
   // "Pago con QR" aparece junto a las formas de pago del negocio, pero no es una de ellas: no entra al efectivo de la caja.
   const metodosVista = p.qr ? [...p.metodos, { id: "qr", nombre: "Pago con QR", esEfectivo: false }] : p.metodos;
@@ -196,13 +198,11 @@ export function FormCobro(p: {
     <form action={accion} className="cobro" ref={raiz}>
       <input type="hidden" name="datos" value={datos} />
       <div className="pila" style={{ gap: 22 }}>
-        <div className="cob-busca">
-          <label className="con-icono buscador">
-            <Icono n="buscar" />
-            <input className="input" data-paso="" value={buscar} onChange={(e) => setBuscar(e.target.value)} placeholder="Buscar servicio" aria-label="Buscar servicio" autoComplete="off" />
-          </label>
-          {p.qr && <CobrosQr nuevo={enEspera} abrir={abrirQr} />}
-        </div>
+        <label className="con-icono buscador">
+          <Icono n="buscar" />
+          <input className="input" data-paso="" value={buscar} onChange={(e) => setBuscar(e.target.value)} placeholder="Buscar servicio" aria-label="Buscar servicio" autoComplete="off" />
+        </label>
+        {p.qr && <TarjetasQr nuevo={enEspera} abrir={abrirQr} vistos={vistos} />}
 
         {categorias.length === 0 && <p className="muted">No hay servicios con ese nombre.</p>}
         {categorias.map((c) => (
@@ -399,9 +399,9 @@ export function FormCobro(p: {
       </aside>
       {cobroQr && (
         <CobroQR key={cobroQr.id} cobro={cobroQr} detalle={cobroQr.detalle ?? ""}
-          listo={(r) => { const propio = cobroQr.id === qrVisto.current; setCobroQr(null); setUltima({ folio: r.folio, total: r.total }); setHoja(false); if (propio) limpiar(); }}
+          listo={(r) => { const propio = cobroQr.id === qrVisto.current; setVistos((v) => [...v, cobroQr.id]); setCobroQr(null); setUltima({ folio: r.folio, total: r.total }); setHoja(false); if (propio) limpiar(); }}
           cerrar={() => { const propio = cobroQr.id === qrVisto.current; setEnEspera(cobroQr); setCobroQr(null); if (propio) { setHoja(false); limpiar(); } }}
-          cancelado={() => { setCobroQr(null); setClave(nuevaClave()); }} />
+          cancelado={() => { setVistos((v) => [...v, cobroQr.id]); setCobroQr(null); setClave(nuevaClave()); }} />
       )}
     </form>
   );

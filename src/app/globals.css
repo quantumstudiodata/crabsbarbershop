@@ -3649,33 +3649,38 @@ button.rv-opc:not(.on) .radio-p { background: none; border-color: rgba(43,58,71,
 .cqr-ok .cqr-vs .vs-grid small { display: inline; flex: none; font-size: 13px; color: var(--muted); text-align: left; }
 .cqr-ok .cqr-vs > small { text-align: left; font-size: 12.5px; }
 
-/* Botón QR junto al buscador de Cobro */
-.cob-busca { display: flex; gap: 10px; align-items: stretch; }
-.cob-busca .buscador { flex: 1; min-width: 0; }
-.cqr-boton { position: relative; display: inline-flex; align-items: center; gap: 6px; padding: 0 16px; min-height: 48px; border-radius: 16px; border: 1px solid var(--line); background: rgba(255,255,255,.75); font: inherit; font-weight: 600; color: inherit; cursor: pointer; flex: none; }
-.cqr-boton .ic { width: 18px; height: 18px; }
-.cqr-boton b { display: grid; place-items: center; min-width: 20px; height: 20px; padding: 0 6px; border-radius: 999px; background: #13171c; color: #fff; font-size: 11.5px; }
-.cqr-boton.con::after { content: ""; position: absolute; inset: -1px; border-radius: 16px; border: 1.5px solid #4b6274; opacity: 0; animation: cqrHalo 2.4s ease-out infinite; pointer-events: none; }
-@keyframes cqrHalo { 0% { opacity: .55; transform: scale(1); } 100% { opacity: 0; transform: scale(1.12); } }
-
-/* Panel de cobros con QR de hoy */
-.cqr-panel { display: grid; gap: 8px; }
-.cqr-panel .lab { margin-top: 6px; font: 500 11px var(--f-mono); letter-spacing: .14em; text-transform: uppercase; color: var(--muted); }
-.cqr-fila { display: flex; align-items: center; gap: 12px; width: 100%; padding: 11px 13px; border: 1px solid var(--line); border-radius: 14px; background: rgba(255,255,255,.75); font: inherit; color: inherit; text-align: left; cursor: pointer; }
-.cqr-fila.hecho { cursor: default; background: rgba(255,255,255,.45); }
-.cqr-fila.cancelado .cqr-fila-t b, .cqr-fila.reembolsado .cqr-fila-t b { color: var(--muted); text-decoration: line-through; }
-.cqr-fila-t { display: grid; flex: 1; min-width: 0; }
-.cqr-fila-t small { color: var(--muted); overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
-.cqr-vence { font: 500 12px var(--f-mono); color: #3c5163; background: #e3e9ef; border-radius: 999px; padding: 3px 9px; white-space: nowrap; }
-.cqr-fila > .ic { width: 16px; height: 16px; color: var(--faint); }
-.cqr-pulso { width: 9px; height: 9px; border-radius: 50%; background: #4b6274; flex: none; animation: cqrPulso 1.6s ease-in-out infinite; }
-@keyframes cqrPulso { 0%,100% { opacity: 1; } 50% { opacity: .3; } }
-.cqr-hoy-est { display: grid; justify-items: end; font-size: 13px; font-weight: 600; color: #3c5163; white-space: nowrap; }
-.cqr-hoy-est .ic { display: none; }
-.cqr-hoy-est small { font: 500 11px var(--f-mono); color: var(--muted); }
-.cqr-fila.cancelado .cqr-hoy-est, .cqr-fila.reembolsado .cqr-hoy-est { color: var(--muted); }
 .cqr-cancelar { justify-self: center; color: var(--muted); font-size: 13px; }
 .cqr-vs { text-align: left; width: 100%; }
+@keyframes cqrPulso { 0%,100% { opacity: 1; } 50% { opacity: .3; } }
+
+/* Tarjetas flotantes de cobros con QR: escritorio abajo a la derecha, teléfono sobre la barra de Cobrar */
+.tq-pila { position: fixed; right: 20px; bottom: 80px; z-index: 45; display: grid; gap: 10px; width: 350px; }
+.tq { display: flex; align-items: center; gap: 14px; width: 100%; padding: 12px 14px; border-radius: 18px; border: 1px solid rgba(30,45,60,.1); background: rgba(255,255,255,.96); box-shadow: 0 14px 36px rgba(20,30,40,.14); font: inherit; color: inherit; text-align: left; cursor: pointer; animation: tqEntra .35s cubic-bezier(.2,.9,.3,1.1) both; }
+.tq:hover { border-color: rgba(30,45,60,.22); }
+.tq-mini { width: 54px; height: 54px; padding: 5px; border-radius: 12px; background: #fff; border: 1px solid rgba(30,45,60,.1); flex: none; }
+.tq-mini svg { display: block; width: 100%; height: 100%; }
+.tq-t { display: grid; flex: 1; min-width: 0; gap: 1px; }
+.tq-t b { font-size: 16px; }
+.tq-t small { color: var(--muted); font-size: 12.5px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.tq-lab { display: flex; align-items: center; gap: 6px; font: 500 10.5px var(--f-mono); letter-spacing: .12em; text-transform: uppercase; color: var(--muted); }
+.tq-punto { width: 7px; height: 7px; border-radius: 50%; background: #4b6274; animation: cqrPulso 1.6s ease-in-out infinite; }
+.tq-anillo { position: relative; width: 48px; height: 48px; flex: none; }
+.tq-anillo svg { width: 48px; height: 48px; transform: rotate(-90deg); }
+.tq-pista { fill: none; stroke: rgba(30,45,60,.12); stroke-width: 4; }
+.tq-avance { fill: none; stroke: #4b6274; stroke-width: 4; stroke-linecap: round; transition: stroke-dashoffset 1s linear; }
+.tq-anillo > span { position: absolute; inset: 0; display: grid; place-items: center; font: 600 11px var(--f-mono); }
+.tq.ok { background: #13171c; color: #fff; border-color: #13171c; }
+.tq.ok .tq-lab, .tq.ok small { color: rgba(255,255,255,.7); }
+.tq.ok > .ic { width: 18px; height: 18px; color: rgba(255,255,255,.8); }
+.tq.ok .pal-fondo { fill: rgba(255,255,255,.12); } .tq.ok .pal-aro, .tq.ok .pal-trazo { stroke: #fff; } .tq.ok .pal-onda { border-color: rgba(255,255,255,.6); }
+.tq.fin .tq-x { display: grid; place-items: center; width: 46px; height: 46px; border-radius: 50%; background: rgba(30,45,60,.08); flex: none; }
+.tq.fin .tq-x .ic { width: 18px; height: 18px; color: var(--muted); }
+@keyframes tqEntra { from { opacity: 0; transform: translateY(10px) scale(.98); } to { opacity: 1; transform: none; } }
+@media (max-width: 640px) {
+  .tq-pila { left: 16px; right: 16px; width: auto; bottom: calc(118px + env(safe-area-inset-bottom)); }
+  .cobro:has(.tq-pila) { padding-bottom: 110px; }
+}
+@media (prefers-reduced-motion: reduce) { .tq, .tq-punto { animation: none; } }
 
 /* Estado "esperando el pago": punto que late y un brillo que recorre la píldora */
 .cqr-est.espera { position: relative; overflow: hidden; }
