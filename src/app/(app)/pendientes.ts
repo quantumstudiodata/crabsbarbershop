@@ -5,7 +5,7 @@ import { fechaLocal, horaCorta } from "@/lib/fechas";
 import { formatoDinero } from "@/lib/money";
 
 type Sesion = Awaited<ReturnType<typeof requerirSesion>>;
-export type Pendiente = { id: string; tipo: "llegar" | "cobrar" | "pago" | "transferencia"; titulo: string; detalle: string; citaId: string; dia: string; tel?: string; enlace?: string; cliente?: string; hora?: string };
+export type Pendiente = { id: string; tipo: "llegar" | "cobrar" | "pago" | "transferencia"; titulo: string; detalle: string; citaId: string; dia: string; tel?: string; enlace?: string; cliente?: string; hora?: string; comprobante?: boolean };
 
 const primer = (n: string) => n.trim().split(" ")[0];
 
@@ -19,7 +19,7 @@ export async function pendientesDe(s: Sesion, hoy: string, zona: string, persona
   const cobra = s.puede("ventas.registrar") || s.puede("ventas.registrar_otros");
   const base = [eq(schema.citas.barberiaId, s.barberia.id), sql`(${schema.citas.inicio} at time zone ${zona})::date = ${hoy}::date`, ...(persona ? [eq(schema.citas.barberoId, persona)] : [])];
   const campos = { token: schema.citas.token, tel: schema.citas.clienteTelefono, id: schema.citas.id, inicio: schema.citas.inicio, fin: schema.citas.fin, estado: schema.citas.estado, cliente: schema.citas.clienteNombre, total: schema.citas.total, pagado: schema.citas.pagado, servicios: schema.citas.servicios, barbero: schema.usuarios.nombre };
-  const transf = s.puede("citas.modificar") ? await db.select({ id: schema.citas.id, cliente: schema.citas.clienteNombre, monto: schema.citas.transferenciaMonto, inicio: schema.citas.inicio, folio: schema.citas.folio })
+  const transf = s.puede("citas.modificar") ? await db.select({ id: schema.citas.id, cliente: schema.citas.clienteNombre, monto: schema.citas.transferenciaMonto, inicio: schema.citas.inicio, folio: schema.citas.folio, comp: schema.citas.transferenciaComprobanteEn })
     .from(schema.citas).where(and(eq(schema.citas.barberiaId, s.barberia.id), eq(schema.citas.estadoPago, "transferencia"), inArray(schema.citas.estado, ["en_espera", "llego", "en_atencion"]),
       gt(schema.citas.inicio, new Date(ahora - 24 * 3600000)), ...(persona ? [eq(schema.citas.barberoId, persona)] : []))).orderBy(schema.citas.inicio).limit(10) : [];
   const [tarde, sinCobrar, pagos] = await Promise.all([
@@ -38,7 +38,7 @@ export async function pendientesDe(s: Sesion, hoy: string, zona: string, persona
   const hace = (d: Date) => { const m = Math.round((ahora - d.getTime()) / 60000); return m < 60 ? `hace ${m} min` : `hace ${Math.floor(m / 60)} h ${m % 60 ? `${m % 60} min` : ""}`.trim(); };
   const dia = (d: Date) => fechaLocal(d, zona) === hoy ? "hoy" : new Intl.DateTimeFormat("es-MX", { timeZone: zona, weekday: "short", day: "numeric" }).format(d).replace(".", "");
   return [
-    ...transf.map((c) => ({ id: `t-${c.id}`, citaId: c.id, tipo: "transferencia" as const, dia: fechaLocal(c.inicio, zona), titulo: `¿Llegó la transferencia de ${primer(c.cliente)}?`, detalle: `${formatoDinero(c.monto)}, cita ${dia(c.inicio)} ${horaCorta(c.inicio, zona)}, concepto ${c.folio}` })),
+    ...transf.map((c) => ({ id: `t-${c.id}`, citaId: c.id, tipo: "transferencia" as const, dia: fechaLocal(c.inicio, zona), comprobante: !!c.comp, titulo: c.comp ? `${primer(c.cliente)} mandó su comprobante` : `¿Llegó la transferencia de ${primer(c.cliente)}?`, detalle: `${formatoDinero(c.monto)}, cita ${dia(c.inicio)} ${horaCorta(c.inicio, zona)}, concepto ${c.folio}` })),
     ...tarde.map((c) => ({ id: `l-${c.id}`, citaId: c.id, tipo: "llegar" as const, dia: hoy, tel: c.tel, cliente: primer(c.cliente), hora: horaCorta(c.inicio, zona), enlace: s.barberia.slug ? `/reservar/${s.barberia.slug}/cita/${c.token}` : "", titulo: `¿Llegó ${primer(c.cliente)}?`, detalle: `Cita de las ${horaCorta(c.inicio, zona)} con ${primer(c.barbero)}, ${hace(c.inicio)}` })),
     ...sinCobrar.map((c) => ({ id: `c-${c.id}`, citaId: c.id, tipo: "cobrar" as const, dia: hoy, titulo: `Falta cobrar a ${primer(c.cliente)}`, detalle: `${c.servicios.map((x) => x.nombre).join(" y ")} con ${primer(c.barbero)}, ${formatoDinero(Math.max(c.total - c.pagado, 0))}` })),
     ...pagos.map((p) => ({ id: `p-${p.id}`, citaId: p.citaId!, tipo: "pago" as const, dia: fechaLocal(p.inicio, zona), titulo: `${primer(p.cliente)} pagó en línea`, detalle: `${formatoDinero(p.monto)}${p.tarjeta ? ` con ${p.tarjeta}` : ""}, cita ${fechaLocal(p.inicio, zona) === hoy ? "hoy" : new Intl.DateTimeFormat("es-MX", { timeZone: zona, weekday: "short", day: "numeric" }).format(p.inicio).replace(".", "")} ${horaCorta(p.inicio, zona)}` })),

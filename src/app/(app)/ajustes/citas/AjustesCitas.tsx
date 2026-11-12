@@ -32,7 +32,7 @@ export function AjustesCitas(p: {
     anticipacionMinHoras: String(c.anticipacionMinMin / 60), anticipacionMaxDias: String(c.anticipacionMaxDias), margenMin: String(c.margenMin), pasoMin: "15",
     elegirBarbero: c.elegirBarbero, cualquierBarbero: c.cualquierBarbero, variosServicios: c.variosServicios,
     pagoModo: c.pago.modo, pagoValor: c.pago.modo === "anticipo_pct" || c.pago.modo === "anticipo_fijo" ? String(c.pago.valor / 100) : "",
-    cancelarHorasAntes: String(c.cancelarHorasAntes), politicaCancelacion: c.politicaCancelacion, politicaReembolso: c.politicaReembolso,
+    cancelarHorasAntes: String(c.cancelarHorasAntes), clienteCancela: c.clienteCancela, politicaCancelacion: c.politicaCancelacion, politicaReembolso: c.politicaReembolso,
   });
   const [d, setD] = useState(base);
   const [sucio, setSucio] = useState(false);
@@ -105,6 +105,7 @@ export function AjustesCitas(p: {
             <section className="glass ac-card">
               <span className="lab">Cancelaciones</span>
               <Num etiqueta="Se puede cambiar hasta" valor={d.cancelarHorasAntes} unidad="horas antes" onChange={(v) => cambia({ cancelarHorasAntes: v })} />
+              <div className="ac-sw"><span>El cliente puede cancelar desde su comprobante<small>Apagado: solo puede cambiar la fecha. Una cita pagada nunca se cancela.</small></span><Interruptor etiqueta="El cliente puede cancelar" checked={d.clienteCancela} onChange={() => cambia({ clienteCancela: !d.clienteCancela })} /></div>
               <label className="ac-campo"><span>Texto de la política</span><textarea className="input" rows={2} maxLength={400} value={d.politicaCancelacion} onChange={(e) => cambia({ politicaCancelacion: e.target.value })} /></label>
               <label className="ac-campo"><span>Política de reembolso</span><textarea className="input" rows={2} maxLength={400} value={d.politicaReembolso} onChange={(e) => cambia({ politicaReembolso: e.target.value })} placeholder="Ejemplo: los pagos no son reembolsables; puedes reagendar tu cita." /></label>
             </section>

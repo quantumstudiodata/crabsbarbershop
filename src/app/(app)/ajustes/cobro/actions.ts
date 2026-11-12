@@ -277,7 +277,7 @@ export async function revisarStripe(): Promise<{ estado?: string; error?: string
 }
 
 /** La cuenta propia del negocio para recibir transferencias. La CLABE se valida con su dígito de control. */
-export async function guardarCuentaTransferencia(d: { banco: string; clabe: string; titular: string }): Promise<EstadoAjuste> {
+export async function guardarCuentaTransferencia(d: { banco: string; clabe: string; titular: string; whatsapp?: string }): Promise<EstadoAjuste> {
   const s = await requerirSesion("configuracion.cobros");
   if (s.vista) return { error: "En la vista previa no se guardan cambios." };
   const clabe = String(d.clabe ?? "").replace(/\D/g, "");
@@ -285,7 +285,9 @@ export async function guardarCuentaTransferencia(d: { banco: string; clabe: stri
   const titular = String(d.titular ?? "").trim().replace(/\s+/g, " ").slice(0, 80);
   if (clabe && !clabeValida(clabe)) return { error: "Revisa la CLABE: son 18 dígitos y el último no coincide." };
   if (clabe && (!banco || titular.length < 3)) return { error: "Escribe el banco y el nombre del titular de la cuenta." };
-  await db.update(schema.barberias).set({ transferenciaClabe: clabe, transferenciaBanco: clabe ? banco : "", transferenciaTitular: clabe ? titular : "" }).where(eq(schema.barberias.id, s.barberia.id));
+  const wa = String(d.whatsapp ?? "").replace(/\D/g, "");
+  if (wa && (wa.length < 10 || wa.length > 13)) return { error: "El WhatsApp debe tener 10 dígitos." };
+  await db.update(schema.barberias).set({ whatsapp: wa, transferenciaClabe: clabe, transferenciaBanco: clabe ? banco : "", transferenciaTitular: clabe ? titular : "" }).where(eq(schema.barberias.id, s.barberia.id));
   await registrar(db, { barberiaId: s.barberia.id, usuarioId: s.usuario.id, tipo: "ajuste", accion: clabe ? `${s.usuario.nombre} guardó la cuenta para transferencias (termina en ${clabe.slice(-4)})` : `${s.usuario.nombre} quitó la cuenta para transferencias` });
   revalidatePath("/", "layout");
   return { ok: true, n: Date.now() };

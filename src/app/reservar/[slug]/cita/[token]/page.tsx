@@ -34,10 +34,12 @@ export default async function PaginaCita({ params }: { params: Promise<{ slug: s
         folio: c.folio, estado: c.estado, estadoTxt: NOMBRE_ESTADO[c.estado] ?? c.estado, cliente: c.clienteNombre,
         fecha: fechaLocal(c.inicio, z), hora: horaCorta(c.inicio, z), duracion: c.duracionMin, servicios: c.servicios.map((s) => ({ nombre: s.nombre, precio: s.precio - s.descuento })),
         total: c.total, pagado: c.pagado, transferencia: c.estadoPago === "transferencia" ? c.transferenciaMonto : 0, barbero: u?.nombre.split(" ")[0] ?? "", avatar: u?.avatar ?? "iniciales",
+        inicio: c.inicio.toISOString(), comprobante: !!c.transferenciaComprobanteEn,
         sePuedeCambiar: c.estado === "no_asistio" || (c.estado === "en_espera" && c.inicio.getTime() - Date.now() >= config.cancelarHorasAntes * 3600e3),
       }}
       politica={config.politicaCancelacion} horas={config.cancelarHorasAntes}
       cuenta={b.transferenciaClabe ? { banco: b.transferenciaBanco, clabe: b.transferenciaClabe, titular: b.transferenciaTitular } : null}
+      whatsapp={b.whatsapp} clienteCancela={config.clienteCancela}
       equipo={equipo} cualquiera={config.cualquierBarbero} persona={c.indiferente ? "" : c.barberoId}
     />
   );

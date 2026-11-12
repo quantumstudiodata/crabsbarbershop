@@ -199,7 +199,7 @@ async function avisosPara(se: Sesion): Promise<AvisoVivo[]> {
       .orderBy(desc(s.notificacionesCita.creadoEn)).limit(15);
     for (const n of cn) {
       if (atiende && !se.puede("ventas.ver_todas") && n.barbero !== yo) continue;
-      avisos.push({ id: `n${n.id}`, t: n.t.toISOString(), titulo: n.tipo === "nueva_reserva" ? `Nueva reservación de ${n.cliente}` : n.tipo === "cita_cancelada" ? `${n.cliente} canceló su cita` : `${n.cliente} cambió su cita`, detalle: n.mensaje.replace(/^[^:]*: /, "").slice(0, 120), href: "/citas", nombre: n.cliente, avatar: "cangrejo", icono: "calendario" });
+      avisos.push({ id: `n${n.id}`, t: n.t.toISOString(), titulo: n.tipo === "nueva_reserva" ? `Nueva reservación de ${n.cliente}` : n.tipo === "cita_cancelada" ? `${n.cliente} canceló su cita` : n.tipo === "comprobante" ? `${n.cliente} mandó su comprobante de transferencia` : `${n.cliente} cambió su cita`, detalle: n.mensaje.replace(/^[^:]*: /, "").slice(0, 120), href: n.tipo === "comprobante" ? "/" : "/citas", nombre: n.cliente, avatar: "cangrejo", icono: "calendario" });
     }
   }
   return avisos.sort((a, b) => b.t.localeCompare(a.t)).slice(0, 25);

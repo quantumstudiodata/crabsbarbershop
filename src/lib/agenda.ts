@@ -15,6 +15,7 @@ export type ConfigCitas = {
   variosServicios: boolean;
   pago: { modo: ModoPago; valor: number }; // anticipo_fijo: centavos; anticipo_pct: puntos base
   cancelarHorasAntes: number;
+  clienteCancela: boolean; // el cliente puede cancelar desde su comprobante (si no, solo cambia la fecha)
   politicaCancelacion: string;
   politicaReembolso: string;
   apartarMin: number; // minutos que se guarda un horario mientras el cliente paga
@@ -33,7 +34,7 @@ export const CONFIG_CITAS: ConfigCitas = {
   enLinea: false,
   anticipacionMinMin: 120, anticipacionMaxDias: 30, margenMin: 0, pasoMin: 15,
   elegirBarbero: true, cualquierBarbero: true, variosServicios: true,
-  pago: { modo: "sin_pago", valor: 0 }, cancelarHorasAntes: 2,
+  pago: { modo: "sin_pago", valor: 0 }, cancelarHorasAntes: 2, clienteCancela: false,
   politicaCancelacion: "Puedes cambiar tu cita hasta 2 horas antes. Si llegas tarde, esperas tu turno o te atiende quien esté libre. Si no llegas, te contactamos para reagendar.",
   politicaReembolso: "", apartarMin: 10,
   usaHorarioPersona: true, usaRotacion: true, usaBloqueos: true, usaDescansoFijo: true, descansosFijos: [],
@@ -55,6 +56,7 @@ export function leerConfig(raw: unknown): ConfigCitas {
     variosServicios: r.variosServicios ?? d.variosServicios,
     pago: { modo: modos.includes(r.pago?.modo as ModoPago) ? (r.pago!.modo as ModoPago) : "sin_pago", valor: num(r.pago?.valor, 0, 0, 100000000) },
     cancelarHorasAntes: num(r.cancelarHorasAntes, d.cancelarHorasAntes, 0, 168),
+    clienteCancela: r.clienteCancela ?? d.clienteCancela,
     politicaCancelacion: typeof r.politicaCancelacion === "string" ? r.politicaCancelacion.slice(0, 400) : d.politicaCancelacion,
     politicaReembolso: typeof r.politicaReembolso === "string" ? r.politicaReembolso.slice(0, 400) : d.politicaReembolso,
     apartarMin: num(r.apartarMin, d.apartarMin, 5, 30),

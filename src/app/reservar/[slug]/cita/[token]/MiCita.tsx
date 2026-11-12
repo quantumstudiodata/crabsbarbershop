@@ -7,7 +7,8 @@ import { Icono } from "@/components/Icono";
 import { DatosTransferencia, type CuentaTransferencia } from "@/components/DatosTransferencia";
 import { aHora } from "@/lib/agenda";
 import { formatoDinero } from "@/lib/money";
-import { cambiarPorCliente, cancelarPorCliente, horariosParaCambio } from "../../../actions";
+import { cambiarPorCliente, cancelarPorCliente, horariosParaCambio, subirComprobante } from "../../../actions";
+import { prepararArchivo, MAX_ADJUNTO } from "@/lib/archivo";
 
 const MESES = ["enero", "febrero", "marzo", "abril", "mayo", "junio", "julio", "agosto", "septiembre", "octubre", "noviembre", "diciembre"];
 const DIAS = ["Dom", "Lun", "Mar", "Mié", "Jue", "Vie", "Sáb"];
@@ -19,11 +20,11 @@ const TRAMOS: [string, string, number, number][] = [["m", "Mañana", 0, 720], ["
 
 type Persona = { id: string; nombre: string; avatar: string };
 
-export function MiCita({ slug, token, negocio, hoy, maxDias, cita, politica, horas, equipo, cualquiera, persona: personaActual, cuenta }: {
-  cuenta?: CuentaTransferencia | null;
+export function MiCita({ slug, token, negocio, hoy, maxDias, cita, politica, horas, equipo, cualquiera, persona: personaActual, cuenta, whatsapp = "", clienteCancela = false }: {
+  cuenta?: CuentaTransferencia | null; whatsapp?: string; clienteCancela?: boolean;
   slug: string; token: string; negocio: string; hoy: string; maxDias: number; politica: string; horas: number;
   equipo: Persona[]; cualquiera: boolean; persona: string;
-  cita: { folio: string; estado: string; estadoTxt: string; cliente: string; fecha: string; hora: string; duracion: number; servicios: { nombre: string; precio: number }[]; total: number; pagado: number; transferencia?: number; barbero: string; avatar: string; sePuedeCambiar: boolean };
+  cita: { folio: string; estado: string; estadoTxt: string; cliente: string; fecha: string; hora: string; duracion: number; servicios: { nombre: string; precio: number }[]; total: number; pagado: number; transferencia?: number; inicio?: string; comprobante?: boolean; barbero: string; avatar: string; sePuedeCambiar: boolean };
 }) {
   const router = useRouter();
   const [modo, setModo] = useState<"ver" | "cancelar" | "cambiar">("ver");
@@ -76,14 +77,50 @@ export function MiCita({ slug, token, negocio, hoy, maxDias, cita, politica, hor
 
   const acciones = activa && cita.sePuedeCambiar && modo === "ver" && (
     <>
-      {cita.pagado === 0 && <button type="button" className="bt sec" onClick={() => { setModo("cancelar"); setCambio(null); }}>Cancelar cita</button>}
+      {clienteCancela && cita.pagado === 0 && <button type="button" className="bt sec" onClick={() => { setModo("cancelar"); setCambio(null); }}>Cancelar cita</button>}
       <button type="button" className="bt" onClick={abrirCambio}>Cambiar fecha u hora</button>
     </>
   );
 
+  // Archivo .ics para guardar la cita en el calendario del teléfono.
+  const calendario = () => {
+    if (!cita.inicio) return;
+    const ini = new Date(cita.inicio), fin = new Date(ini.getTime() + cita.duracion * 60000);
+    const f = (d: Date) => d.toISOString().replace(/[-:]/g, "").replace(/\.\d{3}/, "");
+    const ics = ["BEGIN:VCALENDAR", "VERSION:2.0", "PRODID:-//Crabs//Citas//ES", "BEGIN:VEVENT", `UID:${cita.folio}@crabs`, `DTSTAMP:${f(new Date())}`, `DTSTART:${f(ini)}`, `DTEND:${f(fin)}`,
+      `SUMMARY:${negocio}: ${cita.servicios.map((x) => x.nombre).join(", ")}`, `DESCRIPTION:Con ${cita.barbero}. Folio ${cita.folio}. ${window.location.href}`, "BEGIN:VALARM", "TRIGGER:-PT1H", "ACTION:DISPLAY", "DESCRIPTION:Tu cita", "END:VALARM", "END:VEVENT", "END:VCALENDAR"].join("\r\n");
+    const url = URL.createObjectURL(new Blob([ics], { type: "text/calendar" }));
+    const el = document.createElement("a"); el.href = url; el.download = `cita-${cita.folio}.ics`; el.click(); setTimeout(() => URL.revokeObjectURL(url), 1000);
+  };
+  const [subiendo, setSubiendo] = useState(false);
+  const [subido, setSubido] = useState(!!cita.comprobante);
+  const archivo = async (f?: File) => {
+    if (!f) return;
+    setError(null); setSubiendo(true);
+    try {
+      const datos = await prepararArchivo(f);
+      if (datos.length > MAX_ADJUNTO) { setError("El archivo pesa mucho. Prueba con una captura de pantalla."); return; }
+      const r = await subirComprobante(token, datos, f.name);
+      if (r.error) setError(r.error); else { setSubido(true); router.refresh(); }
+    } catch { setError("No se pudo leer el archivo."); } finally { setSubiendo(false); }
+  };
+  const wa = whatsapp ? `https://wa.me/${whatsapp.length === 10 ? `52${whatsapp}` : whatsapp}?text=${encodeURIComponent(`Hola, transferí ${formatoDinero(cita.transferencia ?? 0)} de mi cita ${cita.folio} a nombre de ${cita.cliente}. Te mando mi comprobante.`)}` : "";
+  const pendientePago = activa && !!cita.transferencia;
+  const titulo = noLlego ? "No pudimos verte" : pendientePago ? "Tu cita está apartada" : activa ? "¡Listo! Tu cita está agendada" : confirmando ? "Confirmando tu pago…" : cita.estado === "expirada" ? "El apartado venció" : cita.estadoTxt;
+  const sub = noLlego ? "Elige otro día y hora para tu cita." : pendientePago ? (subido ? "Recibimos tu comprobante. El negocio la confirma en cuanto revise el pago." : "Falta tu transferencia para confirmarla.") : activa ? `Te esperamos en ${negocio}.` : "";
+  const pasos = [
+    { t: "Reservada", ok: true },
+    { t: cita.transferencia || cita.pagado > 0 ? "Pago" : "Pagas en el negocio", ok: cita.pagado > 0 || (!cita.transferencia && activa), espera: pendientePago },
+    { t: "Tu visita", ok: cita.estado === "completada" },
+  ];
+
   return (
     <main className="reserva mc">
-      <header className="rv-cab"><span className="rv-logo" aria-hidden="true"><Icono n="calendario" /></span><span className="rv-tit"><b>{negocio}</b><small>Comprobante de tu cita</small></span></header>
+      <header className="mc-cab">
+        {/* eslint-disable-next-line @next/next/no-img-element */}
+        <img src="/logo-crabs.png" alt={negocio} width={946} height={209} />
+        <small>Comprobante de reservación</small>
+      </header>
       <div className="mc-rejilla">
         <section className="rv-cuerpo mc-izq">
           {cambio && (
@@ -92,26 +129,46 @@ export function MiCita({ slug, token, negocio, hoy, maxDias, cita, politica, hor
               <span><b>Tu cita cambió</b><small>Ahora es el {cambio}. Ya le avisamos al negocio.</small></span>
             </div>
           )}
-          <div className={`rv-ticket ${activa ? "" : "inactiva"} ${cambio ? "mc-nuevo" : ""}`}>
-            <span className="rv-estado">{noLlego ? <><Icono n="reloj" />No pudimos verte, elige otro día</> : activa && cita.transferencia ? <><Icono n="reloj" />Apartada, falta tu transferencia</> : activa ? <><Icono n="palomita" />Cita confirmada</> : confirmando ? <><Icono n="reloj" />Confirmando tu pago…</> : cita.estado === "expirada" ? "El apartado venció sin pago" : cita.estadoTxt}</span>
-            <b className="rv-cuando">{fechaTxt(cita.fecha).replace(/^./, (x) => x.toUpperCase())}</b>
-            <span className="rv-hora">{cita.hora}<small>{cita.duracion} min</small></span>
-            <span className="rv-con"><Avatar avatar={cita.avatar} nombre={cita.barbero} t={28} />Te atiende {cita.barbero}</span>
-            <div className="rv-resumen">
-              {cita.servicios.map((s, i) => <div key={`${s.nombre}-${i}`} className="entre"><span>{s.nombre}</span><b>{formatoDinero(s.precio)}</b></div>)}
-              {cita.pagado > 0 && <div className="entre"><span className="muted">Pagado</span><b>{formatoDinero(cita.pagado)}</b></div>}
-              <div className="entre rv-total"><span>{cita.pagado > 0 ? "Por pagar" : "Total"}</span><b>{formatoDinero(cita.total - cita.pagado)}</b></div>
+          <article className={`mc-recibo ${activa ? "" : "inactiva"} ${cambio ? "mc-nuevo" : ""}`}>
+            <div className="mc-r-cab">
+              <span className={`mc-sello ${pendientePago || confirmando ? "espera" : activa ? "ok" : "gris"}`} aria-hidden="true"><Icono n={pendientePago || confirmando || noLlego ? "reloj" : activa ? "palomita" : "cerrar"} /></span>
+              <h1>{titulo}</h1>
+              {sub && <p>{sub}</p>}
+              <ol className="mc-pasos">{pasos.map((x, i) => <li key={i} className={x.ok ? "ok" : x.espera ? "espera" : ""}><i>{x.ok ? <Icono n="palomita" /> : i + 1}</i>{x.t}</li>)}</ol>
             </div>
-            <small className="muted">Folio {cita.folio}, a nombre de {cita.cliente}</small>
-          </div>
-          {activa && !!cita.transferencia && cuenta && (
+            <div className="mc-r-cuando">
+              <span className="mc-dia"><small>{DIAS[dow(cita.fecha)]}</small><b>{Number(cita.fecha.slice(8))}</b><small>{MESES[Number(cita.fecha.slice(5, 7)) - 1].slice(0, 3)}</small></span>
+              <span><b className="mc-h">{cita.hora}</b><small>{fechaTxt(cita.fecha).replace(/^./, (x) => x.toUpperCase())}, {cita.duracion} min</small></span>
+            </div>
+            <div className="mc-r-filas">
+              <div><span>Te atiende</span><b className="mc-con"><Avatar avatar={cita.avatar} nombre={cita.barbero} t={22} />{cita.barbero}</b></div>
+              {cita.servicios.map((x, i) => <div key={`${x.nombre}-${i}`}><span>{i === 0 ? "Servicios" : ""}</span><b>{x.nombre}<em>{formatoDinero(x.precio)}</em></b></div>)}
+              <div className="mc-tot"><span>Total</span><b>{formatoDinero(cita.total)}</b></div>
+              {cita.pagado > 0 && <div><span>Pagado</span><b>{formatoDinero(cita.pagado)}</b></div>}
+              {cita.pagado > 0 && cita.pagado < cita.total && <div><span>En el negocio</span><b>{formatoDinero(cita.total - cita.pagado)}</b></div>}
+            </div>
+            <div className="mc-corte" aria-hidden="true" />
+            <div className="mc-r-pie"><span><small>Folio</small><b>{cita.folio}</b></span><span><small>A nombre de</small><b>{cita.cliente}</b></span></div>
+          </article>
+
+          {pendientePago && cuenta && (
             <div className="mc-transf">
-              <p className="muted">Transfiere {cita.transferencia < cita.total ? "el anticipo" : "el total"} a esta cuenta. El negocio confirma tu cita cuando llegue el pago.</p>
+              <span className="mc-lab">1. Transfiere {cita.transferencia! < cita.total ? "el anticipo" : "el total"}</span>
               <DatosTransferencia cuenta={cuenta} monto={cita.transferencia} concepto={`Cita ${cita.folio}`} />
+              <span className="mc-lab">2. Manda tu comprobante</span>
+              <div className="mc-comp">
+                <label className={`mc-subir ${subido ? "ok" : ""}`}>
+                  <input type="file" accept="image/*,application/pdf" hidden onChange={(e) => archivo(e.target.files?.[0])} disabled={subiendo} />
+                  <span className="mc-subir-i"><Icono n={subido ? "palomita" : "camara"} /></span>
+                  <span><b>{subiendo ? "Subiendo…" : subido ? "Comprobante enviado" : "Subir foto o PDF"}</b><small>{subido ? "Toca para cambiarlo" : "Captura de pantalla de tu transferencia"}</small></span>
+                </label>
+                {wa && <a className="mc-wa" href={wa} target="_blank" rel="noreferrer"><Icono n="enviar" />Mandarlo por WhatsApp</a>}
+              </div>
             </div>
           )}
-          {activa && modo === "ver" && <p className="muted rv-guarda">{cita.pagado > 0 ? "Tu pago queda guardado aunque cambies de fecha. Guarda esta página." : "Guarda esta página para cambiar o cancelar tu cita."}</p>}
+          {activa && modo === "ver" && !pendientePago && <p className="muted rv-guarda">{cita.pagado > 0 ? "Tu pago queda guardado aunque cambies de fecha." : "Guarda esta página: desde aquí puedes cambiar tu cita."}</p>}
           {activa && !cita.sePuedeCambiar && <p className="muted rv-guarda">Faltan menos de {horas} horas para tu cita. Para cambiarla, comunícate al negocio.</p>}
+          {activa && modo === "ver" && <button type="button" className="mc-cal" onClick={calendario}><Icono n="calendario" />Agregar a mi calendario</button>}
         </section>
 
         <section className="mc-der">

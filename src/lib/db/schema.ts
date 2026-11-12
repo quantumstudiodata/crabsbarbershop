@@ -84,6 +84,8 @@ export const barberias = pgTable("barberias", {
   transferenciaBanco: text("transferencia_banco").notNull().default(""),
   transferenciaClabe: text("transferencia_clabe").notNull().default(""),
   transferenciaTitular: text("transferencia_titular").notNull().default(""),
+  // WhatsApp del negocio: ahí el cliente puede mandar su comprobante de transferencia.
+  whatsapp: text("whatsapp").notNull().default(""),
   stripeEstado: text("stripe_estado").notNull().default("sin"),
   usaComprobantes: boolean("usa_comprobantes").notNull().default(true),
   // Con comprobantes activos: si el comprobante es obligatorio en egresos pagados con transferencia o tarjeta.
@@ -753,6 +755,8 @@ export const citas = pgTable(
     estadoPago: text("estado_pago").notNull().default("sin_pago"),
     // Lo que el cliente dijo que va a transferir; se suma a "pagado" cuando el negocio confirma que llegó.
     transferenciaMonto: integer("transferencia_monto").notNull().default(0),
+    // Cuándo subió el cliente su comprobante de transferencia (el archivo está en comprobantes_cita).
+    transferenciaComprobanteEn: timestamp("transferencia_comprobante_en", { withTimezone: true }),
     // apartada | en_espera | llego | en_atencion | completada | no_asistio | cancelada | expirada
     estado: text("estado").notNull().default("en_espera"),
     observaciones: text("observaciones").notNull().default(""),
@@ -845,4 +849,18 @@ export const pagosLinea = pgTable(
     pagadoEn: timestamp("pagado_en", { withTimezone: true }),
   },
   (t) => [uniqueIndex("pagos_linea_token_uq").on(t.token), uniqueIndex("pagos_linea_intento_uq").on(t.intento), index("pagos_linea_barberia_idx").on(t.barberiaId, t.creadoEn)],
+);
+
+// Comprobante de transferencia que sube el cliente desde su cita. Aparte de citas para no cargar archivos al leer la agenda.
+export const comprobantesCita = pgTable(
+  "comprobantes_cita",
+  {
+    id: id(),
+    barberiaId: barberiaId(),
+    citaId: uuid("cita_id").notNull().references(() => citas.id),
+    nombre: text("nombre").notNull().default(""),
+    datos: text("datos").notNull(),
+    creadoEn: creadoEn(),
+  },
+  (t) => [uniqueIndex("comprobantes_cita_cita_uq").on(t.citaId)],
 );

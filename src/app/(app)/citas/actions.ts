@@ -225,7 +225,7 @@ export async function quitarBloqueo(id: string): Promise<Res> {
 
 export async function guardarConfigCitas(d: {
   usaCitas: boolean; enLinea: boolean; slug: string; horario: Record<string, [string, string]>; diasCerrados: string[];
-  anticipacionMinHoras: string; anticipacionMaxDias: string; margenMin: string; pasoMin?: string;
+  anticipacionMinHoras: string; anticipacionMaxDias: string; margenMin: string; pasoMin?: string; clienteCancela?: boolean;
   elegirBarbero: boolean; cualquierBarbero: boolean; variosServicios: boolean;
   pagoModo: ModoPago; pagoValor: string; cancelarHorasAntes: string; politicaCancelacion: string; politicaReembolso: string;
 }): Promise<Res> {
@@ -246,7 +246,7 @@ export async function guardarConfigCitas(d: {
   if (d.pagoModo === "anticipo_fijo") { const v = leerPesos(d.pagoValor); if (!v || v <= 0) return { error: "Escribe la cantidad del anticipo." }; valor = v; }
   const config = leerConfig({
     ...leerConfig(s.barberia.citasConfig), enLinea: !!d.enLinea,
-    anticipacionMinMin: Math.round(antMin * 60), anticipacionMaxDias: antMax, margenMin: margen, pasoMin: paso,
+    anticipacionMinMin: Math.round(antMin * 60), anticipacionMaxDias: antMax, margenMin: margen, pasoMin: paso, clienteCancela: !!d.clienteCancela,
     elegirBarbero: !!d.elegirBarbero, cualquierBarbero: !!d.cualquierBarbero, variosServicios: !!d.variosServicios,
     pago: { modo: d.pagoModo, valor }, cancelarHorasAntes: cancelar,
     politicaCancelacion: String(d.politicaCancelacion ?? "").trim(), politicaReembolso: String(d.politicaReembolso ?? "").trim(),
@@ -283,4 +283,12 @@ export async function confirmarTransferencia(id: string): Promise<Res> {
   await registrar(db, { barberiaId: s.barberia.id, usuarioId: s.usuario.id, tipo: "venta", accion: `${s.usuario.nombre} confirmó la transferencia de ${formatoDinero(c.transferenciaMonto)} de la cita ${c.folio}` });
   revalidatePath("/", "layout");
   return { mensaje: "Transferencia confirmada." };
+}
+
+/** Foto o PDF del comprobante de transferencia que subió el cliente, para revisarlo antes de confirmar. */
+export async function verComprobante(citaId: string): Promise<{ error?: string; datos?: string; nombre?: string }> {
+  const s = await requerirSesion("citas.ver");
+  const [c] = await db.select({ datos: schema.comprobantesCita.datos, nombre: schema.comprobantesCita.nombre }).from(schema.comprobantesCita)
+    .where(and(eq(schema.comprobantesCita.citaId, citaId), eq(schema.comprobantesCita.barberiaId, s.barberia.id))).limit(1);
+  return c ? { datos: c.datos, nombre: c.nombre } : { error: "El cliente todavía no sube su comprobante." };
 }

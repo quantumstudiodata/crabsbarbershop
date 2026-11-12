@@ -128,6 +128,7 @@ const puedeCambiar = (inicio: Date, horas: number) => inicio.getTime() - Date.no
 export async function cancelarPorCliente(token: string): Promise<{ error?: string }> {
   const x = await citaPorToken(token);
   if (!x || !["en_espera", "apartada"].includes(x.c.estado)) return { error: "Esta cita ya no se puede cancelar." };
+  if (!x.config.clienteCancela) return { error: "Este negocio no permite cancelar en línea. Puedes cambiar tu cita a otro día." };
   if (!puedeCambiar(x.c.inicio, x.config.cancelarHorasAntes)) return { error: `Solo se puede cancelar hasta ${x.config.cancelarHorasAntes} horas antes. Comunícate al negocio.` };
   // Lo pagado no se devuelve: una cita pagada solo se puede cambiar de fecha.
   if (x.c.pagado > 0) return { error: "Tu cita ya está pagada y el pago no es reembolsable. Puedes cambiarla a otro día u hora." };
@@ -183,3 +184,17 @@ export async function cambiarPorCliente(token: string, fecha: string, minuto: nu
   return ok ? {} : { error: "Ese horario se acaba de ocupar. Elige otro." };
 }
 
+
+/** El cliente sube la foto o PDF de su transferencia; el equipo la revisa en Pendientes antes de confirmar. */
+export async function subirComprobante(token: string, datos: string, nombre: string): Promise<{ error?: string }> {
+  const x = await citaPorToken(token);
+  if (!x || x.c.estadoPago !== "transferencia") return { error: "Esta cita ya no espera una transferencia." };
+  const { TIPOS_ADJUNTO, MAX_ADJUNTO } = await import("@/lib/archivo");
+  if (typeof datos !== "string" || datos.length > MAX_ADJUNTO || !TIPOS_ADJUNTO.test(datos)) return { error: "Sube una foto o PDF de menos de 1 MB." };
+  const n = String(nombre ?? "").slice(0, 120) || "comprobante";
+  await db.insert(schema.comprobantesCita).values({ barberiaId: x.b.id, citaId: x.c.id, nombre: n, datos })
+    .onConflictDoUpdate({ target: schema.comprobantesCita.citaId, set: { nombre: n, datos, creadoEn: new Date() } });
+  await db.update(schema.citas).set({ transferenciaComprobanteEn: new Date() }).where(eq(schema.citas.id, x.c.id));
+  await encolarAviso(db, { barberiaId: x.b.id, citaId: x.c.id, tipo: "comprobante", para: "negocio", mensaje: `${x.c.clienteNombre} subió su comprobante de transferencia de la cita ${x.c.folio}.` });
+  return {};
+}

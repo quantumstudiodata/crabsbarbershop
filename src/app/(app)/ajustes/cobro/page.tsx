@@ -73,7 +73,7 @@ export default async function ConfigurarNegocio({ searchParams }: { searchParams
           ["Promociones", b.usaPromociones ? `Permitidas, ${nPromos} ${nPromos === 1 ? "activa" : "activas"}` : "Apagadas"],
         ]} />{qr && await pagosEnLinea()}</>}>
         <Metodos qr={qr} metodos={metodos.map(({ id, nombre, descripcion, esEfectivo, activo }) => ({ id, nombre, descripcion, esEfectivo, activo }))} />
-        <CuentaTransferencia cuenta={{ banco: b.transferenciaBanco, clabe: b.transferenciaClabe, titular: b.transferenciaTitular }} />
+        <CuentaTransferencia cuenta={{ banco: b.transferenciaBanco, clabe: b.transferenciaClabe, titular: b.transferenciaTitular, whatsapp: b.whatsapp }} />
         <ReglasCobro descuento={b.limiteDescuentoPct} autorizan={autorizan} funciones={[
           { clave: "descuentos", nombre: "Descuentos", activa: b.usaDescuentos, encendida: "Aparecen al cobrar.", apagada: "No aparecen al cobrar." },
           { clave: "propinas", nombre: "Propinas", activa: b.usaPropinas, encendida: "Aparecen al cobrar.", apagada: "No aparecen al cobrar." },
