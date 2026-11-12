@@ -24,3 +24,14 @@ export async function guardarAccionesRapidas(orden: string[], ocultas: string[])
   revalidatePath("/");
   return {};
 }
+
+/** Marca como visto el recorrido de consejos de una pantalla, para esta persona en cualquier dispositivo. */
+export async function marcarConsejos(ids: string[]) {
+  const s = await requerirSesion();
+  if (s.vista) return;
+  const limpios = ids.filter((x) => typeof x === "string" && /^[a-z0-9-]{1,40}$/.test(x)).slice(0, 20);
+  if (!limpios.length) return;
+  const [u] = await db.select({ v: schema.usuarios.consejosVistos }).from(schema.usuarios).where(eq(schema.usuarios.id, s.usuario.id)).limit(1);
+  const todos = [...new Set([...(u?.v ?? []), ...limpios])].slice(-200);
+  await db.update(schema.usuarios).set({ consejosVistos: todos }).where(eq(schema.usuarios.id, s.usuario.id));
+}

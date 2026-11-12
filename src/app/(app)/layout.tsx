@@ -80,8 +80,14 @@ export default async function LayoutApp({ children }: { children: React.ReactNod
         ideas: s.puede("ideas.decidir"), ayuda: !soporte, soporte: soporte && !s.vista,
       }} />
       <VentanaVivo />
-      {!s.vista && <Consejos usuario={s.usuario.id} />}
+      {!s.vista && <Suspense fallback={null}><ConsejosDe usuario={s.usuario.id} /></Suspense>}
       {s.barberia.usaCitas && s.puede("citas.ver") && <AvisoPagoLinea />}
     </>
   );
+}
+
+/** Recorridos de consejos que esta persona ya vio (guardado en su usuario). */
+async function ConsejosDe({ usuario }: { usuario: string }) {
+  const [u] = await db.select({ v: schema.usuarios.consejosVistos }).from(schema.usuarios).where(eq(schema.usuarios.id, usuario)).limit(1).catch(() => [] as { v: string[] }[]);
+  return <Consejos vistos={u?.v ?? []} />;
 }

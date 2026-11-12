@@ -1,0 +1,1 @@
+ALTER TABLE "usuarios" ADD COLUMN "consejos_vistos" jsonb DEFAULT '[]'::jsonb NOT NULL;
