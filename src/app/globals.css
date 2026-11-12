@@ -4799,3 +4799,34 @@ html, body { overscroll-behavior-y: none; }
 .tour-sig:hover { transform: translateY(-1px); box-shadow: 0 8px 18px -10px rgba(255,255,255,.6); }
 .tour-sig .ic { width: 14px; height: 14px; transition: transform .25s; } .tour-sig:hover .ic { transform: translateX(2px); }
 @media (prefers-reduced-motion: reduce) { .tour, .tour-globo, .tour-hueco, .tour-hueco i, .tour-i { animation: none !important; transition: none !important; } }
+/* Recorrido v2: tarjeta de cristal clara con identidad de la marca */
+.tour-hueco { box-shadow: 0 0 0 9999px rgba(30,42,54,.38); }
+.tour-hueco::before { box-shadow: inset 0 0 0 2px #fff, 0 0 0 6px rgba(255,255,255,.18); }
+.tour-linea { position: fixed; inset: 0; width: 100vw; height: 100vh; pointer-events: none; overflow: visible; }
+.tour-linea path { fill: none; stroke: #fff; stroke-width: 2; stroke-linecap: round; stroke-dasharray: 3 6; animation: tour-hilo .5s ease both, tour-flujo 1.2s linear infinite; }
+.tour-linea circle { fill: #fff; stroke: #4b6274; stroke-width: 2.5; animation: fx-pop .4s ease both; }
+@keyframes tour-hilo { from { opacity: 0; } }
+@keyframes tour-flujo { to { stroke-dashoffset: -18; } }
+.tour-globo { overflow: hidden; gap: 12px; padding: 20px 18px 16px; border-radius: 26px; color: var(--ink, #13171c);
+  background: linear-gradient(rgba(255,255,255,.9), rgba(246,248,250,.86)) padding-box, linear-gradient(140deg, #fff, rgba(138,156,170,.7) 55%, rgba(255,255,255,.8)) border-box;
+  border: 1.5px solid transparent; -webkit-backdrop-filter: blur(22px) saturate(1.3); backdrop-filter: blur(22px) saturate(1.3);
+  box-shadow: 0 2px 6px rgba(20,35,50,.08), 0 40px 70px -30px rgba(20,35,50,.7); }
+.tour-globo::before { display: none; }
+.tour-prog { position: absolute; left: 0; right: 0; top: 0; height: 3px; background: rgba(19,23,28,.06); }
+.tour-prog i { display: block; height: 100%; background: linear-gradient(90deg, #8a9caa, #3f5568); border-radius: 0 3px 3px 0; transition: width .5s cubic-bezier(.2,.8,.2,1); }
+.tour-num { position: absolute; right: 14px; top: 2px; font: 800 74px/1 var(--f-display); letter-spacing: -.02em; background: linear-gradient(180deg, rgba(75,98,116,.16), rgba(75,98,116,0)); -webkit-background-clip: text; background-clip: text; color: transparent; pointer-events: none; animation: tour-num .6s cubic-bezier(.2,.8,.2,1) both; }
+@keyframes tour-num { from { opacity: 0; transform: translateY(14px); } }
+.tour-cab { position: relative; }
+.tour-i { width: 42px; height: 42px; border-radius: 14px; background: linear-gradient(160deg, #252c33, #13171c); box-shadow: 0 10px 20px -12px rgba(19,23,28,.9), inset 0 1px 0 rgba(255,255,255,.1); }
+.tour-t small { color: #4b6274; } .tour-t b { font-size: 16.5px; letter-spacing: -.02em; color: #13171c; }
+.tour-x { background: rgba(19,23,28,.05); color: #56616c; } .tour-x:hover { background: rgba(19,23,28,.1); }
+.tour-globo p { position: relative; color: #56616c; font-size: 13.5px; }
+.tour-puntos i { background: rgba(19,23,28,.14); } .tour-puntos i.ya { background: rgba(19,23,28,.35); } .tour-puntos i.on { background: linear-gradient(90deg, #8a9caa, #13171c); }
+.tour-atras, .tour-omitir { color: #6b7680; } .tour-atras:hover, .tour-omitir:hover { color: #13171c; }
+.tour-sig { gap: 10px; padding: 5px 5px 5px 16px; background: linear-gradient(180deg, #252c33, #13171c); color: #fff; box-shadow: 0 10px 20px -12px rgba(19,23,28,.9); }
+.tour-sig:hover { box-shadow: 0 14px 24px -12px rgba(19,23,28,.9); }
+.tour-sig-c { width: 30px; height: 30px; border-radius: 50%; display: grid; place-items: center; background: #fff; color: #13171c; transition: transform .25s cubic-bezier(.2,.8,.2,1); }
+.tour-sig:hover .tour-sig-c { transform: translateX(2px) rotate(-8deg); } .tour-sig .ic { width: 14px; height: 14px; }
+@media (prefers-reduced-motion: reduce) { .tour-linea path, .tour-num { animation: none !important; } }
+.tour-i { color: #fff; }
+.tour-num { right: 58px; top: 10px; font-size: 58px; }

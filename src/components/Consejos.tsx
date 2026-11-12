@@ -92,7 +92,8 @@ export function Consejos({ vistos }: { vistos: string[] }) {
   const p = pasos[i];
   const alto = typeof window === "undefined" ? 800 : window.innerHeight;
   const ancho = typeof window === "undefined" ? 400 : window.innerWidth;
-  const abajo = caja.y + caja.h + 200 < alto || caja.y < 220;
+  const abajo = caja.y + caja.h + 230 < alto || caja.y < 250;
+  const GAP = 34;
   const anchoG = ancho < 560 ? ancho - 24 : 340;
   const globoX = ancho < 560 ? 12 : Math.min(Math.max(caja.x, 12), ancho - anchoG - 12);
   const flechaX = Math.min(Math.max(caja.x + Math.min(caja.w / 2, 60) - globoX, 22), anchoG - 30);
@@ -101,7 +102,13 @@ export function Consejos({ vistos }: { vistos: string[] }) {
     <div className={`tour ${saliendo ? "sale" : ""}`} role="dialog" aria-modal="true" aria-label={`Consejo: ${p.t}`}>
       <div className="tour-fondo" onClick={terminar} />
       <div className="tour-hueco" style={{ left: caja.x, top: caja.y, width: caja.w, height: caja.h }} aria-hidden="true"><i /></div>
-      <div key={i} className={`tour-globo ${abajo ? "abajo" : "arriba"}`} style={{ left: globoX, width: anchoG, top: abajo ? caja.y + caja.h + 14 : undefined, bottom: abajo ? undefined : alto - caja.y + 14, ["--fx" as string]: `${flechaX}px` }}>
+      <svg className="tour-linea" aria-hidden="true" key={`l${i}`}>
+        <path d={abajo ? `M ${globoX + flechaX} ${caja.y + caja.h} C ${globoX + flechaX} ${caja.y + caja.h + GAP / 2}, ${globoX + flechaX} ${caja.y + caja.h + GAP / 2}, ${globoX + flechaX} ${caja.y + caja.h + GAP}` : `M ${globoX + flechaX} ${caja.y} L ${globoX + flechaX} ${caja.y - GAP}`} />
+        <circle cx={globoX + flechaX} cy={abajo ? caja.y + caja.h : caja.y} r="4.5" />
+      </svg>
+      <div key={i} className={`tour-globo ${abajo ? "abajo" : "arriba"}`} style={{ left: globoX, width: anchoG, top: abajo ? caja.y + caja.h + GAP : undefined, bottom: abajo ? undefined : alto - caja.y + GAP, ["--fx" as string]: `${flechaX}px` }}>
+        <span className="tour-prog" aria-hidden="true"><i style={{ width: `${((i + 1) / pasos.length) * 100}%` }} /></span>
+        <span className="tour-num" aria-hidden="true">{String(i + 1).padStart(2, "0")}</span>
         <div className="tour-cab">
           <span className="tour-i" aria-hidden="true"><Icono n={p.icono} /></span>
           <span className="tour-t"><small>Paso {i + 1} de {pasos.length}</small><b>{p.t}</b></span>
@@ -112,7 +119,7 @@ export function Consejos({ vistos }: { vistos: string[] }) {
           <span className="tour-puntos" aria-hidden="true">{pasos.map((_, k) => <i key={k} className={k === i ? "on" : k < i ? "ya" : ""} onClick={() => setI(k)} />)}</span>
           {i > 0 && <button type="button" className="tour-atras" onClick={() => ir(i - 1)}>Atrás</button>}
           {!ultimo && <button type="button" className="tour-omitir" onClick={terminar}>Omitir</button>}
-          <button type="button" className="tour-sig" onClick={() => ir(i + 1)}>{ultimo ? "Listo" : "Siguiente"}<Icono n={ultimo ? "palomita" : "derecha"} /></button>
+          <button type="button" className="tour-sig" onClick={() => ir(i + 1)}><span>{ultimo ? "Listo" : "Siguiente"}</span><span className="tour-sig-c"><Icono n={ultimo ? "palomita" : "derecha"} /></span></button>
         </div>
       </div>
     </div>
