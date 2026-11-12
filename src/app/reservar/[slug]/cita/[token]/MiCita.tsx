@@ -4,6 +4,7 @@ import { useRouter } from "next/navigation";
 import { useEffect, useState, useTransition } from "react";
 import { Avatar } from "@/components/Avatar";
 import { Icono } from "@/components/Icono";
+import { DatosTransferencia, type CuentaTransferencia } from "@/components/DatosTransferencia";
 import { aHora } from "@/lib/agenda";
 import { formatoDinero } from "@/lib/money";
 import { cambiarPorCliente, cancelarPorCliente, horariosParaCambio } from "../../../actions";
@@ -18,10 +19,11 @@ const TRAMOS: [string, string, number, number][] = [["m", "Mañana", 0, 720], ["
 
 type Persona = { id: string; nombre: string; avatar: string };
 
-export function MiCita({ slug, token, negocio, hoy, maxDias, cita, politica, horas, equipo, cualquiera, persona: personaActual }: {
+export function MiCita({ slug, token, negocio, hoy, maxDias, cita, politica, horas, equipo, cualquiera, persona: personaActual, cuenta }: {
+  cuenta?: CuentaTransferencia | null;
   slug: string; token: string; negocio: string; hoy: string; maxDias: number; politica: string; horas: number;
   equipo: Persona[]; cualquiera: boolean; persona: string;
-  cita: { folio: string; estado: string; estadoTxt: string; cliente: string; fecha: string; hora: string; duracion: number; servicios: { nombre: string; precio: number }[]; total: number; pagado: number; barbero: string; avatar: string; sePuedeCambiar: boolean };
+  cita: { folio: string; estado: string; estadoTxt: string; cliente: string; fecha: string; hora: string; duracion: number; servicios: { nombre: string; precio: number }[]; total: number; pagado: number; transferencia?: number; barbero: string; avatar: string; sePuedeCambiar: boolean };
 }) {
   const router = useRouter();
   const [modo, setModo] = useState<"ver" | "cancelar" | "cambiar">("ver");
@@ -91,7 +93,7 @@ export function MiCita({ slug, token, negocio, hoy, maxDias, cita, politica, hor
             </div>
           )}
           <div className={`rv-ticket ${activa ? "" : "inactiva"} ${cambio ? "mc-nuevo" : ""}`}>
-            <span className="rv-estado">{noLlego ? <><Icono n="reloj" />No pudimos verte, elige otro día</> : activa ? <><Icono n="palomita" />Cita confirmada</> : confirmando ? <><Icono n="reloj" />Confirmando tu pago…</> : cita.estado === "expirada" ? "El apartado venció sin pago" : cita.estadoTxt}</span>
+            <span className="rv-estado">{noLlego ? <><Icono n="reloj" />No pudimos verte, elige otro día</> : activa && cita.transferencia ? <><Icono n="reloj" />Apartada, falta tu transferencia</> : activa ? <><Icono n="palomita" />Cita confirmada</> : confirmando ? <><Icono n="reloj" />Confirmando tu pago…</> : cita.estado === "expirada" ? "El apartado venció sin pago" : cita.estadoTxt}</span>
             <b className="rv-cuando">{fechaTxt(cita.fecha).replace(/^./, (x) => x.toUpperCase())}</b>
             <span className="rv-hora">{cita.hora}<small>{cita.duracion} min</small></span>
             <span className="rv-con"><Avatar avatar={cita.avatar} nombre={cita.barbero} t={28} />Te atiende {cita.barbero}</span>
@@ -102,6 +104,12 @@ export function MiCita({ slug, token, negocio, hoy, maxDias, cita, politica, hor
             </div>
             <small className="muted">Folio {cita.folio}, a nombre de {cita.cliente}</small>
           </div>
+          {activa && !!cita.transferencia && cuenta && (
+            <div className="mc-transf">
+              <p className="muted">Transfiere {cita.transferencia < cita.total ? "el anticipo" : "el total"} a esta cuenta. El negocio confirma tu cita cuando llegue el pago.</p>
+              <DatosTransferencia cuenta={cuenta} monto={cita.transferencia} concepto={`Cita ${cita.folio}`} />
+            </div>
+          )}
           {activa && modo === "ver" && <p className="muted rv-guarda">{cita.pagado > 0 ? "Tu pago queda guardado aunque cambies de fecha. Guarda esta página." : "Guarda esta página para cambiar o cancelar tu cita."}</p>}
           {activa && !cita.sePuedeCambiar && <p className="muted rv-guarda">Faltan menos de {horas} horas para tu cita. Para cambiarla, comunícate al negocio.</p>}
         </section>

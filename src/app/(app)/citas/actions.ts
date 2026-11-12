@@ -271,3 +271,16 @@ export async function guardarInterruptorHorarios(clave: "usaHorarioPersona" | "u
   revalidatePath("/", "layout");
   return { mensaje: valor ? "Activado." : "Desactivado. Lo configurado se conserva." };
 }
+
+/** El negocio confirma que llegó la transferencia que el cliente eligió al reservar: cuenta como pagado. */
+export async function confirmarTransferencia(id: string): Promise<Res> {
+  const s = await requerirSesion("citas.modificar");
+  if (s.vista) return { error: "En la vista previa no se guardan cambios." };
+  const [c] = await db.select().from(schema.citas).where(and(eq(schema.citas.id, id), eq(schema.citas.barberiaId, s.barberia.id))).limit(1);
+  if (!c || c.estadoPago !== "transferencia") return { error: "Esa transferencia ya se confirmó o ya no aplica." };
+  const pagado = Math.min(c.pagado + c.transferenciaMonto, c.total);
+  await db.update(schema.citas).set({ pagado, transferenciaMonto: 0, estadoPago: pagado >= c.total ? "pagada" : "anticipo", metodoPago: "Transferencia", actualizadoEn: new Date() }).where(eq(schema.citas.id, id));
+  await registrar(db, { barberiaId: s.barberia.id, usuarioId: s.usuario.id, tipo: "venta", accion: `${s.usuario.nombre} confirmó la transferencia de ${formatoDinero(c.transferenciaMonto)} de la cita ${c.folio}` });
+  revalidatePath("/", "layout");
+  return { mensaje: "Transferencia confirmada." };
+}

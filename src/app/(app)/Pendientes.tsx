@@ -4,10 +4,10 @@ import Link from "next/link";
 import { useState, useTransition } from "react";
 import { useRouter } from "next/navigation";
 import { Icono } from "@/components/Icono";
-import { cambiarEstadoCita } from "./citas/actions";
+import { cambiarEstadoCita, confirmarTransferencia } from "./citas/actions";
 import type { Pendiente } from "./pendientes";
 
-const ICONO = { llegar: "reloj", cobrar: "efectivo", pago: "palomita" } as const;
+const ICONO = { llegar: "reloj", cobrar: "efectivo", pago: "palomita", transferencia: "cobro" } as const;
 
 /** Pendientes por registrar en Inicio: máximo tres a la vista, el resto en la agenda. Solo aparece si hay algo. */
 export function Pendientes({ items, className = "" }: { items: Pendiente[]; className?: string }) {
@@ -38,7 +38,8 @@ export function Pendientes({ items, className = "" }: { items: Pendiente[]; clas
           <div key={x.id} className="pnd-f">
             <span className={`pnd-i ${x.tipo === "cobrar" ? "osc" : ""}`} aria-hidden="true"><Icono n={ICONO[x.tipo]} /></span>
             <span className="pnd-t"><b>{x.titulo}</b><small>{x.detalle}</small></span>
-            {x.tipo === "llegar" ? <span className="pnd-dos"><button type="button" className="pnd-b sec" disabled={pend} onClick={() => noVino(x)}>No vino</button><button type="button" className="pnd-b" disabled={pend} onClick={() => llego(x)}>Llegó</button></span>
+            {x.tipo === "transferencia" ? <button type="button" className="pnd-b" disabled={pend} onClick={() => iniciar(async () => { const r = await confirmarTransferencia(x.citaId); if (r.error) setError(r.error); else { setError(null); setHechos((h) => [...h, x.id]); router.refresh(); } })}>Recibida</button>
+              : x.tipo === "llegar" ? <span className="pnd-dos"><button type="button" className="pnd-b sec" disabled={pend} onClick={() => noVino(x)}>No vino</button><button type="button" className="pnd-b" disabled={pend} onClick={() => llego(x)}>Llegó</button></span>
               : x.tipo === "cobrar" ? <Link className="pnd-b" href={`/cobrar?cita=${x.citaId}`}>Cobrar</Link>
               : <Link className="pnd-b sec" href={`/citas?vista=lista&dia=${x.dia}`}>Ver</Link>}
           </div>

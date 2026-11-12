@@ -117,9 +117,12 @@ export async function registrarVenta(_: EstadoCobro, form: FormData): Promise<Es
   if (pagos.some((p) => !p.m)) return { error: "Esa forma de pago ya no está disponible. Recarga la página." };
   // Anticipo pagado en línea al reservar: ya está cobrado y se registra como un pago más de la venta.
   let anticipo = 0;
+  let anticipoNombre = "Anticipo en línea";
   if (e.citaId) {
-    const [c] = await db.select({ pagado: schema.citas.pagado }).from(schema.citas).where(and(eq(schema.citas.id, e.citaId), eq(schema.citas.barberiaId, bId))).limit(1);
+    const [c] = await db.select({ pagado: schema.citas.pagado, metodo: schema.citas.metodoPago }).from(schema.citas).where(and(eq(schema.citas.id, e.citaId), eq(schema.citas.barberiaId, bId))).limit(1);
     anticipo = Math.min(c?.pagado ?? 0, total);
+    // Si lo pagó por transferencia a la cuenta del negocio, el pago se registra como transferencia.
+    if (c?.metodo === "Transferencia") anticipoNombre = "Transferencia";
   }
   const porCobrar = total - anticipo;
   if (conQr && porCobrar <= 0) return { error: "La cita ya está pagada en línea; cóbrala con cualquier forma de pago por $0." };
@@ -155,7 +158,7 @@ export async function registrarVenta(_: EstadoCobro, form: FormData): Promise<Es
     promosUsadas: ap.usadas, nombresPromo: ap.usadas.map((x) => nombrePromo(x)).join(", "), conceptos,
   };
   const propina: PropinaVenta = e.propina.monto > 0 ? { monto: e.propina.monto, barberoId: e.propina.barberoId, efectivo: conQr ? false : e.propina.efectivo } : null;
-  const anticipoPago: PagoVenta[] = anticipo > 0 ? [{ metodoPagoId: null, nombreMetodo: "Anticipo en línea", esEfectivo: false, monto: anticipo }] : [];
+  const anticipoPago: PagoVenta[] = anticipo > 0 ? [{ metodoPagoId: null, nombreMetodo: anticipoNombre, esEfectivo: false, monto: anticipo }] : [];
   if (conQr) return prepararQr(s, plan, propina, lineas.map((l) => ({ nombre: l.s.nombre, barberoId: l.barberoId, precio: l.s.precio })), anticipo);
 
   try {

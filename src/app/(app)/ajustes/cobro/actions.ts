@@ -275,3 +275,25 @@ export async function revisarStripe(): Promise<{ estado?: string; error?: string
     return { error: "No se pudo consultar Stripe." };
   }
 }
+
+/** La cuenta propia del negocio para recibir transferencias. La CLABE se valida con su dígito de control. */
+export async function guardarCuentaTransferencia(d: { banco: string; clabe: string; titular: string }): Promise<EstadoAjuste> {
+  const s = await requerirSesion("configuracion.cobros");
+  if (s.vista) return { error: "En la vista previa no se guardan cambios." };
+  const clabe = String(d.clabe ?? "").replace(/\D/g, "");
+  const banco = String(d.banco ?? "").trim().slice(0, 40);
+  const titular = String(d.titular ?? "").trim().replace(/\s+/g, " ").slice(0, 80);
+  if (clabe && !clabeValida(clabe)) return { error: "Revisa la CLABE: son 18 dígitos y el último no coincide." };
+  if (clabe && (!banco || titular.length < 3)) return { error: "Escribe el banco y el nombre del titular de la cuenta." };
+  await db.update(schema.barberias).set({ transferenciaClabe: clabe, transferenciaBanco: clabe ? banco : "", transferenciaTitular: clabe ? titular : "" }).where(eq(schema.barberias.id, s.barberia.id));
+  await registrar(db, { barberiaId: s.barberia.id, usuarioId: s.usuario.id, tipo: "ajuste", accion: clabe ? `${s.usuario.nombre} guardó la cuenta para transferencias (termina en ${clabe.slice(-4)})` : `${s.usuario.nombre} quitó la cuenta para transferencias` });
+  revalidatePath("/", "layout");
+  return { ok: true, n: Date.now() };
+}
+
+function clabeValida(c: string) {
+  if (!/^\d{18}$/.test(c)) return false;
+  const pesos = [3, 7, 1];
+  const suma = c.slice(0, 17).split("").reduce((a, x, i) => a + ((Number(x) * pesos[i % 3]) % 10), 0);
+  return (10 - (suma % 10)) % 10 === Number(c[17]);
+}

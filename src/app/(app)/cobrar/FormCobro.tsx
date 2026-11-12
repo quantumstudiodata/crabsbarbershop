@@ -1,6 +1,7 @@
 "use client";
 
 import { EncuestaQR } from "@/components/EncuestaQR";
+import { DatosTransferencia, type CuentaTransferencia } from "@/components/DatosTransferencia";
 import { useActionState, useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { Avatar } from "@/components/Avatar";
 import { Fl, Icono } from "@/components/Icono";
@@ -26,6 +27,8 @@ export function FormCobro(p: {
   desdeCita?: { id: string; folio: string; cliente: string; barberoId: string; servicioIds: string[]; pagado?: number } | null;
   /** El negocio puede cobrar con QR (Stripe conectado). */
   qr?: boolean;
+  /** Cuenta propia para transferencias: se muestra al elegir Transferencia. */
+  cuenta?: CuentaTransferencia | null;
 }) {
   const promos = p.promos ?? [];
   const [estado, accion, enviando] = useActionState<EstadoCobro, FormData>(registrarVenta, {});
@@ -165,6 +168,7 @@ export function FormCobro(p: {
   // La propina se paga igual que la venta.
   const propinaEfectivo = !!metodoActual?.esEfectivo;
   const aCobrarEfectivo = total + (propinaEfectivo ? prop : 0);
+  const aCobrarTransferencia = total + prop;
   const cambioC = pagaCon !== null ? pagaCon - aCobrarEfectivo : null;
 
   const datos = useMemo(() => JSON.stringify({
@@ -409,6 +413,9 @@ export function FormCobro(p: {
             </div>
             <span className={`conteo-l ${m1 > 0 && m1 < total ? "ok" : "dif"}`}><Icono n={m1 > 0 && m1 < total ? "palomita" : "reloj"} />{m1 > 0 && m1 < total ? `${metodoActual?.nombre} ${formatoDinero(m1)} y ${p.metodos.find((x) => x.id === metodo2)?.nombre} ${formatoDinero(total - m1)}` : "Escribe cuánto se paga con la primera forma"}</span>
           </div>
+        )}
+        {p.cuenta && !dividir && !conQr && total > 0 && /transfer/i.test(metodoActual?.nombre ?? "") && (
+          <DatosTransferencia cuenta={p.cuenta} monto={aCobrarTransferencia} compartir />
         )}
         {conQr && total > 0 && (
           <div className="paga-con qr-nota"><Icono n="cuadros" /><span>El cliente escanea el código y paga en su teléfono. No entra al efectivo de la caja.</span></div>

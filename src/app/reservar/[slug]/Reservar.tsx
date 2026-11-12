@@ -12,7 +12,7 @@ import { cotizar, diasPublicos, horariosPublicos, reservar } from "../actions";
 
 type Servicio = { id: string; nombre: string; descripcion: string; categoria: string; precio: number; duracionMin: number; promo: { nombre: string; precio: number } | null };
 type Persona = { id: string; nombre: string; avatar: string };
-export type FormaPago = "negocio" | "anticipo" | "total";
+export type FormaPago = "negocio" | "anticipo" | "total" | "transferencia";
 
 const PASOS = ["Servicio", "Barbero", "Día", "Hora", "Tus datos", "Confirmar"];
 const DIAS = ["Dom", "Lun", "Mar", "Mié", "Jue", "Vie", "Sáb"];
@@ -49,6 +49,7 @@ export function Reservar(p: {
   opciones: { elegir: boolean; cualquiera: boolean; varios: boolean; maxDias: number };
   pago: { modo: string; ejemplo: { minimo: number }; politica: string; reembolso: string; regla: ConfigCitas["pago"]; apartarMin: number };
   enLinea: { llave: string; cuenta: string } | null;
+  cuenta?: { banco: string; clabe: string; titular: string } | null;
   regreso?: { href: string; texto: string } | null;
 }) {
   const router = useRouter();
@@ -69,7 +70,8 @@ export function Reservar(p: {
   const [cot, setCot] = useState<{ filas: { nombre: string; precio: number; descuento: number }[]; total: number; duracion: number } | null>(null);
   const [error, setError] = useState<string | null>(null);
   const pagaEnLinea = !!p.enLinea && p.pago.modo !== "sin_pago";
-  const [forma, setForma] = useState<FormaPago>(!pagaEnLinea || p.pago.modo === "opcional" ? "negocio" : p.pago.modo === "completo" ? "total" : "anticipo");
+  const pagaTransferencia = !!p.cuenta && p.pago.modo !== "sin_pago";
+  const [forma, setForma] = useState<FormaPago>(p.pago.modo === "opcional" || (!pagaEnLinea && !pagaTransferencia) ? "negocio" : pagaEnLinea ? (p.pago.modo === "completo" ? "total" : "anticipo") : "transferencia");
   const [pend, iniciar] = useTransition();
   const cats = useMemo(() => [...new Set(p.servicios.map((s) => s.categoria))], [p.servicios]);
   const elegidos = svc.map((id) => p.servicios.find((x) => x.id === id)).filter(Boolean) as Servicio[];
@@ -78,7 +80,9 @@ export function Reservar(p: {
   const estimado = elegidos.reduce((a, s) => a + (s.promo?.precio ?? s.precio), 0);
   const total = cot?.total ?? estimado;
   const anticipo = montoAPagar(total, p.pago.regla).minimo;
-  const enTarjeta = forma === "negocio" ? 0 : forma === "total" ? total : anticipo;
+  const enTarjeta = forma === "total" ? total : forma === "anticipo" ? anticipo : 0;
+  const porTransferir = p.pago.modo === "completo" || p.pago.modo === "opcional" ? total : anticipo;
+  const conTarjeta = forma === "anticipo" || forma === "total";
   const conCargo = enTarjeta ? enTarjeta + cargoEnLinea(enTarjeta) : 0;
   const quien = persona ? p.equipo.find((e) => e.id === persona) : null;
 
@@ -122,7 +126,7 @@ export function Reservar(p: {
   const mas = (id: string) => setSvc((xs) => (xs.length >= 6 ? xs : [...xs, id]));
   const menos = (id: string) => setSvc((xs) => { const i = xs.lastIndexOf(id); return i < 0 ? xs : [...xs.slice(0, i), ...xs.slice(i + 1)]; });
   const confirmar = () => iniciar(async () => {
-    const r = await reservar(p.slug, { servicioIds: svc, persona, fecha: fecha!, minuto: minuto!, nombre, telefono: tel, notas, sitio });
+    const r = await reservar(p.slug, { servicioIds: svc, persona, fecha: fecha!, minuto: minuto!, nombre, telefono: tel, notas, sitio, transferencia: forma === "transferencia" });
     if (r.error) { setError(r.error); if (r.error.includes("ocup")) { setMinuto(null); ir(3); } return; }
     router.push(`/reservar/${p.slug}/cita/${r.token}`);
   });
@@ -134,15 +138,20 @@ export function Reservar(p: {
   const cuando = fecha && minuto !== null ? `${DIAS[dow(fecha)]} ${Number(fecha.slice(8))}, ${aHora(minuto)}` : "";
   const personas = [...(p.opciones.cualquiera ? [{ id: "", nombre: "Quien esté libre", avatar: "" }] : []), ...(p.opciones.elegir ? p.equipo : [])];
   const visibles = cat ? p.servicios.filter((s) => s.categoria === cat) : p.servicios;
-  const opcionesPago: [FormaPago, string, string][] = !pagaEnLinea ? [] : p.pago.modo === "opcional"
-    ? [["negocio", "En el negocio", formatoDinero(total)], ["total", "Con tarjeta", "Ahora, en línea"]]
-    : p.pago.modo === "completo" ? [["total", "Con tarjeta", "Ahora, en línea"]]
-      : [["anticipo", "Anticipo con tarjeta", "El resto en el negocio"], ["total", "Todo con tarjeta", "Ahora, en línea"]];
+  const anticipa = p.pago.modo === "anticipo_fijo" || p.pago.modo === "anticipo_pct";
+  const opcionesPago: [FormaPago, string, string][] = (!pagaEnLinea && !pagaTransferencia) ? [] : [
+    ...(p.pago.modo === "opcional" ? [["negocio", "En el negocio", "Al terminar tu servicio"] as [FormaPago, string, string]] : []),
+    ...(pagaEnLinea ? (anticipa
+      ? [["anticipo", "Anticipo con tarjeta", "El resto en el negocio"], ["total", "Todo con tarjeta", "Ahora, en línea"]] as [FormaPago, string, string][]
+      : [["total", "Con tarjeta", "Ahora, en línea"]] as [FormaPago, string, string][]) : []),
+    ...(pagaTransferencia ? [["transferencia", anticipa ? "Anticipo por transferencia" : "Transferencia", "Te damos la CLABE al reservar"] as [FormaPago, string, string]] : []),
+  ];
 
   // Lo que muestra la barra (teléfono) y el panel (escritorio).
   const barra = paso === 0
     ? { t: svc.length ? <Monto valor={total} /> : "Elige un servicio", s: svc.length ? `${svc.length} ${svc.length === 1 ? "servicio" : "servicios"}, ${duracion} min` : "Toca + para agregar" }
-    : paso === 5 && forma !== "negocio" ? { t: <Monto valor={conCargo} />, s: forma === "anticipo" ? "Anticipo, el resto en el negocio" : "Pagas ahora con tarjeta" }
+    : paso === 5 && conTarjeta ? { t: <Monto valor={conCargo} />, s: forma === "anticipo" ? "Anticipo, el resto en el negocio" : "Pagas ahora con tarjeta" }
+      : paso === 5 && forma === "transferencia" ? { t: <Monto valor={porTransferir} />, s: anticipa ? "Anticipo por transferencia" : "Por transferencia" }
       : paso === 5 ? { t: <Monto valor={total} />, s: "Pagas en el negocio" }
         : { t: cuando || <Monto valor={total} />, s: cuando ? `${quien ? `con ${quien.nombre}` : "con quien esté libre"}, ${formatoDinero(total)}` : `${nombres(elegidos)}, ${duracion} min` };
   const boton = paso < 5
@@ -166,7 +175,7 @@ export function Reservar(p: {
               {r.v && paso > r.k && <button type="button" onClick={() => ir(r.k)}>Cambiar</button>}</li>
           ))}
         </ol>
-        <div className="fx-res-tot"><span>Total</span><b><Monto valor={paso === 5 && forma !== "negocio" ? conCargo : total} /></b></div>
+        <div className="fx-res-tot"><span>Total</span><b><Monto valor={paso === 5 && conTarjeta ? conCargo : total} /></b></div>
       </aside>
 
       <main className="fx-main">
@@ -296,7 +305,7 @@ export function Reservar(p: {
                 <div className="fx-sec"><span className="fx-lab">Cómo pagas</span>
                   <div className="fx-pago" role="radiogroup" aria-label="Cómo pagas">
                     {opcionesPago.map(([k, t, s]) => {
-                      const m = k === "negocio" ? total : k === "total" ? total + cargoEnLinea(total) : anticipo + cargoEnLinea(anticipo);
+                      const m = k === "negocio" ? total : k === "transferencia" ? porTransferir : k === "total" ? total + cargoEnLinea(total) : anticipo + cargoEnLinea(anticipo);
                       return (
                         <button type="button" key={k} role="radio" aria-checked={forma === k} className={forma === k ? "on" : ""} onClick={() => setForma(k)}>
                           <span className="fx-radio" aria-hidden="true" /><span><b>{t}</b><small>{s}</small></span>{forma === k && <b className="fx-pago-m"><Monto valor={m} /></b>}
@@ -306,14 +315,14 @@ export function Reservar(p: {
                   </div>
                 </div>
               )}
-              {p.pago.politica && <p className="fx-politica">{p.pago.politica}{forma !== "negocio" ? " Lo pagado no es reembolsable; si no puedes venir, cambia tu cita a otro día." : ""}</p>}
+              {p.pago.politica && <p className="fx-politica">{p.pago.politica}{forma !== "negocio" ? " Lo pagado no es reembolsable; si no puedes venir, cambia tu cita a otro día." : ""}{forma === "transferencia" ? " Tu cita queda apartada; el negocio la confirma cuando llegue tu transferencia." : ""}</p>}
             </>
           )}
           {error && <p className="aviso error" role="alert">{error}</p>}
         </section>
 
-        {paso === 5 && forma !== "negocio" && p.enLinea && fecha && minuto !== null ? (
-          <PagoTarjeta slug={p.slug} enLinea={p.enLinea} monto={conCargo} forma={forma} apartarMin={p.pago.apartarMin}
+        {paso === 5 && conTarjeta && p.enLinea && fecha && minuto !== null ? (
+          <PagoTarjeta slug={p.slug} enLinea={p.enLinea} monto={conCargo} forma={forma === "anticipo" ? "anticipo" : "total"} apartarMin={p.pago.apartarMin}
             datos={{ servicioIds: svc, persona, fecha, minuto, nombre, telefono: tel, notas, sitio }}
             barra={barra} atras={() => ir(4)}
             alConfirmar={(token) => router.push(`/reservar/${p.slug}/cita/${token}`)}

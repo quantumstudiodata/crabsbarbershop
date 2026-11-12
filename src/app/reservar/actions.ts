@@ -51,7 +51,7 @@ export async function cotizar(slug: string, fecha: string, minuto: number, servi
   return svc ? { filas: svc.filas, total: svc.total, duracion: svc.duracion } : null;
 }
 
-type DatosReserva = { servicioIds: string[]; persona: string | null; fecha: string; minuto: number; nombre: string; telefono: string; notas: string; sitio?: string };
+type DatosReserva = { servicioIds: string[]; persona: string | null; fecha: string; minuto: number; nombre: string; telefono: string; notas: string; sitio?: string; transferencia?: boolean };
 
 export async function reservar(slug: string, d: DatosReserva, apartar = false): Promise<{ error?: string; token?: string; citaId?: string }> {
   // Campo trampa: las personas no lo ven; los robots lo llenan.
@@ -74,6 +74,11 @@ export async function reservar(slug: string, d: DatosReserva, apartar = false): 
   void (await headers());
   const r = await crearCita(n.b, { servicioIds, persona: d.persona, fecha: d.fecha, minuto: d.minuto, nombre, telefono: tel, observaciones: String(d.notas ?? ""), origen: "linea", apartar });
   if ("error" in r) return { error: r.error };
+  // Pagará por transferencia a la cuenta del negocio: se guarda cuánto, y el negocio lo confirma cuando llegue.
+  if (d.transferencia && !apartar && n.b.transferenciaClabe && n.config.pago.modo !== "sin_pago") {
+    const monto = n.config.pago.modo === "completo" || n.config.pago.modo === "opcional" ? r.cita.total : montoAPagar(r.cita.total, n.config.pago).minimo;
+    await db.update(schema.citas).set({ transferenciaMonto: monto, estadoPago: "transferencia" }).where(eq(schema.citas.id, r.cita.id));
+  }
   return { token: r.cita.token, citaId: r.cita.id };
 }
 

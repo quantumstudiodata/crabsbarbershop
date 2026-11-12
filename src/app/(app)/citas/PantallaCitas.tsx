@@ -25,7 +25,7 @@ type Servicio = { id: string; nombre: string; categoria: string; precio: number;
 export type Rot = { persona1: string; persona2: string; dia1: number; dia2: number; semanaInicio: string; activo: boolean; estaSemana: { dia: number; persona: string }[] };
 
 const ESTADO: Record<string, string> = { apartada: "Apartada", en_espera: "En espera", llego: "Llegó", en_atencion: "En atención", completada: "Completada", no_asistio: "No asistió", cancelada: "Cancelada" };
-const PAGO: Record<string, string> = { sin_pago: "Sin pago", anticipo: "Anticipo", pagada: "Pagada" };
+const PAGO: Record<string, string> = { sin_pago: "Sin pago", anticipo: "Anticipo", pagada: "Pagada", transferencia: "Transferencia por confirmar" };
 const DIAS = ["Dom", "Lun", "Mar", "Mié", "Jue", "Vie", "Sáb"];
 const DIAS_L = ["domingo", "lunes", "martes", "miércoles", "jueves", "viernes", "sábado"];
 const MESES = ["ene", "feb", "mar", "abr", "may", "jun", "jul", "ago", "sep", "oct", "nov", "dic"];

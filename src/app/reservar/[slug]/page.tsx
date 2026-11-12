@@ -58,6 +58,7 @@ export default async function PaginaReservar({ params, searchParams }: { params:
       equipo={equipo.map((e) => ({ id: e.id, nombre: e.nombre.split(" ")[0], avatar: e.avatar }))}
       opciones={{ elegir: config.elegirBarbero, cualquiera: config.cualquierBarbero, varios: config.variosServicios, maxDias: config.anticipacionMaxDias }}
       pago={{ modo: config.pago.modo, ejemplo: montoAPagar(10000, config.pago), politica: config.politicaCancelacion, reembolso: config.politicaReembolso, regla: config.pago, apartarMin: config.apartarMin }}
+      cuenta={b.transferenciaClabe ? { banco: b.transferenciaBanco, clabe: b.transferenciaClabe, titular: b.transferenciaTitular } : null}
       enLinea={cobraEnLinea(b) ? { llave: process.env.NEXT_PUBLIC_STRIPE_PUBLISHABLE_KEY!, cuenta: b.stripeCuenta! } : null}
       regreso={regreso}
     />

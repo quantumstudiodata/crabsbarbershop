@@ -80,6 +80,10 @@ export const barberias = pgTable("barberias", {
   citasConfig: jsonb("citas_config").$type<Record<string, unknown>>().notNull().default({}),
   // Pagos en línea: cada negocio conecta su propia cuenta de Stripe (Connect). sin | pendiente | activa
   stripeCuenta: text("stripe_cuenta"),
+  // Cuenta propia para recibir transferencias (se muestra al cobrar y al reservar). Sin comisión.
+  transferenciaBanco: text("transferencia_banco").notNull().default(""),
+  transferenciaClabe: text("transferencia_clabe").notNull().default(""),
+  transferenciaTitular: text("transferencia_titular").notNull().default(""),
   stripeEstado: text("stripe_estado").notNull().default("sin"),
   usaComprobantes: boolean("usa_comprobantes").notNull().default(true),
   // Con comprobantes activos: si el comprobante es obligatorio en egresos pagados con transferencia o tarjeta.
@@ -747,6 +751,8 @@ export const citas = pgTable(
     metodoPago: text("metodo_pago"),
     // sin_pago | anticipo | pagada
     estadoPago: text("estado_pago").notNull().default("sin_pago"),
+    // Lo que el cliente dijo que va a transferir; se suma a "pagado" cuando el negocio confirma que llegó.
+    transferenciaMonto: integer("transferencia_monto").notNull().default(0),
     // apartada | en_espera | llego | en_atencion | completada | no_asistio | cancelada | expirada
     estado: text("estado").notNull().default("en_espera"),
     observaciones: text("observaciones").notNull().default(""),

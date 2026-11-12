@@ -61,6 +61,7 @@ export default async function Cobrar({ searchParams }: { searchParams: Promise<{
                 servicios={servicios.map(({ id, nombre, duracionMin, precio, categoria }) => ({ id, nombre, duracionMin, precio, categoria }))}
                 equipo={equipo.map(({ id, nombre, avatar }) => ({ id, nombre, avatar }))}
                 metodos={metodos.map(({ id, nombre, esEfectivo }) => ({ id, nombre, esEfectivo }))}
+                cuenta={s.barberia.transferenciaClabe ? { banco: s.barberia.transferenciaBanco, clabe: s.barberia.transferenciaClabe, titular: s.barberia.transferenciaTitular } : null}
                 yo={s.usuario.id}
                 puedeOtros={s.puede("ventas.registrar_otros")}
                 limiteDescuento={s.barberia.limiteDescuentoPct}

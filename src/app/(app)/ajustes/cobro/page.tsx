@@ -12,6 +12,7 @@ import { NOMBRE_ROL, PERMISOS_CONFIG, permisosDe } from "@/lib/permisos";
 import { redirect } from "next/navigation";
 import { Funciones } from "./Funciones";
 import { Metodos } from "./Metodos";
+import { CuentaTransferencia } from "./CuentaTransferencia";
 import { CajaConfig, MetaMensual, ReglasCobro } from "./Reglas";
 import { ModeloCaja } from "./Secciones";
 import { Bloque, CategoriasEgresos, GastosFrecuentes, OpcionesRegistro, Resumen } from "./Bloques";
@@ -72,6 +73,7 @@ export default async function ConfigurarNegocio({ searchParams }: { searchParams
           ["Promociones", b.usaPromociones ? `Permitidas, ${nPromos} ${nPromos === 1 ? "activa" : "activas"}` : "Apagadas"],
         ]} />{qr && await pagosEnLinea()}</>}>
         <Metodos qr={qr} metodos={metodos.map(({ id, nombre, descripcion, esEfectivo, activo }) => ({ id, nombre, descripcion, esEfectivo, activo }))} />
+        <CuentaTransferencia cuenta={{ banco: b.transferenciaBanco, clabe: b.transferenciaClabe, titular: b.transferenciaTitular }} />
         <ReglasCobro descuento={b.limiteDescuentoPct} autorizan={autorizan} funciones={[
           { clave: "descuentos", nombre: "Descuentos", activa: b.usaDescuentos, encendida: "Aparecen al cobrar.", apagada: "No aparecen al cobrar." },
           { clave: "propinas", nombre: "Propinas", activa: b.usaPropinas, encendida: "Aparecen al cobrar.", apagada: "No aparecen al cobrar." },
