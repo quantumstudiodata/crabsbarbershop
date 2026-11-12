@@ -4513,3 +4513,40 @@ html, body { overscroll-behavior-y: none; }
   .fx-res button { background: rgba(19,23,28,.06); color: var(--tinta); } .fx-res button:hover { background: rgba(19,23,28,.1); }
   .fx-res-tot { border-top-color: rgba(19,23,28,.12); }
 }
+/* Reservar v3: paso a paso, negro, grises y blanco con toques de azul grisáceo */
+.fx { --azul: linear-gradient(180deg, #252c33, #13171c); --azul-s: #13171c; --acento: linear-gradient(90deg, #8a9caa, #4b6274); }
+.fx-prog { position: sticky; top: 0; z-index: 6; display: grid; gap: 10px; margin: 0 -20px; padding: 14px 20px 12px; -webkit-backdrop-filter: blur(14px); backdrop-filter: blur(14px); }
+.fx-prog-t { display: flex; justify-content: space-between; align-items: baseline; }
+.fx-prog-t b { font-size: 13px; font-weight: 600; letter-spacing: .02em; }
+.fx-prog-t small { font-size: 12px; color: var(--gris); font-variant-numeric: tabular-nums; }
+.fx-prog-b { height: 3px; border-radius: 3px; background: rgba(19,23,28,.08); overflow: hidden; }
+.fx-prog-b i { display: block; height: 100%; border-radius: inherit; background: var(--acento); transition: width .5s var(--ease); }
+.fx-cuerpo { padding-top: 16px; }
+.fx-barberos { display: grid; gap: 8px; }
+.fx-bb { display: grid; grid-template-columns: auto minmax(0,1fr) auto; gap: 14px; align-items: center; padding: 12px 16px 12px 12px; border: 0; border-radius: 20px; background: rgba(255,255,255,.72); box-shadow: inset 0 0 0 1px rgba(255,255,255,.9), 0 8px 20px -18px rgba(30,45,60,.6); font: inherit; color: inherit; text-align: left; cursor: pointer; animation: fx-sube .45s var(--ease) both; animation-delay: calc(var(--i, 0) * 45ms); transition: transform .2s var(--ease), box-shadow .25s, background .25s; }
+.fx-bb > :first-child { width: 52px !important; height: 52px !important; border-radius: 50%; }
+.fx-bb .fx-libre { width: 52px; height: 52px; border-radius: 50%; }
+.fx-bb b { display: block; font-size: 16px; font-weight: 600; } .fx-bb small { font-size: 12.5px; color: var(--gris); }
+.fx-bb > .ic { width: 18px; height: 18px; color: var(--tenue); transition: transform .25s var(--ease), color .25s; }
+.fx-bb:hover { transform: translateY(-2px); background: #fff; } .fx-bb:hover > .ic { transform: translateX(3px); color: var(--tinta); }
+.fx-bb.on { background: #fff; box-shadow: inset 0 0 0 1.5px #13171c; }
+.fx-bb.on > .ic { color: var(--tinta); }
+.fx-cal { display: grid; gap: 12px; padding: 16px; border-radius: 22px; background: rgba(255,255,255,.6); box-shadow: inset 0 0 0 1px rgba(255,255,255,.9); }
+.fx-cal-g { display: grid; grid-template-columns: repeat(7, minmax(0,1fr)); gap: 6px; }
+.fx-cal-g > small { text-align: center; font-size: 11.5px; font-weight: 600; color: var(--tenue); padding-bottom: 2px; }
+.fx-cd { position: relative; aspect-ratio: 1; border: 0; border-radius: 14px; background: #fff; font: 600 15px var(--f-body); color: var(--tinta); cursor: pointer; animation: fx-sube .4s var(--ease) both; animation-delay: calc(var(--i, 0) * 10ms); transition: transform .2s var(--ease), background .25s, color .25s, box-shadow .25s; }
+.fx-cd em { position: absolute; top: 3px; left: 0; right: 0; font: 600 8.5px var(--f-body); font-style: normal; text-transform: uppercase; color: var(--gris); }
+.fx-cd.hoy { box-shadow: inset 0 0 0 1.5px rgba(75,98,116,.5); }
+.fx-cd:hover:not(:disabled):not(.on) { transform: translateY(-2px); box-shadow: 0 8px 16px -12px rgba(30,45,60,.6); }
+.fx-cd.on { background: var(--azul); color: #fff; }
+.fx-cd:disabled { background: transparent; color: #b6bec5; cursor: default; }
+.fx-svc.on .fx-add, .fx-step, .fx-hrs button.on, .fx-cats button.on, .fx-d.on { background: var(--azul); }
+.fx-when-d { background: var(--azul); }
+.fx-logo-img { box-shadow: 0 8px 18px -12px rgba(30,45,60,.7); }
+@media (min-width: 960px) {
+  .fx-prog { margin: 0; padding: 28px 0 14px; }
+  .fx-barberos { grid-template-columns: 1fr 1fr; }
+  .fx-cal { max-width: 520px; }
+  .fx-res li.ok i { background: var(--azul); }
+  .fx-res-tot b { background: linear-gradient(90deg, #13171c, #4b6274); -webkit-background-clip: text; background-clip: text; color: transparent; }
+}

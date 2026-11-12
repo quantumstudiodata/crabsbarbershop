@@ -14,7 +14,7 @@ type Servicio = { id: string; nombre: string; descripcion: string; categoria: st
 type Persona = { id: string; nombre: string; avatar: string };
 export type FormaPago = "negocio" | "anticipo" | "total";
 
-const PASOS = ["Servicio", "Cuándo", "Tus datos", "Confirmar"];
+const PASOS = ["Servicio", "Barbero", "Día", "Hora", "Tus datos", "Confirmar"];
 const DIAS = ["Dom", "Lun", "Mar", "Mié", "Jue", "Vie", "Sáb"];
 const DIAS_L = ["domingo", "lunes", "martes", "miércoles", "jueves", "viernes", "sábado"];
 const MESES = ["enero", "febrero", "marzo", "abril", "mayo", "junio", "julio", "agosto", "septiembre", "octubre", "noviembre", "diciembre"];
@@ -84,18 +84,18 @@ export function Reservar(p: {
 
   // Días con lugar para lo elegido; al cambiar de persona o servicio se vuelven a pedir.
   useEffect(() => {
-    if (paso !== 1 || !svc.length) return;
+    if (paso !== 2 || !svc.length) return;
     let vivo = true;
     setDias(null);
     diasPublicos(p.slug, svc, persona).then((d) => {
       if (!vivo) return;
       setDias(d);
-      if (!fecha || !d[fecha]) { const primero = Object.keys(d).sort().find((f) => d[f]) ?? null; setFecha(primero); setMinuto(null); }
+      if (fecha && !d[fecha]) { setFecha(null); setMinuto(null); }
     });
     return () => { vivo = false; };
   }, [paso, persona, svc.join(",")]); // eslint-disable-line react-hooks/exhaustive-deps
   useEffect(() => {
-    if (!fecha || paso !== 1) return;
+    if (!fecha || paso !== 3) return;
     let vivo = true;
     setHoras(null);
     horariosPublicos(p.slug, fecha, svc, persona).then((h) => { if (vivo) setHoras(h); });
@@ -104,14 +104,17 @@ export function Reservar(p: {
   // El precio final depende del día y la hora (promociones): se recalcula si algo cambia.
   useEffect(() => { setCot(null); }, [svc.join(","), fecha, minuto]); // eslint-disable-line react-hooks/exhaustive-deps
   useEffect(() => {
-    if (paso < 2 || cot || !fecha || minuto === null) return;
+    if (paso < 4 || cot || !fecha || minuto === null) return;
     let vivo = true;
     cotizar(p.slug, fecha, minuto, svc).then((r) => { if (vivo) setCot(r); });
     return () => { vivo = false; };
   }, [paso, cot]); // eslint-disable-line react-hooks/exhaustive-deps
 
-  const ir = (n: number) => { setError(null); setDir(n > paso ? 1 : -1); setPaso(n); window.scrollTo({ top: 0, behavior: "smooth" }); };
-  const listo = [svc.length > 0, !!fecha && minuto !== null, nombre.trim().length > 1 && tel.replace(/\D/g, "").length >= 10, true][paso];
+  // Si no hay a quién elegir, el paso Barbero se salta.
+  const saltaBarbero = (p.opciones.cualquiera ? 1 : 0) + (p.opciones.elegir ? p.equipo.length : 0) <= 1;
+  const ir = (n: number) => { const m = n === 1 && saltaBarbero ? (n > paso ? 2 : 0) : n; setError(null); setDir(m > paso ? 1 : -1); setPaso(m); window.scrollTo({ top: 0, behavior: "smooth" }); };
+  const listo = [svc.length > 0, true, !!fecha, minuto !== null, nombre.trim().length > 1 && tel.replace(/\D/g, "").length >= 10, true][paso];
+  const avanzar = (n: number) => setTimeout(() => ir(n), 220);
   const tocar = (id: string) => {
     if (!p.opciones.varios) { setSvc([id]); setTimeout(() => ir(1), 180); return; }
     if (!svc.includes(id)) mas(id);
@@ -120,7 +123,7 @@ export function Reservar(p: {
   const menos = (id: string) => setSvc((xs) => { const i = xs.lastIndexOf(id); return i < 0 ? xs : [...xs.slice(0, i), ...xs.slice(i + 1)]; });
   const confirmar = () => iniciar(async () => {
     const r = await reservar(p.slug, { servicioIds: svc, persona, fecha: fecha!, minuto: minuto!, nombre, telefono: tel, notas, sitio });
-    if (r.error) { setError(r.error); if (r.error.includes("ocup")) { setMinuto(null); ir(1); } return; }
+    if (r.error) { setError(r.error); if (r.error.includes("ocup")) { setMinuto(null); ir(3); } return; }
     router.push(`/reservar/${p.slug}/cita/${r.token}`);
   });
 
@@ -139,17 +142,18 @@ export function Reservar(p: {
   // Lo que muestra la barra (teléfono) y el panel (escritorio).
   const barra = paso === 0
     ? { t: svc.length ? <Monto valor={total} /> : "Elige un servicio", s: svc.length ? `${svc.length} ${svc.length === 1 ? "servicio" : "servicios"}, ${duracion} min` : "Toca + para agregar" }
-    : paso === 3 && forma !== "negocio" ? { t: <Monto valor={conCargo} />, s: forma === "anticipo" ? "Anticipo, el resto en el negocio" : "Pagas ahora con tarjeta" }
-      : paso === 3 ? { t: <Monto valor={total} />, s: "Pagas en el negocio" }
+    : paso === 5 && forma !== "negocio" ? { t: <Monto valor={conCargo} />, s: forma === "anticipo" ? "Anticipo, el resto en el negocio" : "Pagas ahora con tarjeta" }
+      : paso === 5 ? { t: <Monto valor={total} />, s: "Pagas en el negocio" }
         : { t: cuando || <Monto valor={total} />, s: cuando ? `${quien ? `con ${quien.nombre}` : "con quien esté libre"}, ${formatoDinero(total)}` : `${nombres(elegidos)}, ${duracion} min` };
-  const boton = paso < 3
+  const boton = paso < 5
     ? <button type="button" className="fx-go" disabled={!listo} onClick={() => ir(paso + 1)}>Continuar<Icono n="derecha" /></button>
     : <button type="button" className="fx-go" disabled={pend} onClick={confirmar}>{pend ? "Reservando…" : "Reservar"}<Icono n="derecha" /></button>;
 
   const resumen = [
     { k: 0, t: "Servicios", v: svc.length ? nombres(elegidos) : "" },
-    { k: 1, t: "Cuándo", v: cuando ? `${cuando}${quien ? `, con ${quien.nombre}` : ""}` : "" },
-    { k: 2, t: "A nombre de", v: paso > 2 ? nombre : "" },
+    ...(saltaBarbero ? [] : [{ k: 1, t: "Barbero", v: paso > 1 ? (quien ? quien.nombre : "Quien esté libre") : "" }]),
+    { k: 2, t: "Cuándo", v: cuando },
+    { k: 4, t: "A nombre de", v: paso > 4 ? nombre : "" },
   ];
 
   return (
@@ -158,23 +162,20 @@ export function Reservar(p: {
         <div className="fx-marca"><img className="fx-logo-img" src="/icono-192.png" alt="" width={48} height={48} /><span><b>{p.negocio}</b><small>Reserva tu cita en menos de un minuto</small></span></div>
         <ol className="fx-res">
           {resumen.map((r) => (
-            <li key={r.k} className={r.v ? "ok" : ""}><i aria-hidden="true">{r.v ? <Icono n="palomita" /> : r.k + 1}</i><span><small>{r.t}</small><b>{r.v || "Falta"}</b></span>
+            <li key={r.k} className={r.v ? "ok" : ""}><i aria-hidden="true">{r.v ? <Icono n="palomita" /> : <Icono n="mas" />}</i><span><small>{r.t}</small><b>{r.v || "Falta"}</b></span>
               {r.v && paso > r.k && <button type="button" onClick={() => ir(r.k)}>Cambiar</button>}</li>
           ))}
         </ol>
-        <div className="fx-res-tot"><span>Total</span><b><Monto valor={paso === 3 && forma !== "negocio" ? conCargo : total} /></b></div>
+        <div className="fx-res-tot"><span>Total</span><b><Monto valor={paso === 5 && forma !== "negocio" ? conCargo : total} /></b></div>
       </aside>
 
       <main className="fx-main">
         {p.regreso && <a href={p.regreso.href} className="fx-regreso"><Icono n="izquierda" />{p.regreso.texto}</a>}
         <header className="fx-top"><img className="fx-logo-img" src="/icono-192.png" alt="" width={40} height={40} /><span><b>{p.negocio}</b><small>Reserva en línea</small></span></header>
-        <nav className="fx-pasos" aria-label="Pasos">
-          {PASOS.map((t, i) => (
-            <button type="button" key={t} className={i < paso ? "ok" : i === paso ? "on" : ""} disabled={i > paso} aria-current={i === paso ? "step" : undefined} onClick={() => i < paso && ir(i)}>
-              {i < paso && <Icono n="palomita" />}{t}
-            </button>
-          ))}
-        </nav>
+        <div className="fx-prog" aria-label={`Paso ${paso + 1} de ${PASOS.length}`}>
+          <span className="fx-prog-t"><b>{PASOS[paso]}</b><small>Paso {paso + 1 - (saltaBarbero && paso > 1 ? 1 : 0)} de {PASOS.length - (saltaBarbero ? 1 : 0)}</small></span>
+          <span className="fx-prog-b"><i style={{ width: `${((paso + 1) / PASOS.length) * 100}%` }} /></span>
+        </div>
 
         <section key={paso} className={`fx-cuerpo ${dir > 0 ? "adelante" : "atras"}`}>
           {paso === 0 && (
@@ -208,57 +209,61 @@ export function Reservar(p: {
 
           {paso === 1 && (
             <>
-              <h1 className="fx-h">¿Cuándo vienes?<small>{nombres(elegidos)}, {duracion} min</small></h1>
-              {personas.length > 1 && (
-                <div className="fx-sec"><span className="fx-lab">Con quién</span>
-                  <div className="fx-ppl" role="radiogroup" aria-label="Con quién">
-                    {personas.map((e, i) => {
-                      const on = (persona ?? "") === e.id;
-                      return (
-                        <button type="button" key={e.id || "libre"} role="radio" aria-checked={on} className={`fx-pp ${on ? "on" : ""}`} style={{ ["--i" as string]: i }} onClick={() => { setPersona(e.id || null); setMinuto(null); }}>
-                          {e.id ? <Avatar avatar={e.avatar} nombre={e.nombre} t={56} /> : <span className="fx-libre"><Icono n="clientes" /></span>}
-                          <span>{e.id ? e.nombre : "Libre"}</span>
-                        </button>
-                      );
-                    })}
-                  </div>
-                </div>
-              )}
-              <div className="fx-sec"><span className="fx-lab">{mesVisible.replace(/^./, (x) => x.toUpperCase())}</span>
-                <div className="fx-dias">
-                  {fechas.map((f) => {
-                    const hay = !!dias?.[f];
-                    return (
-                      <button type="button" key={f} disabled={!dias || !hay} className={`fx-d ${fecha === f ? "on" : ""}`} aria-pressed={fecha === f} onClick={() => { setFecha(f); setMinuto(null); }}>
-                        <small>{f === p.hoy ? "Hoy" : DIAS[dow(f)]}</small><b>{Number(f.slice(8))}</b><i aria-hidden="true" />
-                      </button>
-                    );
-                  })}
-                </div>
-                {dias && !Object.values(dias).some(Boolean) && <p className="fx-nota">No hay lugares disponibles en estas fechas{persona ? `. Prueba con otra persona.` : "."}</p>}
+              <h1 className="fx-h">¿Quién te atiende?<small>Elige a alguien o a quien esté libre</small></h1>
+              <div className="fx-barberos" role="radiogroup" aria-label="Quién te atiende">
+                {personas.map((e, i) => {
+                  const on = (persona ?? "") === e.id;
+                  return (
+                    <button type="button" key={e.id || "libre"} role="radio" aria-checked={on} className={`fx-bb ${on ? "on" : ""}`} style={{ ["--i" as string]: i }} onClick={() => { setPersona(e.id || null); setMinuto(null); avanzar(2); }}>
+                      {e.id ? <Avatar avatar={e.avatar} nombre={e.nombre} t={52} /> : <span className="fx-libre"><Icono n="clientes" /></span>}
+                      <span><b>{e.id ? e.nombre : "Quien esté libre"}</b><small>{e.id ? "Barbero" : "El primero disponible"}</small></span>
+                      <Icono n="derecha" />
+                    </button>
+                  );
+                })}
               </div>
-              {fecha && (
-                <div className="fx-sec">
-                  {horas === null ? <div className="fx-cargando" aria-label="Buscando horarios"><i /><i /><i /><i /></div>
-                    : horas.length === 0 ? <p className="fx-nota">Ese día ya no hay horarios. Elige otro día.</p>
-                      : <>
-                        {grupos.length > 1 && (
-                          <div className="fx-seg" role="tablist" aria-label="Momento del día">
-                            {grupos.map((g) => <button type="button" role="tab" key={g.k} aria-selected={g.k === tramoV} className={g.k === tramoV ? "on" : ""} onClick={() => setTramo(g.k)}>{g.t}<small>{g.xs.length}</small></button>)}
-                          </div>
-                        )}
-                        <div className="fx-hrs" key={`${fecha}-${tramoV}`}>
-                          {(grupos.find((g) => g.k === tramoV)?.xs ?? []).map((m, i) => (
-                            <button type="button" key={m} style={{ ["--i" as string]: i }} className={minuto === m ? "on" : ""} aria-pressed={minuto === m} onClick={() => setMinuto(m)}>{aHora(m)}</button>
-                          ))}
-                        </div>
-                      </>}
-                </div>
-              )}
             </>
           )}
 
           {paso === 2 && (
+            <>
+              <h1 className="fx-h">¿Qué día?<small>{quien ? `Días con lugar con ${quien.nombre}` : "Días con lugar"}</small></h1>
+              <div className="fx-cal">
+                <span className="fx-lab">{mesVisible.replace(/^./, (x) => x.toUpperCase())}</span>
+                <div className="fx-cal-g">
+                  {["L", "M", "M", "J", "V", "S", "D"].map((d, i) => <small key={i}>{d}</small>)}
+                  {Array.from({ length: (dow(p.hoy) + 6) % 7 }, (_, i) => <span key={`v${i}`} />)}
+                  {fechas.map((f, i) => {
+                    const hay = !!dias?.[f];
+                    return (
+                      <button type="button" key={f} style={{ ["--i" as string]: i }} disabled={!dias || !hay} className={`fx-cd ${fecha === f ? "on" : ""} ${f === p.hoy ? "hoy" : ""}`} aria-pressed={fecha === f} aria-label={`${DIAS_L[dow(f)]} ${Number(f.slice(8))} de ${MESES[Number(f.slice(5, 7)) - 1]}`} onClick={() => { setFecha(f); setMinuto(null); avanzar(3); }}>
+                        {Number(f.slice(8)) === 1 && <em>{MESES[Number(f.slice(5, 7)) - 1].slice(0, 3)}</em>}{Number(f.slice(8))}
+                      </button>
+                    );
+                  })}
+                </div>
+                {!dias && <p className="fx-nota">Buscando días con lugar…</p>}
+                {dias && !Object.values(dias).some(Boolean) && <p className="fx-nota">No hay lugares disponibles en estas fechas{persona ? ". Prueba con otra persona." : "."}</p>}
+              </div>
+            </>
+          )}
+
+          {paso === 3 && fecha && (
+            <>
+              <h1 className="fx-h">¿A qué hora?<small>{DIAS_L[dow(fecha)].replace(/^./, (x) => x.toUpperCase())} {Number(fecha.slice(8))} de {MESES[Number(fecha.slice(5, 7)) - 1]}</small></h1>
+              {horas === null ? <div className="fx-cargando" aria-label="Buscando horarios"><i /><i /><i /><i /></div>
+                : horas.length === 0 ? <p className="fx-nota">Ese día ya no hay horarios. Elige otro día.</p>
+                  : grupos.map((g) => (
+                    <div key={g.k} className="fx-sec"><span className="fx-lab">{g.t}</span>
+                      <div className="fx-hrs">
+                        {g.xs.map((m, i) => <button type="button" key={m} style={{ ["--i" as string]: i }} className={minuto === m ? "on" : ""} aria-pressed={minuto === m} onClick={() => { setMinuto(m); avanzar(4); }}>{aHora(m)}</button>)}
+                      </div>
+                    </div>
+                  ))}
+            </>
+          )}
+
+          {paso === 4 && (
             <>
               <h1 className="fx-h">¿A nombre de quién?<small>Te mandamos tu comprobante por WhatsApp. No necesitas cuenta.</small></h1>
               <div className="fx-campos">
@@ -270,17 +275,17 @@ export function Reservar(p: {
             </>
           )}
 
-          {paso === 3 && fecha && minuto !== null && (
+          {paso === 5 && fecha && minuto !== null && (
             <>
               <h1 className="fx-h">Confirma tu cita</h1>
               <div className="fx-when">
                 <span className="fx-when-d"><small>{DIAS[dow(fecha)]}</small><b>{Number(fecha.slice(8))}</b></span>
                 <span className="fx-when-t"><b>{aHora(minuto)} a {aHora(minuto + (cot?.duracion ?? duracion))}</b><small>{DIAS_L[dow(fecha)]} {Number(fecha.slice(8))} de {MESES[Number(fecha.slice(5, 7)) - 1]}, {quien ? `con ${quien.nombre}` : "con quien esté libre"}</small></span>
-                <button type="button" onClick={() => ir(1)}>Cambiar</button>
+                <button type="button" onClick={() => ir(2)}>Cambiar</button>
               </div>
               <div className="fx-tk">
                 <div><span>Servicios</span><span className="fx-tk-v">{(cot?.filas ?? elegidos.map((x) => ({ nombre: x.nombre, precio: x.precio, descuento: x.precio - (x.promo?.precio ?? x.precio) }))).map((f, i) => <span key={i}>{f.nombre} <b>{formatoDinero(f.precio - f.descuento)}</b></span>)}</span><button type="button" onClick={() => ir(0)}>Cambiar</button></div>
-                <div><span>A nombre de</span><span className="fx-tk-v"><span>{nombre}</span><small>{tel}</small></span><button type="button" onClick={() => ir(2)}>Cambiar</button></div>
+                <div><span>A nombre de</span><span className="fx-tk-v"><span>{nombre}</span><small>{tel}</small></span><button type="button" onClick={() => ir(4)}>Cambiar</button></div>
               </div>
               {opcionesPago.length > 0 && (
                 <div className="fx-sec"><span className="fx-lab">Cómo pagas</span>
@@ -302,12 +307,12 @@ export function Reservar(p: {
           {error && <p className="aviso error" role="alert">{error}</p>}
         </section>
 
-        {paso === 3 && forma !== "negocio" && p.enLinea && fecha && minuto !== null ? (
+        {paso === 5 && forma !== "negocio" && p.enLinea && fecha && minuto !== null ? (
           <PagoTarjeta slug={p.slug} enLinea={p.enLinea} monto={conCargo} forma={forma} apartarMin={p.pago.apartarMin}
             datos={{ servicioIds: svc, persona, fecha, minuto, nombre, telefono: tel, notas, sitio }}
-            barra={barra} atras={() => ir(2)}
+            barra={barra} atras={() => ir(4)}
             alConfirmar={(token) => router.push(`/reservar/${p.slug}/cita/${token}`)}
-            alOcupado={() => { setMinuto(null); ir(1); }} />
+            alOcupado={() => { setMinuto(null); ir(3); }} />
         ) : (
           <footer className="fx-barra">
             <div>
