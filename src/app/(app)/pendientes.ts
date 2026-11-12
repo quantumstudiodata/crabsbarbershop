@@ -5,7 +5,7 @@ import { fechaLocal, horaCorta } from "@/lib/fechas";
 import { formatoDinero } from "@/lib/money";
 
 type Sesion = Awaited<ReturnType<typeof requerirSesion>>;
-export type Pendiente = { id: string; tipo: "llegar" | "cobrar" | "pago"; titulo: string; detalle: string; citaId: string; dia: string };
+export type Pendiente = { id: string; tipo: "llegar" | "cobrar" | "pago"; titulo: string; detalle: string; citaId: string; dia: string; tel?: string; enlace?: string; cliente?: string; hora?: string };
 
 const primer = (n: string) => n.trim().split(" ")[0];
 
@@ -18,7 +18,7 @@ export async function pendientesDe(s: Sesion, hoy: string, zona: string, persona
   const ahora = Date.now();
   const cobra = s.puede("ventas.registrar") || s.puede("ventas.registrar_otros");
   const base = [eq(schema.citas.barberiaId, s.barberia.id), sql`(${schema.citas.inicio} at time zone ${zona})::date = ${hoy}::date`, ...(persona ? [eq(schema.citas.barberoId, persona)] : [])];
-  const campos = { id: schema.citas.id, inicio: schema.citas.inicio, fin: schema.citas.fin, estado: schema.citas.estado, cliente: schema.citas.clienteNombre, total: schema.citas.total, pagado: schema.citas.pagado, servicios: schema.citas.servicios, barbero: schema.usuarios.nombre };
+  const campos = { token: schema.citas.token, tel: schema.citas.clienteTelefono, id: schema.citas.id, inicio: schema.citas.inicio, fin: schema.citas.fin, estado: schema.citas.estado, cliente: schema.citas.clienteNombre, total: schema.citas.total, pagado: schema.citas.pagado, servicios: schema.citas.servicios, barbero: schema.usuarios.nombre };
   const [tarde, sinCobrar, pagos] = await Promise.all([
     s.puede("citas.modificar") ? db.select(campos).from(schema.citas).innerJoin(schema.usuarios, eq(schema.usuarios.id, schema.citas.barberoId))
       .where(and(...base, eq(schema.citas.estado, "en_espera"), lt(schema.citas.inicio, new Date(ahora - 5 * 60000)), gt(schema.citas.inicio, new Date(ahora - 3 * 3600000))))
@@ -34,7 +34,7 @@ export async function pendientesDe(s: Sesion, hoy: string, zona: string, persona
   ]);
   const hace = (d: Date) => { const m = Math.round((ahora - d.getTime()) / 60000); return m < 60 ? `hace ${m} min` : `hace ${Math.floor(m / 60)} h ${m % 60 ? `${m % 60} min` : ""}`.trim(); };
   return [
-    ...tarde.map((c) => ({ id: `l-${c.id}`, citaId: c.id, tipo: "llegar" as const, dia: hoy, titulo: `¿Llegó ${primer(c.cliente)}?`, detalle: `Cita de las ${horaCorta(c.inicio, zona)} con ${primer(c.barbero)}, ${hace(c.inicio)}` })),
+    ...tarde.map((c) => ({ id: `l-${c.id}`, citaId: c.id, tipo: "llegar" as const, dia: hoy, tel: c.tel, cliente: primer(c.cliente), hora: horaCorta(c.inicio, zona), enlace: s.barberia.slug ? `/reservar/${s.barberia.slug}/cita/${c.token}` : "", titulo: `¿Llegó ${primer(c.cliente)}?`, detalle: `Cita de las ${horaCorta(c.inicio, zona)} con ${primer(c.barbero)}, ${hace(c.inicio)}` })),
     ...sinCobrar.map((c) => ({ id: `c-${c.id}`, citaId: c.id, tipo: "cobrar" as const, dia: hoy, titulo: `Falta cobrar a ${primer(c.cliente)}`, detalle: `${c.servicios.map((x) => x.nombre).join(" y ")} con ${primer(c.barbero)}, ${formatoDinero(Math.max(c.total - c.pagado, 0))}` })),
     ...pagos.map((p) => ({ id: `p-${p.id}`, citaId: p.citaId!, tipo: "pago" as const, dia: fechaLocal(p.inicio, zona), titulo: `${primer(p.cliente)} pagó en línea`, detalle: `${formatoDinero(p.monto)}${p.tarjeta ? ` con ${p.tarjeta}` : ""}, cita ${fechaLocal(p.inicio, zona) === hoy ? "hoy" : new Intl.DateTimeFormat("es-MX", { timeZone: zona, weekday: "short", day: "numeric" }).format(p.inicio).replace(".", "")} ${horaCorta(p.inicio, zona)}` })),
   ];

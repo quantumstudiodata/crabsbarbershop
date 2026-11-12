@@ -34,7 +34,7 @@ export const CONFIG_CITAS: ConfigCitas = {
   anticipacionMinMin: 120, anticipacionMaxDias: 30, margenMin: 0, pasoMin: 15,
   elegirBarbero: true, cualquierBarbero: true, variosServicios: true,
   pago: { modo: "sin_pago", valor: 0 }, cancelarHorasAntes: 2,
-  politicaCancelacion: "Puedes cancelar o cambiar tu cita hasta 2 horas antes.",
+  politicaCancelacion: "Puedes cambiar tu cita hasta 2 horas antes. Si llegas tarde, esperas tu turno o te atiende quien esté libre. Si no llegas, te contactamos para reagendar.",
   politicaReembolso: "", apartarMin: 10,
   usaHorarioPersona: true, usaRotacion: true, usaBloqueos: true, usaDescansoFijo: true, descansosFijos: [],
 };

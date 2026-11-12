@@ -34,7 +34,8 @@ export function MiCita({ slug, token, negocio, hoy, maxDias, cita, politica, hor
   const [minuto, setMinuto] = useState<number | null>(null);
   const [error, setError] = useState<string | null>(null);
   const [pend, iniciar] = useTransition();
-  const activa = cita.estado === "en_espera";
+  const noLlego = cita.estado === "no_asistio";
+  const activa = cita.estado === "en_espera" || noLlego;
   const confirmando = cita.estado === "apartada";
   // Mientras Stripe confirma el pago, la página se actualiza sola.
   useEffect(() => {
@@ -73,7 +74,7 @@ export function MiCita({ slug, token, negocio, hoy, maxDias, cita, politica, hor
 
   const acciones = activa && cita.sePuedeCambiar && modo === "ver" && (
     <>
-      <button type="button" className="bt sec" onClick={() => { setModo("cancelar"); setCambio(null); }}>Cancelar cita</button>
+      {cita.pagado === 0 && <button type="button" className="bt sec" onClick={() => { setModo("cancelar"); setCambio(null); }}>Cancelar cita</button>}
       <button type="button" className="bt" onClick={abrirCambio}>Cambiar fecha u hora</button>
     </>
   );
@@ -90,7 +91,7 @@ export function MiCita({ slug, token, negocio, hoy, maxDias, cita, politica, hor
             </div>
           )}
           <div className={`rv-ticket ${activa ? "" : "inactiva"} ${cambio ? "mc-nuevo" : ""}`}>
-            <span className="rv-estado">{activa ? <><Icono n="palomita" />Cita confirmada</> : confirmando ? <><Icono n="reloj" />Confirmando tu pago…</> : cita.estado === "expirada" ? "El apartado venció sin pago" : cita.estadoTxt}</span>
+            <span className="rv-estado">{noLlego ? <><Icono n="reloj" />No pudimos verte, elige otro día</> : activa ? <><Icono n="palomita" />Cita confirmada</> : confirmando ? <><Icono n="reloj" />Confirmando tu pago…</> : cita.estado === "expirada" ? "El apartado venció sin pago" : cita.estadoTxt}</span>
             <b className="rv-cuando">{fechaTxt(cita.fecha).replace(/^./, (x) => x.toUpperCase())}</b>
             <span className="rv-hora">{cita.hora}<small>{cita.duracion} min</small></span>
             <span className="rv-con"><Avatar avatar={cita.avatar} nombre={cita.barbero} t={28} />Te atiende {cita.barbero}</span>
@@ -101,7 +102,7 @@ export function MiCita({ slug, token, negocio, hoy, maxDias, cita, politica, hor
             </div>
             <small className="muted">Folio {cita.folio}, a nombre de {cita.cliente}</small>
           </div>
-          {activa && modo === "ver" && <p className="muted rv-guarda">Guarda esta página para cambiar o cancelar tu cita.</p>}
+          {activa && modo === "ver" && <p className="muted rv-guarda">{cita.pagado > 0 ? "Tu pago queda guardado aunque cambies de fecha. Guarda esta página." : "Guarda esta página para cambiar o cancelar tu cita."}</p>}
           {activa && !cita.sePuedeCambiar && <p className="muted rv-guarda">Faltan menos de {horas} horas para tu cita. Para cambiarla, comunícate al negocio.</p>}
         </section>
 

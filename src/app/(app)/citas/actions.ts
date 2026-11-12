@@ -76,21 +76,16 @@ export async function cancelarCita(id: string, motivo: string): Promise<Res> {
   if (s.vista) return { error: "En la vista previa no se guardan cambios." };
   const [c] = await db.select().from(schema.citas).where(and(eq(schema.citas.id, id), eq(schema.citas.barberiaId, s.barberia.id))).limit(1);
   if (!c || ["cancelada", "completada", "expirada"].includes(c.estado)) return { error: "Esa cita ya no se puede cancelar." };
+  // Los pagos en línea no se reembolsan: una cita pagada se reagenda. Si de verdad hay que devolver, se hace desde Stripe.
+  if (c.pagado > 0) return { error: "Esta cita ya está pagada y el pago no es reembolsable. Cámbiala a otro día u hora en lugar de cancelarla." };
   await db.transaction(async (tx) => {
     await tx.update(schema.citas).set({ estado: "cancelada", motivoCancelacion: String(motivo ?? "").slice(0, 200) || "Cancelada por el negocio", actualizadoEn: new Date() }).where(eq(schema.citas.id, id));
     await tx.update(schema.notificacionesCita).set({ estado: "omitida" }).where(and(eq(schema.notificacionesCita.citaId, id), eq(schema.notificacionesCita.estado, "pendiente")));
     await encolarAviso(tx, { barberiaId: s.barberia.id, citaId: id, tipo: "cita_cancelada", para: "cliente", destino: c.clienteTelefono, mensaje: `Tu cita ${c.folio} en ${s.barberia.nombre} fue cancelada.` });
     await registrar(tx, { barberiaId: s.barberia.id, usuarioId: s.usuario.id, tipo: "venta", accion: `${s.usuario.nombre} canceló la cita ${c.folio} de ${c.clienteNombre}`, detalle: { motivo } });
   });
-  // Si el cliente pagó en línea, se le devuelve lo pagado.
-  let devuelto = 0;
-  if (c.pagado > 0) {
-    const r = await reembolsarCita(id, { barberiaId: s.barberia.id, usuarioId: s.usuario.id, nombre: s.usuario.nombre }).catch((err) => { console.error("reembolso", err); return { monto: 0, error: "No se pudo devolver el anticipo; devuélvelo desde el panel de Stripe." }; });
-    if ("error" in r && r.error) { revalidatePath("/citas"); return { mensaje: `Cita cancelada. ${r.error}` }; }
-    devuelto = r.monto;
-  }
   revalidatePath("/citas");
-  return { mensaje: devuelto ? `Cita cancelada. Se devolvieron ${formatoDinero(devuelto)} pagados en línea.` : "Cita cancelada." };
+  return { mensaje: "Cita cancelada." };
 }
 
 /** Cambia el día, la hora o la persona de una cita, revisando que el nuevo horario esté libre. */

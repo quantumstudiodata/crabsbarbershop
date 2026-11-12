@@ -17,8 +17,17 @@ export function Pendientes({ items, className = "" }: { items: Pendiente[]; clas
   const router = useRouter();
   const xs = items.filter((x) => !hechos.includes(x.id));
   if (!xs.length) return null;
-  const llego = (x: Pendiente) => iniciar(async () => {
-    const r = await cambiarEstadoCita(x.citaId, "llego");
+  // Si no llegó, se marca y se le escribe por WhatsApp con su enlace para elegir otro día.
+  const noVino = (x: Pendiente) => {
+    const d = (x.tel ?? "").replace(/\D/g, "");
+    const url = x.enlace ? `${window.location.origin}${x.enlace}` : "";
+    const msg = `Te esperábamos a las ${x.hora} y no pudimos verte. Elige otro día y hora para tu cita aquí: ${url}`;
+    if (d) window.open(`https://wa.me/${d.length === 10 ? `52${d}` : d}?text=${encodeURIComponent(msg)}`, "_blank");
+    estado(x, "no_asistio");
+  };
+  const llego = (x: Pendiente) => estado(x, "llego");
+  const estado = (x: Pendiente, e: string) => iniciar(async () => {
+    const r = await cambiarEstadoCita(x.citaId, e);
     if (r.error) setError(r.error); else { setError(null); setHechos((h) => [...h, x.id]); router.refresh(); }
   });
   return (
@@ -29,7 +38,7 @@ export function Pendientes({ items, className = "" }: { items: Pendiente[]; clas
           <div key={x.id} className="pnd-f">
             <span className={`pnd-i ${x.tipo === "cobrar" ? "osc" : ""}`} aria-hidden="true"><Icono n={ICONO[x.tipo]} /></span>
             <span className="pnd-t"><b>{x.titulo}</b><small>{x.detalle}</small></span>
-            {x.tipo === "llegar" ? <button type="button" className="pnd-b" disabled={pend} onClick={() => llego(x)}>Llegó</button>
+            {x.tipo === "llegar" ? <span className="pnd-dos"><button type="button" className="pnd-b sec" disabled={pend} onClick={() => noVino(x)}>No vino</button><button type="button" className="pnd-b" disabled={pend} onClick={() => llego(x)}>Llegó</button></span>
               : x.tipo === "cobrar" ? <Link className="pnd-b" href={`/cobrar?cita=${x.citaId}`}>Cobrar</Link>
               : <Link className="pnd-b sec" href={`/citas?vista=lista&dia=${x.dia}`}>Ver</Link>}
           </div>

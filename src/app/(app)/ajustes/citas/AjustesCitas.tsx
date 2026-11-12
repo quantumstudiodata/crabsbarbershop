@@ -104,9 +104,9 @@ export function AjustesCitas(p: {
             </section>
             <section className="glass ac-card">
               <span className="lab">Cancelaciones</span>
-              <Num etiqueta="Se puede cancelar o cambiar hasta" valor={d.cancelarHorasAntes} unidad="horas antes" onChange={(v) => cambia({ cancelarHorasAntes: v })} />
+              <Num etiqueta="Se puede cambiar hasta" valor={d.cancelarHorasAntes} unidad="horas antes" onChange={(v) => cambia({ cancelarHorasAntes: v })} />
               <label className="ac-campo"><span>Texto de la política</span><textarea className="input" rows={2} maxLength={400} value={d.politicaCancelacion} onChange={(e) => cambia({ politicaCancelacion: e.target.value })} /></label>
-              <label className="ac-campo"><span>Política de reembolso</span><textarea className="input" rows={2} maxLength={400} value={d.politicaReembolso} onChange={(e) => cambia({ politicaReembolso: e.target.value })} placeholder="Opcional. Ejemplo: el anticipo no es reembolsable si cancelas con menos de 2 horas." /></label>
+              <label className="ac-campo"><span>Política de reembolso</span><textarea className="input" rows={2} maxLength={400} value={d.politicaReembolso} onChange={(e) => cambia({ politicaReembolso: e.target.value })} placeholder="Ejemplo: los pagos no son reembolsables; puedes reagendar tu cita." /></label>
             </section>
             <section className="glass ac-card">
               <span className="lab">Quién puede</span>

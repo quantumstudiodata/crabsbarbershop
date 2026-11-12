@@ -124,14 +124,14 @@ export async function cancelarPorCliente(token: string): Promise<{ error?: strin
   const x = await citaPorToken(token);
   if (!x || !["en_espera", "apartada"].includes(x.c.estado)) return { error: "Esta cita ya no se puede cancelar." };
   if (!puedeCambiar(x.c.inicio, x.config.cancelarHorasAntes)) return { error: `Solo se puede cancelar hasta ${x.config.cancelarHorasAntes} horas antes. Comunícate al negocio.` };
+  // Lo pagado no se devuelve: una cita pagada solo se puede cambiar de fecha.
+  if (x.c.pagado > 0) return { error: "Tu cita ya está pagada y el pago no es reembolsable. Puedes cambiarla a otro día u hora." };
   await db.transaction(async (tx) => {
     await tx.update(schema.citas).set({ estado: "cancelada", motivoCancelacion: "Cancelada por el cliente", actualizadoEn: new Date() }).where(eq(schema.citas.id, x.c.id));
     await tx.update(schema.notificacionesCita).set({ estado: "omitida" }).where(and(eq(schema.notificacionesCita.citaId, x.c.id), eq(schema.notificacionesCita.estado, "pendiente")));
     await encolarAviso(tx, { barberiaId: x.b.id, citaId: x.c.id, tipo: "cita_cancelada", para: "cliente", destino: x.c.clienteTelefono, mensaje: `Tu cita ${x.c.folio} en ${x.b.nombre} quedó cancelada.` });
     await encolarAviso(tx, { barberiaId: x.b.id, citaId: x.c.id, tipo: "cita_cancelada", para: "negocio", mensaje: `${x.c.clienteNombre} canceló su cita ${x.c.folio}.` });
   });
-  // Lo pagado en línea se devuelve solo (la cancelación ya está dentro del tiempo permitido).
-  if (x.c.pagado > 0) await reembolsarCita(x.c.id, { barberiaId: x.b.id, usuarioId: null, nombre: x.c.clienteNombre }).catch((err) => console.error("reembolso", err));
   return {};
 }
 
@@ -153,8 +153,10 @@ export async function horariosParaCambio(token: string, fecha: string, persona?:
 
 export async function cambiarPorCliente(token: string, fecha: string, minuto: number, personaElegida?: string): Promise<{ error?: string }> {
   const x = await citaPorToken(token);
-  if (!x || x.c.estado !== "en_espera") return { error: "Esta cita ya no se puede cambiar." };
-  if (!puedeCambiar(x.c.inicio, x.config.cancelarHorasAntes)) return { error: `Solo se puede cambiar hasta ${x.config.cancelarHorasAntes} horas antes. Comunícate al negocio.` };
+  // Si no llegó, el negocio le manda su enlace para reagendar: ahí sí puede cambiarla aunque la hora ya pasó.
+  const noLlego = x?.c.estado === "no_asistio";
+  if (!x || (x.c.estado !== "en_espera" && !noLlego)) return { error: "Esta cita ya no se puede cambiar." };
+  if (!noLlego && !puedeCambiar(x.c.inicio, x.config.cancelarHorasAntes)) return { error: `Solo se puede cambiar hasta ${x.config.cancelarHorasAntes} horas antes. Comunícate al negocio.` };
   if (!FECHA.test(fecha) || !Number.isInteger(minuto)) return { error: "Elige el día y la hora." };
   const { instante } = await import("@/lib/agenda");
   const inicio = new Date(instante(fecha, minuto, x.b.zonaHoraria));
@@ -166,7 +168,7 @@ export async function cambiarPorCliente(token: string, fecha: string, minuto: nu
     const slot = libres.find((l) => l.minuto === minuto);
     if (!slot) return null;
     const persona = quiere ?? (slot.personas.includes(x.c.barberoId) ? x.c.barberoId : slot.personas[0]);
-    const [c] = await tx.update(schema.citas).set({ inicio, fin: new Date(inicio.getTime() + x.c.duracionMin * 60000), barberoId: persona, indiferente: quiere === null, actualizadoEn: new Date() }).where(eq(schema.citas.id, x.c.id)).returning();
+    const [c] = await tx.update(schema.citas).set({ inicio, fin: new Date(inicio.getTime() + x.c.duracionMin * 60000), barberoId: persona, indiferente: quiere === null, estado: "en_espera", actualizadoEn: new Date() }).where(eq(schema.citas.id, x.c.id)).returning();
     await tx.update(schema.notificacionesCita).set({ estado: "omitida" }).where(and(eq(schema.notificacionesCita.citaId, x.c.id), eq(schema.notificacionesCita.estado, "pendiente")));
     const quien = equipo.find((e) => e.id === persona)?.nombre.split(" ")[0] ?? "";
     await encolarAviso(tx, { barberiaId: x.b.id, citaId: c.id, tipo: "cita_modificada", para: "negocio", mensaje: `${c.clienteNombre} cambió su cita ${c.folio}: ${textoCita(x.b, c, quien, c.servicios.map((s) => s.nombre).join(", "))}` });
