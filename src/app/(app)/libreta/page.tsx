@@ -11,6 +11,7 @@ import { formatoDinero } from "@/lib/money";
 import { NavLibreta } from "./NavLibreta";
 import { DeslizaSemana } from "./HojaSemana";
 import { liquidarAutomaticos } from "@/lib/pagosAuto";
+import { asentarCitasPagadas } from "@/lib/pagos";
 
 export const metadata = { title: "Datos" };
 
@@ -21,6 +22,7 @@ const n = (c: number) => formatoDinero(c).replace("$", "");
 export default async function Libreta({ searchParams }: { searchParams: Promise<{ vista?: string; mes?: string; anio?: string; semana?: string }> }) {
   const s = await requerirSesion();
   await liquidarAutomaticos(s.barberia.id);
+  await asentarCitasPagadas(s.barberia.id);
   if (!s.puede("reportes.exportar")) redirect("/");
   const q = await searchParams;
   const zona = s.barberia.zonaHoraria;

@@ -52,7 +52,8 @@ export async function GET() {
     const metodos = [...new Set(ps.filter((x) => x.ventaId === c.id).map((x) => x.metodo.toLowerCase()))].join(" y ");
     eventos.push({
       id: `v${c.id}${c.estado}`, t: c.t.toISOString(),
-      titulo: c.estado === "cancelada" ? `Se canceló ${lista}` : `${(quien?.barbero ?? c.nombre).split(" ")[0]} atendió ${lista}`,
+      // Cita pagada en línea: el cliente pagó antes de venir, todavía no se atiende.
+      titulo: c.estado === "cancelada" ? `Se canceló ${lista}` : ps.some((x) => x.ventaId === c.id && x.metodo === "Pago en línea") ? `Un cliente pagó en línea ${lista} con ${(quien?.barbero ?? c.nombre).split(" ")[0]}` : `${(quien?.barbero ?? c.nombre).split(" ")[0]} atendió ${lista}`,
       detalle: `${formatoDinero(c.total)}${metodos ? ` con ${metodos}` : ""}`,
       href: "/analitica/ventas", nombre: quien?.barbero ?? c.nombre, avatar: quien?.avatar ?? c.avatar,
     });

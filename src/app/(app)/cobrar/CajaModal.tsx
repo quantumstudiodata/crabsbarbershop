@@ -196,7 +196,7 @@ export function CajaModal({ inicial, turno, limiteDiferencia, categorias, eviden
   return <CortePasos turno={turno} accion={accCerrar} cerrando={cerrando} error={eCerrar.error} contado={contado} setContado={setContado} limiteDiferencia={limiteDiferencia} evidencias={evidencias} cerrar={cerrar} />;
 }
 
-const EN_LINEA = ["Pago con QR", "Anticipo en línea"];
+const EN_LINEA = ["Pago con QR", "Anticipo en línea", "Pago en línea"];
 const COLORES = ["#3c5163", "#6f8597", "#9fb3c4", "#13171c", "#b9c6d1", "#56646f"];
 const iconoDe = (m: string) => (m === "Efectivo" ? "efectivo" : EN_LINEA.includes(m) ? "cuadros" : /transfer/i.test(m) ? "enviar" : "tarjeta");
 

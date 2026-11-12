@@ -1,5 +1,6 @@
 "use server";
 
+import { ventasDeCitasPagadas } from "@/lib/pagos";
 import { and, eq } from "drizzle-orm";
 import { revalidatePath } from "next/cache";
 import { requerirSesion } from "@/lib/auth";
@@ -23,7 +24,7 @@ const listo = (mensaje: string): EstadoCaja => {
   return { ok: true, mensaje, n: Date.now() };
 };
 
-const EN_LINEA = ["Pago con QR", "Anticipo en línea"];
+const EN_LINEA = ["Pago con QR", "Anticipo en línea", "Pago en línea"];
 
 export async function abrirCaja(_: EstadoCaja, form: FormData): Promise<EstadoCaja> {
   const s = await requerirSesion();
@@ -39,6 +40,8 @@ export async function abrirCaja(_: EstadoCaja, form: FormData): Promise<EstadoCa
   } catch {
     return { error: "La caja ya está abierta." };
   }
+  // Citas pagadas en línea mientras la caja estaba cerrada: se registran como venta en esta caja.
+  await ventasDeCitasPagadas(s.barberia.id).catch((err) => console.error("venta_cita_linea", err));
   return listo("La caja quedó abierta.");
 }
 

@@ -1,4 +1,5 @@
 import { and, eq } from "drizzle-orm";
+import { asentarCitasPagadas } from "@/lib/pagos";
 import { cobraEnLinea } from "@/lib/stripe";
 import { requerirSesion } from "@/lib/auth";
 import { cajaOAbrir, categoriasGasto, equipoQueAtiende, folioCorte, metodosActivos, movimientosDeTurno, serviciosActivos } from "@/lib/datos";
@@ -13,6 +14,7 @@ export const metadata = { title: "Cobro" };
 
 export default async function Cobrar({ searchParams }: { searchParams: Promise<{ caja?: string; cita?: string }> }) {
   const s = await requerirSesion();
+  await asentarCitasPagadas(s.barberia.id);
   if (!s.puede("ventas.registrar") && !s.puede("ventas.registrar_otros")) return <p className="aviso error">No tienes permiso para cobrar.</p>;
   const q = await searchParams;
   const zona = s.barberia.zonaHoraria;

@@ -17,6 +17,7 @@ import { esMovil } from "@/lib/dispositivo";
 import { formatoDinero } from "@/lib/money";
 import { Movimientos, type DiaMovimientos, type Movimiento } from "./Movimientos";
 import { liquidarAutomaticos } from "@/lib/pagosAuto";
+import { asentarCitasPagadas } from "@/lib/pagos";
 
 export const metadata = { title: "Finanzas" };
 
@@ -31,6 +32,7 @@ type Q = ConsultaFiltros & { tipo?: string; egreso?: string };
 export default async function Finanzas({ searchParams }: { searchParams: Promise<Q> }) {
   const s = await requerirSesion();
   await liquidarAutomaticos(s.barberia.id);
+  await asentarCitasPagadas(s.barberia.id);
   const verTodo = s.puede("reportes.ver");
   if (!verTodo && !s.puede("gastos.ver")) redirect("/?aviso=sin-permiso");
   const q = await searchParams;

@@ -1,4 +1,5 @@
 import { redirect } from "next/navigation";
+import { asentarCitasPagadas } from "@/lib/pagos";
 import { AvisoUrl } from "@/components/Encabezado";
 import { BarraFiltros } from "@/components/BarraFiltros";
 import { Paginacion } from "@/components/Paginacion";
@@ -21,6 +22,7 @@ type Q = ConsultaFiltros & { aviso?: string; error?: string; cortes?: string };
 
 export default async function Ventas({ searchParams }: { searchParams: Promise<Q> }) {
   const s = await requerirSesion();
+  await asentarCitasPagadas(s.barberia.id);
   // La misma pantalla para todos. El barbero consulta todo el historial, pero el encabezado y las gráficas son de sus propios datos.
   const verTodas = s.puede("ventas.ver_todas");
   const atiende = s.usuario.rol === "barbera" || s.usuario.rol === "encargada";

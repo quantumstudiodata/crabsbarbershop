@@ -10,6 +10,8 @@ export type PlanVenta = {
   barberiaId: string; turnoId: string; usuarioId: string; usuarioNombre: string;
   total: number; descuentoTotal: number; descuento: number; motivoDescuento: string; observaciones: string; clave: string;
   citaId: string; promosUsadas: string[]; nombresPromo: string;
+  // Cita pagada en línea por adelantado: la venta se registra al pagar y la cita sigue pendiente de atenderse.
+  mantenerCita?: boolean;
   conceptos: (Omit<typeof schema.conceptos.$inferInsert, "ventaId">)[];
 };
 export type PagoVenta = { metodoPagoId: string | null; nombreMetodo: string; esEfectivo: boolean; monto: number };
@@ -27,7 +29,7 @@ export async function insertarVenta(tx: Tx, plan: PlanVenta, pagos: PagoVenta[],
   await tx.insert(schema.conceptos).values(plan.conceptos.map((c) => ({ ...c, ventaId: v.id })));
   // Si viene de una cita, queda ligada a la venta y completada (una cita no se cobra dos veces).
   if (plan.citaId) {
-    const r = await tx.update(schema.citas).set({ ventaId: v.id, estado: "completada", estadoPago: "pagada", actualizadoEn: new Date() })
+    const r = await tx.update(schema.citas).set(plan.mantenerCita ? { ventaId: v.id, estadoPago: "pagada", actualizadoEn: new Date() } : { ventaId: v.id, estado: "completada", estadoPago: "pagada", actualizadoEn: new Date() })
       .where(and(eq(schema.citas.id, plan.citaId), eq(schema.citas.barberiaId, plan.barberiaId), sql`${schema.citas.ventaId} is null`)).returning({ id: schema.citas.id });
     if (!r.length) throw new Error("cita_cobrada");
   }

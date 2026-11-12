@@ -1,4 +1,5 @@
 import { and, asc, eq, gt, or, sql } from "drizzle-orm";
+import { asentarCitasPagadas } from "@/lib/pagos";
 import Link from "next/link";
 import { Avatar } from "@/components/Avatar";
 import { Ayuda } from "@/components/Ayuda";
@@ -229,6 +230,7 @@ function InicioVista(v: Vista) {
 
 export default async function Inicio({ searchParams }: { searchParams: Promise<Q> }) {
   const s = await requerirSesion();
+  await asentarCitasPagadas(s.barberia.id);
   const q = await searchParams;
   const zona = s.barberia.zonaHoraria;
   const hoy = fechaLocal(new Date(), zona);
