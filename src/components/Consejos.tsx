@@ -121,7 +121,7 @@ export function Consejos({ vistos }: { vistos: string[] }) {
   const alto = typeof window === "undefined" ? 800 : window.innerHeight;
   const ancho = typeof window === "undefined" ? 400 : window.innerWidth;
   const abajo = caja.y + caja.h + 230 < alto || caja.y < 250;
-  const GAP = 34;
+  const GAP = 16;
   const anchoG = ancho < 560 ? Math.min(290, ancho - 32) : 300;
   const globoX = Math.min(Math.max(caja.x + (ancho < 560 ? 4 : 0), 16), ancho - anchoG - 16);
   const flechaX = Math.min(Math.max(caja.x + Math.min(caja.w / 2, 60) - globoX, 22), anchoG - 30);
@@ -130,11 +130,8 @@ export function Consejos({ vistos }: { vistos: string[] }) {
     <div className={`tour ${saliendo ? "sale" : ""}`} role="dialog" aria-modal="true" aria-label={`Consejo: ${p.t}`}>
       <div className="tour-fondo" onClick={() => terminar(false)} />
       <div className="tour-hueco" style={{ left: caja.x, top: caja.y, width: caja.w, height: caja.h }} aria-hidden="true"><i /></div>
-      <svg className="tour-linea" aria-hidden="true" key={`l${i}`}>
-        <path d={abajo ? `M ${globoX + flechaX} ${caja.y + caja.h} C ${globoX + flechaX} ${caja.y + caja.h + GAP / 2}, ${globoX + flechaX} ${caja.y + caja.h + GAP / 2}, ${globoX + flechaX} ${caja.y + caja.h + GAP}` : `M ${globoX + flechaX} ${caja.y} L ${globoX + flechaX} ${caja.y - GAP}`} />
-        <circle cx={globoX + flechaX} cy={abajo ? caja.y + caja.h : caja.y} r="4.5" />
-      </svg>
       <div key={i} className={`tour-globo ${abajo ? "abajo" : "arriba"}`} style={{ left: globoX, width: anchoG, top: abajo ? caja.y + caja.h + GAP : undefined, bottom: abajo ? undefined : alto - caja.y + GAP, ["--fx" as string]: `${flechaX}px` }}>
+        <span className="tour-cola" aria-hidden="true" />
         <span className="tour-prog" aria-hidden="true"><i style={{ width: `${((i + 1) / pasos.length) * 100}%` }} /></span>
         <span className="tour-num" aria-hidden="true">{String(i + 1).padStart(2, "0")}</span>
         <div className="tour-cab">
