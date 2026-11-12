@@ -298,7 +298,7 @@ export function FormCobro(p: {
         {cita && <p className="aviso-cita"><Icono n="calendario" />Cita {cita.folio} de <b>{cita.cliente}</b></p>}
         <div className="entre cab-hoja"><h2 className="titulo">Esta venta</h2><button type="button" className="icb cerrar-hoja" onClick={() => setHoja(false)} aria-label="Cerrar"><Icono n="cerrar" /></button></div>
         {ultima && lineas.length === 0 && (
-          <div className="aviso ok" role="status"><span>Venta <b>{ultima.folio}</b> cobrada por <b>{formatoDinero(ultima.total)}</b>.</span>{ultima.encuesta && <EncuestaQR token={ultima.encuesta} />}</div>
+          <div className="cobro-ok" role="status"><span className="cobro-ok-i" aria-hidden="true"><Icono n="palomita" /></span><span className="cobro-ok-t"><b>Venta cobrada</b><small>{ultima.folio}, {formatoDinero(ultima.total)}</small></span>{ultima.encuesta && <EncuestaQR token={ultima.encuesta} />}</div>
         )}
         {conServicio.length > 0 && (
           <div className="lineas">

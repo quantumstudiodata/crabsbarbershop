@@ -8,6 +8,7 @@ import { Grafica } from "@/components/Grafica";
 import { Icono } from "@/components/Icono";
 import { Cuenta } from "@/components/ui";
 import { requerirSesion } from "@/lib/auth";
+import { leerConfig } from "@/lib/agenda";
 import { cajaDe, equipoQueAtiende, metasDelMes, turnoAbierto, ventasEntre } from "@/lib/datos";
 import { db, schema } from "@/lib/db";
 import { fechaLarga, fechaLocal, horaCorta, lunesDe, nombreDia, sumarDias } from "@/lib/fechas";
@@ -85,6 +86,7 @@ async function accionesDe(s: Sesion, turno: Turno | null | undefined, hoy: strin
     { k: "corte", href: "/cobrar?caja=cerrar", texto: "Realizar corte de caja", corto: "Corte", icono: "candado", aviso: corteAtrasado, dato: corteAtrasado ? "Pendiente" : turno ? undefined : "Caja cerrada", ok: s.puede("caja.operar") && !!turno },
     { k: "retiro", href: "/cobrar?caja=retiro", texto: "Registrar retiro de caja", corto: "Retiro", icono: "salida", ok: s.puede("caja.retiros") && !!turno },
     { k: "cita", href: "/citas?nueva=1", texto: "Agendar cita a cliente", corto: "Nueva cita", icono: "calendario", dato: !barbero && citasHoy ? `${citasHoy} por llegar` : undefined, ok: s.barberia.usaCitas && s.puede("citas.modificar") },
+    { k: "compartir", href: "/citas?compartir=1", texto: "Compartir enlace para reservar", corto: "Compartir enlace", icono: "enviar", ok: s.barberia.usaCitas && !!s.barberia.slug && leerConfig(s.barberia.citasConfig).enLinea && s.puede("citas.ver") },
     { k: "egreso", href: "/analitica/finanzas?egreso=1", texto: "Registrar un egreso", corto: "Egreso", icono: "archivo", ok: s.puede("gastos.registrar") },
     { k: "pago", href: "/equipo?pagar=1", texto: "Registrar pago o comisión", corto: "Pago al equipo", icono: "efectivo", ok: s.puede("equipo.pagar") },
     { k: "ventas", href: "/analitica/ventas", texto: barbero ? "Ver mis ventas" : "Ver ventas", corto: barbero ? "Mis ventas" : "Ventas", icono: "lista", ok: true },
@@ -94,9 +96,9 @@ async function accionesDe(s: Sesion, turno: Turno | null | undefined, hoy: strin
   ];
   // Orden sugerido por rol: lo del día a día primero.
   const PRIORIDAD: Record<string, string[]> = {
-    barbera: ["cobrar", "mias", "cita", "ventas", "resenas", "retiro", "corte"],
-    encargada: ["cobrar", "corte", "retiro", "cita", "egreso", "ventas", "pago", "correccion", "historial", "resenas"],
-    otro: ["cobrar", "corte", "egreso", "pago", "ventas", "cita", "retiro", "correccion", "historial", "resenas"],
+    barbera: ["cobrar", "mias", "cita", "compartir", "ventas", "resenas", "retiro", "corte"],
+    encargada: ["cobrar", "corte", "retiro", "cita", "compartir", "egreso", "ventas", "pago", "correccion", "historial", "resenas"],
+    otro: ["cobrar", "corte", "egreso", "pago", "ventas", "cita", "compartir", "retiro", "correccion", "historial", "resenas"],
   };
   const base = PRIORIDAD[barbero ? "barbera" : s.usuario.rol === "encargada" ? "encargada" : "otro"];
   const rango = (k: string) => { const i = base.indexOf(k); return i < 0 ? 99 : i; };

@@ -11,7 +11,7 @@ import { db, schema } from "@/lib/db";
 import { fechaLocal } from "@/lib/fechas";
 import { formatoDinero } from "@/lib/money";
 import { aplicarPromos, momentoEn, type Promo } from "@/lib/promociones";
-import { cobraEnLinea, crearIntento, origen, stripe } from "@/lib/stripe";
+import { cobraEnLinea, crearIntento, MINIMO_STRIPE, origen, stripe } from "@/lib/stripe";
 import { insertarVenta, type PagoVenta, type PlanVenta, type PropinaVenta } from "@/lib/ventas";
 import { pagosLinea } from "@/lib/db/schema";
 
@@ -185,19 +185,24 @@ async function prepararQr(s: Sesion, plan: PlanVenta, propina: PropinaVenta, lin
   const b = s.barberia;
   const base = await origen();
   // Doble clic: si ya hay un cobro con QR pendiente para esta misma venta, se reutiliza.
+  const cobro = plan.total - anticipo + (propina?.monto ?? 0);
+  // Stripe no acepta cobros con tarjeta menores a $10.
+  if (cobro < MINIMO_STRIPE) return { error: `El cobro con QR debe ser de al menos ${formatoDinero(MINIMO_STRIPE)}. Cóbralo con otro método.` };
   const [previo] = await db.select().from(pagosLinea)
-    .where(and(eq(pagosLinea.barberiaId, b.id), eq(pagosLinea.estado, "pendiente"), sql`${pagosLinea.plan}->'plan'->>'clave' = ${plan.clave}`)).limit(1);
+    .where(and(eq(pagosLinea.barberiaId, b.id), eq(pagosLinea.estado, "pendiente"), sql`${pagosLinea.intento} is not null`, sql`${pagosLinea.plan}->'plan'->>'clave' = ${plan.clave}`)).limit(1);
   if (previo && Date.now() - previo.creadoEn.getTime() < 25 * 60000) return { qr: { id: previo.id, url: `${base}/pagar/${previo.token}`, total: previo.monto + previo.propina, vence: previo.creadoEn.getTime() + 30 * 60000 } };
   const equipo = await equipoQueAtiende(b.id);
   const nombre = (id: string) => equipo.find((x) => x.id === id)?.nombre.split(" ")[0] ?? "";
   const token = randomBytes(12).toString("base64url");
   const propinaFija = propina?.monto ?? 0;
+  let pagoId: string | null = null;
   try {
     const [pago] = await db.insert(pagosLinea).values({
       barberiaId: b.id, tipo: "venta", token, monto: plan.total - anticipo, propina: propinaFija, creadoPor: s.usuario.id,
       plan: { plan, propina, propinaPara: propina?.barberoId ?? lineas[0]?.barberoId ?? "", anticipo },
       detalle: { negocio: b.nombre, conceptos: lineas.map((l) => ({ nombre: l.nombre, con: nombre(l.barberoId), precio: l.precio })), propinaFija: propinaFija > 0, descuento: plan.descuentoTotal, anticipo },
     }).returning();
+    pagoId = pago.id;
     const pi = await crearIntento(b.stripeCuenta!, {
       monto: plan.total - anticipo + propinaFija, descripcion: `${b.nombre}: ${lineas.map((l) => l.nombre).join(", ")}`,
       metadata: { pagoId: pago.id, barberiaId: b.id, tipo: "venta" }, clave: `qr-${pago.id}`,
@@ -206,6 +211,8 @@ async function prepararQr(s: Sesion, plan: PlanVenta, propina: PropinaVenta, lin
     return { qr: { id: pago.id, url: `${base}/pagar/${token}`, total: plan.total - anticipo + propinaFija, vence: Date.now() + 30 * 60000 } };
   } catch (err) {
     console.error(err);
+    // Sin intento de pago el enlace no sirve: se cancela para que no aparezca como pendiente.
+    if (pagoId) await db.update(pagosLinea).set({ estado: "cancelado" }).where(eq(pagosLinea.id, pagoId));
     return { error: "No se pudo preparar el cobro con QR. Revisa la conexión con Stripe e intenta otra vez." };
   }
 }

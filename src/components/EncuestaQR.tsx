@@ -22,7 +22,7 @@ export function EncuestaQR({ token }: { token: string }) {
   };
   return (
     <>
-      <button type="button" className="enlace enc-b" onClick={() => setAbierto(true)}><Icono n="chispa" />Encuesta para el cliente</button>
+      <button type="button" className="enc-b" onClick={() => setAbierto(true)}><Icono n="estrella" />Encuesta</button>
       <Modal abierto={abierto} cerrar={() => setAbierto(false)} etiqueta="Encuesta" titulo="¿Cómo te atendimos?">
         <div className="enc-qr">
           <p className="muted">Pide al cliente que escanee el código con su teléfono. Son dos preguntas.</p>

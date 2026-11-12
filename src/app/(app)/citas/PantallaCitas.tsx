@@ -38,7 +38,7 @@ const fechaTxt = (f: string) => `${DIAS_L[dow(f)]} ${Number(f.slice(8))} de ${["
 const activa = (e: string) => ["apartada", "en_espera", "llego", "en_atencion"].includes(e);
 
 export function PantallaCitas(p: {
-  abrirNueva?: boolean; porDefecto: "linea" | "semana";
+  abrirNueva?: boolean; abrirCompartir?: boolean; porDefecto: "linea" | "semana";
   hoy: string; dia: string; vista: "linea" | "lista" | "calendario" | "semana" | "horarios"; persona: string; citas: CitaVista[]; ahora: number;
   equipo: Persona[]; servicios: Servicio[]; horarioNegocio: Horario; cerrados: string[]; conteo: Record<string, number>;
   rotacion: Rot | null; bloqueos: Bloqueo[];
@@ -62,7 +62,7 @@ export function PantallaCitas(p: {
   const lunes = lunesDe(p.dia);
   const semana = Array.from({ length: 7 }, (_, i) => sumar(lunes, i));
 
-  const [compartir, setCompartir] = useState(false);
+  const [compartir, setCompartir] = useState(!!p.abrirCompartir && !!p.enlace);
   const [verVista, setVerVista] = useState(false);
   const vistas = ([["linea", "Línea del tiempo", "reloj"], ["lista", "Lista", "lista"], ["calendario", "Día por persona", "persona"], ["semana", "Semana", "calendario"]] as [string, string, string][]);
   const actual = vistas.find(([k]) => k === p.vista) ?? vistas[0];
@@ -244,9 +244,28 @@ function VistaDia({ citas, equipo, horario, dia, abrir }: { citas: CitaVista[]; 
   );
 }
 
+/** Citas que se cruzan en el tiempo van lado a lado, cada una en su carril, para que no se encimen. */
+function carriles(cs: CitaVista[]) {
+  const xs = [...cs].sort((a, b) => aMin(a.hora) - aMin(b.hora));
+  const res = new Map<string, { carril: number; de: number }>();
+  let grupo: CitaVista[] = [], fins: number[] = [], finGrupo = -1;
+  const cerrar = () => { for (const c of grupo) res.set(c.id, { carril: res.get(c.id)!.carril, de: fins.length }); grupo = []; fins = []; };
+  for (const c of xs) {
+    const i = aMin(c.hora), f = i + c.duracion;
+    if (i >= finGrupo) { cerrar(); finGrupo = -1; }
+    let k = fins.findIndex((x) => x <= i);
+    if (k < 0) { k = fins.length; fins.push(f); } else fins[k] = f;
+    res.set(c.id, { carril: k, de: 0 });
+    grupo.push(c);
+    finGrupo = Math.max(finGrupo, f);
+  }
+  cerrar();
+  return res;
+}
+
 function VistaSemana({ citas, semana, horario, hoy, abrir, url }: { citas: CitaVista[]; semana: string[]; horario: Horario; hoy: string; abrir: (c: CitaVista) => void; url: (x: { dia?: string; vista?: string }) => string }) {
   const [ini, fin] = rango(horario);
-  const px = 1;
+  const px = 1.4;
   return (
     <section className="glass cal-dia cal-semana subir d1" style={{ ["--cols" as string]: 7 }}>
       <div className="cal-cab"><span />{semana.map((d) => <Link key={d} href={url({ dia: d, vista: "calendario" })} className={d === hoy ? "hoy" : ""}>{DIAS[dow(d)]} {Number(d.slice(8))}</Link>)}</div>
@@ -254,11 +273,14 @@ function VistaSemana({ citas, semana, horario, hoy, abrir, url }: { citas: CitaV
         <div className="cal-horas">{Array.from({ length: Math.floor((fin - ini) / 120) + 1 }, (_, i) => ini + i * 120).map((m) => <span key={m} style={{ top: (m - ini) * px }}>{aHora(m)}</span>)}</div>
         {semana.map((d) => (
           <div key={d} className="cal-col">
-            {citas.filter((c) => c.fecha === d).map((c) => (
-              <button type="button" key={c.id} className={`blq-c mini e-${c.estado}`} style={{ top: (aMin(c.hora) - ini) * px, height: Math.max(c.duracion * px - 2, 16) }} onClick={() => abrir(c)} title={`${c.hora} ${c.cliente}`}>
-                <b>{c.hora} {c.cliente.split(" ").slice(0, 2).map((x, i) => (i ? `${x[0]}.` : x)).join(" ")}</b><small><i className="est-p" aria-hidden="true" />{ESTADO[c.estado] ?? c.estado}, {primer(c.barbero)}</small>
-              </button>
-            ))}
+            {(() => { const delDia = citas.filter((c) => c.fecha === d); const k = carriles(delDia); return delDia.map((c) => {
+              const { carril, de } = k.get(c.id)!;
+              return (
+                <button type="button" key={c.id} className={`blq-c mini e-${c.estado} ${de > 1 ? "angosta" : ""}`} style={{ top: (aMin(c.hora) - ini) * px, height: Math.max(c.duracion * px - 2, 22), left: `calc(${(carril / de) * 100}% + 2px)`, width: `calc(${100 / de}% - 4px)`, right: "auto" }} onClick={() => abrir(c)} title={`${c.hora} ${c.cliente}, ${primer(c.barbero)}`}>
+                  <b>{c.hora} {de > 1 ? primer(c.cliente) : c.cliente.split(" ").slice(0, 2).map((x, i) => (i ? `${x[0]}.` : x)).join(" ")}</b><small><i className="est-p" aria-hidden="true" />{de > 1 ? primer(c.barbero) : `${ESTADO[c.estado] ?? c.estado}, ${primer(c.barbero)}`}</small>
+                </button>
+              );
+            }); })()}
           </div>
         ))}
       </div>
@@ -533,28 +555,37 @@ function Flotante({ cerrar, className, rol, children }: { cerrar: () => void; cl
   return <div ref={ref} className={`ag-flot ${className}`} role={rol}>{children}</div>;
 }
 
-/** Compartir reservaciones: enlace público, código QR y la página como la ve el cliente. */
+/** Compartir reservaciones: código QR a la vista, el enlace y las formas de enviarlo. */
 function Compartir({ enlace, cerrar }: { enlace: string; cerrar: () => void }) {
   const [copiado, setCopiado] = useState(false);
   const [qr, setQr] = useState<string | null>(null);
   const url = typeof window === "undefined" ? enlace : `${window.location.origin}${enlace}`;
   const corto = url.replace(/^https?:\/\/(www\.)?/, "");
+  useEffect(() => {
+    let vivo = true;
+    import("qrcode").then(({ default: QR }) => QR.toString(url, { type: "svg", margin: 1, color: { dark: "#13171c", light: "#ffffff" } })).then((x) => { if (vivo) setQr(x); }).catch(() => {});
+    return () => { vivo = false; };
+  }, [url]);
   const copiar = () => navigator.clipboard?.writeText(url).then(() => { setCopiado(true); setTimeout(() => setCopiado(false), 1800); });
-  const verQr = async () => {
-    if (qr) { setQr(null); return; }
-    const QR = (await import("qrcode")).default;
-    setQr(await QR.toString(url, { type: "svg", margin: 1, color: { dark: "#13171c", light: "#ffffff" } }));
+  const texto = `Agenda tu cita en línea aquí: ${url}`;
+  const imprimir = () => {
+    if (!qr) return;
+    const w = window.open("", "_blank", "width=480,height=640");
+    if (!w) return;
+    w.document.write(`<title>Reserva tu cita</title><body style="font-family:system-ui;text-align:center;padding:40px"><h2 style="margin:0 0 6px">Reserva tu cita</h2><p style="color:#555;margin:0 0 20px">Escanea el código con tu teléfono</p><div style="width:280px;margin:0 auto">${qr}</div><p style="margin-top:16px;font-size:14px">${corto}</p><script>setTimeout(()=>print(),300)</` + `script></body>`);
+    w.document.close();
   };
   return (
-    <Flotante cerrar={cerrar} className="ag-comp" rol="dialog">
-      <div className="ag-comp-cab"><span><b>Compartir reservaciones</b><small>Permite que tus clientes agenden directamente.</small></span><button type="button" className="icb" onClick={cerrar} aria-label="Cerrar"><Icono n="cerrar" /></button></div>
-      <div className="ag-enl"><small>Enlace público</small>
-        <div><span>{corto}</span><button type="button" className="icb" onClick={copiar} aria-label="Copiar enlace"><Icono n={copiado ? "palomita" : "copiar"} /></button></div>
-        {copiado && <small className="ag-ok">Enlace copiado. Compártelo por WhatsApp o redes sociales.</small>}
+    <Flotante cerrar={cerrar} className="ag-comp ag-comp2" rol="dialog">
+      <div className="ag-comp-cab"><span><b>Compartir reservaciones</b><small>Tus clientes agendan solos desde este enlace</small></span><button type="button" className="icb" onClick={cerrar} aria-label="Cerrar"><Icono n="cerrar" /></button></div>
+      <div className="agc-qr">{qr ? <div className="qr" dangerouslySetInnerHTML={{ __html: qr }} /> : <div className="qr" />}</div>
+      <button type="button" className="agc-enl" onClick={copiar} aria-label="Copiar enlace"><span>{corto}</span><Icono n={copiado ? "palomita" : "copiar"} /></button>
+      {copiado && <small className="ag-ok">Enlace copiado</small>}
+      <div className="agc-acc">
+        <a className="bt" href={`https://wa.me/?text=${encodeURIComponent(texto)}`} target="_blank" rel="noreferrer"><Icono n="enviar" />WhatsApp</a>
+        <button type="button" className="bt sec" onClick={imprimir} disabled={!qr}><Icono n="imprimir" />Imprimir QR</button>
       </div>
-      <button type="button" className="ag-op" aria-expanded={!!qr} onClick={verQr}><span><Icono n="cuadros" /></span><span><b>{qr ? "Ocultar código QR" : "Mostrar código QR"}</b><small>Para imprimir o mostrar en el establecimiento</small></span></button>
-      {qr && <div className="qr ag-qr" dangerouslySetInnerHTML={{ __html: qr }} />}
-      <a className="ag-op" href={`${enlace}?desde=agenda`}><span><Icono n="ojo" /></span><span><b>Ver página de reservaciones</b><small>Abrir la página como la ve el cliente</small></span></a>
+      <a className="agc-ver" href={`${enlace}?desde=agenda`}><Icono n="ojo" />Ver la página como la ve el cliente</a>
     </Flotante>
   );
 }

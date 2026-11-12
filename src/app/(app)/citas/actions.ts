@@ -230,7 +230,7 @@ export async function quitarBloqueo(id: string): Promise<Res> {
 
 export async function guardarConfigCitas(d: {
   usaCitas: boolean; enLinea: boolean; slug: string; horario: Record<string, [string, string]>; diasCerrados: string[];
-  anticipacionMinHoras: string; anticipacionMaxDias: string; margenMin: string;
+  anticipacionMinHoras: string; anticipacionMaxDias: string; margenMin: string; pasoMin?: string;
   elegirBarbero: boolean; cualquierBarbero: boolean; variosServicios: boolean;
   pagoModo: ModoPago; pagoValor: string; cancelarHorasAntes: string; politicaCancelacion: string; politicaReembolso: string;
 }): Promise<Res> {
@@ -244,14 +244,14 @@ export async function guardarConfigCitas(d: {
   if (!horario) return { error: "Revisa el horario del negocio: la apertura va antes que el cierre." };
   const cerrados = [...new Set((d.diasCerrados ?? []).filter((x) => FECHA.test(x)))].sort().slice(0, 60);
   const n = (t: string, min: number, max: number) => { const v = Number(String(t).trim()); return Number.isFinite(v) && v >= min && v <= max ? v : null; };
-  const antMin = n(d.anticipacionMinHoras, 0, 168), antMax = n(d.anticipacionMaxDias, 1, 180), margen = n(d.margenMin, 0, 120), cancelar = n(d.cancelarHorasAntes, 0, 168);
+  const antMin = n(d.anticipacionMinHoras, 0, 168), antMax = n(d.anticipacionMaxDias, 1, 180), margen = n(d.margenMin, 0, 120), paso = n(d.pasoMin ?? "15", 5, 120), cancelar = n(d.cancelarHorasAntes, 0, 168);
   if (antMin === null || antMax === null || margen === null || cancelar === null) return { error: "Revisa las cantidades de anticipación, margen y cancelación." };
   let valor = 0;
   if (d.pagoModo === "anticipo_pct") { const v = n(d.pagoValor, 1, 100); if (v === null) return { error: "El porcentaje de anticipo va de 1 a 100." }; valor = Math.round(v * 100); }
   if (d.pagoModo === "anticipo_fijo") { const v = leerPesos(d.pagoValor); if (!v || v <= 0) return { error: "Escribe la cantidad del anticipo." }; valor = v; }
   const config = leerConfig({
     ...leerConfig(s.barberia.citasConfig), enLinea: !!d.enLinea,
-    anticipacionMinMin: Math.round(antMin * 60), anticipacionMaxDias: antMax, margenMin: margen,
+    anticipacionMinMin: Math.round(antMin * 60), anticipacionMaxDias: antMax, margenMin: margen, pasoMin: paso,
     elegirBarbero: !!d.elegirBarbero, cualquierBarbero: !!d.cualquierBarbero, variosServicios: !!d.variosServicios,
     pago: { modo: d.pagoModo, valor }, cancelarHorasAntes: cancelar,
     politicaCancelacion: String(d.politicaCancelacion ?? "").trim(), politicaReembolso: String(d.politicaReembolso ?? "").trim(),

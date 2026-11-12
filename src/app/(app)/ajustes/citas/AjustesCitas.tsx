@@ -29,7 +29,7 @@ export function AjustesCitas(p: {
   const c = p.inicial.config;
   const base = () => ({
     usaCitas: p.inicial.usaCitas, enLinea: c.enLinea, slug: p.inicial.slug, horario: p.inicial.horario, diasCerrados: p.inicial.cerrados,
-    anticipacionMinHoras: String(c.anticipacionMinMin / 60), anticipacionMaxDias: String(c.anticipacionMaxDias), margenMin: String(c.margenMin),
+    anticipacionMinHoras: String(c.anticipacionMinMin / 60), anticipacionMaxDias: String(c.anticipacionMaxDias), margenMin: String(c.margenMin), pasoMin: String(c.pasoMin),
     elegirBarbero: c.elegirBarbero, cualquierBarbero: c.cualquierBarbero, variosServicios: c.variosServicios,
     pagoModo: c.pago.modo, pagoValor: c.pago.modo === "anticipo_pct" || c.pago.modo === "anticipo_fijo" ? String(c.pago.valor / 100) : "",
     cancelarHorasAntes: String(c.cancelarHorasAntes), politicaCancelacion: c.politicaCancelacion, politicaReembolso: c.politicaReembolso,
@@ -79,7 +79,14 @@ export function AjustesCitas(p: {
               <span className="lab">Cuándo se puede reservar</span>
               <Num etiqueta="Con al menos" valor={d.anticipacionMinHoras} unidad="horas de anticipación" onChange={(v) => cambia({ anticipacionMinHoras: v })} />
               <Num etiqueta="Hasta" valor={d.anticipacionMaxDias} unidad="días hacia adelante" onChange={(v) => cambia({ anticipacionMaxDias: v })} />
-              <Num etiqueta="Tiempo libre entre citas" valor={d.margenMin} unidad="minutos" onChange={(v) => cambia({ margenMin: v })} />
+            </section>
+            <section className="glass ac-card">
+              <span className="lab">Espacio entre citas</span>
+              <label className="ac-fila"><span>Tiempo libre después de cada cita</span>
+                <Selector etiqueta="Tiempo libre después de cada cita" valor={d.margenMin} onChange={(v) => cambia({ margenMin: v })} opciones={["0", "10", "15", "30", "45", "60", "90"].map((v) => ({ valor: v, texto: v === "0" ? "Sin tiempo libre" : Number(v) >= 60 ? `${Number(v) / 60 === 1 ? "1 hora" : "1 hora 30 min"}` : `${v} min` }))} /></label>
+              <label className="ac-fila"><span>Ofrecer horarios cada</span>
+                <Selector etiqueta="Ofrecer horarios cada" valor={d.pasoMin} onChange={(v) => cambia({ pasoMin: v })} opciones={["15", "30", "45", "60", "90"].map((v) => ({ valor: v, texto: v === "60" ? "1 hora" : v === "90" ? "1 hora 30 min" : `${v} min` }))} /></label>
+              <small className="muted">Aplica a cada persona del equipo. Ejemplo: un corte de 30 min con 1 hora libre deja la siguiente cita 1 hora 30 min después.</small>
             </section>
             <section className="glass ac-card">
               <span className="lab">Cómo reservan</span>

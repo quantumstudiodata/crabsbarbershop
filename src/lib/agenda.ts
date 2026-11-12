@@ -49,7 +49,7 @@ export function leerConfig(raw: unknown): ConfigCitas {
     anticipacionMinMin: num(r.anticipacionMinMin, d.anticipacionMinMin, 0, 7 * 24 * 60),
     anticipacionMaxDias: num(r.anticipacionMaxDias, d.anticipacionMaxDias, 1, 180),
     margenMin: num(r.margenMin, d.margenMin, 0, 120),
-    pasoMin: num(r.pasoMin, d.pasoMin, 5, 60),
+    pasoMin: num(r.pasoMin, d.pasoMin, 5, 120),
     elegirBarbero: r.elegirBarbero ?? d.elegirBarbero,
     cualquierBarbero: r.cualquierBarbero ?? d.cualquierBarbero,
     variosServicios: r.variosServicios ?? d.variosServicios,

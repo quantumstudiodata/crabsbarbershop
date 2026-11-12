@@ -113,7 +113,7 @@ export function NuevaCita({ equipo, servicios, dia, hoy, horario, cerrados, cerr
     const hora = minuto === null ? "" : aHora(minuto);
     const servicioTxt = lista([...new Set(sel.map((s) => s.nombre))].map((n) => { const k = sel.filter((s) => s.nombre === n).length; return k > 1 ? `${n} x${k}` : n; }));
     const con = listo.con || quien;
-    const msg = `Hola ${primer(nombre.trim())}, tu cita en ${listo.negocio} quedó para el ${DIAS_L[dow(fecha)].toLowerCase()} ${Number(fecha.slice(8))} a las ${hora} con ${con} (${servicioTxt}, ${formatoDinero(listo.total ?? total)}).${url ? ` Aquí puedes verla, cambiarla o cancelarla: ${url}` : ""}`;
+    const msg = `Tu cita en ${listo.negocio} quedó agendada para el ${DIAS_L[dow(fecha)].toLowerCase()} ${Number(fecha.slice(8))} a las ${hora} con ${con}. ${servicioTxt}, ${formatoDinero(listo.total ?? total)}.${url ? ` Consulta, cambia o cancela tu cita aquí: ${url}` : ""}`;
     const d = tel.replace(/\D/g, "");
     const wa = `https://wa.me/${d.length === 10 ? `52${d}` : d}?text=${encodeURIComponent(msg)}`;
     return createPortal(

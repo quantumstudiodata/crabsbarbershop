@@ -2,7 +2,7 @@ import { and, eq } from "drizzle-orm";
 import type { Metadata } from "next";
 import { notFound } from "next/navigation";
 import { leerConfig } from "@/lib/agenda";
-import { NOMBRE_ESTADO } from "@/lib/citas";
+import { equipoAgenda, NOMBRE_ESTADO } from "@/lib/citas";
 import { db, schema } from "@/lib/db";
 import { pagosLinea } from "@/lib/db/schema";
 import { verificarPago } from "@/lib/pagos";
@@ -26,6 +26,7 @@ export default async function PaginaCita({ params }: { params: Promise<{ slug: s
   const [u] = await db.select({ nombre: schema.usuarios.nombre, avatar: schema.usuarios.avatar }).from(schema.usuarios).where(eq(schema.usuarios.id, c.barberoId)).limit(1);
   const config = leerConfig(b.citasConfig);
   const z = b.zonaHoraria;
+  const equipo = config.elegirBarbero ? (await equipoAgenda(b.id)).map((e) => ({ id: e.id, nombre: e.nombre.split(" ")[0], avatar: e.avatar })) : [];
   return (
     <MiCita
       slug={slug} token={token} negocio={b.nombre} hoy={fechaLocal(new Date(), z)} maxDias={config.anticipacionMaxDias}
@@ -36,6 +37,7 @@ export default async function PaginaCita({ params }: { params: Promise<{ slug: s
         sePuedeCambiar: c.estado === "en_espera" && c.inicio.getTime() - Date.now() >= config.cancelarHorasAntes * 3600e3,
       }}
       politica={config.politicaCancelacion} horas={config.cancelarHorasAntes}
+      equipo={equipo} cualquiera={config.cualquierBarbero} persona={c.indiferente ? "" : c.barberoId}
     />
   );
 }

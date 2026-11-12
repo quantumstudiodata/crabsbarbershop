@@ -62,10 +62,14 @@ export function Reservar(p: {
     setHoras(null);
     horariosPublicos(p.slug, fecha, svc, persona).then(setHoras);
   }, [fecha, paso]); // eslint-disable-line react-hooks/exhaustive-deps
+  // Si cambia el servicio, el día o la hora, el precio calculado ya no vale y se vuelve a pedir.
+  useEffect(() => { setCot(null); }, [svc.join(","), fecha, minuto]); // eslint-disable-line react-hooks/exhaustive-deps
   useEffect(() => {
-    if (paso !== 5 || !fecha || minuto === null) return;
-    cotizar(p.slug, fecha, minuto, svc).then(setCot);
-  }, [paso]); // eslint-disable-line react-hooks/exhaustive-deps
+    if (paso < 5 || cot || !fecha || minuto === null) return;
+    let vivo = true;
+    cotizar(p.slug, fecha, minuto, svc).then((r) => { if (vivo) setCot(r); });
+    return () => { vivo = false; };
+  }, [paso, cot]); // eslint-disable-line react-hooks/exhaustive-deps
 
   const ir = (n: number) => { setError(null); setPaso(n === 1 && saltaBarbero ? (n > paso ? 2 : 0) : n); window.scrollTo({ top: 0, behavior: "smooth" }); };
   const puedeSeguir = [svc.length > 0, p.opciones.cualquiera || !!persona, !!fecha, minuto !== null, nombre.trim().length > 1 && tel.replace(/\D/g, "").length >= 10, !!cot, true, true][paso];
@@ -180,16 +184,31 @@ export function Reservar(p: {
         {paso === 5 && (
           <>
             <h1>Revisa tu reservación</h1>
+            <p className="muted">Toca Cambiar en lo que quieras corregir.</p>
             {!cot ? <p className="muted">Calculando…</p> : (
-              <div className="rv-resumen">
-                {cot.filas.map((f) => (
-                  <div key={f.nombre} className="entre"><span>{f.nombre}</span><span>{f.descuento ? <><s className="muted">{formatoDinero(f.precio)}</s> </> : null}<b>{formatoDinero(f.precio - f.descuento)}</b></span></div>
-                ))}
-                <div className="entre"><span className="muted">Con</span><b>{persona ? p.equipo.find((e) => e.id === persona)?.nombre : "Cualquier barbero"}</b></div>
-                <div className="entre"><span className="muted">Cuándo</span><b>{fecha && fechaTxt(fecha)}, {minuto !== null && aHora(minuto)}</b></div>
-                <div className="entre"><span className="muted">Duración</span><b>{cot.duracion} min</b></div>
-                <div className="entre"><span className="muted">A nombre de</span><b>{nombre}</b></div>
-                <div className="entre rv-total"><span>Total</span><b>{formatoDinero(cot.total)}</b></div>
+              <div className="rv-rev">
+                <div className="rv-rev-cab">
+                  <span><small>{fecha && fechaTxt(fecha).replace(/^./, (x) => x.toUpperCase())}</small><b>{minuto !== null && aHora(minuto)}</b><em>{cot.duracion} min</em></span>
+                  <button type="button" className="rv-cambia" onClick={() => ir(2)}>Cambiar</button>
+                </div>
+                <div className="rv-rev-f">
+                  <span className="rv-rev-l">Te atiende</span>
+                  <b>{persona ? p.equipo.find((e) => e.id === persona)?.nombre.split(" ")[0] : "Quien esté libre"}</b>
+                  {!saltaBarbero && <button type="button" className="rv-cambia" onClick={() => ir(1)}>Cambiar</button>}
+                </div>
+                <div className="rv-rev-f rv-rev-svc">
+                  <span className="rv-rev-l">Servicios</span>
+                  <span className="rv-rev-lista">{cot.filas.map((f, i) => (
+                    <span key={`${f.nombre}-${i}`} className="entre"><span>{f.nombre}</span><span>{f.descuento ? <s className="muted">{formatoDinero(f.precio)}</s> : null} <b>{formatoDinero(f.precio - f.descuento)}</b></span></span>
+                  ))}</span>
+                  <button type="button" className="rv-cambia" onClick={() => ir(0)}>Cambiar</button>
+                </div>
+                <div className="rv-rev-f">
+                  <span className="rv-rev-l">A nombre de</span>
+                  <b>{nombre}<small>{tel}</small></b>
+                  <button type="button" className="rv-cambia" onClick={() => ir(4)}>Cambiar</button>
+                </div>
+                <div className="rv-rev-tot"><span>Total</span><b>{formatoDinero(cot.total)}</b></div>
               </div>
             )}
           </>

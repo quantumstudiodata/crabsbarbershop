@@ -79,7 +79,7 @@ export async function comisionesStripe(barberiaId: string) {
   const [b] = await db.select({ cuenta: schema.barberias.stripeCuenta, zona: schema.barberias.zonaHoraria }).from(schema.barberias).where(eq(schema.barberias.id, barberiaId)).limit(1);
   if (!b?.cuenta) return;
   const pagos = await db.select({ id: pagosLinea.id, intento: pagosLinea.intento, pagadoEn: pagosLinea.pagadoEn, tipo: pagosLinea.tipo }).from(pagosLinea)
-    .where(and(eq(pagosLinea.barberiaId, barberiaId), inArray(pagosLinea.estado, ["pagado", "reembolsado"]), sql`${pagosLinea.intento} is not null`,
+    .where(and(eq(pagosLinea.barberiaId, barberiaId), inArray(pagosLinea.estado, ["pagado", "reembolsado"]), sql`${pagosLinea.intento} is not null`, sql`not (${pagosLinea.detalle} ? 'sinComision')`,
       sql`not exists (select 1 from ${schema.gastos} g where g.barberia_id = ${barberiaId} and g.categoria = ${CATEGORIA_COMISIONES} and g.descripcion like '%' || ${pagosLinea.intento} || '%')`)).limit(10);
   if (!pagos.length) return;
   const [titular] = await db.select({ id: schema.usuarios.id }).from(schema.usuarios)
@@ -99,6 +99,8 @@ export async function comisionesStripe(barberiaId: string) {
         descripcion: `Stripe ${pi.id}`, monto: bt.fee, fecha, metodo: "transferencia", usuarioId: titular.id,
       });
     } catch (err) {
+      // Pagos de prueba o de otra cuenta: Stripe ya no los tiene. Se marcan para no volver a preguntar en cada página.
+      if ((err as { code?: string }).code === "resource_missing") { await db.update(pagosLinea).set({ detalle: sql`${pagosLinea.detalle} || '{"sinComision": true}'::jsonb` }).where(eq(pagosLinea.id, p.id)); continue; }
       console.error("comision_stripe", p.id, err);
     }
   }

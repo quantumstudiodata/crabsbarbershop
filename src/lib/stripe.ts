@@ -91,6 +91,9 @@ export async function estadoCuentaNegocio(cuenta: string): Promise<"pendiente" |
   }
 }
 
+/** Lo mínimo que Stripe cobra con tarjeta en pesos: $10. */
+export const MINIMO_STRIPE = 1000;
+
 /** Intento de pago en la cuenta del negocio. El monto va en centavos de peso. */
 export async function crearIntento(cuenta: string, d: { monto: number; descripcion: string; metadata: Record<string, string>; clave: string }) {
   return stripe().paymentIntents.create({

@@ -133,14 +133,23 @@ export async function cancelarPorCliente(token: string): Promise<{ error?: strin
   return {};
 }
 
-export async function horariosParaCambio(token: string, fecha: string) {
+/** Con quién queda la cita al cambiarla: la misma persona, otra que el negocio deje elegir o quien esté libre. */
+async function personaCambio(x: NonNullable<Awaited<ReturnType<typeof citaPorToken>>>, persona: string | undefined) {
+  if (persona === undefined) return x.c.indiferente ? null : x.c.barberoId;
+  if (persona === "") return x.config.cualquierBarbero ? null : x.c.barberoId;
+  if (!x.config.elegirBarbero) return x.c.barberoId;
+  const equipo = await equipoAgenda(x.b.id);
+  return equipo.some((e) => e.id === persona) ? persona : x.c.barberoId;
+}
+
+export async function horariosParaCambio(token: string, fecha: string, persona?: string) {
   const x = await citaPorToken(token);
   if (!x || !FECHA.test(fecha)) return [];
-  const libres = await disponibilidadDia(x.b, fecha, x.c.duracionMin, x.c.indiferente ? null : x.c.barberoId, db, { ignorarCita: x.c.id });
+  const libres = await disponibilidadDia(x.b, fecha, x.c.duracionMin, await personaCambio(x, persona), db, { ignorarCita: x.c.id });
   return libres.map((l) => l.minuto);
 }
 
-export async function cambiarPorCliente(token: string, fecha: string, minuto: number): Promise<{ error?: string }> {
+export async function cambiarPorCliente(token: string, fecha: string, minuto: number, personaElegida?: string): Promise<{ error?: string }> {
   const x = await citaPorToken(token);
   if (!x || x.c.estado !== "en_espera") return { error: "Esta cita ya no se puede cambiar." };
   if (!puedeCambiar(x.c.inicio, x.config.cancelarHorasAntes)) return { error: `Solo se puede cambiar hasta ${x.config.cancelarHorasAntes} horas antes. Comunícate al negocio.` };
@@ -148,13 +157,14 @@ export async function cambiarPorCliente(token: string, fecha: string, minuto: nu
   const { instante } = await import("@/lib/agenda");
   const inicio = new Date(instante(fecha, minuto, x.b.zonaHoraria));
   const equipo = await equipoAgenda(x.b.id);
+  const quiere = await personaCambio(x, personaElegida);
   const ok = await db.transaction(async (tx) => {
     await tx.execute(sql`select pg_advisory_xact_lock(hashtext(${`citas:${x.b.id}`}))`);
-    const libres = await disponibilidadDia(x.b, fecha, x.c.duracionMin, x.c.indiferente ? null : x.c.barberoId, tx, { ignorarCita: x.c.id });
+    const libres = await disponibilidadDia(x.b, fecha, x.c.duracionMin, quiere, tx, { ignorarCita: x.c.id });
     const slot = libres.find((l) => l.minuto === minuto);
     if (!slot) return null;
-    const persona = slot.personas.includes(x.c.barberoId) ? x.c.barberoId : slot.personas[0];
-    const [c] = await tx.update(schema.citas).set({ inicio, fin: new Date(inicio.getTime() + x.c.duracionMin * 60000), barberoId: persona, actualizadoEn: new Date() }).where(eq(schema.citas.id, x.c.id)).returning();
+    const persona = quiere ?? (slot.personas.includes(x.c.barberoId) ? x.c.barberoId : slot.personas[0]);
+    const [c] = await tx.update(schema.citas).set({ inicio, fin: new Date(inicio.getTime() + x.c.duracionMin * 60000), barberoId: persona, indiferente: quiere === null, actualizadoEn: new Date() }).where(eq(schema.citas.id, x.c.id)).returning();
     await tx.update(schema.notificacionesCita).set({ estado: "omitida" }).where(and(eq(schema.notificacionesCita.citaId, x.c.id), eq(schema.notificacionesCita.estado, "pendiente")));
     const quien = equipo.find((e) => e.id === persona)?.nombre.split(" ")[0] ?? "";
     await encolarAviso(tx, { barberiaId: x.b.id, citaId: c.id, tipo: "cita_modificada", para: "negocio", mensaje: `${c.clienteNombre} cambió su cita ${c.folio}: ${textoCita(x.b, c, quien, c.servicios.map((s) => s.nombre).join(", "))}` });
