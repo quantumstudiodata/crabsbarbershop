@@ -12,6 +12,8 @@ export type PlanVenta = {
   citaId: string; promosUsadas: string[]; nombresPromo: string;
   // Cita pagada en línea por adelantado: la venta se registra al pagar y la cita sigue pendiente de atenderse.
   mantenerCita?: boolean;
+  // Hora real del cobro cuando no es ahora (por ejemplo, el cliente pagó en línea antes de abrir la caja).
+  creadoEn?: Date;
   conceptos: (Omit<typeof schema.conceptos.$inferInsert, "ventaId">)[];
 };
 export type PagoVenta = { metodoPagoId: string | null; nombreMetodo: string; esEfectivo: boolean; monto: number };
@@ -24,7 +26,7 @@ export async function insertarVenta(tx: Tx, plan: PlanVenta, pagos: PagoVenta[],
   const folio = `${prefijo}-${String(n).padStart(6, "0")}`;
   const [v] = await tx.insert(schema.ventas).values({
     barberiaId: plan.barberiaId, folio, turnoId: plan.turnoId, registradaPor: plan.usuarioId, total: plan.total, descuentoTotal: plan.descuentoTotal,
-    observaciones: plan.observaciones, claveUnica: plan.clave, tokenEncuesta: encuesta,
+    observaciones: plan.observaciones, claveUnica: plan.clave, tokenEncuesta: encuesta, ...(plan.creadoEn ? { creadoEn: plan.creadoEn } : {}),
   }).returning({ id: schema.ventas.id });
   await tx.insert(schema.conceptos).values(plan.conceptos.map((c) => ({ ...c, ventaId: v.id })));
   // Si viene de una cita, queda ligada a la venta y completada (una cita no se cobra dos veces).

@@ -256,7 +256,7 @@ function VistaSemana({ citas, semana, horario, hoy, abrir, url }: { citas: CitaV
           <div key={d} className="cal-col">
             {citas.filter((c) => c.fecha === d).map((c) => (
               <button type="button" key={c.id} className={`blq-c mini e-${c.estado}`} style={{ top: (aMin(c.hora) - ini) * px, height: Math.max(c.duracion * px - 2, 16) }} onClick={() => abrir(c)} title={`${c.hora} ${c.cliente}`}>
-                <b>{c.hora} {c.cliente.split(" ").slice(0, 2).map((x, i) => (i ? `${x[0]}.` : x)).join(" ")}</b><small>{c.duracion >= 35 ? `${c.servicios[0] ?? ""}, ${primer(c.barbero)}` : primer(c.barbero)}</small>
+                <b>{c.hora} {c.cliente.split(" ").slice(0, 2).map((x, i) => (i ? `${x[0]}.` : x)).join(" ")}</b><small><i className="est-p" aria-hidden="true" />{ESTADO[c.estado] ?? c.estado}, {primer(c.barbero)}</small>
               </button>
             ))}
           </div>
@@ -279,8 +279,8 @@ function DetalleCita({ c, cerrar, puede, equipo, avisar }: { c: CitaVista; cerra
       {modo === "ver" ? (
         <div className="pila" style={{ gap: 12 }}>
           <div className="entre"><Chip e={c.estado} /><span className="fila" style={{ gap: 6 }}>
-            <a className="icb" href={`tel:${tel}`} aria-label="Llamar"><Icono n="persona" /></a>
-            <a className="icb" href={`https://wa.me/${tel.length === 10 ? `52${tel}` : tel}`} target="_blank" rel="noreferrer" aria-label="Escribir por WhatsApp"><Icono n="enviar" /></a>
+            <a className="ct-bt" href={`tel:${tel}`}>Llamar</a>
+            <a className="ct-bt" href={`https://wa.me/${tel.length === 10 ? `52${tel}` : tel}`} target="_blank" rel="noreferrer">WhatsApp</a>
           </span></div>
           <div className="datos resumen-cfg">
             <div><span>Teléfono</span><b>{c.telefono}</b></div>
@@ -565,6 +565,7 @@ function VistaLinea(p: {
   abrir: (c: CitaVista) => void; url: (x: Partial<{ dia: string; vista: string; persona: string }>) => string;
   puede: { modificar: boolean; horarios: boolean }; agendar: (minuto: number) => void; bloquear: () => void; avisar: (r: Res) => void;
 }) {
+  const router = useRouter();
   const [quitar, setQuitar] = useState<Bloqueo | null>(null);
   const [pend, iniciar] = useTransition();
   const h = p.cerrados.includes(p.dia) ? null : p.horario[String(dow(p.dia))];
@@ -584,7 +585,8 @@ function VistaLinea(p: {
     <div className="ln-barra">
       <div className="ln-dia">
         <Link href={p.url({ dia: sumar(p.dia, -1) })} scroll={false} aria-label="Día anterior"><Icono n="izquierda" /></Link>
-        <Link href={p.url({ dia: p.hoy })} scroll={false} className="ln-hoy" title="Ir a hoy">{etiqueta}</Link>
+        <span className="ln-fecha"><CampoFecha valor={p.dia} texto={etiqueta} etiqueta="Elegir día" cambiar={(f) => router.push(p.url({ dia: f }), { scroll: false })} /></span>
+        {p.dia !== p.hoy && <Link href={p.url({ dia: p.hoy })} scroll={false} className="ln-ahoy">Hoy</Link>}
         <Link href={p.url({ dia: sumar(p.dia, 1) })} scroll={false} aria-label="Día siguiente"><Icono n="derecha" /></Link>
       </div>
       {p.puede.horarios && <button type="button" className="ln-ib" onClick={p.bloquear} aria-label="Bloquear horario" title="Bloquear horario"><Icono n="candado" /></button>}

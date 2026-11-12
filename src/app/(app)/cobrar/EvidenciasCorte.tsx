@@ -14,7 +14,7 @@ const MAX_ARCHIVOS = 6;
  * Los cobros en línea (QR) ya los verificó Stripe y no piden comprobante. Con la función obligatoria,
  * cada forma de pago con cobros necesita al menos un archivo.
  */
-export function EvidenciasCorte({ grupos, obligatorio, cambio, dinero }: { grupos: GrupoEvidencia[]; obligatorio: boolean; cambio: (faltan: number) => void; dinero: (n: number) => string }) {
+export function EvidenciasCorte({ grupos, obligatorio, cambio, dinero }: { grupos: GrupoEvidencia[]; obligatorio: boolean; cambio: (faltan: number, archivos: number) => void; dinero: (n: number) => string }) {
   const [lista, setLista] = useState<Evidencia[]>([]);
   const [error, setError] = useState<string | null>(null);
   const destino = useRef("");
@@ -22,7 +22,7 @@ export function EvidenciasCorte({ grupos, obligatorio, cambio, dinero }: { grupo
   const camara = useRef<HTMLInputElement>(null);
   const actualizar = (nueva: Evidencia[]) => {
     setLista(nueva);
-    cambio(obligatorio ? grupos.filter((g) => !g.enLinea && g.total > 0 && !nueva.some((e) => e.etiqueta === g.metodo)).length : 0);
+    cambio(obligatorio ? grupos.filter((g) => !g.enLinea && g.total > 0 && !nueva.some((e) => e.etiqueta === g.metodo)).length : 0, nueva.length);
   };
   const agregar = async (f?: File) => {
     setError(null);
@@ -52,7 +52,7 @@ export function EvidenciasCorte({ grupos, obligatorio, cambio, dinero }: { grupo
           <div key={g.metodo} className="ev-g">
             <div className="ev-h">
               <span className="ev-ic"><Icono n={g.icono} /></span>
-              <span className="ev-t"><b>{g.metodo}</b><small>{g.ventas} {g.ventas === 1 ? "cobro" : "cobros"}, {dinero(g.total)}</small></span>
+              <span className="ev-t"><b>{g.metodo}</b><small>{g.ventas} {g.ventas === 1 ? "cobro" : "cobros"}, {dinero(g.total)}{!g.enLinea && g.ventas > 1 ? ". Un archivo puede cubrir varios" : ""}</small></span>
               <span className={`ev-est ${g.enLinea || suyos.length ? "ok" : ""}`}>{g.enLinea ? "Verificado" : suyos.length ? `${suyos.length} ${suyos.length === 1 ? "archivo" : "archivos"}` : falta ? (obligatorio ? "Falta comprobante" : "Sin comprobante") : "Sin cobros"}</span>
             </div>
             {g.enLinea ? <small className="muted">No necesita comprobante: Stripe confirmó cada pago.</small> : (

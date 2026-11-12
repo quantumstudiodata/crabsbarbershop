@@ -30,10 +30,10 @@ export async function ventasDeCitasPagadas(barberiaId: string) {
     sql`exists (select 1 from ${pagosLinea} pl where pl.cita_id = ${schema.citas.id} and pl.estado = 'pagado')`)).limit(20);
   if (!pendientes.length) return;
   const reglas = await reglasDe(barberiaId);
-  const [titular] = await db.select({ id: schema.usuarios.id }).from(schema.usuarios)
-    .where(and(eq(schema.usuarios.barberiaId, barberiaId), eq(schema.usuarios.rol, "duena"))).limit(1);
   for (const c of pendientes) {
     try {
+      const [pg] = await db.select({ t: sql<Date | null>`min(${pagosLinea.pagadoEn})` }).from(pagosLinea).where(and(eq(pagosLinea.citaId, c.id), eq(pagosLinea.estado, "pagado")));
+      const pagadoEn = pg?.t ? new Date(pg.t) : undefined;
       await db.transaction(async (tx) => {
         const conceptos = c.servicios.map((sv) => {
           const desc = Math.min(sv.descuento ?? 0, sv.precio);
@@ -46,7 +46,8 @@ export async function ventasDeCitasPagadas(barberiaId: string) {
           };
         });
         const plan: PlanVenta = {
-          barberiaId, turnoId: turno.id, usuarioId: c.creadoPor ?? titular?.id ?? c.barberoId, usuarioNombre: "Pago en línea",
+          // La registra quien atiende la cita; la hora es la del pago, no la de abrir la app.
+          barberiaId, turnoId: turno.id, usuarioId: c.barberoId, usuarioNombre: "Pago en línea", creadoEn: pagadoEn,
           total: c.total, descuentoTotal: conceptos.reduce((a, x) => a + x.descuento, 0), descuento: 0, motivoDescuento: "",
           observaciones: `Cita ${c.folio} pagada en línea`, clave: `cita-linea-${c.id}`, citaId: c.id, promosUsadas: [], nombresPromo: "",
           conceptos, mantenerCita: true,
@@ -62,7 +63,59 @@ export async function ventasDeCitasPagadas(barberiaId: string) {
 }
 
 /** Lo mismo, una vez por petición: se llama al cargar las pantallas de ventas, cobro e inicio. */
-export const asentarCitasPagadas = cache(async (barberiaId: string) => { await ventasDeCitasPagadas(barberiaId).catch((err) => console.error("venta_cita_linea", err)); });
+export const asentarCitasPagadas = cache(async (barberiaId: string) => {
+  await ventasDeCitasPagadas(barberiaId).catch((err) => console.error("venta_cita_linea", err));
+  await comisionesStripe(barberiaId).catch((err) => console.error("comision_stripe", err));
+});
+
+export const CATEGORIA_COMISIONES = "Comisiones Stripe";
+
+/**
+ * Lo que Stripe cobra por cada pago en línea se anota solo como egreso, para que Finanzas y la libreta cuadren.
+ * Stripe no devuelve su comisión en un reembolso, así que el egreso se queda. Es idempotente (una vez por pago).
+ */
+export async function comisionesStripe(barberiaId: string) {
+  if (!process.env.STRIPE_SECRET_KEY) return;
+  const [b] = await db.select({ cuenta: schema.barberias.stripeCuenta, zona: schema.barberias.zonaHoraria }).from(schema.barberias).where(eq(schema.barberias.id, barberiaId)).limit(1);
+  if (!b?.cuenta) return;
+  const pagos = await db.select({ id: pagosLinea.id, intento: pagosLinea.intento, pagadoEn: pagosLinea.pagadoEn, tipo: pagosLinea.tipo }).from(pagosLinea)
+    .where(and(eq(pagosLinea.barberiaId, barberiaId), inArray(pagosLinea.estado, ["pagado", "reembolsado"]), sql`${pagosLinea.intento} is not null`,
+      sql`not exists (select 1 from ${schema.gastos} g where g.barberia_id = ${barberiaId} and g.categoria = ${CATEGORIA_COMISIONES} and g.descripcion like '%' || ${pagosLinea.intento} || '%')`)).limit(10);
+  if (!pagos.length) return;
+  const [titular] = await db.select({ id: schema.usuarios.id }).from(schema.usuarios)
+    .where(and(eq(schema.usuarios.barberiaId, barberiaId), eq(schema.usuarios.rol, "duena"))).limit(1);
+  if (!titular) return;
+  // La categoría existe para que aparezca en Finanzas como cualquier otra.
+  await db.insert(schema.categoriasGasto).values({ barberiaId, nombre: CATEGORIA_COMISIONES, orden: 99 }).onConflictDoNothing();
+  for (const p of pagos) {
+    try {
+      const pi = await stripe().paymentIntents.retrieve(p.intento!, { expand: ["latest_charge.balance_transaction"] }, { stripeAccount: b.cuenta });
+      const ch = typeof pi.latest_charge === "object" ? pi.latest_charge : null;
+      const bt = ch && typeof ch.balance_transaction === "object" ? ch.balance_transaction : null;
+      if (!bt?.fee) continue;
+      const fecha = new Intl.DateTimeFormat("en-CA", { timeZone: b.zona, year: "numeric", month: "2-digit", day: "2-digit" }).format(p.pagadoEn ?? new Date());
+      await db.insert(schema.gastos).values({
+        barberiaId, categoria: CATEGORIA_COMISIONES, concepto: p.tipo === "cita" ? "Comisión por pago de cita en línea" : "Comisión por cobro con QR",
+        descripcion: `Stripe ${pi.id}`, monto: bt.fee, fecha, metodo: "transferencia", usuarioId: titular.id,
+      });
+    } catch (err) {
+      console.error("comision_stripe", p.id, err);
+    }
+  }
+}
+
+/**
+ * Stripe dice que un pago se devolvió (por ejemplo, desde su panel) aunque el aviso no haya llegado:
+ * se deja igual aquí. La venta se cancela y, si era de una cita, la cita queda sin pago.
+ */
+export async function sincronizarReembolso(intento: string) {
+  const filas = await db.update(pagosLinea).set({ estado: "reembolsado" }).where(and(eq(pagosLinea.intento, intento), eq(pagosLinea.estado, "pagado")))
+    .returning({ tipo: pagosLinea.tipo, ventaId: pagosLinea.ventaId, citaId: pagosLinea.citaId });
+  for (const f of filas) {
+    await cancelarVentaReembolsada(f.ventaId);
+    if (f.tipo === "cita" && f.citaId) await db.update(schema.citas).set({ pagado: 0, estadoPago: "sin_pago", actualizadoEn: new Date() }).where(eq(schema.citas.id, f.citaId));
+  }
+}
 
 /** Si una venta salió de una cita pagada en línea y el pago se devolvió, la venta se cancela sola. */
 async function cancelarVentaReembolsada(ventaId: string | null) {
@@ -228,12 +281,5 @@ export async function vencerSiToca(p: { id: string; tipo: string; intento: strin
 /** Stripe devolvió un cobro (desde su panel o por nosotros). */
 export async function marcarReembolso(ch: Stripe.Charge) {
   const pi = typeof ch.payment_intent === "string" ? ch.payment_intent : ch.payment_intent?.id;
-  if (!pi || !ch.refunded) return;
-  const filas = await db.update(pagosLinea).set({ estado: "reembolsado" }).where(eq(pagosLinea.intento, pi)).returning({ tipo: pagosLinea.tipo, ventaId: pagosLinea.ventaId, citaId: pagosLinea.citaId });
-  // Reembolso hecho desde Stripe de una cita pagada en línea: la venta se cancela y la cita queda sin pago.
-  for (const f of filas) {
-    if (f.tipo !== "cita") continue;
-    await cancelarVentaReembolsada(f.ventaId);
-    if (f.citaId) await db.update(schema.citas).set({ pagado: 0, estadoPago: "sin_pago", ventaId: null, actualizadoEn: new Date() }).where(eq(schema.citas.id, f.citaId));
-  }
+  if (pi && ch.refunded) await sincronizarReembolso(pi);
 }

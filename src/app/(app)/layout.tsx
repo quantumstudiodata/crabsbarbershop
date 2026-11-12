@@ -1,4 +1,6 @@
 import { eq } from "drizzle-orm";
+import { QrGlobal } from "./cobrar/QrGlobal";
+import { cobraEnLinea } from "@/lib/stripe";
 import { headers } from "next/headers";
 import { Suspense } from "react";
 import { CambiarVista } from "@/components/CambiarVista";
@@ -69,6 +71,7 @@ export default async function LayoutApp({ children }: { children: React.ReactNod
         </div>
       </header>
       <main className="contenedor">{children}</main>
+      {(s.puede("ventas.registrar") || s.puede("ventas.registrar_otros")) && cobraEnLinea(s.barberia) && <QrGlobal />}
       <BarraInferior items={items} mas={{
         historial: s.puede("ventas.ver_todas") || atiende,
         ajustes: s.puede("usuarios.ver") || s.puede("servicios.ver") || s.puede("citas.horarios") || PERMISOS_CONFIG.some((p) => s.puede(p)),

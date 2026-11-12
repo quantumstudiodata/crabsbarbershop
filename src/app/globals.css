@@ -4091,3 +4091,29 @@ html, body { overscroll-behavior-y: none; }
 .lb-dots a.on { width: 18px; border-radius: 4px; background: #13171c; }
 @media (min-width: 761px) { .lb-t td { height: 42px; } }
 @media (min-width: 761px) { .lb-t { table-layout: fixed; } .lb-t th:first-child { width: 120px; } .lb-t th.tt { width: 150px; } }
+/* Detalle de pago en línea: chips de estado y marca de la tarjeta */
+.vs-chips { display: flex; flex-wrap: wrap; align-items: center; gap: 6px; }
+.vs-est { font-style: normal; font-size: 11.5px; font-weight: 600; padding: 3px 9px; border-radius: 999px; background: #e3e9ef; color: #3c5163; }
+.vs-est.cobrado { background: #13171c; color: #fff; }
+.vs-est.reembolsado, .vs-est.parcial { background: #fff; color: #13171c; box-shadow: inset 0 0 0 1px rgba(19,23,28,.25); }
+.vs-tj { display: inline-flex; align-items: center; gap: 6px; font: 600 12px var(--f-mono); color: #3c5163; }
+.pm.pm-chico { width: 34px; height: 22px; border-radius: 6px; }
+.pm.pm-chico svg { width: 28px; height: 13px; }
+.vs-caja.dev { background: rgba(255,255,255,.55); }
+/* Agenda: tocar el día abre el calendario */
+.ln-dia .ln-fecha { flex: 1; min-width: 0; display: flex; justify-content: center; }
+.ln-dia .ln-fecha .cf-campo { width: auto; }
+.ln-dia .ln-fecha .campo-f-b { border: 0; background: none; box-shadow: none; min-height: 0; padding: 6px 10px; font-weight: 600; justify-content: center; gap: 8px; }
+.ln-dia .ln-fecha .campo-f-b .ic { width: 15px; height: 15px; color: var(--faint); }
+.ln-ahoy { flex: none; font-size: 12.5px; font-weight: 600; padding: 5px 10px; border-radius: 999px; background: rgba(19,23,28,.06); color: var(--fg); text-decoration: none; }
+/* Agenda: chips de estado legibles */
+.ln-c { align-items: center; }
+.ln-c .chip-cita { display: inline-flex !important; flex: none; white-space: nowrap; align-self: center; }
+.blq-c small { display: flex; align-items: center; gap: 4px; }
+.blq-c .est-p { width: 6px; height: 6px; border-radius: 50%; flex: none; background: #4b6274; }
+.blq-c.e-llego .est-p { background: #2b3a47; } .blq-c.e-en_atencion .est-p { background: #13171c; animation: parpadeo-e 1.2s ease-in-out infinite; }
+.blq-c.e-completada { opacity: .6; } .blq-c.e-completada .est-p { background: #9aa6b1; }
+.blq-c.e-no_asistio { opacity: .45; text-decoration: line-through; }
+.blq-c.e-llego { border-left-color: #2b3a47; } .blq-c.e-en_atencion { border-left-color: #13171c; background: linear-gradient(135deg, #2b3138, #13171c); color: #fff; }
+.blq-c.e-en_atencion .est-p { background: #fff; }
+.ct-bt { display: inline-flex; align-items: center; height: 34px; padding: 0 14px; border-radius: 999px; font: 600 13px var(--f-body); text-decoration: none; color: var(--fg); background: rgba(255,255,255,.8); box-shadow: inset 0 0 0 1px rgba(19,23,28,.12); }

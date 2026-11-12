@@ -4,7 +4,8 @@ import { AvisoUrl } from "@/components/Encabezado";
 import { Icono } from "@/components/Icono";
 import { db, schema } from "@/lib/db";
 import { fechaCorta, fechaLocal } from "@/lib/fechas";
-import { personasEquipo, sesionEquipo } from "../../equipo/datos";
+import { requerirSesion } from "@/lib/auth";
+import { personasEquipo } from "../../equipo/datos";
 import { Responder } from "./Responder";
 
 export const metadata = { title: "Reseñas" };
@@ -16,16 +17,18 @@ const Estrellas = ({ n }: { n: number }) => (
 type Q = { persona?: string; estado?: string; n?: string; aviso?: string; error?: string };
 
 export default async function Resenas({ searchParams }: { searchParams: Promise<Q> }) {
-  const se = await sesionEquipo();
+  const se = await requerirSesion();
+  // Quien no ve las ventas de todo el equipo ve solo sus propias reseñas.
+  const verTodo = se.puede("ventas.ver_todas") || se.puede("resenas.responder");
   const q = await searchParams;
   const zona = se.barberia.zonaHoraria;
   const hoy = fechaLocal(new Date(), zona);
-  const personas = await personasEquipo(se.barberia.id);
-  const persona = personas.some((p) => p.id === q.persona) ? q.persona! : "";
+  const personas = (await personasEquipo(se.barberia.id)).filter((p) => verTodo || p.id === se.usuario.id);
+  const persona = !verTodo ? se.usuario.id : personas.some((p) => p.id === q.persona) ? q.persona! : "";
   const estado = q.estado === "sin" || q.estado === "resp" ? q.estado : "todas";
   const limite = Math.min(Math.max(Number(q.n) || 20, 20), 200);
   const todas = await db.select({ barberoId: schema.resenas.barberoId, calificacion: schema.resenas.calificacion, respuesta: schema.resenas.respuesta })
-    .from(schema.resenas).where(eq(schema.resenas.barberiaId, se.barberia.id));
+    .from(schema.resenas).where(and(eq(schema.resenas.barberiaId, se.barberia.id), ...(verTodo ? [] : [eq(schema.resenas.barberoId, se.usuario.id)])));
   const cond: SQL[] = [eq(schema.resenas.barberiaId, se.barberia.id)];
   if (persona) cond.push(eq(schema.resenas.barberoId, persona));
   if (estado === "sin") cond.push(isNull(schema.resenas.respuesta));

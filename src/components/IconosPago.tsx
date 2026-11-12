@@ -10,3 +10,13 @@ export function IconosPago() {
     </span>
   );
 }
+
+/** Logo de la marca de una tarjeta a partir de su texto ("Mastercard 7445", "Visa 4242"). */
+export function MarcaTarjeta({ tarjeta }: { tarjeta: string }) {
+  const t = tarjeta.toLowerCase();
+  const svg = t.includes("visa") ? <svg viewBox="0 0 40 14" aria-hidden="true"><text x="20" y="11.5" textAnchor="middle" fontFamily="Arial Black,Arial" fontWeight="900" fontStyle="italic" fontSize="12" fill="#1f2c38">VISA</text></svg>
+    : t.includes("master") ? <svg viewBox="0 0 40 24" aria-hidden="true"><circle cx="16" cy="12" r="7.5" fill="#55687a" /><circle cx="24" cy="12" r="7.5" fill="#a7b4c0" fillOpacity=".9" /></svg>
+    : t.includes("amex") || t.includes("american") ? <svg viewBox="0 0 40 14" aria-hidden="true"><text x="20" y="11" textAnchor="middle" fontFamily="Arial" fontWeight="800" fontSize="10" letterSpacing=".5" fill="#1f2c38">AMEX</text></svg>
+    : null;
+  return svg ? <span className="pm pm-chico">{svg}</span> : null;
+}

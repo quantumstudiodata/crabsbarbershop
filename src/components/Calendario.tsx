@@ -155,8 +155,10 @@ const hora12 = (hm: string) => {
  * Campo de fecha con el diseño de la página (en lugar del calendario del navegador).
  * Con `vacio` se puede dejar sin fecha. Con `name`, manda el valor en el formulario.
  */
-export function CampoFecha({ valor, cambiar, min, max, vacio, name, etiqueta = "Fecha" }: {
+export function CampoFecha({ valor, cambiar, min, max, vacio, name, etiqueta = "Fecha", texto }: {
   valor: string; cambiar?: (f: string) => void; min?: string; max?: string; vacio?: string; name?: string; etiqueta?: string;
+  /** Texto propio del botón en lugar de la fecha (por ejemplo, "Hoy, miércoles 11"). */
+  texto?: string;
 }) {
   const { abierto, setAbierto, caja } = useVentana();
   const [interno, setInterno] = useState(valor);
@@ -174,7 +176,7 @@ export function CampoFecha({ valor, cambiar, min, max, vacio, name, etiqueta = "
     <div className="cf-campo" ref={caja}>
       {name && <input type="hidden" name={name} value={actual} />}
       <button type="button" className={`input campo-f-b ${actual ? "" : "vacio"}`} aria-label={etiqueta} aria-expanded={abierto} onClick={() => setAbierto((x) => !x)}>
-        <Icono n="calendario" /><span>{actual ? fechaTexto(actual) : vacio ?? "Elegir fecha"}</span>
+        <Icono n="calendario" /><span>{texto ?? (actual ? fechaTexto(actual) : vacio ?? "Elegir fecha")}</span>
       </button>
       {abierto && (
         <Flotante ancla={caja} className="calendario" label={etiqueta}>

@@ -160,6 +160,8 @@ export async function consultarPagoStripe(ventaId: string): Promise<ConsultaStri
     const ch = typeof pi.latest_charge === "object" ? pi.latest_charge : null;
     const reemb = ch?.amount_refunded ?? 0;
     const estado = pi.status !== "succeeded" ? "pendiente" : reemb >= (ch?.amount ?? pi.amount) ? "reembolsado" : reemb > 0 ? "parcial" : "cobrado";
+    // Si se devolvió desde Stripe y aquí no se supo, se deja igual: la venta se cancela.
+    if (estado === "reembolsado" && p.estado === "pagado") { const { sincronizarReembolso } = await import("@/lib/pagos"); await sincronizarReembolso(p.intento); }
     const hora = new Intl.DateTimeFormat("es-MX", { timeZone: s.barberia.zonaHoraria, hour: "2-digit", minute: "2-digit", hour12: false }).format(new Date());
     return { estado, monto: pi.amount_received || pi.amount, reembolsado: reemb, tarjeta: tarjetaDe(pi), referencia: pi.id, consultado: hora };
   } catch (err) {

@@ -238,6 +238,7 @@ function CortePasos({ turno, accion, cerrando, error, contado, setContado, limit
   const pasos = conComprobantes ? 4 : 3;
   const [paso, setPaso] = useState(1);
   const [faltan, setFaltan] = useState(() => grupos.filter((g) => !g.enLinea).length);
+  const [archivos, setArchivos] = useState(0);
   const c = leerPesos(contado);
   const dif = c === null ? null : c - turno.esperado;
   const nombre = ["Resumen del turno", "Efectivo", ...(conComprobantes ? ["Comprobantes"] : []), "Cierre"][paso - 1];
@@ -289,7 +290,7 @@ function CortePasos({ turno, accion, cerrando, error, contado, setContado, limit
         {conComprobantes && (
           <div className="pila" hidden={paso !== 3}>
             <small className="muted">Sube las fotos o archivos de cada forma de pago, en el orden que quieras.</small>
-            <EvidenciasCorte grupos={grupos} obligatorio cambio={setFaltan} dinero={formatoDinero} />
+            <EvidenciasCorte grupos={grupos} obligatorio cambio={(f, n) => { setFaltan(f); setArchivos(n); }} dinero={formatoDinero} />
           </div>
         )}
 
@@ -297,7 +298,7 @@ function CortePasos({ turno, accion, cerrando, error, contado, setContado, limit
           <div className="ck-con">
             <div><span>Total vendido</span><b className="num">{formatoDinero(total)}</b></div>
             <div><span>Efectivo contado</span><span>{c === null ? "Sin contar" : `${formatoDinero(c)}, ${dif === 0 ? "coincide" : dif! > 0 ? `sobran ${formatoDinero(dif!)}` : `faltan ${formatoDinero(-dif!)}`}`}</span></div>
-            {conComprobantes && <div><span>Comprobantes</span><span>{faltan ? `Faltan ${faltan}` : "Completos"}</span></div>}
+            {conComprobantes && <div><span>Comprobantes</span><span>{faltan ? `Falta en ${faltan} ${faltan === 1 ? "forma de pago" : "formas de pago"}` : `${archivos} ${archivos === 1 ? "archivo" : "archivos"}, al menos uno por forma de pago`}</span></div>}
             {qr > 0 && <div><span>Pago con QR</span><span>{qr} {qr === 1 ? "verificado" : "verificados"} por Stripe</span></div>}
           </div>
           <label className="campo">
