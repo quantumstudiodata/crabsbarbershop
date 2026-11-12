@@ -5,7 +5,8 @@ import { headers } from "next/headers";
 import { randomBytes } from "node:crypto";
 import { leerConfig, montoAPagar } from "@/lib/agenda";
 import { pagosLinea } from "@/lib/db/schema";
-import { cobraEnLinea, crearIntento } from "@/lib/stripe";
+import { cobraEnLinea, crearIntento, MINIMO_STRIPE } from "@/lib/stripe";
+import { cargoEnLinea } from "@/lib/cargo";
 import { reembolsarCita } from "@/lib/pagos";
 import { avisosDeConfirmacion, crearCita, diasConLugar, disponibilidadDia, encolarAviso, equipoAgenda, serviciosDeCita, telefonoValido, textoCita } from "@/lib/citas";
 import { db, schema } from "@/lib/db";
@@ -89,14 +90,15 @@ export async function prepararPagoReserva(slug: string, d: DatosReserva, forma: 
   const [c] = await db.select().from(schema.citas).where(eq(schema.citas.id, r.citaId)).limit(1);
   const anticipo = montoAPagar(c.total, n.config.pago).minimo;
   const monto = forma === "total" || n.config.pago.modo === "completo" || n.config.pago.modo === "opcional" ? c.total : anticipo;
-  if (monto < 1000) return { error: "El monto es muy bajo para pagar en línea. Reserva y paga en el negocio." };
+  const cargo = cargoEnLinea(monto);
+  if (monto + cargo < MINIMO_STRIPE) return { error: "El monto es muy bajo para pagar en línea. Reserva y paga en el negocio." };
   try {
     const [pago] = await db.insert(pagosLinea).values({
       barberiaId: n.b.id, tipo: "cita", token: randomBytes(12).toString("base64url"), citaId: c.id, monto,
-      detalle: { negocio: n.b.nombre, folio: c.folio, servicios: c.servicios.map((x) => x.nombre), total: c.total },
+      detalle: { negocio: n.b.nombre, folio: c.folio, servicios: c.servicios.map((x) => x.nombre), total: c.total, cargo },
     }).returning();
     const pi = await crearIntento(n.b.stripeCuenta!, {
-      monto, descripcion: `${n.b.nombre}: ${monto < c.total ? "anticipo de " : ""}cita ${c.folio}`,
+      monto: monto + cargo, descripcion: `${n.b.nombre}: ${monto < c.total ? "anticipo de " : ""}cita ${c.folio}`,
       metadata: { pagoId: pago.id, barberiaId: n.b.id, tipo: "cita", citaId: c.id }, clave: `cita-${c.id}`,
     });
     await db.update(pagosLinea).set({ intento: pi.id }).where(eq(pagosLinea.id, pago.id));

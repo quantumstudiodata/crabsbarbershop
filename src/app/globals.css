@@ -4289,3 +4289,14 @@ html, body { overscroll-behavior-y: none; }
 .agc-acc { display: grid; grid-template-columns: 1fr 1fr; gap: 8px; } .agc-acc .bt { justify-content: center; }
 .agc-ver { display: inline-flex; align-items: center; justify-content: center; gap: 6px; font: 600 13px var(--f-body, inherit); color: var(--muted); text-decoration: none; padding: 4px; }
 .agc-ver .ic { width: 15px; height: 15px; }
+.cal-semana .blq-grupo { display: grid; align-content: start; gap: 1px; text-decoration: none; color: inherit; background: #fff; border-left-color: #13171c; overflow: hidden; }
+.cal-semana .blq-grupo small { white-space: nowrap; overflow: hidden; text-overflow: ellipsis; font-size: 11px; color: var(--muted); }
+.blq-n { font: 600 10px var(--f-mono); padding: 1px 6px; border-radius: 999px; background: #13171c; color: #fff; margin-left: 2px; }
+.ac-chips { display: flex; flex-wrap: wrap; gap: 6px; }
+.ac-chips button { padding: 8px 14px; border-radius: 999px; border: 1px solid rgba(19,23,28,.1); background: #fff; font: 600 13px var(--f-body, inherit); color: inherit; cursor: pointer; }
+.ac-chips button.on { background: #13171c; color: #fff; border-color: #13171c; }
+.ac-ejemplo { margin: 0; padding: 10px 12px; border-radius: 12px; background: rgba(19,23,28,.05); font-size: 13px; line-height: 1.5; color: var(--muted); }
+.rv-desglose { display: grid; gap: 6px; padding: 12px 14px; border-radius: 14px; background: rgba(255,255,255,.7); font-size: 13.5px; }
+.rv-desglose span:first-child { color: var(--muted); }
+.rv-desglose-t { border-top: 1px dashed rgba(19,23,28,.18); padding-top: 8px; font-size: 15px; } .rv-desglose-t span:first-child { color: inherit; }
+.rv-desglose small { color: var(--faint); font-size: 12px; }

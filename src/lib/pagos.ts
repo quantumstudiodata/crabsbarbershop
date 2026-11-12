@@ -79,7 +79,7 @@ export async function comisionesStripe(barberiaId: string) {
   const [b] = await db.select({ cuenta: schema.barberias.stripeCuenta, zona: schema.barberias.zonaHoraria }).from(schema.barberias).where(eq(schema.barberias.id, barberiaId)).limit(1);
   if (!b?.cuenta) return;
   const pagos = await db.select({ id: pagosLinea.id, intento: pagosLinea.intento, pagadoEn: pagosLinea.pagadoEn, tipo: pagosLinea.tipo }).from(pagosLinea)
-    .where(and(eq(pagosLinea.barberiaId, barberiaId), inArray(pagosLinea.estado, ["pagado", "reembolsado"]), sql`${pagosLinea.intento} is not null`, sql`not (${pagosLinea.detalle} ? 'sinComision')`,
+    .where(and(eq(pagosLinea.barberiaId, barberiaId), inArray(pagosLinea.estado, ["pagado", "reembolsado"]), sql`${pagosLinea.intento} is not null`, sql`not (${pagosLinea.detalle} ? 'sinComision')`, sql`coalesce((${pagosLinea.detalle}->>'cargo')::int, 0) = 0`,
       sql`not exists (select 1 from ${schema.gastos} g where g.barberia_id = ${barberiaId} and g.categoria = ${CATEGORIA_COMISIONES} and g.descripcion like '%' || ${pagosLinea.intento} || '%')`)).limit(10);
   if (!pagos.length) return;
   const [titular] = await db.select({ id: schema.usuarios.id }).from(schema.usuarios)
@@ -173,9 +173,12 @@ export async function confirmarPago(pi: Stripe.PaymentIntent, cuenta: string) {
     return r ? { venta: r.folio } : { omitido: "repetido" };
   }
 
-  // Anticipo o pago completo de una cita reservada en línea.
+  // Anticipo o pago completo de una cita reservada en línea. Si el cliente pagó el cargo por pago en línea,
+  // a la cita solo cuenta lo del servicio: el cargo es lo que se queda Stripe.
+  const cargo = Number((p.detalle as { cargo?: number })?.cargo ?? 0);
+  const neto = Math.max(cobrado - cargo, 0);
   const r = await db.transaction(async (tx) => {
-    const marcado = await tx.update(pagosLinea).set({ estado: "pagado", pagadoEn: new Date(), tarjeta, monto: cobrado })
+    const marcado = await tx.update(pagosLinea).set({ estado: "pagado", pagadoEn: new Date(), tarjeta, monto: neto })
       .where(and(eq(pagosLinea.id, p.id), eq(pagosLinea.estado, "pendiente"))).returning({ id: pagosLinea.id });
     if (!marcado.length || !p.citaId) return null;
     const [c] = await tx.select().from(schema.citas).where(eq(schema.citas.id, p.citaId)).limit(1);
@@ -187,7 +190,7 @@ export async function confirmarPago(pi: Stripe.PaymentIntent, cuenta: string) {
           lt(schema.citas.inicio, c.fin), gt(schema.citas.fin, c.inicio), inArray(schema.citas.estado, [...ESTADOS_ACTIVOS])));
       if (c.estado === "cancelada" || choque.n > 0) return { reembolsar: true, c };
     }
-    const pagado = c.pagado + cobrado;
+    const pagado = c.pagado + neto;
     const [act] = await tx.update(schema.citas).set({
       estado: c.estado === "apartada" || c.estado === "expirada" ? "en_espera" : c.estado, expiraEn: null,
       pagado, estadoPago: pagado >= c.total ? "pagada" : "anticipo", metodoPago: tarjeta ? `En línea, ${tarjeta}` : "En línea", actualizadoEn: new Date(),

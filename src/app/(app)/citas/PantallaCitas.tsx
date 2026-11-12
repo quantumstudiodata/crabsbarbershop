@@ -244,22 +244,14 @@ function VistaDia({ citas, equipo, horario, dia, abrir }: { citas: CitaVista[]; 
   );
 }
 
-/** Citas que se cruzan en el tiempo van lado a lado, cada una en su carril, para que no se encimen. */
-function carriles(cs: CitaVista[]) {
+/** Citas que se cruzan en el tiempo: en la semana se juntan en un solo bloque legible en vez de columnas angostas. */
+function grupos(cs: CitaVista[]) {
   const xs = [...cs].sort((a, b) => aMin(a.hora) - aMin(b.hora));
-  const res = new Map<string, { carril: number; de: number }>();
-  let grupo: CitaVista[] = [], fins: number[] = [], finGrupo = -1;
-  const cerrar = () => { for (const c of grupo) res.set(c.id, { carril: res.get(c.id)!.carril, de: fins.length }); grupo = []; fins = []; };
+  const res: { ini: number; fin: number; citas: CitaVista[] }[] = [];
   for (const c of xs) {
-    const i = aMin(c.hora), f = i + c.duracion;
-    if (i >= finGrupo) { cerrar(); finGrupo = -1; }
-    let k = fins.findIndex((x) => x <= i);
-    if (k < 0) { k = fins.length; fins.push(f); } else fins[k] = f;
-    res.set(c.id, { carril: k, de: 0 });
-    grupo.push(c);
-    finGrupo = Math.max(finGrupo, f);
+    const i = aMin(c.hora), f = i + c.duracion, g = res[res.length - 1];
+    if (g && i < g.fin) { g.citas.push(c); g.fin = Math.max(g.fin, f); } else res.push({ ini: i, fin: f, citas: [c] });
   }
-  cerrar();
   return res;
 }
 
@@ -273,14 +265,23 @@ function VistaSemana({ citas, semana, horario, hoy, abrir, url }: { citas: CitaV
         <div className="cal-horas">{Array.from({ length: Math.floor((fin - ini) / 120) + 1 }, (_, i) => ini + i * 120).map((m) => <span key={m} style={{ top: (m - ini) * px }}>{aHora(m)}</span>)}</div>
         {semana.map((d) => (
           <div key={d} className="cal-col">
-            {(() => { const delDia = citas.filter((c) => c.fecha === d); const k = carriles(delDia); return delDia.map((c) => {
-              const { carril, de } = k.get(c.id)!;
+            {grupos(citas.filter((c) => c.fecha === d)).map((g) => {
+              const estilo = { top: (g.ini - ini) * px, height: Math.max((g.fin - g.ini) * px - 2, 24) };
+              if (g.citas.length === 1) {
+                const c = g.citas[0];
+                return (
+                  <button type="button" key={c.id} className={`blq-c mini e-${c.estado}`} style={estilo} onClick={() => abrir(c)} title={`${c.hora} ${c.cliente}, ${primer(c.barbero)}`}>
+                    <b>{c.hora} {c.cliente.split(" ").slice(0, 2).map((x, i) => (i ? `${x[0]}.` : x)).join(" ")}</b><small><i className="est-p" aria-hidden="true" />{ESTADO[c.estado] ?? c.estado}, {primer(c.barbero)}</small>
+                  </button>
+                );
+              }
               return (
-                <button type="button" key={c.id} className={`blq-c mini e-${c.estado} ${de > 1 ? "angosta" : ""}`} style={{ top: (aMin(c.hora) - ini) * px, height: Math.max(c.duracion * px - 2, 22), left: `calc(${(carril / de) * 100}% + 2px)`, width: `calc(${100 / de}% - 4px)`, right: "auto" }} onClick={() => abrir(c)} title={`${c.hora} ${c.cliente}, ${primer(c.barbero)}`}>
-                  <b>{c.hora} {de > 1 ? primer(c.cliente) : c.cliente.split(" ").slice(0, 2).map((x, i) => (i ? `${x[0]}.` : x)).join(" ")}</b><small><i className="est-p" aria-hidden="true" />{de > 1 ? primer(c.barbero) : `${ESTADO[c.estado] ?? c.estado}, ${primer(c.barbero)}`}</small>
-                </button>
+                <Link key={g.citas[0].id} href={url({ dia: d, vista: "calendario" })} className="blq-c mini blq-grupo" style={estilo} title={g.citas.map((c) => `${c.hora} ${c.cliente} con ${primer(c.barbero)}`).join("\n")}>
+                  <b>{aHora(g.ini)} <span className="blq-n">{g.citas.length} citas</span></b>
+                  {g.citas.slice(0, Math.max(1, Math.floor(estilo.height / 16) - 1)).map((c) => <small key={c.id}>{c.hora} {primer(c.cliente)}, {primer(c.barbero)}</small>)}
+                </Link>
               );
-            }); })()}
+            })}
           </div>
         ))}
       </div>

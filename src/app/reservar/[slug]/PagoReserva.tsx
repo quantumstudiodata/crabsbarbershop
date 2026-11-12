@@ -5,6 +5,7 @@ import { loadStripe, type Stripe } from "@stripe/stripe-js";
 import { useEffect, useMemo, useState } from "react";
 import { Icono } from "@/components/Icono";
 import { formatoDinero } from "@/lib/money";
+import { cargoEnLinea } from "@/lib/cargo";
 import { prepararPagoReserva } from "../actions";
 
 export type FormaPago = "anticipo" | "total" | "negocio";
@@ -25,7 +26,7 @@ export function PagoReserva(p: Props) {
   const promesa = useMemo<Promise<Stripe | null>>(() => loadStripe(p.enLinea.llave, { stripeAccount: p.enLinea.cuenta, locale: "es-419" }), [p.enLinea.llave, p.enLinea.cuenta]);
   const monto = p.forma === "total" ? p.total : p.anticipo;
   return (
-    <Elements stripe={promesa} options={{ mode: "payment", amount: Math.max(monto, 1000), currency: "mxn", appearance: apariencia }}>
+    <Elements stripe={promesa} options={{ mode: "payment", amount: Math.max(monto + cargoEnLinea(monto), 1000), currency: "mxn", appearance: apariencia }}>
       <Contenido {...p} monto={monto} />
     </Elements>
   );
@@ -38,7 +39,8 @@ function Contenido(p: Props & { monto: number }) {
   const [pagando, setPagando] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [ahora, setAhora] = useState(() => Date.now());
-  useEffect(() => { elements?.update({ amount: Math.max(p.monto, 1000) }); }, [elements, p.monto]);
+  const cargo = cargoEnLinea(p.monto);
+  useEffect(() => { elements?.update({ amount: Math.max(p.monto + cargo, 1000) }); }, [elements, p.monto, cargo]);
   useEffect(() => { if (!preparado) return; const t = setInterval(() => setAhora(Date.now()), 1000); return () => clearInterval(t); }, [preparado]);
   const restan = preparado ? Math.max(Math.floor((preparado.hasta - ahora) / 1000), 0) : 0;
   const opciones: [FormaPago, string, string][] = p.modo === "completo"
@@ -79,6 +81,14 @@ function Contenido(p: Props & { monto: number }) {
         ))}
       </div>
       {!enNegocio && (
+        <div className="rv-desglose">
+          <div className="entre"><span>{p.monto < p.total ? "Anticipo" : "Servicio"}</span><span>{formatoDinero(p.monto)}</span></div>
+          <div className="entre"><span>Cargo por pago en línea</span><span>{formatoDinero(cargo)}</span></div>
+          <div className="entre rv-desglose-t"><span>Pagas ahora</span><b>{formatoDinero(p.monto + cargo)}</b></div>
+          <small>El cargo es la comisión del banco por pagar con tarjeta. Si pagas en el negocio no se cobra.</small>
+        </div>
+      )}
+      {!enNegocio && (
         <div className="rv-stripe">
           <PaymentElement options={{ layout: "tabs" }} />
           <small className="rv-seguro"><Icono n="candado" />Pago seguro con Stripe. Nadie en el negocio ve ni guarda los datos de tu tarjeta.</small>
@@ -88,7 +98,7 @@ function Contenido(p: Props & { monto: number }) {
       {p.reembolso && <p className="rv-politica"><b>Reembolsos.</b> {p.reembolso}</p>}
       {error && <p className="aviso error" role="alert">{error}</p>}
       <footer className="rv-barra">
-        <span className="rv-sum"><b>{formatoDinero(enNegocio ? p.total : p.monto)}</b><small>{enNegocio ? "Pagas en el negocio" : p.monto < p.total ? `Anticipo de ${formatoDinero(p.total)}` : "Pago completo"}</small></span>
+        <span className="rv-sum"><b>{formatoDinero(enNegocio ? p.total : p.monto + cargo)}</b><small>{enNegocio ? "Pagas en el negocio" : p.monto < p.total ? `Anticipo con cargo en línea` : "Incluye cargo en línea"}</small></span>
         {enNegocio
           ? <button type="button" className="bt" onClick={p.enNegocio}>Continuar</button>
           : <button type="button" className="bt" disabled={!stripe || pagando} onClick={pagar}>{pagando ? "Pagando…" : "Pagar y confirmar"}</button>}

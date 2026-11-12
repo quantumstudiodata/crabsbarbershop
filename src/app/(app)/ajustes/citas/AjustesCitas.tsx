@@ -29,7 +29,7 @@ export function AjustesCitas(p: {
   const c = p.inicial.config;
   const base = () => ({
     usaCitas: p.inicial.usaCitas, enLinea: c.enLinea, slug: p.inicial.slug, horario: p.inicial.horario, diasCerrados: p.inicial.cerrados,
-    anticipacionMinHoras: String(c.anticipacionMinMin / 60), anticipacionMaxDias: String(c.anticipacionMaxDias), margenMin: String(c.margenMin), pasoMin: String(c.pasoMin),
+    anticipacionMinHoras: String(c.anticipacionMinMin / 60), anticipacionMaxDias: String(c.anticipacionMaxDias), margenMin: String(c.margenMin), pasoMin: "15",
     elegirBarbero: c.elegirBarbero, cualquierBarbero: c.cualquierBarbero, variosServicios: c.variosServicios,
     pagoModo: c.pago.modo, pagoValor: c.pago.modo === "anticipo_pct" || c.pago.modo === "anticipo_fijo" ? String(c.pago.valor / 100) : "",
     cancelarHorasAntes: String(c.cancelarHorasAntes), politicaCancelacion: c.politicaCancelacion, politicaReembolso: c.politicaReembolso,
@@ -81,12 +81,16 @@ export function AjustesCitas(p: {
               <Num etiqueta="Hasta" valor={d.anticipacionMaxDias} unidad="días hacia adelante" onChange={(v) => cambia({ anticipacionMaxDias: v })} />
             </section>
             <section className="glass ac-card">
-              <span className="lab">Espacio entre citas</span>
-              <label className="ac-fila"><span>Tiempo libre después de cada cita</span>
-                <Selector etiqueta="Tiempo libre después de cada cita" valor={d.margenMin} onChange={(v) => cambia({ margenMin: v })} opciones={["0", "10", "15", "30", "45", "60", "90"].map((v) => ({ valor: v, texto: v === "0" ? "Sin tiempo libre" : Number(v) >= 60 ? `${Number(v) / 60 === 1 ? "1 hora" : "1 hora 30 min"}` : `${v} min` }))} /></label>
-              <label className="ac-fila"><span>Ofrecer horarios cada</span>
-                <Selector etiqueta="Ofrecer horarios cada" valor={d.pasoMin} onChange={(v) => cambia({ pasoMin: v })} opciones={["15", "30", "45", "60", "90"].map((v) => ({ valor: v, texto: v === "60" ? "1 hora" : v === "90" ? "1 hora 30 min" : `${v} min` }))} /></label>
-              <small className="muted">Aplica a cada persona del equipo. Ejemplo: un corte de 30 min con 1 hora libre deja la siguiente cita 1 hora 30 min después.</small>
+              <span className="lab">Descanso entre clientes</span>
+              <div className="ac-chips" role="radiogroup" aria-label="Descanso entre clientes">
+                {(["0", "5", "10", "15", "20", "30"].includes(d.margenMin) ? ["0", "5", "10", "15", "20", "30"] : ["0", "5", "10", "15", "20", "30", d.margenMin]).map((v) => (
+                  <button type="button" key={v} role="radio" aria-checked={d.margenMin === v} className={d.margenMin === v ? "on" : ""} onClick={() => cambia({ margenMin: v, pasoMin: "15" })}>{v === "0" ? "Sin descanso" : `${v} min`}</button>
+                ))}
+              </div>
+              <p className="ac-ejemplo">
+                {d.margenMin === "0" ? "Si alguien termina un corte a las 10:30, su siguiente cita puede empezar a las 10:30." : `Si alguien termina un corte a las 10:30, su siguiente cita puede empezar a las ${(() => { const m = 630 + (Number(d.margenMin) || 0); return `${Math.floor(m / 60)}:${String(m % 60).padStart(2, "0")}`; })()}. Sirve para limpiar, cobrar y no hacer esperar al siguiente cliente.`}
+                {" "}Los horarios se ofrecen cada 15 minutos.
+              </p>
             </section>
             <section className="glass ac-card">
               <span className="lab">Cómo reservan</span>
