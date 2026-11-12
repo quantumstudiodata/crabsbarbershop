@@ -9,8 +9,10 @@ export default async function Entrar() {
   return (
     <main className="entrada">
       <div className="glass entrada-c">
-        {/* eslint-disable-next-line @next/next/no-img-element */}
-        <img className="entrada-logo" src="/logo-crabs.png" alt="Crabs Barbershop" width={946} height={209} />
+        <div className="marca">
+          {/* eslint-disable-next-line @next/next/no-img-element */}
+          <img className="marca-logo" src="/logo-crabs.png" alt="Crabs Barbershop" width={946} height={209} />
+        </div>
         <FormEntrar />
       </div>
     </main>

@@ -4550,3 +4550,85 @@ html, body { overscroll-behavior-y: none; }
   .fx-res li.ok i { background: var(--azul); }
   .fx-res-tot b { background: linear-gradient(90deg, #13171c, #4b6274); -webkit-background-clip: text; background-clip: text; color: transparent; }
 }
+/* Entrada: panel de cristal con el logo de letras */
+.marca-logo { position: relative; z-index: 1; width: clamp(180px, 20vw, 280px); height: auto; filter: drop-shadow(0 12px 16px rgba(20,35,50,.16)); animation: aparecer .6s ease both; }
+@media (max-width: 760px) { .marca { padding: calc(env(safe-area-inset-top, 0px) + 34px) 24px 28px; } .marca-logo { width: 150px; } .form-entrada { padding-top: 26px; } .form-entrada .titulo { font-size: 26px; } }
+/* Reservar v4: compacto, tipografía contenida, sin cajas genéricas */
+.fx-palabra { display: block; height: auto; }
+.fx-top { padding: 16px 0 2px; justify-content: center; }
+.fx-top .fx-palabra { width: 104px; }
+.fx-prog { padding: 10px 20px 10px; gap: 8px; }
+.fx-prog-t b { font-size: 12px; text-transform: uppercase; letter-spacing: .1em; color: var(--gris); font-weight: 600; }
+.fx-prog-t small { font-size: 11.5px; }
+.fx-prog-b { height: 2px; }
+.fx-cuerpo { gap: 16px; padding-top: 10px; }
+.fx-h { font-size: 21px; font-weight: 700; letter-spacing: -.02em; }
+.fx-h small { margin-top: 3px; font-size: 13px; }
+.fx-lab { font-size: 11px; font-weight: 600; text-transform: uppercase; letter-spacing: .1em; color: var(--tenue); }
+.fx-lista { margin-top: 0; }
+.fx-cat { display: block; padding: 14px 0 4px; font-size: 11px; font-weight: 600; text-transform: uppercase; letter-spacing: .1em; color: var(--tenue); animation: fx-sube .4s var(--ease) both; animation-delay: calc(var(--i, 0) * 30ms); }
+.fx-cat:first-child { padding-top: 0; }
+.fx-svc { padding: 10px 0; gap: 12px; border-bottom-color: rgba(19,23,28,.06); }
+.fx-svc-t b { font-size: 14.5px; font-weight: 500; } .fx-svc.on .fx-svc-t b { font-weight: 600; }
+.fx-svc-t small { font-size: 12px; }
+.fx-p { font-size: 14px; font-weight: 600; font-variant-numeric: tabular-nums; } .fx-p s { font-size: 11px; }
+.fx-promo { font-size: 10.5px; padding: 1px 7px; }
+.fx-add { width: 28px; height: 28px; background: transparent; }
+.fx-add .ic { width: 15px; height: 15px; }
+.fx-step { padding: 2px; } .fx-step button { width: 24px; height: 24px; } .fx-step b { font-size: 13px; min-width: 14px; }
+/* Barberos: filas con línea, sin tarjetas */
+.fx-barberos { gap: 0; }
+.fx-bb { padding: 10px 2px; border-radius: 0; background: none; box-shadow: none; border-bottom: 1px solid rgba(19,23,28,.06); gap: 12px; }
+.fx-bb > :first-child, .fx-bb .fx-libre { width: 40px !important; height: 40px !important; }
+.fx-bb b { font-size: 14.5px; font-weight: 500; } .fx-bb small { font-size: 12px; }
+.fx-bb:hover { transform: translateX(3px); background: none; }
+.fx-bb.on { background: none; box-shadow: none; } .fx-bb.on b { font-weight: 600; }
+.fx-bb.on > :first-child { box-shadow: 0 0 0 2px #e9edf1, 0 0 0 3.5px #13171c; }
+/* Calendario: números sueltos, el elegido en círculo */
+.fx-cal { padding: 0; background: none; box-shadow: none; gap: 8px; }
+.fx-cal-g { gap: 2px 0; }
+.fx-cd { aspect-ratio: auto; height: 42px; width: 42px; justify-self: center; border-radius: 50%; background: none; font: 500 14.5px var(--f-body); }
+.fx-cd em { top: -3px; font-size: 8px; }
+.fx-cd.hoy { box-shadow: none; font-weight: 700; }
+.fx-cd.hoy::after { content: ""; position: absolute; bottom: 5px; left: 50%; width: 4px; height: 4px; margin-left: -2px; border-radius: 50%; background: #4b6274; }
+.fx-cd:hover:not(:disabled):not(.on) { transform: none; background: rgba(19,23,28,.06); box-shadow: none; }
+.fx-cd.on { box-shadow: 0 6px 14px -8px rgba(19,23,28,.6); }
+.fx-cd.on::after { background: #fff; }
+.fx-cd:disabled { color: #c3cad0; }
+/* Horas: chips finos */
+.fx-hrs { grid-template-columns: repeat(4, minmax(0, 1fr)); gap: 6px; }
+.fx-hrs button { padding: 9px 0; border-radius: 999px; background: transparent; box-shadow: inset 0 0 0 1px rgba(19,23,28,.12); font: 500 13.5px var(--f-body); font-variant-numeric: tabular-nums; }
+.fx-hrs button:hover:not(.on) { background: rgba(255,255,255,.7); box-shadow: inset 0 0 0 1px rgba(19,23,28,.25); transform: none; }
+.fx-hrs button.on { font-weight: 600; }
+/* Datos */
+.fx-campos { gap: 14px; }
+.fx-campo span { font-size: 11px; text-transform: uppercase; letter-spacing: .1em; color: var(--tenue); }
+.fx-campo input { padding: 8px 0 10px; font-size: 16px; border-bottom-width: 1px; }
+/* Confirmar */
+.fx-when { padding: 12px 14px; border-radius: 18px; background: rgba(255,255,255,.55); box-shadow: inset 0 0 0 1px rgba(255,255,255,.9); }
+.fx-when-d { padding: 6px 10px; border-radius: 12px; } .fx-when-d b { font-size: 19px; } .fx-when-d small { font-size: 10px; }
+.fx-when-t b { font-size: 16px; } .fx-when-t small { font-size: 12px; }
+.fx-when button, .fx-tk button, .fx-res button { padding: 0; background: none; font-size: 12.5px; font-weight: 600; color: var(--gris); text-decoration: underline; text-underline-offset: 3px; text-decoration-color: rgba(19,23,28,.2); }
+.fx-when button:hover, .fx-tk button:hover, .fx-res button:hover { background: none; color: var(--tinta); transform: none; }
+.fx-tk > div { padding: 10px 0; font-size: 13.5px; grid-template-columns: 88px minmax(0,1fr) auto; }
+.fx-pago button { padding: 12px 14px; border-radius: 14px; background: transparent; box-shadow: inset 0 0 0 1px rgba(19,23,28,.12); }
+.fx-pago b { font-size: 14px; } .fx-pago small { font-size: 12px; }
+.fx-politica { font-size: 12px; }
+/* Barra inferior */
+.fx-barra > div { padding: 6px; border-radius: 20px; }
+.fx-atras { width: 40px; height: 40px; border-radius: 14px; }
+.fx-barra-t b { font-size: 15px; } .fx-barra-t small { font-size: 11.5px; }
+.fx-go { padding: 11px 14px 11px 18px; border-radius: 15px; font-size: 14px; }
+.fx-cargando i { height: 36px; border-radius: 999px; }
+@media (min-width: 960px) {
+  .fx-panel { padding: 32px 28px; }
+  .fx-marca { gap: 8px; } .fx-marca .fx-palabra { width: 150px; } .fx-marca small { font-size: 13px; }
+  .fx-res li { padding: 11px 0; } .fx-res b { font-size: 14px; } .fx-res-tot b { font-size: 28px; }
+  .fx-main { padding: 0 48px 120px; max-width: 760px; }
+  .fx-prog { padding: 26px 0 12px; }
+  .fx-h { font-size: 24px; }
+  .fx-lista { grid-template-columns: 1fr; }
+  .fx-hrs { grid-template-columns: repeat(6, minmax(0, 1fr)); }
+  .fx-cal { max-width: 380px; }
+  .fx-barberos { grid-template-columns: 1fr; max-width: 520px; }
+}

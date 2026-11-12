@@ -1,7 +1,7 @@
 "use client";
 
 import { useRouter } from "next/navigation";
-import { useEffect, useMemo, useRef, useState, useTransition } from "react";
+import { Fragment, useEffect, useMemo, useRef, useState, useTransition } from "react";
 import { Avatar } from "@/components/Avatar";
 import { Icono } from "@/components/Icono";
 import { aHora, montoAPagar, type ConfigCitas } from "@/lib/agenda";
@@ -159,7 +159,7 @@ export function Reservar(p: {
   return (
     <div className="fx">
       <aside className="fx-panel" aria-label="Tu cita">
-        <div className="fx-marca"><img className="fx-logo-img" src="/icono-192.png" alt="" width={48} height={48} /><span><b>{p.negocio}</b><small>Reserva tu cita en menos de un minuto</small></span></div>
+        <div className="fx-marca"><img className="fx-palabra" src="/logo-crabs.png" alt={p.negocio} width={946} height={209} /><small>Reserva tu cita en menos de un minuto</small></div>
         <ol className="fx-res">
           {resumen.map((r) => (
             <li key={r.k} className={r.v ? "ok" : ""}><i aria-hidden="true">{r.v ? <Icono n="palomita" /> : <Icono n="mas" />}</i><span><small>{r.t}</small><b>{r.v || "Falta"}</b></span>
@@ -171,7 +171,7 @@ export function Reservar(p: {
 
       <main className="fx-main">
         {p.regreso && <a href={p.regreso.href} className="fx-regreso"><Icono n="izquierda" />{p.regreso.texto}</a>}
-        <header className="fx-top"><img className="fx-logo-img" src="/icono-192.png" alt="" width={40} height={40} /><span><b>{p.negocio}</b><small>Reserva en línea</small></span></header>
+        <header className="fx-top"><img className="fx-palabra" src="/logo-crabs.png" alt={p.negocio} width={946} height={209} /></header>
         <div className="fx-prog" aria-label={`Paso ${paso + 1} de ${PASOS.length}`}>
           <span className="fx-prog-t"><b>{PASOS[paso]}</b><small>Paso {paso + 1 - (saltaBarbero && paso > 1 ? 1 : 0)} de {PASOS.length - (saltaBarbero ? 1 : 0)}</small></span>
           <span className="fx-prog-b"><i style={{ width: `${((paso + 1) / PASOS.length) * 100}%` }} /></span>
@@ -181,16 +181,14 @@ export function Reservar(p: {
           {paso === 0 && (
             <>
               <h1 className="fx-h">¿Qué te hacemos hoy?<small>{p.opciones.varios ? "Agrega uno o varios; puedes repetir un servicio" : "Elige un servicio"}</small></h1>
-              {cats.length > 1 && (
-                <div className="fx-cats" role="tablist" aria-label="Categorías">
-                  {["", ...cats].map((c) => <button type="button" role="tab" key={c || "todos"} aria-selected={cat === c} className={cat === c ? "on" : ""} onClick={() => setCat(c)}>{c || "Todos"}</button>)}
-                </div>
-              )}
-              <div className="fx-lista" key={cat}>
+              <div className="fx-lista">
                 {visibles.map((s, i) => {
+                  const nuevaCat = cats.length > 1 && (i === 0 || visibles[i - 1].categoria !== s.categoria);
                   const n = svc.filter((x) => x === s.id).length;
                   return (
-                    <div key={s.id} className={`fx-svc ${n ? "on" : ""}`} style={{ ["--i" as string]: i }}>
+                    <Fragment key={s.id}>
+                    {nuevaCat && <span className="fx-cat" style={{ ["--i" as string]: i }}>{s.categoria}</span>}
+                    <div className={`fx-svc ${n ? "on" : ""}`} style={{ ["--i" as string]: i }}>
                       <button type="button" className="fx-svc-t" onClick={() => tocar(s.id)} aria-pressed={n > 0}><b>{s.nombre}{s.promo && <em className="fx-promo">{s.promo.nombre}</em>}</b><small>{s.duracionMin} min{s.descripcion ? `, ${s.descripcion}` : ""}</small></button>
                       <span className="fx-p">{s.promo && <s>{formatoDinero(s.precio)}</s>}{formatoDinero(s.promo?.precio ?? s.precio)}</span>
                       {n && p.opciones.varios ? (
@@ -201,6 +199,7 @@ export function Reservar(p: {
                         </span>
                       ) : <button type="button" className="fx-add" onClick={() => tocar(s.id)} aria-label={`Agregar ${s.nombre}`}><Icono n={n ? "palomita" : "mas"} /></button>}
                     </div>
+                    </Fragment>
                   );
                 })}
               </div>
