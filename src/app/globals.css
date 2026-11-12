@@ -2646,7 +2646,7 @@ html:has(.capa) body, html:has(.velo-c) body, html:has(.velo-hoja) body, html:ha
 .rv-tit small { color: var(--muted); font-size: 12.5px; }
 .rv-progreso { height: 4px; border-radius: 99px; background: rgba(43,58,71,.1); overflow: hidden; }
 .rv-progreso i { display: block; height: 100%; background: linear-gradient(90deg, var(--cafe), #141a20); border-radius: inherit; transition: width .35s ease; }
-.rv-cuerpo { display: grid; gap: 12px; animation: subir .25s ease both; }
+.rv-cuerpo { display: grid; gap: 12px; animation: aparecer .25s ease both; }
 .rv-cuerpo h1 { margin: 6px 0 0; font-size: 24px; font-weight: 700; letter-spacing: -.01em; }
 .rv-cuerpo > .muted { margin: -6px 0 0; font-size: 13.5px; }
 .rv-grupo { display: grid; gap: 6px; }
