@@ -10,6 +10,7 @@ import { Avatar } from "./Avatar";
 import { Fl, Icono } from "./Icono";
 import { Modal } from "./ui";
 import { abrirPanel } from "./BarraMovil";
+import { abrirTutorial } from "./Consejos";
 
 export function MenuUsuario(p: {
   nombre: string; usuario: string; rol: string; avatar: string; ajustes: boolean; historial: boolean; formaPago: string | null;
@@ -60,6 +61,7 @@ export function MenuUsuario(p: {
           {p.mas?.extra.map((i) => <Link key={i.href} role="menuitem" className="it solo-m-u" href={i.href} onClick={() => setAbierto(false)}><Icono n={i.icono} />{i.texto}</Link>)}
           {p.mas?.soporte && <Link role="menuitem" className="it solo-m-u" href="/soporte" onClick={() => setAbierto(false)}><Icono n="llave" />Soporte</Link>}
           {p.mas?.ideas && <button type="button" role="menuitem" className="it" onClick={() => { setAbierto(false); abrirPanel("ideas"); }}><Icono n="chispa" />Ideas</button>}
+          <button type="button" role="menuitem" className="it" onClick={() => { setAbierto(false); abrirTutorial(); }}><Icono n="chispa" />Ver tutorial</button>
           {p.mas?.ayuda && <button type="button" role="menuitem" className="it" onClick={() => { setAbierto(false); abrirPanel("ayuda"); }}><Icono n="ayuda" />Ayuda</button>}
           <div className="separador" style={{ margin: "4px 0" }} />
           <form action={salir}><button role="menuitem" className="it salir"><Icono n="salir" />Salir</button></form>

@@ -4830,3 +4830,16 @@ html, body { overscroll-behavior-y: none; }
 @media (prefers-reduced-motion: reduce) { .tour-linea path, .tour-num { animation: none !important; } }
 .tour-i { color: #fff; }
 .tour-num { right: 58px; top: 10px; font-size: 58px; }
+/* Recorrido: tarjeta más compacta */
+.tour-globo { gap: 8px; padding: 14px 14px 12px; border-radius: 20px; }
+.tour-cab { gap: 10px; }
+.tour-i { width: 32px; height: 32px; border-radius: 10px; } .tour-i .ic { width: 16px; height: 16px; }
+.tour-t small { font-size: 9.5px; } .tour-t b { font-size: 14.5px; }
+.tour-x { width: 26px; height: 26px; } .tour-x .ic { width: 12px; height: 12px; }
+.tour-globo p { font-size: 12.5px; line-height: 1.45; }
+.tour-num { right: 44px; top: 8px; font-size: 40px; }
+.tour-pie { gap: 4px; padding-top: 0; }
+.tour-atras, .tour-omitir { padding: 6px 8px; font-size: 12px; }
+.tour-sig { gap: 8px; padding: 4px 4px 4px 12px; font-size: 12.5px; }
+.tour-sig-c { width: 24px; height: 24px; } .tour-sig .ic { width: 12px; height: 12px; }
+@media (min-width: 561px) { .tour-globo { width: 300px !important; } }
