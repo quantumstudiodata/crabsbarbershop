@@ -104,7 +104,18 @@ async function accionesDe(s: Sesion, turno: Turno | null | undefined, hoy: strin
     ? [...disponibles].sort((a, b) => { const ia = pref.orden.indexOf(a.k), ib = pref.orden.indexOf(b.k); return (ia < 0 ? 100 + rango(a.k) : ia) - (ib < 0 ? 100 + rango(b.k) : ib); })
     : disponibles;
   const ocultas = new Set(pref?.ocultas ?? []);
-  return { visibles: ordenadas.filter((x) => !ocultas.has(x.k)), todas: ordenadas.map((x) => ({ k: x.k, texto: x.texto, icono: x.icono, oculta: ocultas.has(x.k), fija: x.k === "cobrar" })), sugerido: disponibles.map((x) => x.k) };
+  // Citas que llegaron por la página de reservaciones o ya se pagaron: van primero mientras haya alguna por venir.
+  const reservadas = s.barberia.usaCitas && s.puede("citas.ver") ? await db.select({ inicio: schema.citas.inicio, pagado: schema.citas.pagado })
+    .from(schema.citas).where(and(eq(schema.citas.barberiaId, s.barberia.id), gt(schema.citas.inicio, new Date()), eq(schema.citas.estado, "en_espera"),
+      or(eq(schema.citas.origen, "linea"), gt(schema.citas.pagado, 0)), ...(barbero ? [eq(schema.citas.barberoId, yo)] : [])))
+    .orderBy(asc(schema.citas.inicio)).limit(50) : [];
+  const nPagadas = reservadas.filter((x) => x.pagado > 0).length;
+  const fija: AccionInicio[] = reservadas.length ? [{
+    k: "reservadas", href: `/citas?vista=lista&dia=${fechaLocal(reservadas[0].inicio, zona)}`, icono: "calendario",
+    texto: nPagadas ? "Citas reservadas y pagadas" : "Citas reservadas en línea", corto: "Reservadas",
+    dato: [`${reservadas.length} ${reservadas.length === 1 ? "próxima" : "próximas"}`, nPagadas ? `${nPagadas} ${nPagadas === 1 ? "pagada" : "pagadas"}` : ""].filter(Boolean).join(", "),
+  }] : [];
+  return { visibles: [...fija, ...ordenadas.filter((x) => !ocultas.has(x.k))], todas: ordenadas.map((x) => ({ k: x.k, texto: x.texto, icono: x.icono, oculta: ocultas.has(x.k), fija: x.k === "cobrar" })), sugerido: disponibles.map((x) => x.k) };
 }
 
 type Vista = {
