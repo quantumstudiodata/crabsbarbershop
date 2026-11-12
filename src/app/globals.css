@@ -4843,3 +4843,14 @@ html, body { overscroll-behavior-y: none; }
 .tour-sig { gap: 8px; padding: 4px 4px 4px 12px; font-size: 12.5px; }
 .tour-sig-c { width: 24px; height: 24px; } .tour-sig .ic { width: 12px; height: 12px; }
 @media (min-width: 561px) { .tour-globo { width: 300px !important; } }
+@media (max-width: 560px) {
+  .tour-globo { width: min(290px, calc(100vw - 32px)) !important; gap: 6px; padding: 12px 12px 10px; border-radius: 18px; }
+  .tour-num { display: none; }
+  .tour-cab { gap: 8px; }
+  .tour-i { width: 28px; height: 28px; border-radius: 9px; } .tour-i .ic { width: 14px; height: 14px; }
+  .tour-t small { font-size: 9px; } .tour-t b { font-size: 13.5px; }
+  .tour-x { width: 24px; height: 24px; }
+  .tour-globo p { font-size: 12px; line-height: 1.4; }
+  .tour-atras, .tour-omitir { padding: 5px 6px; font-size: 11.5px; }
+  .tour-sig { font-size: 12px; padding: 3px 3px 3px 10px; } .tour-sig-c { width: 22px; height: 22px; }
+}

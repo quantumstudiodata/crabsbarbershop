@@ -122,8 +122,8 @@ export function Consejos({ vistos }: { vistos: string[] }) {
   const ancho = typeof window === "undefined" ? 400 : window.innerWidth;
   const abajo = caja.y + caja.h + 230 < alto || caja.y < 250;
   const GAP = 34;
-  const anchoG = ancho < 560 ? ancho - 24 : 300;
-  const globoX = ancho < 560 ? 12 : Math.min(Math.max(caja.x, 12), ancho - anchoG - 12);
+  const anchoG = ancho < 560 ? Math.min(290, ancho - 32) : 300;
+  const globoX = Math.min(Math.max(caja.x + (ancho < 560 ? 4 : 0), 16), ancho - anchoG - 16);
   const flechaX = Math.min(Math.max(caja.x + Math.min(caja.w / 2, 60) - globoX, 22), anchoG - 30);
   const ultimo = i === pasos.length - 1;
   return (
