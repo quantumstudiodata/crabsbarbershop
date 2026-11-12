@@ -1,7 +1,7 @@
 "use client";
 
 import { useRouter } from "next/navigation";
-import { Fragment, useEffect, useMemo, useRef, useState, useTransition } from "react";
+import { useEffect, useMemo, useRef, useState, useTransition } from "react";
 import { Avatar } from "@/components/Avatar";
 import { Icono } from "@/components/Icono";
 import { aHora, montoAPagar, type ConfigCitas } from "@/lib/agenda";
@@ -182,26 +182,32 @@ export function Reservar(p: {
             <>
               <h1 className="fx-h">¿Qué te hacemos hoy?<small>{p.opciones.varios ? "Agrega uno o varios; puedes repetir un servicio" : "Elige un servicio"}</small></h1>
               <div className="fx-lista">
-                {visibles.map((s, i) => {
-                  const nuevaCat = cats.length > 1 && (i === 0 || visibles[i - 1].categoria !== s.categoria);
-                  const n = svc.filter((x) => x === s.id).length;
-                  return (
-                    <Fragment key={s.id}>
-                    {nuevaCat && <span className="fx-cat" style={{ ["--i" as string]: i }}>{s.categoria}</span>}
-                    <div className={`fx-svc ${n ? "on" : ""}`} style={{ ["--i" as string]: i }}>
-                      <button type="button" className="fx-svc-t" onClick={() => tocar(s.id)} aria-pressed={n > 0}><b>{s.nombre}{s.promo && <em className="fx-promo">{s.promo.nombre}</em>}</b><small>{s.duracionMin} min{s.descripcion ? `, ${s.descripcion}` : ""}</small></button>
-                      <span className="fx-p">{s.promo && <s>{formatoDinero(s.precio)}</s>}{formatoDinero(s.promo?.precio ?? s.precio)}</span>
-                      {n && p.opciones.varios ? (
-                        <span className="fx-step">
-                          <button type="button" onClick={() => menos(s.id)} aria-label={`Quitar uno de ${s.nombre}`}><Icono n="minimizar" /></button>
-                          <b key={n}>{n}</b>
-                          <button type="button" onClick={() => mas(s.id)} disabled={svc.length >= 6} aria-label={`Agregar otro ${s.nombre}`}><Icono n="mas" /></button>
-                        </span>
-                      ) : <button type="button" className="fx-add" onClick={() => tocar(s.id)} aria-label={`Agregar ${s.nombre}`}><Icono n={n ? "palomita" : "mas"} /></button>}
+                {cats.map((c, ci) => (
+                  <section key={c} className="fx-grupo" style={{ ["--i" as string]: ci }}>
+                    {cats.length > 1 && <span className="fx-cat">{c}</span>}
+                    <div className="fx-grupo-c">
+                      {visibles.filter((s) => s.categoria === c).map((s, i) => {
+                        const n = svc.filter((x) => x === s.id).length;
+                        return (
+                          <div key={s.id} className={`fx-svc ${n ? "on" : ""}`} style={{ ["--i" as string]: i }}>
+                            <button type="button" className="fx-svc-t" onClick={() => tocar(s.id)} aria-pressed={n > 0}>
+                              <b>{s.nombre}</b>
+                              <small><span className="fx-dur"><Icono n="reloj" />{s.duracionMin} min</span>{s.promo && <em className="fx-promo"><Icono n="etiqueta" />{s.promo.nombre}</em>}</small>
+                            </button>
+                            <span className="fx-p">{s.promo && <s>{formatoDinero(s.precio)}</s>}{formatoDinero(s.promo?.precio ?? s.precio)}</span>
+                            {n && p.opciones.varios ? (
+                              <span className="fx-step">
+                                <button type="button" onClick={() => menos(s.id)} aria-label={`Quitar uno de ${s.nombre}`}><Icono n="minimizar" /></button>
+                                <b key={n}>{n}</b>
+                                <button type="button" onClick={() => mas(s.id)} disabled={svc.length >= 6} aria-label={`Agregar otro ${s.nombre}`}><Icono n="mas" /></button>
+                              </span>
+                            ) : <button type="button" className="fx-add" onClick={() => tocar(s.id)} aria-label={`Agregar ${s.nombre}`}><Icono n={n ? "palomita" : "mas"} /></button>}
+                          </div>
+                        );
+                      })}
                     </div>
-                    </Fragment>
-                  );
-                })}
+                  </section>
+                ))}
               </div>
             </>
           )}
