@@ -15,6 +15,7 @@ import { Campana } from "@/components/Campana";
 import { Icono } from "@/components/Icono";
 import { PanelIdeas } from "@/components/PanelIdeas";
 import { VentanaVivo } from "@/components/VentanaVivo";
+import { AvisoPagoLinea } from "@/components/AvisoPagoLinea";
 import { requerirSesion } from "@/lib/auth";
 import { describirRegla, elegirRegla } from "@/lib/comisiones";
 import { copiaRegla, reglasDe } from "@/lib/datos";
@@ -78,6 +79,7 @@ export default async function LayoutApp({ children }: { children: React.ReactNod
         ideas: s.puede("ideas.decidir"), ayuda: !soporte, soporte: soporte && !s.vista,
       }} />
       <VentanaVivo />
+      {s.barberia.usaCitas && s.puede("citas.ver") && <AvisoPagoLinea />}
     </>
   );
 }

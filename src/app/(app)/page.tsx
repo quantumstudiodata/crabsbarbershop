@@ -19,6 +19,8 @@ import { AvisoCajaEmergente } from "./AvisoCaja";
 import { RefrescarConVentas } from "./RefrescarConVentas";
 import { UltimosServicios, type FilaUltimo } from "./UltimosServicios";
 import { verificadosDe, type Verificado } from "@/lib/pagos";
+import { Pendientes } from "./Pendientes";
+import { pendientesDe, type Pendiente } from "./pendientes";
 
 type Q = { aviso?: string; error?: string };
 type Sesion = Awaited<ReturnType<typeof requerirSesion>>;
@@ -124,6 +126,7 @@ type Vista = {
   total: number; servicios: number; clientes: number; previo: number; movs: Movimiento[];
   meta: { monto: number; ayuda?: string; nota?: string } | null;
   citas: Awaited<ReturnType<typeof porLlegar>>;
+  pendientes: Pendiente[];
   equipo: { id: string; nombre: string; avatar: string; monto: number; servicios: number; meta?: number }[];
   ultimos: FilaUltimo[]; verMas: { href: string; texto: string } | null; verVentas: boolean;
 };
@@ -164,6 +167,7 @@ function InicioVista(v: Vista) {
         </div>
         {barra}
       </section>
+      <Pendientes items={v.pendientes} className="solo-movil subir d2" />
       <AccionesMovil acciones={v.acciones.visibles} personalizar={v.acciones} />
       {siguiente && (
         <section className="glass ini-sig solo-movil subir d2">
@@ -201,6 +205,7 @@ function InicioVista(v: Vista) {
           {v.verMas && <Link className="ini-link" href={v.verMas.href}>{v.verMas.texto}</Link>}
         </section>
         <div className={`ini-der ${v.citas ? "con-citas" : ""}`}>
+          <Pendientes items={v.pendientes} className="subir d2" />
           {v.citas && (
             <section className="glass ini-card subir d2">
               <div className="entre"><span className="lab">{v.barbero ? "Tus próximas citas" : "Próximas citas"}</span><Link className="ini-link" href={v.barbero ? `/citas?persona=${s.usuario.id}` : "/citas"}>Agenda</Link></div>
@@ -256,6 +261,7 @@ export default async function Inicio({ searchParams }: { searchParams: Promise<Q
     equipoQueAtiende(s.barberia.id),
     porLlegar(s, hoy, zona),
   ]);
+  const pendientes = await pendientesDe(s, hoy, zona);
   const pagadas = ventas.filter((v) => v.estado === "pagada");
   const deHoy = pagadas.filter((v) => v.fecha === hoy);
   const total = deHoy.reduce((a, v) => a + v.total, 0);
@@ -276,7 +282,7 @@ export default async function Inicio({ searchParams }: { searchParams: Promise<Q
     <InicioVista s={s} hoy={hoy} zona={zona} avisos={avisos} acciones={acciones} barbero={false}
       total={total} servicios={conceptos.length} clientes={deHoy.length} previo={previo}
       movs={pagadas.map((v) => ({ creadoEn: v.creadoEn, fecha: v.fecha, monto: v.total }))}
-      meta={meta} citas={citas} equipo={filasEq}
+      meta={meta} citas={citas} equipo={filasEq} pendientes={pendientes}
       ultimos={filasUltimos(ventas.slice(0, 5), equipo, hoy, zona, await verificadosDe(ventas.slice(0, 5).map((v) => v.id)))}
       verMas={{ href: "/analitica", texto: "Ver semana y mes en Analítica" }} verVentas={s.puede("ventas.ver_todas")} />
   );
@@ -291,6 +297,7 @@ async function InicioBarbero({ s, hoy, zona, turno, avisos }: { s: Sesion; hoy: 
     equipoQueAtiende(s.barberia.id),
     porLlegar(s, hoy, zona, yo),
   ]);
+  const pendientes = await pendientesDe(s, hoy, zona, yo);
   const pagadas = todas.filter((v) => v.estado === "pagada");
   const mios = pagadas.flatMap((v) => v.conceptos.filter((c) => c.barberoId === yo).map((c) => ({ ...c, fecha: v.fecha, creadoEn: v.creadoEn })));
   const deHoy = mios.filter((c) => c.fecha === hoy);
@@ -317,7 +324,7 @@ async function InicioBarbero({ s, hoy, zona, turno, avisos }: { s: Sesion; hoy: 
       total={total} servicios={deHoy.length} clientes={clientesHoy} previo={previo}
       movs={mios.map((c) => ({ creadoEn: c.creadoEn, fecha: c.fecha, monto: c.precioCobrado }))}
       meta={s.barberia.usaMetas ? { monto: Math.max(metaHoy, 1), ayuda: mia?.aplica ? "Sale de la meta mensual del negocio y de tu forma de pago." : "Refleja tu meta de ventas y cuánto llevas de ella." } : null}
-      citas={citas} equipo={filasEq}
+      citas={citas} equipo={filasEq} pendientes={pendientes}
       ultimos={filasUltimos(todas.slice(0, 5), gente, hoy, zona, await verificadosDe(todas.slice(0, 5).map((v) => v.id)))}
       verMas={{ href: "/analitica/ventas", texto: "Ver tu semana y mes en Ventas" }} verVentas />
   );

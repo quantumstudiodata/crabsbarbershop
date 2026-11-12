@@ -12,6 +12,7 @@ import { registrar } from "@/lib/historial";
 import { leerPesos } from "@/lib/money";
 
 export type Res = { error?: string; mensaje?: string; id?: string };
+export type CitaLista = Res & { folio?: string; enlace?: string; con?: string; total?: number; negocio?: string };
 const FECHA = /^\d{4}-\d{2}-\d{2}$/;
 const HORA = /^([01]\d|2[0-3]):[0-5]\d$/;
 
@@ -33,7 +34,7 @@ export async function horariosCita(id: string, fecha: string, persona: string) {
   return disponibilidadDia(s.barberia, fecha, c.duracion, persona || null, db, { ignorarCita: id, sinAnticipacion: true });
 }
 
-export async function agendarCita(d: { servicioIds: string[]; persona: string | null; fecha: string; minuto: number; nombre: string; telefono: string; observaciones: string }): Promise<Res> {
+export async function agendarCita(d: { servicioIds: string[]; persona: string | null; fecha: string; minuto: number; nombre: string; telefono: string; observaciones: string }): Promise<CitaLista> {
   const s = await requerirSesion("citas.modificar");
   if (s.vista) return { error: "En la vista previa no se guardan cambios." };
   const nombre = String(d.nombre ?? "").trim().slice(0, 80);
@@ -46,7 +47,8 @@ export async function agendarCita(d: { servicioIds: string[]; persona: string | 
   if ("error" in r) return { error: r.error };
   await registrar(db, { barberiaId: s.barberia.id, usuarioId: s.usuario.id, tipo: "venta", accion: `${s.usuario.nombre} agendó la cita ${r.cita.folio} de ${nombre}` });
   revalidatePath("/citas");
-  return { mensaje: "Cita agendada.", id: r.cita.id };
+  const [con] = await db.select({ nombre: schema.usuarios.nombre }).from(schema.usuarios).where(eq(schema.usuarios.id, r.cita.barberoId)).limit(1);
+  return { mensaje: "Cita agendada.", id: r.cita.id, folio: r.cita.folio, enlace: s.barberia.slug ? `/reservar/${s.barberia.slug}/cita/${r.cita.token}` : "", con: con?.nombre.split(" ")[0] ?? "", total: r.cita.total, negocio: s.barberia.nombre };
 }
 
 const SIGUIENTE: Record<string, string[]> = {

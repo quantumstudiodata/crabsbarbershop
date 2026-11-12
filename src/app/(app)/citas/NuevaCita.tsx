@@ -5,7 +5,7 @@ import { createPortal } from "react-dom";
 import { Icono } from "@/components/Icono";
 import { aHora, type Horario } from "@/lib/agenda";
 import { formatoDinero } from "@/lib/money";
-import { agendarCita, horariosAgenda, type Res } from "./actions";
+import { agendarCita, horariosAgenda, type CitaLista, type Res } from "./actions";
 import { CampoFecha } from "@/components/Calendario";
 
 type Persona = { id: string; nombre: string };
@@ -49,6 +49,8 @@ export function NuevaCita({ equipo, servicios, dia, hoy, horario, cerrados, cerr
   const [obs, setObs] = useState("");
   const [error, setError] = useState<string | null>(null);
   const [pend, iniciar] = useTransition();
+  const [listo, setListo] = useState<CitaLista | null>(null);
+  const [copiado, setCopiado] = useState(false);
   const [montado, setMontado] = useState(false);
   const ref = useRef<HTMLDivElement>(null);
   const id = useId();
@@ -84,7 +86,9 @@ export function NuevaCita({ equipo, servicios, dia, hoy, horario, cerrados, cerr
   const grupos = ([["m", "Mañana", 0, 720], ["t", "Tarde", 720, 1080], ["n", "Noche", 1080, 1440]] as const)
     .map(([k, t, a, b]) => ({ k, t, xs: (libres ?? []).filter((x) => x.minuto >= a && x.minuto < b) })).filter((g) => g.xs.length);
   const tramoV = grupos.some((g) => g.k === tramo) ? tramo : grupos.find((g) => minuto !== null && g.xs.some((x) => x.minuto === minuto))?.k ?? grupos[0]?.k;
-  const sel = servicios.filter((s) => elegidos.includes(s.id));
+  const sel = elegidos.map((id) => servicios.find((s) => s.id === id)).filter(Boolean) as Servicio[];
+  const mas = (id: string) => setElegidos((xs) => (xs.length >= 6 ? xs : [...xs, id]));
+  const menos = (id: string) => setElegidos((xs) => { const i = xs.lastIndexOf(id); return i < 0 ? xs : [...xs.slice(0, i), ...xs.slice(i + 1)]; });
   const total = sel.reduce((a, s) => a + s.precio, 0);
   const duracion = sel.reduce((a, s) => a + s.duracionMin, 0);
   const cats = [...new Set(servicios.map((s) => s.categoria))];
@@ -99,11 +103,50 @@ export function NuevaCita({ equipo, servicios, dia, hoy, horario, cerrados, cerr
     if (nombre.trim().length < 2) { setError("Escribe el nombre del cliente."); return; }
     iniciar(async () => {
       const r = await agendarCita({ servicioIds: elegidos, persona: persona || null, fecha, minuto: minuto!, nombre, telefono: tel, observaciones: obs });
-      if (r.error) setError(r.error); else { avisar(r); cerrar(); }
+      if (r.error) setError(r.error); else { avisar({ mensaje: r.mensaje }); setListo(r); }
     });
   };
 
   if (!montado) return null;
+  if (listo) {
+    const url = listo.enlace ? `${window.location.origin}${listo.enlace}` : "";
+    const hora = minuto === null ? "" : aHora(minuto);
+    const servicioTxt = lista([...new Set(sel.map((s) => s.nombre))].map((n) => { const k = sel.filter((s) => s.nombre === n).length; return k > 1 ? `${n} x${k}` : n; }));
+    const con = listo.con || quien;
+    const msg = `Hola ${primer(nombre.trim())}, tu cita en ${listo.negocio} quedó para el ${DIAS_L[dow(fecha)].toLowerCase()} ${Number(fecha.slice(8))} a las ${hora} con ${con} (${servicioTxt}, ${formatoDinero(listo.total ?? total)}).${url ? ` Aquí puedes verla, cambiarla o cancelarla: ${url}` : ""}`;
+    const d = tel.replace(/\D/g, "");
+    const wa = `https://wa.me/${d.length === 10 ? `52${d}` : d}?text=${encodeURIComponent(msg)}`;
+    return createPortal(
+      <div className="capa nc-capa">
+        <div ref={ref} className="nc nc-listo" role="dialog" aria-modal="true" aria-labelledby={id}>
+          <div className="nc-cab">
+            <span className="nc-asa" aria-hidden="true" />
+            <div className="entre">
+              <span className="nc-ok"><span className="nc-ok-i" aria-hidden="true"><Icono n="palomita" /></span><span><h2 id={id} tabIndex={-1}>Cita agendada</h2><small>Folio {listo.folio}</small></span></span>
+              <button type="button" className="icb cerrar-x" onClick={cerrar} aria-label="Cerrar"><Icono n="cerrar" /></button>
+            </div>
+          </div>
+          <div className="nc-cuerpo">
+            <div className="nc-ticket">
+              <div><span>Cliente</span><b>{nombre.trim()}</b></div>
+              <div><span>Cuándo</span><b>{cuandoCorto}</b></div>
+              <div><span>Con</span><b>{con}</b></div>
+              <div><span>Servicio</span><b>{servicioTxt}</b></div>
+              <div><span>Total</span><b className="num nc-tt">{formatoDinero(listo.total ?? total)}</b></div>
+            </div>
+            <span className="lab">Mensaje para el cliente</span>
+            <p className="nc-msg">{msg}</p>
+          </div>
+          <div className="nc-acc">
+            <a className="bt nc-wa" href={wa} target="_blank" rel="noreferrer" onClick={() => setTimeout(cerrar, 300)}>Enviar por WhatsApp</a>
+            {url && <button type="button" className="bt sec" onClick={async () => { try { await navigator.clipboard.writeText(msg); setCopiado(true); setTimeout(() => setCopiado(false), 1800); } catch { /* sin portapapeles */ } }}>{copiado ? "Copiado" : "Copiar mensaje"}</button>}
+            {url && <a className="bt sec" href={url} target="_blank" rel="noreferrer">Ver como cliente</a>}
+          </div>
+        </div>
+      </div>,
+      document.body,
+    );
+  }
   return createPortal(
     <div className="capa nc-capa">
       <div ref={ref} className="nc" role="dialog" aria-modal="true" aria-labelledby={id}>
@@ -119,16 +162,24 @@ export function NuevaCita({ equipo, servicios, dia, hoy, horario, cerrados, cerr
         <div className="nc-cuerpo">
           {paso === 0 && (
             <>
-              <small className="nc-ayuda">Selecciona uno o varios servicios</small>
+              <small className="nc-ayuda">Toca + para agregar; puedes repetir un servicio</small>
               {cats.map((c) => (
-                <div key={c} className="nc-grupo">
+                <div key={c} className="nc-grupo nc-lista">
                   {cats.length > 1 && <span className="lab">{c}</span>}
                   {servicios.filter((s) => s.categoria === c).map((s) => {
-                    const on = elegidos.includes(s.id);
+                    const n = elegidos.filter((x) => x === s.id).length;
                     return (
-                      <button type="button" key={s.id} className={`nc-svc ${on ? "on" : ""}`} aria-pressed={on} onClick={() => setElegidos(on ? elegidos.filter((x) => x !== s.id) : [...elegidos, s.id])}>
-                        <span><b>{s.nombre}</b><small>{s.duracionMin} min</small></span><b className="num">{formatoDinero(s.precio)}</b>
-                      </button>
+                      <div key={s.id} className={`nc-fila ${n ? "on" : ""}`}>
+                        <button type="button" className="nc-n" onClick={() => mas(s.id)}><b>{s.nombre}</b><small>{s.duracionMin} min</small></button>
+                        <b className="num nc-p">{formatoDinero(s.precio)}</b>
+                        {n ? (
+                          <span className="cm-step nc-step">
+                            <button type="button" aria-label={`Quitar uno de ${s.nombre}`} onClick={() => menos(s.id)}><Icono n="minimizar" /></button>
+                            <b>{n}</b>
+                            <button type="button" aria-label={`Agregar otro ${s.nombre}`} disabled={elegidos.length >= 6} onClick={() => mas(s.id)}><Icono n="mas" /></button>
+                          </span>
+                        ) : <button type="button" className="cm-add nc-add" aria-label={`Agregar ${s.nombre}`} disabled={elegidos.length >= 6} onClick={() => mas(s.id)}><Icono n="mas" /></button>}
+                      </div>
                     );
                   })}
                 </div>
@@ -178,7 +229,7 @@ export function NuevaCita({ equipo, servicios, dia, hoy, horario, cerrados, cerr
               <label className="nc-campo"><span>Teléfono</span><input className="input" inputMode="tel" value={tel} onChange={(e) => setTel(e.target.value)} placeholder="10 dígitos" autoComplete="off" /></label>
               <label className="nc-campo"><span>Observaciones</span><input className="input" value={obs} onChange={(e) => setObs(e.target.value)} maxLength={300} placeholder="Opcional" /></label>
               <div className="nc-res">
-                <div><span>Servicios</span><span>{lista(sel.map((s) => s.nombre))}</span></div>
+                <div><span>Servicios</span><span>{lista([...new Set(sel.map((s) => s.nombre))].map((n) => { const k = sel.filter((s) => s.nombre === n).length; return k > 1 ? `${n} x${k}` : n; }))}</span></div>
                 <div><span>Cuándo</span><span>{cuando}</span></div>
                 <div><span>Con</span><span>{quien}</span></div>
               </div>

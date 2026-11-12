@@ -15,6 +15,8 @@ const RUTA: Record<string, string> = {
 };
 
 export type EventoVivo = { id: string; t: string; titulo: string; detalle?: string; href?: string; nombre: string; avatar: string };
+/** Cita pagada en línea hace poco: se muestra como aviso fuerte arriba, una sola vez. */
+export type PagoVivo = { id: string; titulo: string; detalle: string; href: string };
 export type AlertaVivo = { id: string; titulo: string; detalle: string; href: string };
 export type SolicitudVivo = { id: string; usuarioId: string; nombre: string; avatar: string; t: string };
 /** Notificación personal: solo lo que a esa persona le toca saber. */
@@ -96,7 +98,21 @@ export async function GET() {
     alertas.push({ id: `caja-${t.id}`, titulo: "Tienes un corte de caja pendiente", detalle: "La caja sigue abierta. Realiza el corte para finalizar el día", href: "/cobrar?caja=cerrar" });
   }
   const avisos = await avisosPara(se);
-  return Response.json({ eventos, solicitudes, alertas, avisos }, { headers: { "Cache-Control": "no-store" } });
+  let pagos: PagoVivo[] = [];
+  if (se.barberia.usaCitas && se.puede("citas.ver")) {
+    const zona = se.barberia.zonaHoraria;
+    const ps = await db.select({ id: s.pagosLinea.id, monto: s.pagosLinea.monto, tarjeta: s.pagosLinea.tarjeta, cliente: s.citas.clienteNombre, inicio: s.citas.inicio, barberoId: s.citas.barberoId, barbero: s.usuarios.nombre })
+      .from(s.pagosLinea).innerJoin(s.citas, eq(s.citas.id, s.pagosLinea.citaId)).innerJoin(s.usuarios, eq(s.usuarios.id, s.citas.barberoId))
+      .where(and(eq(s.pagosLinea.barberiaId, bId), eq(s.pagosLinea.tipo, "cita"), eq(s.pagosLinea.estado, "pagado"), gte(s.pagosLinea.pagadoEn, new Date(Date.now() - 15 * 60000))))
+      .limit(5);
+    const fmt = new Intl.DateTimeFormat("es-MX", { timeZone: zona, weekday: "long", hour: "2-digit", minute: "2-digit", hour12: false });
+    pagos = ps.filter((p) => se.puede("ventas.ver_todas") || p.barberoId === se.usuario.id).map((p) => ({
+      id: p.id, titulo: `${p.cliente.split(" ")[0]} pagó su cita en línea`,
+      detalle: `${formatoDinero(p.monto)}${p.tarjeta ? ` con ${p.tarjeta}` : ""}, ${fmt.format(p.inicio)} con ${p.barbero.split(" ")[0]}`,
+      href: `/citas?vista=lista&dia=${fechaLocal(p.inicio, zona)}`,
+    }));
+  }
+  return Response.json({ eventos, solicitudes, alertas, avisos, pagos }, { headers: { "Cache-Control": "no-store" } });
 }
 
 type Sesion = NonNullable<Awaited<ReturnType<typeof obtenerSesion>>>;
