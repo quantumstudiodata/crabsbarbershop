@@ -4117,3 +4117,9 @@ html, body { overscroll-behavior-y: none; }
 .blq-c.e-llego { border-left-color: #2b3a47; } .blq-c.e-en_atencion { border-left-color: #13171c; background: linear-gradient(135deg, #2b3138, #13171c); color: #fff; }
 .blq-c.e-en_atencion .est-p { background: #fff; }
 .ct-bt { display: inline-flex; align-items: center; height: 34px; padding: 0 14px; border-radius: 999px; font: 600 13px var(--f-body); text-decoration: none; color: var(--fg); background: rgba(255,255,255,.8); box-shadow: inset 0 0 0 1px rgba(19,23,28,.12); }
+/* Gastos frecuentes en Registrar egreso */
+.chips-cat > button.chip-cat { padding: 8px 14px 8px 11px; gap: 7px; overflow: visible; background: rgba(255,255,255,.75); color: var(--fg); }
+.chips-cat > button.chip-cat .ic { width: 14px; height: 14px; color: var(--faint); }
+.chips-cat > button.chip-cat b { font-weight: 600; font-variant-numeric: tabular-nums; color: #3c5163; }
+.chips-cat > button.chip-cat.on { background: #13171c; color: #fff; border-color: #13171c; }
+.chips-cat > button.chip-cat.on b, .chips-cat > button.chip-cat.on .ic { color: #c9d2da; }

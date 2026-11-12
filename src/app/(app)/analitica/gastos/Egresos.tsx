@@ -141,7 +141,7 @@ export function Nuevo({ hoy, cajaAbierta, categorias, cerrar, otro, opciones }: 
           {opciones.frecuentes.length > 0 && (
             <div className="pila-chica">
               <span className="lab">Gastos frecuentes</span>
-              <div className="chips-cat">{opciones.frecuentes.map((f) => <button key={f.id} type="button" className={`chip-cat ${concepto === f.concepto ? "on" : ""}`} onClick={() => usar(f)}>{f.concepto}{f.monto ? ` ${formatoDinero(f.monto)}` : ""}</button>)}</div>
+              <div className="chips-cat">{opciones.frecuentes.map((f) => <button key={f.id} type="button" className={`chip-cat ${concepto === f.concepto ? "on" : ""}`} onClick={() => usar(f)}><Icono n="historial" /><span>{f.concepto}</span>{f.monto ? <b>{formatoDinero(f.monto)}</b> : null}</button>)}</div>
             </div>
           )}
           <label className="campo"><span>Concepto</span><input className="input" name="concepto" value={concepto} onChange={(x) => setConcepto(x.target.value)} placeholder="Ejemplo: Recibo de luz de octubre" required maxLength={120} /></label>
