@@ -4678,3 +4678,27 @@ html, body { overscroll-behavior-y: none; }
   .fx-svc-t b { font-size: 15px; }
   .fx-cal, .fx-barberos, .fx-campos, .fx-tk { max-width: 560px; }
 }
+/* Reservar: servicios como lista compacta vertical (sin tarjetas) */
+.fx-lista { gap: 0; }
+.fx-grupo { gap: 0; }
+.fx-grupo + .fx-grupo { margin-top: 14px; }
+.fx-cat { padding: 0 0 2px; }
+.fx-grupo-c { padding: 0; border-radius: 0; background: none; -webkit-backdrop-filter: none; backdrop-filter: none; box-shadow: none; }
+.fx-grupo-c .fx-svc { padding: 9px 8px; margin: 0 -8px; border-bottom: 1px solid rgba(19,23,28,.06); border-radius: 0; transition: background .2s; }
+.fx-grupo-c .fx-svc:last-child { border-bottom: 0; }
+.fx-svc.on::before { left: 0; top: 9px; bottom: 9px; }
+.fx-svc.on { background: linear-gradient(90deg, rgba(255,255,255,.7), rgba(255,255,255,0)); }
+.fx-svc-t { gap: 2px; }
+.fx-svc-t b { font-size: 14.5px; }
+.fx-svc-t small { font-size: 11.5px; gap: 6px; }
+@media (min-width: 960px) {
+  .fx-lista { max-width: 620px; padding: 8px 22px 14px; border-radius: 22px; background: var(--cristal); -webkit-backdrop-filter: blur(14px); backdrop-filter: blur(14px); box-shadow: var(--borde-luz), var(--sombra-1); }
+  .fx-grupo { padding-top: 10px; }
+  .fx-grupo + .fx-grupo { margin-top: 4px; }
+  .fx-grupo-c { display: grid; grid-template-columns: 1fr; gap: 0; }
+  .fx-grupo-c .fx-svc { padding: 10px 12px; margin: 0 -12px; border: 0; border-bottom: 1px solid rgba(19,23,28,.06); border-radius: 12px; background: none; -webkit-backdrop-filter: none; backdrop-filter: none; box-shadow: none; animation: none; }
+  .fx-grupo-c .fx-svc:hover { transform: none; background: rgba(255,255,255,.7); box-shadow: none; }
+  .fx-grupo-c .fx-svc.on { background: #fff; box-shadow: 0 6px 16px -12px rgba(20,35,50,.6); }
+  .fx-svc.on::before { display: block; left: 0; }
+  .fx-svc-t b { font-size: 14.5px; }
+}
