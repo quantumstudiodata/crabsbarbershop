@@ -39,7 +39,7 @@ const activa = (e: string) => ["apartada", "en_espera", "llego", "en_atencion"].
 
 export function PantallaCitas(p: {
   abrirNueva?: boolean; abrirCompartir?: boolean; porDefecto: "linea" | "semana";
-  hoy: string; dia: string; vista: "linea" | "lista" | "calendario" | "semana" | "horarios"; persona: string; citas: CitaVista[]; ahora: number;
+  zona: string; hoy: string; dia: string; vista: "linea" | "lista" | "calendario" | "semana" | "horarios"; persona: string; citas: CitaVista[]; ahora: number;
   equipo: Persona[]; servicios: Servicio[]; horarioNegocio: Horario; cerrados: string[]; conteo: Record<string, number>;
   rotacion: Rot | null; bloqueos: Bloqueo[];
   enlace: string | null; puede: { modificar: boolean; cancelar: boolean; pagos: boolean; horarios: boolean; cobrar: boolean };
@@ -136,8 +136,8 @@ export function PantallaCitas(p: {
           abrir={setVer} url={url} puede={p.puede} agendar={(m) => setAgendar({ minuto: m })} bloquear={() => setBloquear(true)} avisar={setAviso} />
       )}
       {p.vista === "lista" && <VistaLista citas={citas} ahora={p.ahora} esHoy={p.dia === p.hoy} abrir={setVer} puede={p.puede} avisar={setAviso} />}
-      {p.vista === "calendario" && <VistaDia citas={citas} equipo={p.equipo.filter((e) => !p.persona || e.id === p.persona)} horario={p.horarioNegocio} dia={p.dia} abrir={setVer} />}
-      {p.vista === "semana" && <VistaSemana citas={citas} semana={semana} horario={p.horarioNegocio} hoy={p.hoy} abrir={setVer} url={url} />}
+      {p.vista === "calendario" && <VistaDia citas={citas} equipo={p.equipo.filter((e) => !p.persona || e.id === p.persona)} horario={p.horarioNegocio} dia={p.dia} abrir={setVer} zona={p.zona} hoy={p.hoy} />}
+      {p.vista === "semana" && <VistaSemana citas={citas} semana={semana} horario={p.horarioNegocio} hoy={p.hoy} abrir={setVer} url={url} zona={p.zona} />}
 
       {ver && <DetalleCita c={ver} cerrar={() => setVer(null)} puede={p.puede} equipo={p.equipo} avisar={setAviso} />}
       {agendar && <NuevaCita equipo={p.equipo} servicios={p.servicios} dia={p.dia} hoy={p.hoy} horario={p.horarioNegocio} cerrados={p.cerrados} minutoInicial={agendar.minuto} personaInicial={p.persona} cerrar={() => setAgendar(false)} avisar={setAviso} />}
@@ -216,7 +216,21 @@ function rango(h: Horario) {
   return [Math.min(...ds.map((x) => aMin(x[0]))), Math.max(...ds.map((x) => aMin(x[1])))];
 }
 
-function VistaDia({ citas, equipo, horario, dia, abrir }: { citas: CitaVista[]; equipo: Persona[]; horario: Horario; dia: string; abrir: (c: CitaVista) => void }) {
+/** Línea de la hora actual: baja poco a poco sobre el calendario. Se actualiza cada 30 segundos. */
+function LineaAhora({ zona, ini, fin, px, col }: { zona: string; ini: number; fin: number; px: number; col?: { i: number; de: number } }) {
+  const leer = () => { const x = new Intl.DateTimeFormat("en-GB", { timeZone: zona, hour: "2-digit", minute: "2-digit", second: "2-digit", hour12: false }).formatToParts(new Date()); const v = (t: string) => Number(x.find((y) => y.type === t)?.value ?? 0); return (v("hour") % 24) * 60 + v("minute") + v("second") / 60; };
+  const [m, setM] = useState<number | null>(null);
+  useEffect(() => { setM(leer()); const t = setInterval(() => setM(leer()), 30000); return () => clearInterval(t); }, [zona]); // eslint-disable-line react-hooks/exhaustive-deps
+  if (m === null || m < ini || m > fin) return null;
+  const hh = Math.floor(m), txt = `${String(Math.floor(hh / 60)).padStart(2, "0")}:${String(hh % 60).padStart(2, "0")}`;
+  return (
+    <div className="cal-ahora" style={{ top: (m - ini) * px, ["--x" as string]: col ? `calc(46px + (100% - 46px) * ${col.i} / ${col.de})` : "46px", ["--w" as string]: col ? `calc((100% - 46px) / ${col.de})` : "calc(100% - 46px)" }} aria-label={`Ahora, ${txt}`}>
+      <span>{txt}</span><i />
+    </div>
+  );
+}
+
+function VistaDia({ citas, equipo, horario, dia, abrir, zona, hoy }: { citas: CitaVista[]; equipo: Persona[]; horario: Horario; dia: string; abrir: (c: CitaVista) => void; zona: string; hoy: string }) {
   const [ini, fin] = rango(horario);
   const horas = Array.from({ length: Math.ceil((fin - ini) / 60) + 1 }, (_, i) => ini + i * 60).filter((m) => m <= fin);
   const px = 1.1; // píxeles por minuto
@@ -225,6 +239,7 @@ function VistaDia({ citas, equipo, horario, dia, abrir }: { citas: CitaVista[]; 
     <section className="glass cal-dia subir d1" style={{ ["--cols" as string]: equipo.length }}>
       <div className="cal-cab"><span />{equipo.map((e) => <span key={e.id} className="persona"><Avatar avatar={e.avatar} nombre={e.nombre} t={22} />{primer(e.nombre)}</span>)}</div>
       <div className="cal-cuerpo" style={{ height: (fin - ini) * px }}>
+        {dia === hoy && <LineaAhora zona={zona} ini={ini} fin={fin} px={px} />}
         <div className="cal-horas">{horas.map((m) => <span key={m} style={{ top: (m - ini) * px }}>{aHora(m)}</span>)}</div>
         {equipo.map((e) => (
           <div key={e.id} className="cal-col">
@@ -255,13 +270,14 @@ function grupos(cs: CitaVista[]) {
   return res;
 }
 
-function VistaSemana({ citas, semana, horario, hoy, abrir, url }: { citas: CitaVista[]; semana: string[]; horario: Horario; hoy: string; abrir: (c: CitaVista) => void; url: (x: { dia?: string; vista?: string }) => string }) {
+function VistaSemana({ citas, semana, horario, hoy, abrir, url, zona }: { zona: string; citas: CitaVista[]; semana: string[]; horario: Horario; hoy: string; abrir: (c: CitaVista) => void; url: (x: { dia?: string; vista?: string }) => string }) {
   const [ini, fin] = rango(horario);
   const px = 1.4;
   return (
     <section className="glass cal-dia cal-semana subir d1" style={{ ["--cols" as string]: 7 }}>
       <div className="cal-cab"><span />{semana.map((d) => <Link key={d} href={url({ dia: d, vista: "calendario" })} className={d === hoy ? "hoy" : ""}>{DIAS[dow(d)]} {Number(d.slice(8))}</Link>)}</div>
       <div className="cal-cuerpo" style={{ height: (fin - ini) * px }}>
+        {semana.includes(hoy) && <LineaAhora zona={zona} ini={ini} fin={fin} px={px} col={{ i: semana.indexOf(hoy), de: semana.length }} />}
         <div className="cal-horas">{Array.from({ length: Math.floor((fin - ini) / 120) + 1 }, (_, i) => ini + i * 120).map((m) => <span key={m} style={{ top: (m - ini) * px }}>{aHora(m)}</span>)}</div>
         {semana.map((d) => (
           <div key={d} className="cal-col">

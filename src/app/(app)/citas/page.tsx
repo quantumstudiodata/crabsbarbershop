@@ -56,7 +56,7 @@ export default async function Citas({ searchParams }: { searchParams: Promise<Q>
   return (
     <PantallaCitas
       abrirNueva={q.nueva === "1"} abrirCompartir={q.compartir === "1"} porDefecto={porDefecto}
-      hoy={hoy} dia={dia} vista={vista} persona={q.persona ?? ""} citas={citas} ahora={Date.now()}
+      zona={zona} hoy={hoy} dia={dia} vista={vista} persona={q.persona ?? ""} citas={citas} ahora={Date.now()}
       equipo={equipo.map((e) => ({ id: e.id, nombre: e.nombre, avatar: e.avatar, horario: e.horario as Horario | null }))}
       servicios={servicios}
       horarioNegocio={b.horario as Horario} cerrados={b.diasCerrados} conteo={Object.fromEntries(futuros.map((x) => [x.d, x.n]))}

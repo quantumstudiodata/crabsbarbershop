@@ -72,7 +72,8 @@ export function Reservar(p: {
   const [forma, setForma] = useState<FormaPago>(!pagaEnLinea || p.pago.modo === "opcional" ? "negocio" : p.pago.modo === "completo" ? "total" : "anticipo");
   const [pend, iniciar] = useTransition();
   const cats = useMemo(() => [...new Set(p.servicios.map((s) => s.categoria))], [p.servicios]);
-  const elegidos = p.servicios.filter((s) => svc.includes(s.id));
+  const elegidos = svc.map((id) => p.servicios.find((x) => x.id === id)).filter(Boolean) as Servicio[];
+  const nombres = (xs: Servicio[]) => lista([...new Set(xs.map((x) => x.nombre))].map((n) => { const k = xs.filter((x) => x.nombre === n).length; return k > 1 ? `${n} x${k}` : n; }));
   const duracion = elegidos.reduce((a, s) => a + s.duracionMin, 0);
   const estimado = elegidos.reduce((a, s) => a + (s.promo?.precio ?? s.precio), 0);
   const total = cot?.total ?? estimado;
@@ -113,8 +114,10 @@ export function Reservar(p: {
   const listo = [svc.length > 0, !!fecha && minuto !== null, nombre.trim().length > 1 && tel.replace(/\D/g, "").length >= 10, true][paso];
   const tocar = (id: string) => {
     if (!p.opciones.varios) { setSvc([id]); setTimeout(() => ir(1), 180); return; }
-    setSvc(svc.includes(id) ? svc.filter((x) => x !== id) : [...svc, id]);
+    if (!svc.includes(id)) mas(id);
   };
+  const mas = (id: string) => setSvc((xs) => (xs.length >= 6 ? xs : [...xs, id]));
+  const menos = (id: string) => setSvc((xs) => { const i = xs.lastIndexOf(id); return i < 0 ? xs : [...xs.slice(0, i), ...xs.slice(i + 1)]; });
   const confirmar = () => iniciar(async () => {
     const r = await reservar(p.slug, { servicioIds: svc, persona, fecha: fecha!, minuto: minuto!, nombre, telefono: tel, notas, sitio });
     if (r.error) { setError(r.error); if (r.error.includes("ocup")) { setMinuto(null); ir(1); } return; }
@@ -135,16 +138,16 @@ export function Reservar(p: {
 
   // Lo que muestra la barra (teléfono) y el panel (escritorio).
   const barra = paso === 0
-    ? { t: svc.length ? <Monto valor={total} /> : "Elige un servicio", s: svc.length ? `${lista(elegidos.map((x) => x.nombre))}, ${duracion} min` : "Puedes elegir más de uno" }
+    ? { t: svc.length ? <Monto valor={total} /> : "Elige un servicio", s: svc.length ? `${svc.length} ${svc.length === 1 ? "servicio" : "servicios"}, ${duracion} min` : "Toca + para agregar" }
     : paso === 3 && forma !== "negocio" ? { t: <Monto valor={conCargo} />, s: forma === "anticipo" ? "Anticipo, el resto en el negocio" : "Pagas ahora con tarjeta" }
       : paso === 3 ? { t: <Monto valor={total} />, s: "Pagas en el negocio" }
-        : { t: cuando || <Monto valor={total} />, s: cuando ? `${quien ? `con ${quien.nombre}` : "con quien esté libre"}, ${formatoDinero(total)}` : `${lista(elegidos.map((x) => x.nombre))}, ${duracion} min` };
+        : { t: cuando || <Monto valor={total} />, s: cuando ? `${quien ? `con ${quien.nombre}` : "con quien esté libre"}, ${formatoDinero(total)}` : `${nombres(elegidos)}, ${duracion} min` };
   const boton = paso < 3
     ? <button type="button" className="fx-go" disabled={!listo} onClick={() => ir(paso + 1)}>Continuar<Icono n="derecha" /></button>
     : <button type="button" className="fx-go" disabled={pend} onClick={confirmar}>{pend ? "Reservando…" : "Reservar"}<Icono n="derecha" /></button>;
 
   const resumen = [
-    { k: 0, t: "Servicios", v: svc.length ? lista(elegidos.map((x) => x.nombre)) : "" },
+    { k: 0, t: "Servicios", v: svc.length ? nombres(elegidos) : "" },
     { k: 1, t: "Cuándo", v: cuando ? `${cuando}${quien ? `, con ${quien.nombre}` : ""}` : "" },
     { k: 2, t: "A nombre de", v: paso > 2 ? nombre : "" },
   ];
@@ -152,7 +155,7 @@ export function Reservar(p: {
   return (
     <div className="fx">
       <aside className="fx-panel" aria-label="Tu cita">
-        <div className="fx-marca"><span className="fx-logo" aria-hidden="true">{p.negocio.slice(0, 1)}</span><span><b>{p.negocio}</b><small>Reserva tu cita en menos de un minuto</small></span></div>
+        <div className="fx-marca"><img className="fx-logo-img" src="/icono-192.png" alt="" width={48} height={48} /><span><b>{p.negocio}</b><small>Reserva tu cita en menos de un minuto</small></span></div>
         <ol className="fx-res">
           {resumen.map((r) => (
             <li key={r.k} className={r.v ? "ok" : ""}><i aria-hidden="true">{r.v ? <Icono n="palomita" /> : r.k + 1}</i><span><small>{r.t}</small><b>{r.v || "Falta"}</b></span>
@@ -164,7 +167,7 @@ export function Reservar(p: {
 
       <main className="fx-main">
         {p.regreso && <a href={p.regreso.href} className="fx-regreso"><Icono n="izquierda" />{p.regreso.texto}</a>}
-        <header className="fx-top"><span className="fx-logo" aria-hidden="true">{p.negocio.slice(0, 1)}</span><span><b>{p.negocio}</b><small>Reserva en línea</small></span></header>
+        <header className="fx-top"><img className="fx-logo-img" src="/icono-192.png" alt="" width={40} height={40} /><span><b>{p.negocio}</b><small>Reserva en línea</small></span></header>
         <nav className="fx-pasos" aria-label="Pasos">
           {PASOS.map((t, i) => (
             <button type="button" key={t} className={i < paso ? "ok" : i === paso ? "on" : ""} disabled={i > paso} aria-current={i === paso ? "step" : undefined} onClick={() => i < paso && ir(i)}>
@@ -176,7 +179,7 @@ export function Reservar(p: {
         <section key={paso} className={`fx-cuerpo ${dir > 0 ? "adelante" : "atras"}`}>
           {paso === 0 && (
             <>
-              <h1 className="fx-h">¿Qué te hacemos hoy?<small>{p.opciones.varios ? "Puedes elegir más de uno" : "Elige un servicio"}</small></h1>
+              <h1 className="fx-h">¿Qué te hacemos hoy?<small>{p.opciones.varios ? "Agrega uno o varios; puedes repetir un servicio" : "Elige un servicio"}</small></h1>
               {cats.length > 1 && (
                 <div className="fx-cats" role="tablist" aria-label="Categorías">
                   {["", ...cats].map((c) => <button type="button" role="tab" key={c || "todos"} aria-selected={cat === c} className={cat === c ? "on" : ""} onClick={() => setCat(c)}>{c || "Todos"}</button>)}
@@ -184,13 +187,19 @@ export function Reservar(p: {
               )}
               <div className="fx-lista" key={cat}>
                 {visibles.map((s, i) => {
-                  const on = svc.includes(s.id);
+                  const n = svc.filter((x) => x === s.id).length;
                   return (
-                    <button type="button" key={s.id} className={`fx-svc ${on ? "on" : ""}`} style={{ ["--i" as string]: i }} aria-pressed={on} onClick={() => tocar(s.id)}>
-                      <span className="fx-svc-t"><b>{s.nombre}{s.promo && <em className="fx-promo">{s.promo.nombre}</em>}</b><small>{s.duracionMin} min{s.descripcion ? `, ${s.descripcion}` : ""}</small></span>
+                    <div key={s.id} className={`fx-svc ${n ? "on" : ""}`} style={{ ["--i" as string]: i }}>
+                      <button type="button" className="fx-svc-t" onClick={() => tocar(s.id)} aria-pressed={n > 0}><b>{s.nombre}{s.promo && <em className="fx-promo">{s.promo.nombre}</em>}</b><small>{s.duracionMin} min{s.descripcion ? `, ${s.descripcion}` : ""}</small></button>
                       <span className="fx-p">{s.promo && <s>{formatoDinero(s.precio)}</s>}{formatoDinero(s.promo?.precio ?? s.precio)}</span>
-                      <span className="fx-ck" aria-hidden="true"><Icono n="palomita" /></span>
-                    </button>
+                      {n && p.opciones.varios ? (
+                        <span className="fx-step">
+                          <button type="button" onClick={() => menos(s.id)} aria-label={`Quitar uno de ${s.nombre}`}><Icono n="minimizar" /></button>
+                          <b key={n}>{n}</b>
+                          <button type="button" onClick={() => mas(s.id)} disabled={svc.length >= 6} aria-label={`Agregar otro ${s.nombre}`}><Icono n="mas" /></button>
+                        </span>
+                      ) : <button type="button" className="fx-add" onClick={() => tocar(s.id)} aria-label={`Agregar ${s.nombre}`}><Icono n={n ? "palomita" : "mas"} /></button>}
+                    </div>
                   );
                 })}
               </div>
@@ -199,7 +208,7 @@ export function Reservar(p: {
 
           {paso === 1 && (
             <>
-              <h1 className="fx-h">¿Cuándo vienes?<small>{lista(elegidos.map((x) => x.nombre))}, {duracion} min</small></h1>
+              <h1 className="fx-h">¿Cuándo vienes?<small>{nombres(elegidos)}, {duracion} min</small></h1>
               {personas.length > 1 && (
                 <div className="fx-sec"><span className="fx-lab">Con quién</span>
                   <div className="fx-ppl" role="radiogroup" aria-label="Con quién">
