@@ -5386,3 +5386,7 @@ html:has(.fx) { background: url(/grunge.png?v=4) 0 0 / 640px 640px repeat, url("
 .fx-raiz .fx .fx-ini-prox, .fx-raiz .fx .fx-ini-est { background: rgba(255,255,255,.07); }
 
 .fx-raiz .fx .fx-prog { background: rgba(12,13,15,.9) !important; }
+
+/* Pago con tarjeta en reservas: tarjeta oscura como el resto */
+.fx-raiz .fx .fx-tarjeta { background: #202329 !important; box-shadow: inset 0 0 0 1px rgba(255,255,255,.08), 0 12px 30px -18px rgba(0,0,0,.85) !important; }
+.fx-raiz .fx .fx-seguro { color: #8a94a2; }

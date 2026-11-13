@@ -13,10 +13,20 @@ type Props = {
   alConfirmar: (token: string) => void; alOcupado: () => void;
 };
 
+// Formulario de Stripe en modo oscuro, con los mismos grises de la página de reservas.
 const apariencia = {
-  theme: "flat" as const,
-  variables: { colorPrimary: "#13171c", colorText: "#13171c", colorTextSecondary: "#6b7680", colorBackground: "#ffffff", borderRadius: "14px", fontFamily: "Geist, system-ui, -apple-system, 'Segoe UI', sans-serif", spacingUnit: "4px" },
-  rules: { ".Input": { boxShadow: "inset 0 0 0 1px rgba(19,23,28,.1)" }, ".Input:focus": { boxShadow: "inset 0 0 0 2px #13171c" }, ".Tab": { boxShadow: "inset 0 0 0 1px rgba(19,23,28,.1)" } },
+  theme: "night" as const,
+  variables: {
+    colorPrimary: "#eef1f5", colorText: "#eef1f5", colorTextSecondary: "#98a2b0", colorTextPlaceholder: "#646e7b", colorBackground: "#1a1d21",
+    colorDanger: "#e7a3a3", colorIcon: "#98a2b0", borderRadius: "14px", fontFamily: "Geist, system-ui, -apple-system, 'Segoe UI', sans-serif", spacingUnit: "4px",
+  },
+  rules: {
+    ".Input": { backgroundColor: "#15181b", boxShadow: "inset 0 0 0 1px rgba(255,255,255,.12)", border: "none" },
+    ".Input:focus": { boxShadow: "inset 0 0 0 1.5px #c9d4e2" },
+    ".Label": { color: "#98a2b0" },
+    ".Tab": { backgroundColor: "#15181b", boxShadow: "inset 0 0 0 1px rgba(255,255,255,.12)", border: "none" },
+    ".Tab--selected": { boxShadow: "inset 0 0 0 1.5px #eef1f5" },
+  },
 };
 
 /** Pago con tarjeta al confirmar la cita: el formulario de Stripe y la barra con el botón para pagar. */
