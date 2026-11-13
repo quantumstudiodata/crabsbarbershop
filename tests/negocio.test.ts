@@ -108,9 +108,14 @@ describe("permisos", () => {
     expect(permisosDe("barbera", ["no.existe"]).size).toBe(6);
     expect(permisosDe("contador").has("ventas.registrar")).toBe(false);
     expect(permisosDe("contador").has("reportes.exportar")).toBe(true);
-    // El titular puede crear Soporte técnico; nadie puede crear el rol de encargado (ya no existe).
+    // El titular puede crear Soporte técnico y Encargada.
     expect(rolesAsignables("duena")).toContain("admin");
-    expect(rolesAsignables("duena")).not.toContain("encargada");
+    expect(rolesAsignables("duena")).toContain("encargada");
+    // La encargada supervisa el día (ventas del equipo, cortes, analítica) pero no paga al equipo ni edita usuarios.
+    expect(permisosDe("encargada").has("ventas.ver_todas")).toBe(true);
+    expect(permisosDe("encargada").has("reportes.ver")).toBe(true);
+    expect(permisosDe("encargada").has("equipo.pagar")).toBe(false);
+    expect(permisosDe("encargada").has("usuarios.editar")).toBe(false);
     // Quien tiene un puesto personalizado solo asigna Administrador y Barbero.
     expect(rolesAsignables("duena", true)).toEqual(["contador", "barbera"]);
   });
