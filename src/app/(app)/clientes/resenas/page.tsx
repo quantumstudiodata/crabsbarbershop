@@ -54,7 +54,7 @@ export default async function Resenas({ searchParams }: { searchParams: Promise<
   );
 
   return (
-    <div className="eq">
+    <div className="eq eq-llena">
       <AvisoUrl aviso={q.aviso} error={q.error} />
       <div className="glass eq-card eq-rres">
         <div className="eq-prom"><Estrellas n={promedio(todas)} /><span><b>{todas.length ? promedio(todas).toFixed(1) : "Sin datos"}</b>{todas.length > 0 && <small>promedio</small>}</span></div>
@@ -86,6 +86,13 @@ export default async function Resenas({ searchParams }: { searchParams: Promise<
             </div>
           ) : <p className="muted eq-vacio">{todas.length ? "No hay reseñas con este filtro." : "Todavía no hay reseñas. Al cobrar, comparte la encuesta con el cliente."}</p>}
           {hayMas && <Link className="eq-mas" href={url({ n: String(limite + 20) })}>Ver más<Icono n="abajo" /></Link>}
+          {!hayMas && (
+            <div className="eq-relleno solo-esc-r" aria-hidden={lista.length === 0}>
+              <span className="eq-relleno-i"><Icono n="chispa" /></span>
+              <b>{lista.length ? "Parece que no hay mucho por aquí todavía" : "Aquí aparecerán las reseñas"}</b>
+              <small>Cada vez que cobres, comparte la encuesta con el cliente. Lo que opine aparecerá en esta lista.</small>
+            </div>
+          )}
         </div>
       </div>
     </div>

@@ -160,6 +160,7 @@ export default async function Resumen({ searchParams }: { searchParams: Promise<
               ]; })}
             </div>
           ) : <p className="muted rs-vacio">Sin servicios en estas fechas.</p>}
+          {(s.puede("ventas.ver_todas") || s.puede("equipo.pagar")) && <Link href="/equipo" className="rs-ir">Ver equipo<Icono n="derecha" /></Link>}
         </section>
         <section className="glass rs-card subir d2" aria-label="Ventas atribuidas">
           <div className="rs-cab"><b>Ventas atribuidas</b><small>por quien atendió</small></div>
