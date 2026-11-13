@@ -261,7 +261,10 @@ function Recorrido({ punto, lista, hechos, esc, ruta, ir, listo }: {
 
       <aside className={`gu-lista ${abierta ? "abierta" : ""} ${caja && (esc ? caja.x < 330 : caja.y + caja.h > vh * 0.55) ? "otro-lado" : ""}`}>
         <header onClick={() => setAbierta((a) => !a)}>
-          <div><b>Tu primera vez</b><span>{lista.filter((x) => hechos.has(x)).length} de {lista.length}</span></div>
+          <div><b>Tu primera vez</b><span>{lista.filter((x) => hechos.has(x)).length} de {lista.length}</span>
+            {/* Siempre a la vista, también en el teléfono con la lista cerrada. */}
+            <button type="button" className="gu-salir-v" onClick={(e) => { e.stopPropagation(); salir(); }}>Salir</button>
+          </div>
           <span className="gu-prog"><i style={{ width: `${(lista.filter((x) => hechos.has(x)).length / lista.length) * 100}%` }} /></span>
         </header>
         <ol>
@@ -272,7 +275,6 @@ function Recorrido({ punto, lista, hechos, esc, ruta, ir, listo }: {
             </li>
           ))}
         </ol>
-        <button type="button" className="gu-salir" onClick={() => salir()}>Salir de mi cuenta</button>
       </aside>
     </div>
   );
