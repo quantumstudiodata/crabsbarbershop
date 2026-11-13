@@ -1,10 +1,8 @@
 "use client";
 
 import { useEffect, useState } from "react";
-import { Avatar } from "@/components/Avatar";
 import { Icono } from "@/components/Icono";
 import { aHora } from "@/lib/agenda";
-import { formatoDinero } from "@/lib/money";
 
 type Servicio = { id: string; nombre: string; precio: number; duracionMin: number; promo: { nombre: string; precio: number } | null };
 type Persona = { id: string; nombre: string; avatar: string };
@@ -59,12 +57,11 @@ export function Inicio(p: {
     if (ult && ult.horas === horas) { ult.dias = `${ult.dias.split(" a ")[0]} a ${DIAS_L[d].toLowerCase()}`; } else filas.push({ dias: DIAS_L[d], horas });
   }
   const wa = p.datos.whatsapp.replace(/\D/g, "");
-  const r = p.datos.resenas;
   return (
     <section className="fx-ini">
       <div className="fx-ini-hero fx-cg">
         <p className="fx-ini-sal">{saludo}</p>
-        <h1>Reserva tu cita en menos de un minuto</h1>
+        <h1>Agenda tu cita</h1>
         {estado && <span className={`fx-ini-est ${estado.abierto ? "si" : ""}`}><i />{estado.t}</span>}
         <button type="button" className="fx-ini-cta" onClick={p.empezar}>Reservar cita<span><Icono n="derecha" /></span></button>
         {p.libres && p.libres.xs[0] !== undefined && (
@@ -77,40 +74,7 @@ export function Inicio(p: {
       {p.libres && p.libres.xs.length > 1 && (
         <div className="fx-ini-sec">
           <span className="fx-lab">{p.libres.hoy ? "Libres hoy" : "Libres mañana"}</span>
-          <div className="fx-ini-hrs">{p.libres.xs.slice(0, 8).map((m) => <button type="button" key={m} onClick={() => p.conHora(p.libres!.fecha, m)}>{aHora(m)}</button>)}</div>
-        </div>
-      )}
-
-      <div className="fx-ini-sec">
-        <span className="fx-lab fx-ini-lab">Servicios<button type="button" onClick={p.empezar}>Ver todos</button></span>
-        <div className="fx-ini-lista">
-          {p.servicios.slice(0, 4).map((s) => (
-            <button type="button" key={s.id} className="fx-ini-fila" onClick={() => p.conServicio(s.id)}>
-              <span><b>{s.nombre}</b><small>{s.duracionMin} min{s.promo ? `, ${s.promo.nombre}` : ""}</small></span>
-              <span className="fx-p">{s.promo && <s>{formatoDinero(s.precio)}</s>}{formatoDinero(s.promo?.precio ?? s.precio)}</span>
-            </button>
-          ))}
-        </div>
-      </div>
-
-      {p.equipo.length > 0 && (
-        <div className="fx-ini-sec">
-          <span className="fx-lab">Equipo</span>
-          <div className="fx-ini-eq">
-            {p.equipo.map((e) => (
-              <button type="button" key={e.id} onClick={() => (p.elegir ? p.conPersona(e.id) : p.empezar())}><Avatar avatar={e.avatar} nombre={e.nombre} t={48} />{e.nombre}</button>
-            ))}
-          </div>
-        </div>
-      )}
-
-      {r && r.n > 0 && (
-        <div className="fx-ini-sec">
-          <span className="fx-lab">Lo que dicen</span>
-          <div className="fx-ini-rs">
-            <span><b>{r.promedio.toFixed(1)}</b><small>de 5, {r.n} {r.n === 1 ? "reseña" : "reseñas"}</small></span>
-            {r.comentario && <p>“{r.comentario}”</p>}
-          </div>
+          <div className="fx-ini-hrs">{p.libres.xs.slice(0, 12).map((m) => <button type="button" key={m} onClick={() => p.conHora(p.libres!.fecha, m)}>{aHora(m)}</button>)}</div>
         </div>
       )}
 
