@@ -106,8 +106,8 @@ export default async function Equipo({ searchParams }: { searchParams: Promise<{
             return (
               <Link key={p.id} href={`/equipo/${p.id}${q}`} className="eq2-fila">
                 <Avatar avatar={p.avatar} nombre={p.nombre} t={38} />
-                <span><b>{p.nombre}</b><small>{!c || c.sinRegla ? "Sin forma de pago" : `${c.modalidad}, ${c.frecuencia.toLowerCase()}`}</small></span>
-                <span className="eq2-m"><b>{formatoDinero(p.r.vendido)}</b><small>en ventas</small>{pend && <small className="pend">{pend}</small>}</span>
+                <span><b>{p.nombre}</b><small>{!c || c.sinRegla ? "Sin forma de pago" : `${c.modalidad}, ${c.frecuencia.toLowerCase()}`}</small>{pend && <small className="pend">{pend}</small>}</span>
+                <span className="eq2-m"><b>{formatoDinero(p.r.vendido)}</b><small>{p.r.servicios} {p.r.servicios === 1 ? "servicio" : "servicios"}</small></span>
                 <Icono n="derecha" />
                 <i className="eqa-barra eq2-barra-fila" aria-hidden="true"><i style={{ width: `${Math.max((p.r.vendido / maxV) * 100, 2)}%` }} /></i>
               </Link>

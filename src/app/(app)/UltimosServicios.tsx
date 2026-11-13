@@ -1,6 +1,7 @@
 "use client";
 
 import { useState } from "react";
+import { Vacio } from "@/components/Vacio";
 import { Avatar } from "@/components/Avatar";
 import { Icono } from "@/components/Icono";
 
@@ -14,7 +15,7 @@ export type FilaUltimo = {
 /** Lista de lo último cobrado; al tocar una fila se despliegan sus datos, como en el historial. */
 export function UltimosServicios({ filas }: { filas: FilaUltimo[] }) {
   const [abierta, setAbierta] = useState<string | null>(null);
-  if (filas.length === 0) return <p className="muted" style={{ padding: 20 }}>Todavía no hay servicios cobrados.</p>;
+  if (filas.length === 0) return <Vacio icono="cobro" titulo="Todavía no hay servicios cobrados" texto="Cada vez que se cobre un servicio aparecerá aquí con su hora, quién lo hizo y cómo pagaron." />;
   return (
     <div className="glass historial">
       {filas.map((f) => (

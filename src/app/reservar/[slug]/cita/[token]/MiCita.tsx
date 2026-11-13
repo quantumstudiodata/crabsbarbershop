@@ -166,13 +166,23 @@ export function MiCita({ slug, token, negocio, hoy, maxDias, cita, politica, hor
               </div>
             </div>
           )}
-          {activa && modo === "ver" && !pendientePago && <p className="muted rv-guarda">{cita.pagado > 0 ? "Tu pago queda guardado aunque cambies de fecha." : "Guarda esta página: desde aquí puedes cambiar tu cita."}</p>}
-          {activa && !cita.sePuedeCambiar && <p className="muted rv-guarda">Faltan menos de {horas} horas para tu cita. Para cambiarla, comunícate al negocio.</p>}
-          {activa && modo === "ver" && <button type="button" className="mc-cal" onClick={calendario}><Icono n="calendario" />Agregar a mi calendario</button>}
+          {activa && modo === "ver" && !pendientePago && <p className="muted rv-guarda mc-solo-mov">{cita.pagado > 0 ? "Tu pago queda guardado aunque cambies de fecha." : "Guarda esta página: desde aquí puedes cambiar tu cita."}</p>}
+          {activa && !cita.sePuedeCambiar && <p className="muted rv-guarda mc-solo-mov">Faltan menos de {horas} horas para tu cita. Para cambiarla, comunícate al negocio.</p>}
+          {activa && modo === "ver" && <button type="button" className="mc-cal mc-solo-mov" onClick={calendario}><Icono n="calendario" />Agregar a mi calendario</button>}
         </section>
 
         <section className="mc-der">
-          {modo === "ver" && acciones && <div className="mc-acc">{acciones}</div>}
+          {/* En escritorio, al lado del comprobante: qué se puede hacer con la cita. */}
+          {modo === "ver" && activa && (
+            <div className="rv-tarjeta mc-ayuda">
+              <span className="mc-ayuda-i" aria-hidden="true"><Icono n="calendario" /></span>
+              <b className="mc-tit">{acciones ? "¿Necesitas cambiar algo?" : "Tu cita está guardada"}</b>
+              <p className="muted">{acciones ? `Puedes cambiar el día, la hora${opciones.length > 1 ? " o con quién" : ""} desde aquí, hasta ${horas} horas antes de tu cita.` : !cita.sePuedeCambiar ? `Faltan menos de ${horas} horas para tu cita. Para cambiarla, comunícate al negocio.` : "Guarda esta página para consultarla cuando quieras."}</p>
+              {acciones && <div className="mc-acc">{acciones}</div>}
+              <button type="button" className="mc-cal" onClick={calendario}><Icono n="calendario" />Agregar a mi calendario</button>
+              <small className="muted">Guarda esta página: aquí siempre verás tu cita al día.</small>
+            </div>
+          )}
           {modo === "cancelar" && (
             <div className="rv-tarjeta mc-panel">
               <b className="mc-tit">¿Cancelar tu cita?</b>

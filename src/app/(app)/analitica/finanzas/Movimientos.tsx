@@ -1,6 +1,7 @@
 "use client";
 
 import { useState } from "react";
+import { Vacio } from "@/components/Vacio";
 import { Icono } from "@/components/Icono";
 import { formatoDinero } from "@/lib/money";
 import { Cancelar, type FilaEgreso, Nuevo, type OpcionesEgreso } from "../gastos/Egresos";
@@ -38,7 +39,7 @@ export function Movimientos({ dias, registrar, hoy, cajaAbierta, categorias, opc
 }
 
 function MovimientosLista({ dias, abierto, setAbierto, setCancelar }: { dias: DiaMovimientos[]; abierto: string | null; setAbierto: (x: string | null) => void; setCancelar: (f: FilaEgreso) => void }) {
-  if (dias.length === 0) return <p className="muted" style={{ padding: "8px 4px" }}>No hay movimientos con esos filtros.</p>;
+  if (dias.length === 0) return <Vacio icono="archivo" titulo="No hay movimientos con esos filtros" texto="Aquí aparecen los ingresos y egresos del negocio. Prueba con otras fechas o registra un egreso." />;
   return (
     <div className="hist-scroll movs-f" data-lista-mov>
       {dias.map((d) => (

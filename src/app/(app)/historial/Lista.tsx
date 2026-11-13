@@ -1,6 +1,7 @@
 "use client";
 
 import Link from "next/link";
+import { Vacio } from "@/components/Vacio";
 import { useState } from "react";
 import { Avatar } from "@/components/Avatar";
 import { Icono } from "@/components/Icono";
@@ -13,7 +14,7 @@ export type FilaHistorial = {
 
 export function Lista({ filas }: { filas: FilaHistorial[] }) {
   const [abierta, setAbierta] = useState<FilaHistorial | null>(null);
-  if (filas.length === 0) return <p className="muted" style={{ padding: 16 }}>No hay eventos con esos filtros.</p>;
+  if (filas.length === 0) return <Vacio icono="historial" titulo="No hay eventos con esos filtros" texto="Aquí queda todo lo que se hace en la app: cobros, cortes, cambios y quién los hizo." />;
   return (
     <>
       <div className="glass historial">

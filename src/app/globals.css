@@ -3384,7 +3384,7 @@ a.eq2-fila:hover { background: rgba(255,255,255,.45); }
 .fa-cifras > span { display: grid; gap: 4px; align-content: start; }
 .fa-cifras small { font: 500 10px var(--f-mono); letter-spacing: .12em; text-transform: uppercase; color: var(--faint); }
 .fa-cifras b { font: 800 36px/1 var(--f-display); font-variant-numeric: tabular-nums; } .fa-cifras em { font-style: normal; font-size: 12px; color: var(--faint); }
-.fa-dos { display: grid; grid-template-columns: 1fr 1fr; gap: 16px; }
+.fa-dos { display: grid; grid-template-columns: minmax(0, 1.35fr) minmax(0, 1fr); gap: 16px; align-items: start; }
 .fa-card { display: grid; gap: 12px; align-content: start; padding: 18px 20px; border-radius: 20px; }
 .fa-card .eq2-vacia { box-shadow: none; }
 .fa-cuenta { display: grid; gap: 14px; padding: 16px 18px; border-radius: 22px; box-shadow: var(--sh1), var(--hi); }
@@ -4254,11 +4254,19 @@ html, body { overscroll-behavior-y: none; }
 .mc-nueva { justify-content: center; }
 @media (min-width: 900px) {
   .reserva.mc { max-width: 980px; padding-bottom: 40px; }
-  .mc-rejilla { grid-template-columns: minmax(0, 1fr) minmax(0, 420px); gap: 24px; align-items: start; }
+  .mc-rejilla { grid-template-columns: minmax(0, 470px) minmax(0, 360px); justify-content: center; gap: 28px; align-items: start; margin-top: 18px; }
+  .mc-solo-mov { display: none !important; }
   .mc .mc-barra { display: none; }
   .mc-der { position: sticky; top: 84px; }
 }
-@media (max-width: 899px) { .mc .mc-acc { display: none; } }
+@media (max-width: 899px) { .mc .mc-acc, .mc .mc-ayuda { display: none; } }
+.mc-ayuda { display: grid; gap: 12px; padding: 22px; }
+.mc-ayuda .mc-tit { font-size: 19px; }
+.mc-ayuda p { margin: 0; font-size: 14px; line-height: 1.5; }
+.mc-ayuda-i { width: 42px; height: 42px; border-radius: 14px; display: grid; place-items: center; background: #14171c; color: #fff; }
+.mc-ayuda-i svg { width: 19px; height: 19px; }
+.mc-ayuda .mc-cal { justify-self: stretch; justify-content: center; }
+.mc-ayuda small { font-size: 12px; text-align: center; }
 
 /* Reservar en escritorio: contenido a la izquierda y el resumen fijo a la derecha */
 @media (min-width: 900px) {
@@ -5133,3 +5141,39 @@ a.eqa-bt { display: flex; justify-content: center; align-items: center; text-dec
 
 .gu-b { transition: background .25s ease; }
 .gu-b.suave { background: rgba(8, 10, 14, .22); }
+
+.eq2-fila > span small.pend { margin-top: 3px; font-size: 12.5px; }
+
+/* Comprobante de corte: ticket blanco sobre papel arrugado, con el logo arriba */
+.rc-papel { display: grid; justify-items: center; gap: 14px; padding: 26px 18px 30px; border-radius: 16px; background-color: #e7e7e4;
+  background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='600' height='600'%3E%3Cfilter id='p'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='.011' numOctaves='5' seed='7'/%3E%3CfeDiffuseLighting lighting-color='%23f4f4f1' surfaceScale='2.4'%3E%3CfeDistantLight azimuth='35' elevation='52'/%3E%3C/feDiffuseLighting%3E%3C/filter%3E%3Crect width='100%25' height='100%25' filter='url(%23p)'/%3E%3C/svg%3E");
+  background-size: 600px 600px; box-shadow: inset 0 0 0 1px rgba(0,0,0,.04); }
+.rc-logo { width: 104px; height: auto; filter: contrast(1.1); }
+.rc-papel .recibo-c { width: min(100%, 340px); background: #fff; border: 1.5px dotted #6b6f76; border-radius: 2px; padding: 18px 18px 20px; gap: 14px; font-size: 13.5px; color: #15171b;
+  box-shadow: 0 1px 2px rgba(0,0,0,.06), 0 12px 26px rgba(30,30,25,.12); }
+.rc-papel .rc-tit { display: block; font-size: 16.5px; font-weight: 700; margin-bottom: 4px; }
+.rc-papel .rc-cab b { font-size: 15px; }
+.rc-papel .rc-cab { border: 0; border-bottom: 1.5px dotted #8a8e95; }
+.rc-papel .rc-tot { border: 0; border-top: 1.5px dotted #8a8e95; }
+.rc-papel .lab { font: 700 12px var(--f-mono); letter-spacing: .14em; color: #15171b; text-transform: uppercase; }
+.rc-papel .rc-sec > div { font-size: 13.5px; }
+@media print {
+  body.imprimiendo-ticket .rc-papel { background: none !important; box-shadow: none; padding: 0; }
+  body.imprimiendo-ticket .rc-logo { width: 40mm; }
+}
+
+/* Pantallas vacías: amplias, centradas y con un ícono que flota suave */
+.vacio-g { display: grid; justify-items: center; align-content: center; gap: 6px; text-align: center; min-height: 260px; padding: 34px 24px; border-radius: 22px;
+  background: linear-gradient(180deg, rgba(255,255,255,.55), rgba(255,255,255,.2)); border: 1px solid rgba(255,255,255,.6); box-shadow: inset 0 1px 0 rgba(255,255,255,.6); }
+.vacio-g b { font-size: 16px; color: var(--fg); margin-top: 8px; }
+.vacio-g small { font-size: 13.5px; line-height: 1.5; color: var(--muted); max-width: 380px; }
+.vacio-g-i { width: 56px; height: 56px; border-radius: 18px; display: grid; place-items: center; color: #4f5f78; background: rgba(255,255,255,.75);
+  box-shadow: 0 10px 26px rgba(40,52,72,.12), inset 0 1px 0 #fff; animation: vacio-flota 4s ease-in-out infinite; }
+.vacio-g-i svg { width: 24px; height: 24px; }
+@keyframes vacio-flota { 50% { transform: translateY(-5px); } }
+.vacio-g.chico { min-height: 0; padding: 22px 18px; background: none; border: 0; box-shadow: none; }
+.vacio-g.chico .vacio-g-i { width: 44px; height: 44px; border-radius: 14px; animation: none; }
+.vacio-g.chico .vacio-g-i svg { width: 19px; height: 19px; }
+.fa-card .vacio-g, .glass .vacio-g { background: none; border: 0; box-shadow: none; }
+@media (prefers-reduced-motion: reduce) { .vacio-g-i { animation: none; } }
+.fa-card .vacio-g { min-height: 0; padding: 18px 10px; }

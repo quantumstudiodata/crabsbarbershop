@@ -1,6 +1,7 @@
 "use client";
 
 import Link from "next/link";
+import { Vacio } from "@/components/Vacio";
 import { useRouter } from "next/navigation";
 import { useEffect, useMemo, useRef, useState, useTransition } from "react";
 import { Avatar } from "@/components/Avatar";
@@ -193,7 +194,7 @@ function VistaLista({ citas, ahora, esHoy, abrir, puede, avisar }: { citas: Cita
             {puede.pagos && <button type="button" aria-current={filtro === "pago" ? "page" : undefined} onClick={() => setFiltro("pago")}>Pago pendiente</button>}
           </nav>
         </div>
-        {lista.length === 0 && <p className="muted vacio-c">No hay citas{filtro !== "todas" ? " con ese filtro" : " este día"}.</p>}
+        {lista.length === 0 && <Vacio icono="calendario" titulo={filtro !== "todas" ? "No hay citas con ese filtro" : "No hay citas este día"} texto={filtro !== "todas" ? "Prueba con otro filtro o con otro día." : "Cuando alguien reserve o agendes una cita, aparecerá aquí con su hora y su cliente."} />}
         {lista.map((c) => (
           <div key={c.id} role="button" tabIndex={0} className={`fila-cita ${activa(c.estado) ? "" : "pasada"}`} onClick={() => abrir(c)} onKeyDown={(e) => { if (e.key === "Enter") abrir(c); }}>
             <span className="h-c num">{c.hora}<small>{c.duracion} min</small></span>

@@ -1,6 +1,7 @@
 "use client";
 
 import { useState } from "react";
+import { Vacio } from "@/components/Vacio";
 import { Avatar } from "@/components/Avatar";
 import { Cajon } from "@/components/Cajon";
 import { Icono } from "@/components/Icono";
@@ -61,7 +62,7 @@ export function NecesitaRevision({ cortes, puede }: { cortes: Corte[]; puede: bo
 export function TablaCortes({ cortes, corregir }: { cortes: Corte[]; corregir: boolean }) {
   const [ver, setVer] = useState<Corte | null>(null);
   const [ajuste, setAjuste] = useState<Corte | null>(null);
-  if (!cortes.length) return <p className="muted" style={{ padding: "8px 4px" }}>No hay cortes con esos filtros.</p>;
+  if (!cortes.length) return <Vacio icono="candado" titulo="No hay cortes con esos filtros" texto="Cada vez que alguien cierre la caja, el corte aparecerá aquí con lo vendido y si sobró o faltó dinero." />;
   return (
     <>
       <div className="hist-scroll tabla-c-scroll">
@@ -122,6 +123,9 @@ function Detalle({ c, cerrar, ajustar }: { c: Corte | null; cerrar: () => void; 
     <Cajon abierto={!!c} cerrar={cerrar} titulo={c ? `Corte ${c.folio}` : ""}
       pie={c && <>{ajustar && <button type="button" className="enlace" onClick={() => ajustar(c)}>Registrar ajuste</button>}<button type="button" className="bt chico" onClick={() => imprimir(c.folio)}><Icono n="imprimir" />Imprimir</button></>}>
       {c && (
+        <div className="rc-papel">
+        {/* eslint-disable-next-line @next/next/no-img-element */}
+        <img className="rc-logo" src="/logo-crabs.png" alt="Crabs" width={946} height={209} />
         <div className="recibo-c">
           <div className="rc-cab"><span className="rc-tit">Corte de caja {c.folio}</span><b>{c.dia}</b><small>{c.horario}</small><small>Abrió {primer(c.abrio.nombre)}, cerró {primer(c.cerro.nombre)}</small></div>
           <div className="rc-sec"><span className="lab">Cobros</span>
@@ -154,6 +158,7 @@ function Detalle({ c, cerrar, ajustar }: { c: Corte | null; cerrar: () => void; 
               {c.ajustes.map((a, i) => <p key={i}>{a}</p>)}
             </div>
           )}
+        </div>
         </div>
       )}
       {foto && <Visor e={foto} cerrar={() => setFoto(null)} />}

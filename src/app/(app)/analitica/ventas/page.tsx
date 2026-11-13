@@ -1,4 +1,5 @@
 import { redirect } from "next/navigation";
+import { Vacio } from "@/components/Vacio";
 import { asentarCitasPagadas } from "@/lib/pagos";
 import { AvisoUrl } from "@/components/Encabezado";
 import { BarraFiltros } from "@/components/BarraFiltros";
@@ -106,7 +107,7 @@ export default async function Ventas({ searchParams }: { searchParams: Promise<Q
       <section className="glass panel-hist subir d1">
         <BarraFiltros p={p} hoy={hoy} personas={equipo} persona={persona} buscar={f.buscar} sinPeriodo="Todas las fechas" textoBuscar="Buscar folio, servicio o barbero"
           descarga={s.puede("reportes.exportar") ? urlDescarga("ventas", f) : undefined} />
-        {historial.length ? <HistorialVentas dias={historial} regreso={regreso} opciones={opciones} sinMarco /> : <p className="muted" style={{ padding: "8px 4px" }}>No hay ventas con esos filtros.</p>}
+        {historial.length ? <HistorialVentas dias={historial} regreso={regreso} opciones={opciones} sinMarco /> : <Vacio icono="lista" titulo="No hay ventas con esos filtros" texto="En cuanto se cobre un servicio aparecerá aquí con su hora, folio y total. Si buscas algo en especial, prueba con otras fechas." />}
       </section>
       <Paginacion ruta="/analitica/ventas" params={q as Record<string, string | undefined>} pagina={r.pagina} paginas={r.paginas}
         texto={resumen.dias.length ? (movil ? `Página ${r.pagina} de ${r.paginas}` : `${resumen.dias.length} ${resumen.dias.length === 1 ? "día" : "días"} con ventas${r.paginas > 1 ? `, página ${r.pagina} de ${r.paginas}` : ""}`) : ""} />

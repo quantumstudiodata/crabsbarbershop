@@ -1,6 +1,7 @@
 "use client";
 
 import Link from "next/link";
+import { Vacio } from "@/components/Vacio";
 import { prepararArchivo } from "@/lib/archivo";
 import { useActionState, useEffect, useState, useTransition } from "react";
 import { Calendario } from "@/components/Calendario";
@@ -53,7 +54,7 @@ export function Egresos({ dias, hoy, cajaAbierta, puede, categorias, resumen, et
 
       <section className="subir d1">
         <div className="glass historial">
-          {dias.length === 0 ? <p className="muted" style={{ padding: 16 }}>No hay egresos en estas fechas.</p> : (
+          {dias.length === 0 ? <Vacio icono="archivo" titulo="No hay egresos en estas fechas" texto="Registra la renta, la luz o cualquier gasto del negocio y aparecerá aquí." /> : (
             <div className="hist-scroll">
               {dias.map((d) => (
                 <div key={d.fecha}>
