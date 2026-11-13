@@ -29,7 +29,7 @@ export function AjustesCitas(p: {
   const c = p.inicial.config;
   const base = () => ({
     usaCitas: p.inicial.usaCitas, enLinea: c.enLinea, slug: p.inicial.slug, horario: p.inicial.horario, diasCerrados: p.inicial.cerrados,
-    anticipacionMinHoras: String(c.anticipacionMinMin / 60), anticipacionMaxDias: String(c.anticipacionMaxDias), margenMin: String(c.margenMin), pasoMin: String(c.pasoMin),
+    anticipacionMinHoras: String(c.anticipacionMinMin / 60), anticipacionMaxDias: String(c.anticipacionMaxDias), margenMin: String(c.margenMin), pasoMin: String(c.pasoMin), maxCitasCliente: String(c.maxCitasCliente),
     elegirBarbero: c.elegirBarbero, cualquierBarbero: c.cualquierBarbero, variosServicios: c.variosServicios,
     pagoModo: c.pago.modo, pagoValor: c.pago.modo === "anticipo_pct" || c.pago.modo === "anticipo_fijo" ? String(c.pago.valor / 100) : "",
     cancelarHorasAntes: String(c.cancelarHorasAntes), clienteCancela: c.clienteCancela, politicaCancelacion: c.politicaCancelacion, politicaReembolso: c.politicaReembolso,
@@ -101,6 +101,15 @@ export function AjustesCitas(p: {
                 const despues = [sigue, ...[660 + paso, 660 + paso * 2, 660 + paso * 3].filter((m) => m > sigue)].slice(0, 2).map(hora).join(" o ");
                 return `Tus clientes ven horarios como ${lista}. Si alguien reserva a las 11:00 un servicio de 1 hora${margen ? ` y el descanso es de ${margen === 60 ? "1 hora" : `${margen} min`}` : ""}, el siguiente horario disponible es ${despues}.`;
               })()}</p>
+            </section>
+            <section className="glass ac-card">
+              <span className="lab">Citas próximas por cliente</span>
+              <div className="ac-chips" role="radiogroup" aria-label="Citas próximas por cliente">
+                {(["0", "1", "2", "3", "5"].includes(d.maxCitasCliente) ? ["0", "1", "2", "3", "5"] : ["0", "1", "2", "3", "5", d.maxCitasCliente]).map((v) => (
+                  <button type="button" key={v} role="radio" aria-checked={d.maxCitasCliente === v} className={d.maxCitasCliente === v ? "on" : ""} onClick={() => cambia({ maxCitasCliente: v })}>{v === "0" ? "Sin límite" : v === "1" ? "1 cita" : `${v} citas`}</button>
+                ))}
+              </div>
+              <p className="ac-ejemplo">{d.maxCitasCliente === "0" ? "Un cliente puede tener todas las citas que quiera apartadas al mismo tiempo." : `Un mismo teléfono puede tener hasta ${d.maxCitasCliente === "1" ? "1 cita próxima" : `${d.maxCitasCliente} citas próximas`}. Si quiere otra, se le pide que escriba al negocio. Sirve para que nadie aparte muchos horarios.`}</p>
             </section>
             <section className="glass ac-card">
               <span className="lab">Cómo reservan</span>

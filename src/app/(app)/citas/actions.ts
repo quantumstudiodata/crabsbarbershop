@@ -233,7 +233,7 @@ export async function quitarBloqueo(id: string): Promise<Res> {
 
 export async function guardarConfigCitas(d: {
   usaCitas: boolean; enLinea: boolean; slug: string; horario: Record<string, [string, string]>; diasCerrados: string[];
-  anticipacionMinHoras: string; anticipacionMaxDias: string; margenMin: string; pasoMin?: string; clienteCancela?: boolean;
+  anticipacionMinHoras: string; anticipacionMaxDias: string; margenMin: string; pasoMin?: string; clienteCancela?: boolean; maxCitasCliente?: string;
   elegirBarbero: boolean; cualquierBarbero: boolean; variosServicios: boolean;
   pagoModo: ModoPago; pagoValor: string; cancelarHorasAntes: string; politicaCancelacion: string; politicaReembolso: string;
 }): Promise<Res> {
@@ -255,6 +255,7 @@ export async function guardarConfigCitas(d: {
   const config = leerConfig({
     ...leerConfig(s.barberia.citasConfig), enLinea: !!d.enLinea,
     anticipacionMinMin: Math.round(antMin * 60), anticipacionMaxDias: antMax, margenMin: margen, pasoMin: paso, clienteCancela: !!d.clienteCancela,
+    maxCitasCliente: n(d.maxCitasCliente ?? "3", 0, 20) ?? 3,
     elegirBarbero: !!d.elegirBarbero, cualquierBarbero: !!d.cualquierBarbero, variosServicios: !!d.variosServicios,
     pago: { modo: d.pagoModo, valor }, cancelarHorasAntes: cancelar,
     politicaCancelacion: String(d.politicaCancelacion ?? "").trim(), politicaReembolso: String(d.politicaReembolso ?? "").trim(),

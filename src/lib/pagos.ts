@@ -68,7 +68,32 @@ export const asentarCitasPagadas = cache(async (barberiaId: string) => {
   await comisionesStripe(barberiaId).catch((err) => console.error("comision_stripe", err));
 });
 
-export const CATEGORIA_COMISIONES = "Comisiones Stripe";
+export const CATEGORIA_COMISIONES = "Comisiones por pago en línea";
+/** Nombre anterior: se juntó con el nuevo para que no salgan dos categorías iguales. */
+const CATEGORIA_VIEJA = "Comisiones Stripe";
+
+/**
+ * La categoría de comisiones por pagos en línea, una sola. Si el negocio ya creó una con ese nombre (con otras mayúsculas),
+ * se usa esa; la vieja "Comisiones Stripe" se junta con ella.
+ */
+export async function categoriaComisiones(barberiaId: string) {
+  const cats = await db.select({ id: schema.categoriasGasto.id, nombre: schema.categoriasGasto.nombre }).from(schema.categoriasGasto).where(eq(schema.categoriasGasto.barberiaId, barberiaId));
+  const propia = cats.find((c) => c.nombre.trim().toLowerCase() === CATEGORIA_COMISIONES.toLowerCase());
+  const nombre = propia?.nombre ?? CATEGORIA_COMISIONES;
+  if (!propia) await db.insert(schema.categoriasGasto).values({ barberiaId, nombre, orden: 99 }).onConflictDoNothing();
+  const vieja = cats.find((c) => c.nombre === CATEGORIA_VIEJA);
+  if (vieja) {
+    await db.transaction(async (tx) => {
+      await tx.update(schema.gastos).set({ categoria: nombre }).where(and(eq(schema.gastos.barberiaId, barberiaId), eq(schema.gastos.categoria, CATEGORIA_VIEJA)));
+      await tx.update(schema.conceptosFrecuentes).set({ categoria: nombre }).where(and(eq(schema.conceptosFrecuentes.barberiaId, barberiaId), eq(schema.conceptosFrecuentes.categoria, CATEGORIA_VIEJA)));
+      await tx.delete(schema.categoriasGasto).where(eq(schema.categoriasGasto.id, vieja.id));
+    });
+  }
+  return nombre;
+}
+
+/** Las comisiones por pagos en línea nunca salen de la caja: no se ofrecen como gasto de caja. */
+export const esCategoriaComisiones = (nombre: string) => [CATEGORIA_COMISIONES.toLowerCase(), CATEGORIA_VIEJA.toLowerCase()].includes(nombre.trim().toLowerCase());
 
 /**
  * Lo que Stripe cobra por cada pago en línea se anota solo como egreso, para que Finanzas y la libreta cuadren.
@@ -78,15 +103,14 @@ export async function comisionesStripe(barberiaId: string) {
   if (!process.env.STRIPE_SECRET_KEY) return;
   const [b] = await db.select({ cuenta: schema.barberias.stripeCuenta, zona: schema.barberias.zonaHoraria }).from(schema.barberias).where(eq(schema.barberias.id, barberiaId)).limit(1);
   if (!b?.cuenta) return;
+  const categoria = await categoriaComisiones(barberiaId);
   const pagos = await db.select({ id: pagosLinea.id, intento: pagosLinea.intento, pagadoEn: pagosLinea.pagadoEn, tipo: pagosLinea.tipo }).from(pagosLinea)
     .where(and(eq(pagosLinea.barberiaId, barberiaId), inArray(pagosLinea.estado, ["pagado", "reembolsado"]), sql`${pagosLinea.intento} is not null`, sql`not (${pagosLinea.detalle} ? 'sinComision')`, sql`coalesce((${pagosLinea.detalle}->>'cargo')::int, 0) = 0`,
-      sql`not exists (select 1 from ${schema.gastos} g where g.barberia_id = ${barberiaId} and g.categoria = ${CATEGORIA_COMISIONES} and g.descripcion like '%' || ${pagosLinea.intento} || '%')`)).limit(10);
+      sql`not exists (select 1 from ${schema.gastos} g where g.barberia_id = ${barberiaId} and g.descripcion like '%' || ${pagosLinea.intento} || '%')`)).limit(10);
   if (!pagos.length) return;
   const [titular] = await db.select({ id: schema.usuarios.id }).from(schema.usuarios)
     .where(and(eq(schema.usuarios.barberiaId, barberiaId), eq(schema.usuarios.rol, "duena"))).limit(1);
   if (!titular) return;
-  // La categoría existe para que aparezca en Finanzas como cualquier otra.
-  await db.insert(schema.categoriasGasto).values({ barberiaId, nombre: CATEGORIA_COMISIONES, orden: 99 }).onConflictDoNothing();
   for (const p of pagos) {
     try {
       const pi = await stripe().paymentIntents.retrieve(p.intento!, { expand: ["latest_charge.balance_transaction"] }, { stripeAccount: b.cuenta });
@@ -95,7 +119,7 @@ export async function comisionesStripe(barberiaId: string) {
       if (!bt?.fee) continue;
       const fecha = new Intl.DateTimeFormat("en-CA", { timeZone: b.zona, year: "numeric", month: "2-digit", day: "2-digit" }).format(p.pagadoEn ?? new Date());
       await db.insert(schema.gastos).values({
-        barberiaId, categoria: CATEGORIA_COMISIONES, concepto: p.tipo === "cita" ? "Comisión por pago de cita en línea" : "Comisión por cobro con QR",
+        barberiaId, categoria, concepto: p.tipo === "cita" ? "Comisión por pago de cita en línea" : "Comisión por cobro con QR",
         descripcion: `Stripe ${pi.id}`, monto: bt.fee, fecha, metodo: "transferencia", usuarioId: titular.id,
       });
     } catch (err) {

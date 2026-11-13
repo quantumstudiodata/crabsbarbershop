@@ -19,6 +19,7 @@ export type ConfigCitas = {
   politicaCancelacion: string;
   politicaReembolso: string;
   apartarMin: number; // minutos que se guarda un horario mientras el cliente paga
+  maxCitasCliente: number; // citas próximas que un mismo teléfono puede tener a la vez (0 = sin límite)
   // Interruptores de Ajustes, Horarios: apagados no borran lo configurado, solo dejan de aplicarse.
   usaHorarioPersona: boolean;
   usaRotacion: boolean;
@@ -36,7 +37,7 @@ export const CONFIG_CITAS: ConfigCitas = {
   elegirBarbero: true, cualquierBarbero: true, variosServicios: true,
   pago: { modo: "sin_pago", valor: 0 }, cancelarHorasAntes: 2, clienteCancela: false,
   politicaCancelacion: "Puedes cambiar tu cita hasta 2 horas antes. Si llegas tarde, esperas tu turno o te atiende quien esté libre. Si no llegas, te contactamos para reagendar.",
-  politicaReembolso: "", apartarMin: 10,
+  politicaReembolso: "", apartarMin: 10, maxCitasCliente: 3,
   usaHorarioPersona: true, usaRotacion: true, usaBloqueos: true, usaDescansoFijo: true, descansosFijos: [],
 };
 
@@ -60,6 +61,7 @@ export function leerConfig(raw: unknown): ConfigCitas {
     politicaCancelacion: typeof r.politicaCancelacion === "string" ? r.politicaCancelacion.slice(0, 400) : d.politicaCancelacion,
     politicaReembolso: typeof r.politicaReembolso === "string" ? r.politicaReembolso.slice(0, 400) : d.politicaReembolso,
     apartarMin: num(r.apartarMin, d.apartarMin, 5, 30),
+    maxCitasCliente: num(r.maxCitasCliente, d.maxCitasCliente, 0, 20),
     usaHorarioPersona: r.usaHorarioPersona ?? d.usaHorarioPersona,
     usaRotacion: r.usaRotacion ?? d.usaRotacion,
     usaBloqueos: r.usaBloqueos ?? d.usaBloqueos,

@@ -1,5 +1,5 @@
 import { and, eq, gt, inArray, isNull, sql } from "drizzle-orm";
-import { asentarCitasPagadas } from "@/lib/pagos";
+import { asentarCitasPagadas, esCategoriaComisiones } from "@/lib/pagos";
 import { cobraEnLinea } from "@/lib/stripe";
 import { requerirSesion } from "@/lib/auth";
 import { cajaOAbrir, categoriasGasto, equipoQueAtiende, folioCorte, metodosActivos, movimientosDeTurno, serviciosActivos } from "@/lib/datos";
@@ -89,7 +89,7 @@ export default async function Cobrar({ searchParams }: { searchParams: Promise<{
             )}
           </>
         )}
-      {opera && <CajaModal inicial={q.caja === "cerrar" ? "corte" : q.caja === "retiro" ? "retiro" : null} turno={turno} limiteDiferencia={s.barberia.limiteDiferenciaCaja} categorias={cats.map((c) => c.nombre)} evidencias={s.barberia.usaEvidenciaCorte} />}
+      {opera && <CajaModal inicial={q.caja === "cerrar" ? "corte" : q.caja === "retiro" ? "retiro" : null} turno={turno} limiteDiferencia={s.barberia.limiteDiferenciaCaja} categorias={cats.filter((c) => !esCategoriaComisiones(c.nombre)).map((c) => c.nombre)} evidencias={s.barberia.usaEvidenciaCorte} />}
     </>
   );
 }

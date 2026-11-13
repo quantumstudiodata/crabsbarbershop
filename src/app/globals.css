@@ -5029,8 +5029,8 @@ html, body { overscroll-behavior-y: none; }
 /* Corte de caja: comisiones del corte y entregas */
 .ck-con > .ck-per, .ck-ent > .ck-per { display: grid; grid-template-columns: auto 1fr auto; gap: 10px; align-items: center; text-align: left; }
 .ck-con > .ck-ent { display: grid; justify-content: stretch; }
-.ck-per > span { display: flex; align-items: flex-start; flex-direction: column; font-weight: 600; font-size: 14px; }
-.ck-per > span small { font-weight: 400; font-size: 12px; color: var(--muted); }
+.ck-per > span:not(.avatar) { display: flex; align-items: flex-start; flex-direction: column; font-weight: 600; font-size: 14px; }
+.ck-per > span:not(.avatar) small { font-weight: 400; font-size: 12px; color: var(--muted); }
 .ck-ent { display: grid; gap: 8px; padding: 10px 0; border-top: 1px solid rgba(30,45,60,.07); }
 .ck-ent:first-of-type { border-top: 0; padding-top: 4px; }
 .ck-seg { display: grid !important; grid-template-columns: repeat(3, 1fr); }

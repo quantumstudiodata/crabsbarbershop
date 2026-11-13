@@ -164,7 +164,7 @@ export function CajaModal({ inicial, turno, limiteDiferencia, categorias, eviden
   if (!vista || !turno) return null;
 
   if (vista === "retiro") {
-    const sugeridos = tipoMov === "retiro" ? ["Depósito al banco", "Pago de comisiones", "Pago de servicios"] : ["Más cambio", "Reposición del fondo"];
+    const sugeridos = tipoMov === "retiro" ? ["Depósito al banco", "Pago de servicios"] : ["Más cambio", "Reposición del fondo"];
     return (
       <Modal abierto cerrar={cerrar} etiqueta="Caja" titulo={tipoMov === "retiro" ? "Sacar efectivo" : "Meter efectivo"}>
         <form action={accMov} className="pila">
