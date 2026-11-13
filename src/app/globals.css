@@ -4898,8 +4898,11 @@ html, body { overscroll-behavior-y: none; }
 .gu { position: fixed; inset: 0; z-index: 10000; pointer-events: none; font-family: var(--f-body); }
 .gu > * { pointer-events: auto; }
 .gu-b { position: fixed; background: rgba(8, 10, 14, .64); backdrop-filter: saturate(.7); }
-.gu-hueco { position: fixed; border-radius: 16px; pointer-events: none !important; transition: all .45s cubic-bezier(.65,0,.25,1); box-shadow: 0 0 0 1.5px rgba(255,255,255,.9), 0 0 28px rgba(159,180,212,.35); animation: gu-late 2s ease-in-out infinite; }
-@keyframes gu-late { 50% { box-shadow: 0 0 0 1.5px rgba(255,255,255,.9), 0 0 44px rgba(159,180,212,.55); } }
+.gu-hueco { position: fixed; border-radius: 16px; pointer-events: none !important; transition: all .45s cubic-bezier(.65,0,.25,1);
+  box-shadow: 0 0 0 1.5px rgba(255,255,255,.9), 0 0 28px rgba(159,180,212,.35), 0 0 0 200vmax rgba(8, 10, 14, .64); animation: gu-late 2s ease-in-out infinite; }
+@keyframes gu-late { 50% { box-shadow: 0 0 0 1.5px rgba(255,255,255,.9), 0 0 44px rgba(159,180,212,.55), 0 0 0 200vmax rgba(8, 10, 14, .64); } }
+/* Los paneles solo bloquean toques; el oscurecido lo dibuja el hueco, así sigue la forma redondeada del elemento. */
+.gu-b.marco { background: transparent !important; backdrop-filter: none; }
 .gu-tapa { position: fixed; background: transparent; border: 0; border-radius: 16px; cursor: pointer; padding: 0; }
 .gu-puntero { position: fixed; z-index: 3; pointer-events: none !important; animation: gu-llega 1s cubic-bezier(.3,.1,.2,1) both; }
 .gu-puntero svg { display: block; filter: drop-shadow(0 6px 12px rgba(0,0,0,.45)); animation: gu-clic 1.3s ease-in-out 1s infinite; transform-origin: 30% 10%; }

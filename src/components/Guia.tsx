@@ -213,10 +213,10 @@ function Recorrido({ punto, lista, hechos, esc, ruta, ir, listo }: {
       {/* Cuatro paneles bloquean todo menos lo señalado. */}
       {caja ? (
         <>
-          <div className="gu-b" style={{ left: 0, top: 0, right: 0, height: Math.max(caja.y - PAD, 0) }} />
-          <div className="gu-b" style={{ left: 0, top: caja.y + caja.h + PAD, right: 0, bottom: 0 }} />
-          <div className="gu-b" style={{ left: 0, top: caja.y - PAD, width: Math.max(caja.x - PAD, 0), height: caja.h + PAD * 2 }} />
-          <div className="gu-b" style={{ left: caja.x + caja.w + PAD, top: caja.y - PAD, right: 0, height: caja.h + PAD * 2 }} />
+          <div className="gu-b marco" style={{ left: 0, top: 0, right: 0, height: Math.max(caja.y - PAD, 0) }} />
+          <div className="gu-b marco" style={{ left: 0, top: caja.y + caja.h + PAD, right: 0, bottom: 0 }} />
+          <div className="gu-b marco" style={{ left: 0, top: caja.y - PAD, width: Math.max(caja.x - PAD, 0), height: caja.h + PAD * 2 }} />
+          <div className="gu-b marco" style={{ left: caja.x + caja.w + PAD, top: caja.y - PAD, right: 0, height: caja.h + PAD * 2 }} />
           <div className="gu-hueco" style={{ left: caja.x - PAD, top: caja.y - PAD, width: caja.w + PAD * 2, height: caja.h + PAD * 2, borderRadius: caja.r }} />
           {intercepta && <button type="button" className="gu-tapa" aria-label={accion} style={{ left: caja.x - PAD, top: caja.y - PAD, width: caja.w + PAD * 2, height: caja.h + PAD * 2, borderRadius: caja.r }} onClick={() => (paso!.modo === "final" ? terminar(paso!) : avanzar())} />}
           <span key={`p${i}${punto}${enRuta}`} className={`gu-puntero ${tactil ? "dedo" : "cursor"}`} style={{ left: cx, top: cy }} aria-hidden="true">
