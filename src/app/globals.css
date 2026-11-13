@@ -5056,3 +5056,11 @@ a.eqa-bt { display: flex; justify-content: center; align-items: center; text-dec
 
 .cfg-auto { display: grid; grid-template-columns: auto 1fr; gap: 12px; align-items: start; padding: 12px 14px; border-radius: 14px; background: rgba(255,255,255,.55); border: 1px solid var(--line); }
 .cfg-auto span { display: flex; flex-direction: column; gap: 2px; } .cfg-auto small { color: var(--muted); font-size: 12.5px; }
+
+.pnd-rec { display: grid; gap: 6px; max-height: 50dvh; overflow: auto; }
+.pnd-rec-f { display: grid; grid-template-columns: 52px 1fr auto; gap: 10px; align-items: center; padding: 10px 12px; border-radius: 14px; background: rgba(255,255,255,.6); border: 1px solid var(--line); color: var(--fg); text-decoration: none; }
+.pnd-rec-f span { display: flex; flex-direction: column; font-weight: 600; } .pnd-rec-f small { font-weight: 400; color: var(--muted); font-size: 12px; }
+.pnd-rec-f b { font: 800 18px var(--f-display); }
+.pnd-rec-e { flex-direction: row !important; align-items: center; gap: 6px; font-size: 13px; color: #4f5f78; }
+.pnd-rec-e svg { width: 15px; height: 15px; }
+.pnd-rec-f.ok { opacity: .65; }

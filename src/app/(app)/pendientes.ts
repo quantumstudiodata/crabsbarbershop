@@ -6,7 +6,9 @@ import { formatoDinero } from "@/lib/money";
 import { DIAS_TRANSFERENCIA, autoconfirmarTransferencias } from "@/lib/transferencias";
 
 type Sesion = Awaited<ReturnType<typeof requerirSesion>>;
-export type Pendiente = { id: string; tipo: "llegar" | "cobrar" | "pago" | "transferencia"; titulo: string; detalle: string; citaId: string; dia: string; tel?: string; enlace?: string; cliente?: string; hora?: string; comprobante?: boolean };
+export type Pendiente = { id: string; tipo: "llegar" | "cobrar" | "pago" | "transferencia" | "recordar"; titulo: string; detalle: string; citaId: string; dia: string; tel?: string; enlace?: string; cliente?: string; hora?: string; comprobante?: boolean;
+  /** Citas de mañana para recordar por WhatsApp. */
+  lista?: { id: string; cliente: string; hora: string; tel: string; enlace: string; con: string }[] };
 
 const primer = (n: string) => n.trim().split(" ")[0];
 
@@ -39,6 +41,12 @@ export async function pendientesDe(s: Sesion, hoy: string, zona: string, persona
         inArray(schema.citas.estado, ["en_espera", "apartada"]), ...(persona ? [eq(schema.citas.barberoId, persona)] : [])))
       .orderBy(desc(schema.pagosLinea.pagadoEn)).limit(5),
   ]);
+  // Citas de mañana: se les recuerda por WhatsApp con su enlace para cambiarla si lo necesitan.
+  const manana = new Date(new Date(`${hoy}T12:00:00Z`).getTime() + 86400000).toISOString().slice(0, 10);
+  const deManana = s.puede("citas.modificar") ? await db.select({ id: schema.citas.id, cliente: schema.citas.clienteNombre, tel: schema.citas.clienteTelefono, inicio: schema.citas.inicio, token: schema.citas.token, barbero: schema.usuarios.nombre })
+    .from(schema.citas).innerJoin(schema.usuarios, eq(schema.usuarios.id, schema.citas.barberoId))
+    .where(and(eq(schema.citas.barberiaId, s.barberia.id), eq(schema.citas.estado, "en_espera"), sql`(${schema.citas.inicio} at time zone ${zona})::date = ${manana}::date`, ...(persona ? [eq(schema.citas.barberoId, persona)] : [])))
+    .orderBy(schema.citas.inicio) : [];
   const hace = (d: Date) => { const m = Math.round((ahora - d.getTime()) / 60000); return m < 60 ? `hace ${m} min` : `hace ${Math.floor(m / 60)} h ${m % 60 ? `${m % 60} min` : ""}`.trim(); };
   const dia = (d: Date) => fechaLocal(d, zona) === hoy ? "hoy" : new Intl.DateTimeFormat("es-MX", { timeZone: zona, weekday: "short", day: "numeric" }).format(d).replace(".", "");
   return [
@@ -48,5 +56,8 @@ export async function pendientesDe(s: Sesion, hoy: string, zona: string, persona
       detalle: otroDia ? `Cita del ${dia(c.inicio)} a las ${horaCorta(c.inicio, zona)} con ${primer(c.barbero)}. Marca si llegó o no vino` : `Cita de las ${horaCorta(c.inicio, zona)} con ${primer(c.barbero)}, ${hace(c.inicio)}` }; }),
     ...sinCobrar.map((c) => ({ id: `c-${c.id}`, citaId: c.id, tipo: "cobrar" as const, dia: fechaLocal(c.inicio, zona), titulo: `Falta cobrar a ${primer(c.cliente)}`, detalle: `${c.servicios.map((x) => x.nombre).join(" y ")} con ${primer(c.barbero)}${fechaLocal(c.inicio, zona) !== hoy ? `, cita del ${dia(c.inicio)}` : ""}, ${formatoDinero(Math.max(c.total - c.pagado, 0))}` })),
     ...pagos.map((p) => ({ id: `p-${p.id}`, citaId: p.citaId!, tipo: "pago" as const, dia: fechaLocal(p.inicio, zona), titulo: `${primer(p.cliente)} pagó en línea`, detalle: `${formatoDinero(p.monto)}${p.tarjeta ? ` con ${p.tarjeta}` : ""}, cita ${fechaLocal(p.inicio, zona) === hoy ? "hoy" : new Intl.DateTimeFormat("es-MX", { timeZone: zona, weekday: "short", day: "numeric" }).format(p.inicio).replace(".", "")} ${horaCorta(p.inicio, zona)}` })),
+    ...(deManana.length ? [{ id: `r-${manana}`, citaId: "", tipo: "recordar" as const, dia: manana, titulo: deManana.length === 1 ? "Recuerda la cita de mañana" : `Recuerda las ${deManana.length} citas de mañana`,
+      detalle: "Un mensaje por WhatsApp con su hora y su enlace baja las inasistencias",
+      lista: deManana.map((c) => ({ id: c.id, cliente: primer(c.cliente), hora: horaCorta(c.inicio, zona), tel: c.tel, con: primer(c.barbero), enlace: s.barberia.slug ? `/reservar/${s.barberia.slug}/cita/${c.token}` : "" })) }] : []),
   ];
 }
