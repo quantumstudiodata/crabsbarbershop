@@ -63,6 +63,8 @@ export function FormCobro(p: {
   // En el teléfono: una sola categoría abierta a la vez y el resumen de la venta en un panel inferior.
   const [catAbierta, setCatAbierta] = useState<string | null>(null);
   const [hoja, setHoja] = useState(false);
+  // En el teléfono la hoja se cierra al cobrar: el aviso de venta cobrada (con la encuesta) se muestra aparte, hasta cerrarlo.
+  const [okCerrado, setOkCerrado] = useState<string | null>(null);
   const raiz = useRef<HTMLFormElement>(null);
 
   const limpiar = () => {
@@ -296,6 +298,14 @@ export function FormCobro(p: {
         <span className="bc-total num">{formatoDinero(total)}</span>
         <button type="button" className="bt" disabled={!nServ} onClick={() => setHoja(true)}>Cobrar</button>
       </div>
+      {ultima && lineas.length === 0 && !hoja && okCerrado !== ultima.folio && (
+        <div className="cobro-ok cobro-ok-flota" role="status">
+          <span className="cobro-ok-i" aria-hidden="true"><Icono n="palomita" /></span>
+          <span className="cobro-ok-t"><b>Venta cobrada</b><small>{ultima.folio}, {formatoDinero(ultima.total)}</small></span>
+          {ultima.encuesta && <EncuestaQR token={ultima.encuesta} />}
+          <button type="button" className="icb cobro-ok-x" onClick={() => setOkCerrado(ultima.folio)} aria-label="Cerrar aviso"><Icono n="cerrar" /></button>
+        </div>
+      )}
       {hoja && <div className="velo-hoja" onClick={() => setHoja(false)} aria-hidden="true" />}
 
       <aside className={`glass ticket ${hoja ? "hoja-abierta" : ""}`} aria-label="Esta venta">

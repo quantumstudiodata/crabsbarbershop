@@ -5192,3 +5192,13 @@ a.eqa-bt { display: flex; justify-content: center; align-items: center; text-dec
 .cero-op { display: flex; gap: 12px; align-items: flex-start; padding: 12px 14px; border-radius: 14px; background: rgba(255,255,255,.55); border: 1px solid var(--line); cursor: pointer; }
 .cero-op input { width: 18px; height: 18px; margin-top: 2px; accent-color: #2b3a47; flex: none; }
 .cero-op span { display: grid; gap: 3px; } .cero-op b { font-size: 14px; } .cero-op small { font-size: 12.5px; color: var(--muted); line-height: 1.4; }
+
+/* Cobro en teléfono: aviso de venta cobrada con la encuesta, encima de la barra de cobro */
+.cobro-ok-flota { display: none !important; }
+@media (max-width: 760px) {
+  .cobro-ok-flota { display: grid !important; grid-template-columns: auto minmax(0,1fr) auto auto; position: fixed; left: 10px; right: 10px; bottom: calc(84px + env(safe-area-inset-bottom, 0px)); z-index: 49;
+    box-shadow: 0 18px 40px -18px rgba(20,35,50,.55); animation: ok-sube .4s cubic-bezier(.2,1.2,.35,1); }
+  .cobro-ok-x { width: 32px; height: 32px; }
+  .ticket .cobro-ok { display: none; }
+}
+@keyframes ok-sube { from { opacity: 0; transform: translateY(14px); } }
