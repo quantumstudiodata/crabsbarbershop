@@ -287,7 +287,6 @@ function Bienvenida({ nombre, empezar }: { nombre: string; empezar: () => void }
       <div className="gu-aura" aria-hidden="true" />
       <div className="gu-grano" aria-hidden="true" />
       <div className="gu-bien-c">
-        <span className="gu-marca">Crabs Barbershop</span>
         <h1 className="gu-saludo" aria-label={`Hola, ${nombre}`}><span><i>Hola,</i></span> <span><b>{nombre}</b></span></h1>
         <p className="gu-frase">Te llevo por toda la app. Te señalo dónde tocar y para qué sirve cada botón.</p>
         <button type="button" className="gu-empezar" onClick={() => { setSale(true); setTimeout(empezar, 800); }}><Asoma />Empezar<span>→</span></button>
@@ -303,7 +302,6 @@ function Cierre({ nombre, terminar }: { nombre: string; terminar: () => void }) 
       <div className="gu-aura" aria-hidden="true" />
       <div className="gu-grano" aria-hidden="true" />
       <div className="gu-bien-c">
-        <span className="gu-marca">Crabs Barbershop</span>
         <h1 className="gu-saludo" aria-label={`Listo, ${nombre}`}><span><i>Listo,</i></span> <span><b>{nombre}</b></span></h1>
         <p className="gu-frase">Ya conoces tu app. Todo lo que viste está a un toque cuando lo necesites.</p>
         <button type="button" className="gu-empezar" onClick={terminar}><Asoma />Empezar a trabajar<span>→</span></button>
