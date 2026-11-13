@@ -5341,20 +5341,20 @@ html:has(.fx) body::before,html:has(.fx) body::after{display:none!important}
 /* El cangrejo, pequeño: se asoma detrás de la tarjeta de cada paso; si el paso no tiene tarjeta, sobre el botón Continuar.
    Piezas del logo: cuerpo, tenazas que abren y cierran, y ojos que parpadean. */
 .fx-raiz .fx :is(.fx-ini-hero, .fx-barberos, .fx-cal, .fx-campos, .fx-when, .fx-go) { position: relative; overflow: visible !important; }
-.fx-cg { position: absolute; right: 22px; top: -16px; width: 32px; height: 16px; overflow: hidden; z-index: 2; pointer-events: none; font-style: normal; }
-.fx-go .fx-cg { right: 14px; }
+.fx-cg { position: absolute; right: 16px; top: -30px; width: 44px; height: 30px; overflow: hidden; z-index: 2; pointer-events: none; font-style: normal; }
+.fx-go .fx-cg { right: 8px; }
 /* Se asoma una vez (el contenedor sube) y después solo se mueven las piezas: tenazas y ojos. Todo con transform, que Safari anima bien. */
-.fx-cg-c { position: absolute; left: 0; top: 0; width: 32px; height: 32px; transform: translateY(22px); animation: fx-cg-sube .9s cubic-bezier(.2,1.25,.35,1) .4s forwards; }
+.fx-cg-c { position: absolute; left: 6px; top: 0; width: 32px; height: 32px; transform: translateY(36px); animation: fx-cg-sube .9s cubic-bezier(.2,1.25,.35,1) .4s forwards; }
 .fx-cg b { position: absolute; inset: 0; background: url(/cangrejo-blanco.png) center / 32px 32px no-repeat; }
 .fx-cg .cu { clip-path: inset(41.5% 31.25% 0 31.25%); }
 .fx-cg .t1 { clip-path: inset(0 68.75% 50% 0); transform-origin: 24% 46%; animation: fx-cg-ti 2.6s ease-in-out 1.4s infinite; }
 .fx-cg .t2 { clip-path: inset(0 0 50% 68.75%); transform-origin: 76% 46%; animation: fx-cg-td 2.6s ease-in-out 1.55s infinite; }
 .fx-cg .oj { clip-path: inset(0 31.25% 58.5% 31.25%); transform-origin: 50% 30%; animation: fx-cg-parpa 3.2s ease-in-out 1.2s infinite; }
-@keyframes fx-cg-sube { to { transform: translateY(-3px); } }
+@keyframes fx-cg-sube { to { transform: translateY(11px); } }
 @keyframes fx-cg-ti { 0%, 40%, 100% { transform: rotate(0deg); } 50% { transform: rotate(-26deg); } 58% { transform: rotate(0deg); } 66% { transform: rotate(-22deg); } 76% { transform: rotate(0deg); } }
 @keyframes fx-cg-td { 0%, 40%, 100% { transform: rotate(0deg); } 50% { transform: rotate(26deg); } 58% { transform: rotate(0deg); } 66% { transform: rotate(22deg); } 76% { transform: rotate(0deg); } }
 @keyframes fx-cg-parpa { 0%, 42%, 54%, 100% { transform: scaleY(1); } 48% { transform: scaleY(.1); } }
-@media (prefers-reduced-motion: reduce) { .fx-cg-c { animation: none !important; transform: translateY(-3px); } }
+@media (prefers-reduced-motion: reduce) { .fx-cg-c { animation: none !important; transform: translateY(11px); } }
 
 /* Reservas: fondo con textura de ruido en vez de degradado; inicio sencillo y horarios pequeños */
 html:has(.fx) { background: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='180' height='180'%3E%3Cfilter id='n'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='.75' numOctaves='3' stitchTiles='stitch'/%3E%3CfeColorMatrix values='0 0 0 0 1 0 0 0 0 1 0 0 0 0 1 0 0 0 .1 0'/%3E%3C/filter%3E%3Crect width='100%25' height='100%25' filter='url(%23n)'/%3E%3C/svg%3E") 0 0 / 180px 180px repeat, url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='520' height='520'%3E%3Cfilter id='d'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='.035' numOctaves='5' seed='3' stitchTiles='stitch'/%3E%3CfeColorMatrix values='0 0 0 0 1 0 0 0 0 1 0 0 0 0 1 .3 0 0 0 -.16'/%3E%3C/filter%3E%3Crect width='100%25' height='100%25' filter='url(%23d)'/%3E%3C/svg%3E") 0 0 / 520px 520px repeat, #16181c !important; background-color: #16181c !important; }
