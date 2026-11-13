@@ -29,7 +29,7 @@
 }
 
 * { box-sizing: border-box; }
-html { min-height: 100%; background: linear-gradient(160deg, var(--bg-1), var(--bg-2)); background-color: var(--bg-2); }
+html { min-height: 100%; background: linear-gradient(160deg, var(--bg-1), var(--bg-2)); background-color: var(--bg-1); }
 body { margin: 0; min-height: 100vh; font: 14px/1.5 var(--f-body); color: var(--fg); background: transparent; -webkit-font-smoothing: antialiased; }
 body::before, body::after { content: ""; position: fixed; border-radius: 50%; filter: blur(60px); opacity: 0.55; pointer-events: none; z-index: -1; }
 body::before { width: 520px; height: 520px; background: #a9b8c5; top: -200px; right: -120px; }
@@ -5217,7 +5217,8 @@ a.eqa-bt { display: flex; justify-content: center; align-items: center; text-dec
 /* Safari en el teléfono: el color de la página llega hasta las orillas (barra de estado arriba y barra de Safari abajo). */
 body { min-height: 100lvh; }
 @media (max-width: 760px) {
-  html:has(.entrada) { background: linear-gradient(180deg, #dfe6ec 0 50%, #f5f7f9 50% 100%); background-color: #f5f7f9; }
+  /* Safari 26 pinta las franjas de arriba y abajo con el color de fondo de la página: el del encabezado del logo. */
+  html:has(.entrada) { background: linear-gradient(180deg, #dfe6ec 0 50%, #f5f7f9 50% 100%); background-color: #dfe6ec; }
   .entrada { min-height: 100lvh; }
   .entrada .marca { padding-top: calc(32px + env(safe-area-inset-top, 0px)); }
   .entrada .form-entrada { background: #f5f7f9; padding-bottom: calc(40px + env(safe-area-inset-bottom, 0px)); }
