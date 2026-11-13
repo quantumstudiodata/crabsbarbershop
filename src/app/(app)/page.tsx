@@ -21,6 +21,25 @@ import { RefrescarConVentas } from "./RefrescarConVentas";
 import { UltimosServicios, type FilaUltimo } from "./UltimosServicios";
 import { verificadosDe, type Verificado } from "@/lib/pagos";
 import { Pendientes } from "./Pendientes";
+import { resumenSemana, type ResumenSemana } from "@/lib/resumenSemana";
+
+/** Resumen de la semana pasada: lo vendido, las transferencias por comparar con el banco y lo que se salió de lo normal. */
+function TarjetaSemana({ r }: { r: ResumenSemana }) {
+  return (
+    <section className="glass ini-sem subir d3" aria-label="Resumen de la semana">
+      <div className="entre"><span className="lab">Resumen de la semana</span><small className="muted">{r.periodo}</small></div>
+      <div className="ini-sem-c">
+        <span><small>Vendido</small><b>{formatoDinero(r.ventas)}</b><em>{r.cambio === null ? `${r.servicios} servicios` : `${Math.abs(r.cambio)}% ${r.cambio >= 0 ? "más" : "menos"} que la anterior`}</em></span>
+        <span><small>Transferencias</small><b>{formatoDinero(r.transferencias.total)}</b><em>{r.transferencias.n ? `${r.transferencias.n} para comparar con tu banco` : "Ninguna esta semana"}</em></span>
+      </div>
+      {r.alertas.length ? (
+        <div className="ini-sem-a">
+          {r.alertas.map((a) => <Link key={a.texto} href={a.href}><Icono n="ojo" /><span>{a.texto}</span><Icono n="derecha" /></Link>)}
+        </div>
+      ) : <p className="ini-sem-ok"><Icono n="palomita" />Todo en orden: nada fuera de lo normal.</p>}
+    </section>
+  );
+}
 import { pendientesDe, type Pendiente } from "./pendientes";
 
 type Q = { aviso?: string; error?: string };
@@ -88,9 +107,9 @@ async function accionesDe(s: Sesion, turno: Turno | null | undefined, hoy: strin
     { k: "cita", href: "/citas?nueva=1", texto: "Agendar cita a cliente", corto: "Nueva cita", icono: "calendario", dato: !barbero && citasHoy ? `${citasHoy} por llegar` : undefined, ok: s.barberia.usaCitas && s.puede("citas.modificar") },
     { k: "compartir", href: "/citas?compartir=1", texto: "Compartir enlace para reservar", corto: "Compartir enlace", icono: "enviar", ok: s.barberia.usaCitas && !!s.barberia.slug && leerConfig(s.barberia.citasConfig).enLinea && s.puede("citas.ver") },
     { k: "egreso", href: "/analitica/finanzas?egreso=1", texto: "Registrar un egreso", corto: "Egreso", icono: "archivo", ok: s.puede("gastos.registrar") },
-    { k: "pago", href: "/equipo?pagar=1", texto: "Registrar pago o comisión", corto: "Pago al equipo", icono: "efectivo", ok: s.puede("equipo.pagar") },
+    { k: "pago", href: "/equipo?pagar=1", texto: "Registrar pago o comisión", corto: "Pago al equipo", icono: "efectivo", ok: s.puede("equipo.pagar") && !s.barberia.pagosEquipoAuto },
     { k: "ventas", href: "/analitica/ventas", texto: barbero ? "Ver mis ventas" : "Ver ventas", corto: barbero ? "Mis ventas" : "Ventas", icono: "lista", ok: true },
-    { k: "historial", href: "/equipo/pagos", texto: "Ver historial de pagos", corto: "Historial de pagos", icono: "historial", ok: s.puede("equipo.pagar") || s.puede("equipo.autorizar") },
+    { k: "historial", href: "/equipo/pagos", texto: s.barberia.pagosEquipoAuto ? "Ver historial de comisiones" : "Ver historial de pagos", corto: s.barberia.pagosEquipoAuto ? "Comisiones" : "Historial de pagos", icono: "historial", ok: s.puede("equipo.pagar") || s.puede("equipo.autorizar") },
     { k: "correccion", href: "/analitica/cortes", texto: "Corregir un corte de caja", corto: "Corregir corte", icono: "editar", ok: s.puede("caja.corregir") && s.puede("cortes.ver") },
     { k: "resenas", href: "/clientes/resenas", texto: "Ver reseñas", corto: "Reseñas", icono: "estrella", ok: s.barberia.usaCitas || s.puede("resenas.responder") },
   ];
@@ -131,6 +150,7 @@ type Vista = {
   pendientes: Pendiente[];
   equipo: { id: string; nombre: string; avatar: string; monto: number; servicios: number; meta?: number }[];
   ultimos: FilaUltimo[]; verMas: { href: string; texto: string } | null; verVentas: boolean;
+  semana?: ResumenSemana | null;
 };
 
 /** Inicio: qué pasa hoy. Escritorio: acciones junto al saludo, la tarjeta de hoy con su gráfica y a la derecha citas y equipo. */
@@ -224,6 +244,8 @@ function InicioVista(v: Vista) {
         </div>
       </div>
 
+      {v.semana && <TarjetaSemana r={v.semana} />}
+
       <section className="ultimos-s subir d3">
         <div className="entre">
           <h2 className="sub-t">Últimos servicios</h2>
@@ -286,7 +308,8 @@ export default async function Inicio({ searchParams }: { searchParams: Promise<Q
       movs={pagadas.map((v) => ({ creadoEn: v.creadoEn, fecha: v.fecha, monto: v.total }))}
       meta={meta} citas={citas} equipo={filasEq} pendientes={pendientes}
       ultimos={filasUltimos(ventas.slice(0, 5), equipo, hoy, zona, await verificadosDe(ventas.slice(0, 5).map((v) => v.id)))}
-      verMas={{ href: "/analitica", texto: "Ver semana y mes en Analítica" }} verVentas={s.puede("ventas.ver_todas")} />
+      verMas={{ href: "/analitica", texto: "Ver semana y mes en Analítica" }} verVentas={s.puede("ventas.ver_todas")}
+      semana={s.puede("reportes.ver") && ["duena", "admin", "contador"].includes(s.usuario.rol) ? await resumenSemana(s.barberia.id, zona).catch(() => null) : null} />
   );
 }
 

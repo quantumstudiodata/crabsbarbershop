@@ -5040,3 +5040,16 @@ a.eqa-bt { display: flex; justify-content: center; align-items: center; text-dec
 .ck-aviso { display: grid; grid-template-columns: auto 1fr auto; gap: 10px; align-items: center; padding: 11px 14px; border-radius: 14px; background: #14171c; color: #fff; text-decoration: none; }
 .ck-aviso span { display: flex; flex-direction: column; } .ck-aviso b { font-size: 13.5px; } .ck-aviso small { font-size: 12px; color: #b5bfcc; }
 .ck-aviso svg { width: 17px; height: 17px; }
+
+/* Inicio: resumen de la semana */
+.ini-sem { padding: 18px 20px; display: grid; gap: 14px; margin-top: 18px; }
+.ini-sem-c { display: grid; grid-template-columns: repeat(auto-fit, minmax(180px, 1fr)); gap: 14px; }
+.ini-sem-c > span { display: flex; flex-direction: column; gap: 2px; }
+.ini-sem-c small { font-size: 12px; color: var(--muted); }
+.ini-sem-c b { font: 800 30px/1 var(--f-display); letter-spacing: .01em; }
+.ini-sem-c em { font-style: normal; font-size: 12.5px; color: var(--faint); }
+.ini-sem-a { display: grid; gap: 6px; }
+.ini-sem-a a { display: grid; grid-template-columns: auto 1fr auto; gap: 10px; align-items: center; padding: 10px 12px; border-radius: 14px; background: rgba(255,255,255,.55); color: var(--fg); text-decoration: none; font-size: 13.5px; }
+.ini-sem-a a:hover { background: rgba(255,255,255,.85); }
+.ini-sem-a svg, .ini-sem-ok svg { width: 16px; height: 16px; color: #4f5f78; }
+.ini-sem-ok { display: flex; gap: 8px; align-items: center; margin: 0; font-size: 13.5px; color: var(--muted); }
