@@ -1,15 +1,14 @@
 import "server-only";
-import { and, eq, inArray, like, sql } from "drizzle-orm";
+import { and, eq, inArray, like, or, sql } from "drizzle-orm";
 import { hashContrasena } from "./auth";
 import { comisionDeServicio } from "./comisiones";
 import { contrasenaTemporal, sugerirUsuario } from "./cuentas";
-import { db, schema as t } from "./db";
+import { db, schema as t, type Tx } from "./db";
 import { diaDeSemana, fechaLocal, sumarDias } from "./fechas";
 
 // Mantenimiento de entornos de prueba. Todo aquí exige que el negocio esté marcado como de prueba:
 // un negocio real nunca se restablece ni se elimina, aunque alguien manipule el formulario.
 
-type Tx = Parameters<Parameters<typeof db.transaction>[0]>[0];
 
 /** El negocio, solo si es de prueba. */
 export async function negocioDePrueba(id: string) {
@@ -50,8 +49,14 @@ async function borrarMovimientos(tx: Tx, b: string) {
 export async function conteoMovimientos(id: string) {
   const n = async (tabla: typeof t.ventas | typeof t.gastos | typeof t.turnosCaja | typeof t.pagosComision | typeof t.citas | typeof t.historial) =>
     (await db.select({ n: sql<number>`count(*)::int` }).from(tabla).where(eq(tabla.barberiaId, id)))[0].n;
-  const [ventas, egresos, cortes, pagos, citas, historial] = await Promise.all([n(t.ventas), n(t.gastos), n(t.turnosCaja), n(t.pagosComision), n(t.citas), n(t.historial)]);
-  return { ventas, egresos, cortes, pagos, citas, historial };
+  const [ventas, egresos, cortes, pagos, citas, historial, equipo] = await Promise.all([n(t.ventas), n(t.gastos), n(t.turnosCaja), n(t.pagosComision), n(t.citas), n(t.historial), cuentasDelEquipo(id)]);
+  return { ventas, egresos, cortes, pagos, citas, historial, cuentas: equipo.length };
+}
+
+/** Cuentas que se pueden borrar al empezar de cero: todas menos la titular y las de soporte. */
+async function cuentasDelEquipo(id: string, q: typeof db | Tx = db) {
+  return q.select({ id: t.usuarios.id }).from(t.usuarios)
+    .where(and(eq(t.usuarios.barberiaId, id), sql`${t.usuarios.rol} <> 'duena'`, eq(t.usuarios.esSoporte, false)));
 }
 
 /**
@@ -59,7 +64,7 @@ export async function conteoMovimientos(id: string) {
  * y conserva la configuración: cuentas, servicios, precios, formas de pago, horarios, metas y ajustes.
  * Sirve para quitar las pruebas antes de empezar a usar la app de verdad. No se puede deshacer.
  */
-export async function empezarDeCero(id: string) {
+export async function empezarDeCero(id: string, conCuentas = false) {
   if (!/^[0-9a-f-]{36}$/.test(id)) throw new Error("Negocio no válido.");
   const [b] = await db.select().from(t.barberias).where(eq(t.barberias.id, id)).limit(1);
   if (!b) throw new Error("No existe ese negocio.");
@@ -86,6 +91,26 @@ export async function empezarDeCero(id: string) {
     await tx.delete(t.turnosCaja).where(eq(t.turnosCaja.barberiaId, id));
     await tx.delete(t.pagosComision).where(eq(t.pagosComision.barberiaId, id));
     await tx.delete(t.historial).where(eq(t.historial.barberiaId, id));
+    // Si se pidió, también se borran las cuentas del equipo; se quedan la titular y las de soporte.
+    if (conCuentas) {
+      const ids = (await cuentasDelEquipo(id, tx)).map((x) => x.id);
+      if (ids.length) {
+        await tx.delete(t.sesiones).where(inArray(t.sesiones.usuarioId, ids));
+        await tx.delete(t.solicitudesClave).where(inArray(t.solicitudesClave.usuarioId, ids));
+        await tx.delete(t.reglasComision).where(inArray(t.reglasComision.barberoId, ids));
+        await tx.delete(t.remuneraciones).where(inArray(t.remuneraciones.usuarioId, ids));
+        await tx.delete(t.rotacionesDescanso).where(or(inArray(t.rotacionesDescanso.persona1, ids), inArray(t.rotacionesDescanso.persona2, ids)));
+        await tx.delete(t.bloqueosAgenda).where(inArray(t.bloqueosAgenda.usuarioId, ids));
+        await tx.update(t.bloqueosAgenda).set({ creadoPor: null }).where(inArray(t.bloqueosAgenda.creadoPor, ids));
+        await tx.update(t.promociones).set({ creadoPor: null }).where(inArray(t.promociones.creadoPor, ids));
+        await tx.delete(t.ideas).where(inArray(t.ideas.usuarioId, ids));
+        await tx.delete(t.mensajesSoporte).where(inArray(t.mensajesSoporte.autorId, ids));
+        await tx.update(t.eventosSoporte).set({ autorId: null }).where(inArray(t.eventosSoporte.autorId, ids));
+        await tx.update(t.solicitudesSoporte).set({ responsableId: null }).where(inArray(t.solicitudesSoporte.responsableId, ids));
+        await tx.delete(t.solicitudesSoporte).where(inArray(t.solicitudesSoporte.usuarioId, ids));
+        await tx.delete(t.usuarios).where(inArray(t.usuarios.id, ids));
+      }
+    }
     // Los pagos y rentas automáticos cuentan desde hoy; los gastos fijos vuelven a registrarse en su siguiente fecha.
     await tx.update(t.barberias).set({
       siguienteFolio: 1,
@@ -93,7 +118,7 @@ export async function empezarDeCero(id: string) {
       ...(b.rentasDesde ? { rentasDesde: hoy } : {}),
     }).where(eq(t.barberias.id, id));
   });
-  return { nombre: b.nombre, ...antes };
+  return { nombre: b.nombre, ...antes, cuentas: conCuentas ? antes.cuentas : 0 };
 }
 
 export async function restablecerPrueba(id: string) {

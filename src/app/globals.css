@@ -5189,3 +5189,6 @@ a.eqa-bt { display: flex; justify-content: center; align-items: center; text-dec
 /* Soporte: empezar de cero */
 .cero-s { display: flex; align-items: center; justify-content: space-between; gap: 16px; flex-wrap: wrap; margin-top: 14px; }
 .cero-s > div { display: grid; gap: 3px; max-width: 560px; } .cero-s b { font-size: 15px; } .cero-s small { font-size: 13px; color: var(--muted); line-height: 1.45; }
+.cero-op { display: flex; gap: 12px; align-items: flex-start; padding: 12px 14px; border-radius: 14px; background: rgba(255,255,255,.55); border: 1px solid var(--line); cursor: pointer; }
+.cero-op input { width: 18px; height: 18px; margin-top: 2px; accent-color: #2b3a47; flex: none; }
+.cero-op span { display: grid; gap: 3px; } .cero-op b { font-size: 14px; } .cero-op small { font-size: 12.5px; color: var(--muted); line-height: 1.4; }

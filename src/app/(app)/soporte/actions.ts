@@ -122,11 +122,11 @@ export async function empezarDeCeroNegocio(_: EstadoSoporte, form: FormData): Pr
   if (!b) return { error: "No se encontró el negocio." };
   if (texto(form, "confirmar", 80).trim() !== b.nombre) return { error: `Escribe ${b.nombre} tal cual para confirmar.` };
   try {
-    const r = await empezarDeCero(id);
+    const r = await empezarDeCero(id, form.get("cuentas") === "si");
     console.info("empezar_de_cero", { negocio: id, por: s.usuario.id, ventas: r.ventas, cortes: r.cortes });
     revalidatePath(`/soporte/negocios/${id}`);
     revalidatePath("/", "layout");
-    return { ok: true, mensaje: `${r.nombre} quedó en cero: se borraron ${r.ventas} ventas, ${r.cortes} cortes, ${r.egresos} egresos, ${r.pagos} pagos al equipo y ${r.citas} citas. La configuración sigue igual.` };
+    return { ok: true, mensaje: `${r.nombre} quedó en cero: se borraron ${r.ventas} ventas, ${r.cortes} cortes, ${r.egresos} egresos, ${r.pagos} pagos al equipo y ${r.citas} citas${r.cuentas ? `, además de ${r.cuentas} ${r.cuentas === 1 ? "cuenta" : "cuentas"} del equipo` : ""}. La configuración sigue igual.` };
   } catch (e) {
     return { error: e instanceof Error ? e.message : "No se pudo completar." };
   }
