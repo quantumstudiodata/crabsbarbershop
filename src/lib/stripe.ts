@@ -32,6 +32,26 @@ export async function origen() {
   return `${proto}://${host}`;
 }
 
+const dominiosListos = new Set<string>();
+/**
+ * Apple Pay y Google Pay solo aparecen si el dominio de la página está registrado en la cuenta de Stripe del negocio
+ * (los cobros son directos en su cuenta). Se registra solo la primera vez; si falla, el pago con tarjeta sigue igual.
+ */
+export async function registrarDominioPago(cuenta: string) {
+  try {
+    const h = await headers();
+    const host = (h.get("x-forwarded-host") ?? h.get("host") ?? "").split(":")[0].toLowerCase();
+    if (!host || host === "localhost" || /^[\d.]+$/.test(host) || dominiosListos.has(`${cuenta}|${host}`)) return;
+    const lista = await stripe().paymentMethodDomains.list({ domain_name: host, limit: 1 }, { stripeAccount: cuenta });
+    const d = lista.data[0] ?? await stripe().paymentMethodDomains.create({ domain_name: host }, { stripeAccount: cuenta });
+    if (!d.enabled) await stripe().paymentMethodDomains.update(d.id, { enabled: true }, { stripeAccount: cuenta });
+    else if (d.apple_pay?.status !== "active") await stripe().paymentMethodDomains.validate(d.id, {}, { stripeAccount: cuenta }).catch(() => null);
+    dominiosListos.add(`${cuenta}|${host}`);
+  } catch (err) {
+    console.error("dominio_pago", err);
+  }
+}
+
 /** Estado de la cuenta del negocio según Stripe. */
 export function estadoDeCuenta(a: Stripe.Account): "pendiente" | "activa" {
   return a.charges_enabled ? "activa" : "pendiente";

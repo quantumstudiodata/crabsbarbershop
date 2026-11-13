@@ -3,7 +3,7 @@ import { notFound } from "next/navigation";
 import { db, schema } from "@/lib/db";
 import { pagosLinea } from "@/lib/db/schema";
 import { vencerSiToca, verificarPago } from "@/lib/pagos";
-import { stripe } from "@/lib/stripe";
+import { registrarDominioPago, stripe } from "@/lib/stripe";
 import { formatoDinero } from "@/lib/money";
 import { Pagar } from "./Pagar";
 
@@ -26,6 +26,7 @@ export default async function PaginaPago({ params }: { params: Promise<{ token: 
   if (p.estado === "pendiente" && p.intento && b.cuenta && process.env.STRIPE_SECRET_KEY) {
     const pi = await stripe().paymentIntents.retrieve(p.intento, {}, { stripeAccount: b.cuenta }).catch(() => null);
     secreto = pi && pi.status !== "canceled" && pi.status !== "succeeded" ? pi.client_secret : null;
+    if (secreto) await registrarDominioPago(b.cuenta);
   }
   let folio: string | null = null, encuesta: string | null = null;
   if (p.ventaId) [{ folio, encuesta }] = await db.select({ folio: schema.ventas.folio, encuesta: schema.ventas.tokenEncuesta }).from(schema.ventas).where(eq(schema.ventas.id, p.ventaId)).limit(1);

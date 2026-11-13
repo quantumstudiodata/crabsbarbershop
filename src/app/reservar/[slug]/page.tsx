@@ -1,5 +1,5 @@
 import { and, asc, desc, eq, gte, isNull, ne, sql } from "drizzle-orm";
-import { cobraEnLinea } from "@/lib/stripe";
+import { cobraEnLinea, registrarDominioPago } from "@/lib/stripe";
 import type { Metadata } from "next";
 import { notFound } from "next/navigation";
 import { leerConfig, montoAPagar } from "@/lib/agenda";
@@ -54,6 +54,8 @@ export default async function PaginaReservar({ params, searchParams }: { params:
     const promo = d ? (promos as unknown as Promo[]).find((x) => x.id === ap.porLinea[0]!.promocionId) : null;
     return { id: s.id, nombre: s.nombre, descripcion: s.descripcion, categoria: s.categoria, precio: s.precio, duracionMin: s.duracionMin || 30, promo: promo ? { nombre: promo.nombre, precio: s.precio - d } : null };
   });
+  // Para que Apple Pay y Google Pay aparezcan en el formulario de pago.
+  if (cobraEnLinea(b)) await registrarDominioPago(b.stripeCuenta!);
   return (
     <Reservar
       slug={b.slug!} negocio={b.nombre} hoy={fechaLocal(new Date(), b.zonaHoraria)}
