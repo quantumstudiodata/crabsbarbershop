@@ -5213,3 +5213,12 @@ a.eqa-bt { display: flex; justify-content: center; align-items: center; text-dec
 .gu-lista header > div > b { margin-right: auto; }
 .gu-salir-v { border: 1px solid rgba(255,255,255,.12); background: rgba(255,255,255,.05); color: #a9b4c3; font: 500 12px var(--f-body); padding: 6px 12px; border-radius: 999px; cursor: pointer; flex: none; }
 .gu-salir-v:hover { color: #eef2f6; background: rgba(255,255,255,.1); }
+
+/* Safari en el teléfono: el color de la página llega hasta las orillas (barra de estado arriba y barra de Safari abajo). */
+body { min-height: 100lvh; }
+@media (max-width: 760px) {
+  html:has(.entrada) { background: linear-gradient(180deg, #dfe6ec 0 50%, #f5f7f9 50% 100%); background-color: #f5f7f9; }
+  .entrada { min-height: 100lvh; }
+  .entrada .marca { padding-top: calc(32px + env(safe-area-inset-top, 0px)); }
+  .entrada .form-entrada { background: #f5f7f9; padding-bottom: calc(40px + env(safe-area-inset-bottom, 0px)); }
+}

@@ -17,7 +17,7 @@ export const metadata: Metadata = {
 };
 
 export const viewport: Viewport = {
-  themeColor: "#e4e9ee",
+  themeColor: "#eef2f5",
   width: "device-width",
   initialScale: 1,
   // Se siente como app: sin acercar con los dedos ni al tocar un campo.

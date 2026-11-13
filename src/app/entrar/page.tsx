@@ -3,6 +3,8 @@ import { obtenerSesion } from "@/lib/auth";
 import { FormEntrar } from "./FormEntrar";
 
 export const metadata = { title: "Entrar a Crabs" };
+// La barra de estado del teléfono toma el mismo color que el encabezado con el logo.
+export const viewport = { themeColor: "#dfe6ec" };
 
 export default async function Entrar() {
   if (await obtenerSesion()) redirect("/");
