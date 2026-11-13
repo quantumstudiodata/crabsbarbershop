@@ -29,7 +29,8 @@
 }
 
 * { box-sizing: border-box; }
-html { min-height: 100%; background: linear-gradient(160deg, var(--bg-1), var(--bg-2)); background-color: var(--bg-1); }
+/* Fondo de un solo tono: Safari pinta las franjas de arriba y abajo con este color, así coinciden con la página al llegar al final. Las manchas suaves (body::before/after) dan la profundidad. */
+html { min-height: 100%; background: #e4e9ee; background-color: #e4e9ee; }
 body { margin: 0; min-height: 100vh; font: 14px/1.5 var(--f-body); color: var(--fg); background: transparent; -webkit-font-smoothing: antialiased; }
 body::before, body::after { content: ""; position: fixed; border-radius: 50%; filter: blur(60px); opacity: 0.55; pointer-events: none; z-index: -1; }
 body::before { width: 520px; height: 520px; background: #a9b8c5; top: -200px; right: -120px; }
