@@ -1,4 +1,5 @@
 import { and, eq, sql } from "drizzle-orm";
+import { registrarGastosAutomaticos } from "@/lib/gastosAuto";
 import Link from "next/link";
 import { redirect } from "next/navigation";
 import { BotonCajon } from "@/components/Cajon";
@@ -21,6 +22,7 @@ const n = (c: number) => formatoDinero(c).replace("$", "");
 
 export default async function Libreta({ searchParams }: { searchParams: Promise<{ vista?: string; mes?: string; anio?: string; semana?: string }> }) {
   const s = await requerirSesion();
+  await registrarGastosAutomaticos(s.barberia.id);
   await liquidarAutomaticos(s.barberia.id);
   await asentarCitasPagadas(s.barberia.id);
   if (!s.puede("reportes.exportar")) redirect("/");

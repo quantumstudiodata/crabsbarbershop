@@ -22,6 +22,7 @@ import { UltimosServicios, type FilaUltimo } from "./UltimosServicios";
 import { verificadosDe, type Verificado } from "@/lib/pagos";
 import { Pendientes } from "./Pendientes";
 import { resumenSemana, type ResumenSemana } from "@/lib/resumenSemana";
+import { registrarGastosAutomaticos } from "@/lib/gastosAuto";
 
 /** Resumen de la semana pasada: lo vendido, las transferencias por comparar con el banco y lo que se salió de lo normal. */
 function TarjetaSemana({ r }: { r: ResumenSemana }) {
@@ -309,7 +310,7 @@ export default async function Inicio({ searchParams }: { searchParams: Promise<Q
       meta={meta} citas={citas} equipo={filasEq} pendientes={pendientes}
       ultimos={filasUltimos(ventas.slice(0, 5), equipo, hoy, zona, await verificadosDe(ventas.slice(0, 5).map((v) => v.id)))}
       verMas={{ href: "/analitica", texto: "Ver semana y mes en Analítica" }} verVentas={s.puede("ventas.ver_todas")}
-      semana={s.puede("reportes.ver") && ["duena", "admin", "contador"].includes(s.usuario.rol) ? await resumenSemana(s.barberia.id, zona).catch(() => null) : null} />
+      semana={s.puede("reportes.ver") && ["duena", "admin", "contador"].includes(s.usuario.rol) ? await registrarGastosAutomaticos(s.barberia.id).then(() => resumenSemana(s.barberia.id, zona)).catch(() => null) : null} />
   );
 }
 

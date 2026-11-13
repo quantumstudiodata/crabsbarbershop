@@ -103,7 +103,8 @@ export function CategoriasEgresos({ categorias, puede }: { categorias: Categoria
   );
 }
 
-type Gasto = { id: string; concepto: string; categoria: string; monto: number; metodo: string; periodicidad: string };
+type Gasto = { id: string; concepto: string; categoria: string; monto: number; metodo: string; periodicidad: string; automatico?: boolean; dia?: number };
+const SEMANA: [string, string][] = [["1", "Lunes"], ["2", "Martes"], ["3", "Miércoles"], ["4", "Jueves"], ["5", "Viernes"], ["6", "Sábado"], ["0", "Domingo"]];
 const METODOS: [string, string][] = [["efectivo", "Efectivo"], ["transferencia", "Transferencia"], ["tarjeta", "Tarjeta"]];
 const PERIODOS: [string, string][] = [["", "Sin periodicidad"], ["diaria", "Diaria"], ["semanal", "Semanal"], ["quincenal", "Quincenal"], ["mensual", "Mensual"]];
 
@@ -112,6 +113,9 @@ function FormGasto({ g, categorias, metodos, cerrar }: { g: Gasto | null; catego
   const [categoria, setCategoria] = useState(g?.categoria ?? categorias[0] ?? "");
   const [metodo, setMetodo] = useState(g?.metodo ?? metodos[0] ?? "efectivo");
   const [periodo, setPeriodo] = useState(g?.periodicidad ?? "");
+  const [auto, setAuto] = useState(!!g?.automatico);
+  const [dia, setDia] = useState(String(g?.dia ?? (periodo === "semanal" ? 1 : 1)));
+  const puedeAuto = ["semanal", "quincenal", "mensual"].includes(periodo);
   useEffect(() => { if (e.ok) cerrar(); }, [e.ok, e.n, cerrar]);
   return (
     <Modal abierto cerrar={cerrar} etiqueta="Gastos frecuentes" titulo={g ? g.concepto : "Agregar gasto frecuente"}>
@@ -124,7 +128,20 @@ function FormGasto({ g, categorias, metodos, cerrar }: { g: Gasto | null; catego
         <label className="campo"><span>Importe predeterminado (opcional)</span><input className="input" name="monto" inputMode="decimal" defaultValue={g?.monto ? String(g.monto / 100) : ""} placeholder="$0" /></label>
         <div className="campo"><span>Categoría</span><Selector etiqueta="Categoría" valor={categoria} onChange={setCategoria} opciones={categorias.map((c) => ({ valor: c, texto: c }))} /></div>
         <div className="campo"><span>Método de pago predeterminado</span><Selector etiqueta="Método" valor={metodo} onChange={setMetodo} opciones={METODOS.filter(([k]) => metodos.includes(k) || k === metodo).map(([k, t]) => ({ valor: k, texto: t }))} /></div>
-        <div className="campo"><span>Periodicidad (opcional)</span><Selector etiqueta="Periodicidad" valor={periodo} onChange={setPeriodo} opciones={PERIODOS.map(([k, t]) => ({ valor: k, texto: t }))} /></div>
+        <div className="campo"><span>Periodicidad (opcional)</span><Selector etiqueta="Periodicidad" valor={periodo} onChange={(v) => { setPeriodo(v); setDia("1"); }} opciones={PERIODOS.map(([k, t]) => ({ valor: k, texto: t }))} /></div>
+        {puedeAuto && (
+          <div className="cfg-auto">
+            <Interruptor name="automatico" checked={auto} onChange={() => setAuto(!auto)} etiqueta="Se registra solo" />
+            <span><b>Se registra solo</b><small>{auto ? "Cada periodo se registra el egreso con este importe, sin que nadie lo capture. Úsalo solo si el monto no cambia, como la renta o el internet." : "Si el monto no cambia (renta, internet), actívalo y se registra solo cada periodo."}</small></span>
+          </div>
+        )}
+        {puedeAuto && auto && periodo !== "quincenal" && (
+          <div className="campo"><span>{periodo === "semanal" ? "Día de la semana" : "Día del mes"}</span>
+            <input type="hidden" name="dia" value={dia} />
+            <Selector etiqueta="Día" valor={dia} onChange={setDia} opciones={periodo === "semanal" ? SEMANA.map(([k, t]) => ({ valor: k, texto: t })) : Array.from({ length: 28 }, (_, i) => ({ valor: String(i + 1), texto: `Día ${i + 1}` }))} />
+          </div>
+        )}
+        {puedeAuto && auto && periodo === "quincenal" && <small className="muted">Se registra los días 1 y 16 de cada mes.</small>}
         {e.error && <p className="aviso error">{e.error}</p>}
         <div className="acciones"><button className="bt" disabled={guardando}>{guardando ? "Guardando…" : "Guardar"}<Fl /></button></div>
       </form>
@@ -149,7 +166,7 @@ export function GastosFrecuentes({ gastos, categorias, metodos, puede }: { gasto
         <div className="lista-cfg">
           {gastos.map((g) => (
             <div key={g.id}>
-              <span><b>{g.concepto}</b><small>{[g.categoria, PERIODOS.find(([k]) => k === g.periodicidad && k)?.[1].toLowerCase(), METODOS.find(([k]) => k === g.metodo)?.[1].toLowerCase()].filter(Boolean).join(", ")}</small></span>
+              <span><b>{g.concepto}</b><small>{[g.categoria, PERIODOS.find(([k]) => k === g.periodicidad && k)?.[1].toLowerCase(), METODOS.find(([k]) => k === g.metodo)?.[1].toLowerCase(), g.automatico ? "se registra solo" : ""].filter(Boolean).join(", ")}</small></span>
               <b className="num">{g.monto ? formatoDinero(g.monto) : ""}</b>
               {puede ? <MenuPuntos etiqueta={`Opciones de ${g.concepto}`} items={[
                 { texto: "Editar", icono: "editar", hacer: () => setForm({ g }) },

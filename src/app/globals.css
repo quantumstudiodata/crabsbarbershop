@@ -5053,3 +5053,6 @@ a.eqa-bt { display: flex; justify-content: center; align-items: center; text-dec
 .ini-sem-a a:hover { background: rgba(255,255,255,.85); }
 .ini-sem-a svg, .ini-sem-ok svg { width: 16px; height: 16px; color: #4f5f78; }
 .ini-sem-ok { display: flex; gap: 8px; align-items: center; margin: 0; font-size: 13.5px; color: var(--muted); }
+
+.cfg-auto { display: grid; grid-template-columns: auto 1fr; gap: 12px; align-items: start; padding: 12px 14px; border-radius: 14px; background: rgba(255,255,255,.55); border: 1px solid var(--line); }
+.cfg-auto span { display: flex; flex-direction: column; gap: 2px; } .cfg-auto small { color: var(--muted); font-size: 12.5px; }

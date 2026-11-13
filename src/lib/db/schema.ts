@@ -64,6 +64,8 @@ export const barberias = pgTable("barberias", {
   usaPromociones: boolean("usa_promociones").notNull().default(false),
   // Pagos al equipo automáticos: cada periodo se da por pagado en su fecha de pago y se anota solo en Finanzas y la libreta.
   pagosEquipoAuto: boolean("pagos_equipo_auto").notNull().default(false),
+  // Reembolsos de pagos en línea: apagado, lo pagado solo se reagenda (la titular puede hacer una excepción).
+  aceptaReembolsos: boolean("acepta_reembolsos").notNull().default(false),
   // Desde qué día se lleva la cuenta de lo pendiente al equipo (al encender los pagos automáticos). Vacío: desde su forma de pago.
   pagosEquipoDesde: date("pagos_equipo_desde"),
   // Renta de silla automática: cada periodo se da por cobrado en su fecha límite. Desde cuándo se lleva su cuenta.
@@ -162,6 +164,8 @@ export const servicios = pgTable("servicios", {
   precio: integer("precio").notNull(),
   activo: boolean("activo").notNull().default(true),
   orden: integer("orden").notNull().default(0),
+  // Eliminado: ya no aparece en ningún lado, pero se conserva para el historial y las citas que lo tengan.
+  eliminadoEn: timestamp("eliminado_en", { withTimezone: true }),
   creadoEn: creadoEn(),
 });
 
@@ -379,6 +383,10 @@ export const conceptosFrecuentes = pgTable("conceptos_frecuentes", {
   monto: integer("monto").notNull().default(0),
   metodo: text("metodo").notNull().default("efectivo"),
   periodicidad: text("periodicidad").notNull().default("mensual"),
+  // Automático: con monto fijo, se registra solo cada periodo en su día (mensual: día del mes; semanal: 0 domingo a 6 sábado).
+  automatico: boolean("automatico").notNull().default(false),
+  dia: integer("dia").notNull().default(1),
+  ultimo: date("ultimo"),
   creadoEn: creadoEn(),
 });
 
@@ -528,9 +536,11 @@ export const categoriasServicio = pgTable(
     descripcion: text("descripcion").notNull().default(""),
     orden: integer("orden").notNull().default(0),
     activo: boolean("activo").notNull().default(true),
+    // Eliminada: sale de Ajustes, se conserva en el historial. Su nombre se puede volver a usar.
+    eliminadoEn: timestamp("eliminado_en", { withTimezone: true }),
     creadoEn: creadoEn(),
   },
-  (t) => [uniqueIndex("categorias_servicio_uq").on(t.barberiaId, t.nombre)],
+  (t) => [uniqueIndex("categorias_servicio_uq").on(t.barberiaId, t.nombre).where(sql`${t.eliminadoEn} is null`)],
 );
 
 // Centro de ayuda: solicitudes que el equipo de un negocio envía al soporte de la plataforma.

@@ -211,6 +211,13 @@
       "when": 1794501689339,
       "tag": "0029_consejos_vistos",
       "breakpoints": true
+    },
+    {
+      "idx": 30,
+      "version": "7",
+      "when": 1794554422784,
+      "tag": "0030_automaticos_y_eliminados",
+      "breakpoints": true
     }
   ]
 }

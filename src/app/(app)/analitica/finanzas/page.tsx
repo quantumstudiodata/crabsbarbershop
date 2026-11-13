@@ -1,4 +1,5 @@
 import { and, desc, eq, gte, ilike, inArray, isNull, lte, or, sql, type SQL } from "drizzle-orm";
+import { registrarGastosAutomaticos } from "@/lib/gastosAuto";
 import { alias } from "drizzle-orm/pg-core";
 import { redirect } from "next/navigation";
 import { BarraFiltros } from "@/components/BarraFiltros";
@@ -31,6 +32,7 @@ type Q = ConsultaFiltros & { tipo?: string; egreso?: string };
 /** Finanzas y egresos en una sola pantalla: lo que quedó del periodo y todos los movimientos del negocio. */
 export default async function Finanzas({ searchParams }: { searchParams: Promise<Q> }) {
   const s = await requerirSesion();
+  await registrarGastosAutomaticos(s.barberia.id);
   await liquidarAutomaticos(s.barberia.id);
   await asentarCitasPagadas(s.barberia.id);
   const verTodo = s.puede("reportes.ver");

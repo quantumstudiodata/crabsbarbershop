@@ -1,4 +1,5 @@
 import { and, eq, gte, isNull, lte, sql } from "drizzle-orm";
+import { registrarGastosAutomaticos } from "@/lib/gastosAuto";
 import Link from "next/link";
 import { redirect } from "next/navigation";
 import { Avatar } from "@/components/Avatar";
@@ -28,6 +29,7 @@ function Ir({ href, titulo }: { href: string; titulo: string }) {
 
 export default async function Resumen({ searchParams }: { searchParams: Promise<ConsultaPeriodo> }) {
   const s = await requerirSesion();
+  await registrarGastosAutomaticos(s.barberia.id);
   await liquidarAutomaticos(s.barberia.id);
   await asentarCitasPagadas(s.barberia.id);
   if (!s.puede("reportes.ver")) redirect(s.puede("ventas.ver_todas") ? "/analitica/ventas" : s.puede("cortes.ver") ? "/analitica/cortes" : s.puede("gastos.ver") ? "/analitica/finanzas" : "/");

@@ -91,17 +91,22 @@ export async function agregarConcepto(_: EstadoAjuste, form: FormData): Promise<
   const periodicidad = PERIODOS_G.includes(texto(form, "periodicidad")) ? texto(form, "periodicidad") : "";
   if (concepto.length < 2) return { error: "Escribe el nombre del gasto." };
   if (monto < 0 || monto > 100_000_000) return { error: "Revisa la cantidad." };
+  const automatico = texto(form, "automatico") === "si" && ["semanal", "quincenal", "mensual"].includes(periodicidad);
+  const dia = Math.min(Math.max(Number(texto(form, "dia")) || 1, periodicidad === "semanal" ? 0 : 1), periodicidad === "semanal" ? 6 : 28);
+  if (automatico && monto <= 0) return { error: "Para que se registre solo necesita un importe fijo." };
+  // Al activarlo empieza a contar desde hoy: lo anterior ya se registró a mano.
+  const hoyNeg = fechaLocal(new Date(), s.barberia.zonaHoraria);
   const [cat] = await db.select({ id: schema.categoriasGasto.id }).from(schema.categoriasGasto).where(and(eq(schema.categoriasGasto.barberiaId, s.barberia.id), eq(schema.categoriasGasto.nombre, categoria)));
   if (!cat) return { error: "Elige una categoría." };
   if (id) {
     const [c] = await db.select().from(schema.conceptosFrecuentes).where(and(eq(schema.conceptosFrecuentes.id, id), eq(schema.conceptosFrecuentes.barberiaId, s.barberia.id)));
     if (!c) return { error: "No se encontró el gasto frecuente." };
-    await db.update(schema.conceptosFrecuentes).set({ concepto, categoria, monto, metodo, periodicidad }).where(eq(schema.conceptosFrecuentes.id, c.id));
+    await db.update(schema.conceptosFrecuentes).set({ concepto, categoria, monto, metodo, periodicidad, automatico, dia, ultimo: automatico ? (c.automatico ? c.ultimo : hoyNeg) : null }).where(eq(schema.conceptosFrecuentes.id, c.id));
     await registrar(db, { barberiaId: s.barberia.id, usuarioId: s.usuario.id, tipo: "ajuste", accion: `${s.usuario.nombre} editó el gasto frecuente ${concepto}`, detalle: { antes: `${c.concepto}, ${c.categoria}, ${c.monto ? formatoDinero(c.monto) : "sin importe"}`, ahora: `${concepto}, ${categoria}, ${monto ? formatoDinero(monto) : "sin importe"}` } });
     revalidatePath("/", "layout");
     return { ok: true, n: Date.now() };
   }
-  await db.insert(schema.conceptosFrecuentes).values({ barberiaId: s.barberia.id, concepto, categoria, monto, metodo, periodicidad });
+  await db.insert(schema.conceptosFrecuentes).values({ barberiaId: s.barberia.id, concepto, categoria, monto, metodo, periodicidad, automatico, dia, ultimo: automatico ? hoyNeg : null });
   await registrar(db, { barberiaId: s.barberia.id, usuarioId: s.usuario.id, tipo: "ajuste", accion: `${s.usuario.nombre} agregó el gasto frecuente ${concepto}`, detalle: { categoria, monto, metodo, periodicidad } });
   revalidatePath("/", "layout");
   return { ok: true, n: Date.now() };
