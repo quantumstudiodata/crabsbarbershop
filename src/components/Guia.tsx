@@ -261,18 +261,16 @@ function Bienvenida({ nombre, empezar }: { nombre: string; empezar: () => void }
   const [sale, setSale] = useState(false);
   useLayoutEffect(() => { document.body.style.overflow = "hidden"; return () => { document.body.style.overflow = ""; }; }, []);
   return (
-    <div className={`gu-bien gu-sobria ${sale ? "sale" : ""}`} role="dialog" aria-modal="true" aria-label="Bienvenida">
+    <div className={`gu-bien gu-calma ${sale ? "sale" : ""}`} role="dialog" aria-modal="true" aria-label="Bienvenida">
+      <div className="gu-aura" aria-hidden="true" />
       <div className="gu-grano" aria-hidden="true" />
       <div className="gu-bien-c">
-        <svg className="gu-arco" viewBox="0 0 420 120" aria-hidden="true">
-          <defs><path id="gu-arco-p" d="M30,110 Q210,-10 390,110" /></defs>
-          <text><textPath href="#gu-arco-p" startOffset="50%" textAnchor="middle">TE DAMOS LA BIENVENIDA</textPath></text>
-        </svg>
-        {/* eslint-disable-next-line @next/next/no-img-element */}
-        <img className="gu-can" src="/cangrejo-blanco.png" alt="" />
-        <span className="gu-mini">Crabs Barbershop</span>
-        <h1 className="gu-hola" aria-label={`Hola, ${nombre}`}>Hola, {nombre}</h1>
-        <span className="gu-mini linea"><i />Nº 01 ✦ Tu primer día<i /></span>
+        <span className="gu-sello2" aria-hidden="true">
+          {/* eslint-disable-next-line @next/next/no-img-element */}
+          <img src="/cangrejo-blanco.png" alt="" />
+        </span>
+        <span className="gu-marca">Crabs Barbershop</span>
+        <h1 className="gu-saludo" aria-label={`Hola, ${nombre}`}><span><i>Hola,</i></span> <span><b>{nombre}</b></span></h1>
         <p className="gu-frase">Te llevo por toda la app. Te señalo dónde tocar y para qué sirve cada botón.</p>
         <button type="button" className="gu-empezar" onClick={() => { setSale(true); setTimeout(empezar, 800); }}>Empezar<span>→</span></button>
         <small className="gu-dura">Unos 5 minutos</small>
@@ -282,18 +280,18 @@ function Bienvenida({ nombre, empezar }: { nombre: string; empezar: () => void }
 }
 
 function Cierre({ nombre, terminar }: { nombre: string; terminar: () => void }) {
-  const piezas = useMemo(() => Array.from({ length: 60 }, (_, k) => ({ l: (k * 17) % 100, d: (k % 10) * 0.07, t: 1.8 + (k % 7) * 0.25, c: ["#ffffff", "#9fb4d4", "#5d6e88", "#c9d3e2", "#2f3a4a"][k % 5], r: (k * 47) % 360 })), []);
   return (
-    <div className="gu-bien gu-sobria gu-cierre" role="dialog" aria-modal="true" aria-label="Guía terminada">
+    <div className="gu-bien gu-calma gu-cierre" role="dialog" aria-modal="true" aria-label="Guía terminada">
+      <div className="gu-aura" aria-hidden="true" />
       <div className="gu-grano" aria-hidden="true" />
-      {piezas.map((p, k) => <i key={k} className="gu-conf" style={{ left: `${p.l}%`, background: p.c, animationDelay: `${p.d}s`, animationDuration: `${p.t}s`, rotate: `${p.r}deg` }} />)}
       <div className="gu-bien-c">
-        {/* eslint-disable-next-line @next/next/no-img-element */}
-        <img className="gu-can solo" src="/cangrejo-blanco.png" alt="" />
-        <span className="gu-mini">Crabs Barbershop</span>
-        <h1 className="gu-hola fin">Listo, {nombre}</h1>
-        <span className="gu-mini linea"><i />Ya conoces tu app<i /></span>
-        <p className="gu-frase">Todo lo que viste está a un toque cuando lo necesites.</p>
+        <span className="gu-sello2" aria-hidden="true">
+          {/* eslint-disable-next-line @next/next/no-img-element */}
+          <img src="/cangrejo-blanco.png" alt="" />
+        </span>
+        <span className="gu-marca">Crabs Barbershop</span>
+        <h1 className="gu-saludo" aria-label={`Listo, ${nombre}`}><span><i>Listo,</i></span> <span><b>{nombre}</b></span></h1>
+        <p className="gu-frase">Ya conoces tu app. Todo lo que viste está a un toque cuando lo necesites.</p>
         <button type="button" className="gu-empezar" onClick={terminar}>Empezar a trabajar<span>→</span></button>
       </div>
     </div>
