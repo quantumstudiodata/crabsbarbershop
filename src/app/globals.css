@@ -5122,11 +5122,15 @@ a.eqa-bt { display: flex; justify-content: center; align-items: center; text-dec
 .gu-cierre.gu-calma .gu-empezar { animation-delay: 1.6s, 2.4s; }
 
 /* Cangrejo que se asoma: piezas del logo (tenazas y ojos) recortadas de la misma imagen */
-.gu-asoma { --w: clamp(120px, 14vw, 170px); position: relative; width: var(--w); height: calc(var(--w) * .47); overflow: hidden; margin-bottom: -6px; }
+.gu-asoma { --w: clamp(120px, 14vw, 170px); position: relative; width: var(--w); height: calc(var(--w) * .68); overflow: hidden; margin-bottom: -6px;
+  -webkit-mask-image: linear-gradient(#000 78%, transparent); mask-image: linear-gradient(#000 78%, transparent); }
 .gu-cang { position: absolute; left: 0; top: 0; width: var(--w); height: var(--w); transform: translateY(70%); animation: gu-asomar 1.1s cubic-bezier(.2,1.3,.35,1) .35s forwards, gu-flota 3.8s ease-in-out 1.6s infinite; }
 .gu-cang i { position: absolute; inset: 0; background: url(/cangrejo-blanco.png) center/100% 100% no-repeat; }
 .gu-cang .t1 { clip-path: inset(0 68.75% 50% 0); transform-origin: 22% 44%; animation: gu-tenaza-i 4.2s ease-in-out 1.8s infinite; }
 .gu-cang .t2 { clip-path: inset(0 0 50% 68.75%); transform-origin: 78% 44%; animation: gu-tenaza-d 4.2s ease-in-out 1.8s infinite; }
+.gu-cang .cu { clip-path: inset(43% 31.25% 0 31.25%); }
+.gu-cang .pa { clip-path: inset(50% 0 0 0); transform-origin: 50% 60%; animation: gu-patas 2.4s ease-in-out 1.8s infinite; }
+@keyframes gu-patas { 50% { transform: translateY(1.5px) scaleX(1.015); } }
 .gu-cang .oj { clip-path: inset(0 31.25% 57% 31.25%); transform-origin: 50% 33%; animation: gu-parpadea 3.6s ease-in-out 1.4s infinite, gu-mira 7s ease-in-out 2s infinite; }
 @keyframes gu-asomar { to { transform: translateY(0); } }
 @keyframes gu-flota { 0%, 100% { translate: 0 0; } 50% { translate: 0 3px; } }

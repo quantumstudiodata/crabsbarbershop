@@ -268,12 +268,12 @@ function Recorrido({ punto, lista, hechos, esc, ruta, ir, listo }: {
   );
 }
 
-/** El cangrejo del logo asomándose: solo sus tenazas y sus ojos, que parpadean; las tenazas abren y cierran. */
+/** El cangrejo del logo asomándose: tenazas, ojos y medio cuerpo, que parpadean; las tenazas abren y cierran. */
 function Asoma() {
   return (
     <span className="gu-asoma" aria-hidden="true">
       <span className="gu-cang">
-        <i className="t1" /><i className="t2" /><i className="oj" />
+        <i className="pa" /><i className="cu" /><i className="t1" /><i className="t2" /><i className="oj" />
       </span>
     </span>
   );
