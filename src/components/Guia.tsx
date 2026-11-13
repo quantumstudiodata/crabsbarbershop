@@ -6,7 +6,7 @@ import { marcarConsejos } from "@/app/(app)/acciones-usuario";
 import { salir } from "@/app/salir";
 import { PUNTOS, type Paso } from "./guia-pasos";
 
-type Caja = { x: number; y: number; w: number; h: number };
+type Caja = { x: number; y: number; w: number; h: number; r: number };
 const PAD = 8;
 
 /** Busca el primer elemento visible. "selector|texto" exige que el elemento contenga ese texto. */
@@ -32,7 +32,8 @@ function buscar(sel: string): HTMLElement | null {
   return null;
 }
 
-const medir = (e: HTMLElement): Caja => { const r = e.getBoundingClientRect(); return { x: r.left, y: r.top, w: r.width, h: r.height }; };
+// El resaltado sigue la forma del elemento: si es una píldora, el resaltado también.
+const medir = (e: HTMLElement): Caja => { const r = e.getBoundingClientRect(); const radio = parseFloat(getComputedStyle(e).borderTopLeftRadius) || 12; return { x: r.left, y: r.top, w: r.width, h: r.height, r: Math.min(radio + PAD, (r.height + PAD * 2) / 2) }; };
 const esEscritorio = () => typeof window !== "undefined" && window.matchMedia("(min-width: 821px)").matches;
 
 /**
@@ -55,7 +56,8 @@ export function Guia({ vistos, puntos, nombre }: { vistos: string[]; puntos: str
   const activa = !!fase && !fin;
   useEffect(() => {
     if (!activa) return;
-    const alto = (e: Event) => { e.preventDefault(); e.stopPropagation(); };
+    // Abrir la caja sí se permite: es la operación normal del inicio del día y sin ella no se puede seguir.
+    const alto = (e: Event) => { if ((e.target as HTMLElement)?.querySelector?.('input[name="fondo"]')) return; e.preventDefault(); e.stopPropagation(); };
     document.addEventListener("submit", alto, true);
     document.body.classList.add("con-guia");
     return () => { document.removeEventListener("submit", alto, true); document.body.classList.remove("con-guia"); };
@@ -152,6 +154,13 @@ function Recorrido({ punto, lista, hechos, esc, ruta, ir, listo }: {
     return () => cancelAnimationFrame(raf);
   }, [caja !== null]); // eslint-disable-line react-hooks/exhaustive-deps
 
+  // Pasos que terminan cuando aparece algo (por ejemplo, la caja abierta).
+  useEffect(() => {
+    if (!paso?.hasta) return;
+    const t = setInterval(() => { if (buscar(paso.hasta!)) { clearInterval(t); avanzar(); } }, 400);
+    return () => clearInterval(t);
+  }, [paso, avanzar]);
+
   // Un toque en lo señalado: en "pasa" llega al botón real y luego seguimos.
   useEffect(() => {
     if (!caja || !elRef.current) return;
@@ -160,7 +169,7 @@ function Recorrido({ punto, lista, hechos, esc, ruta, ir, listo }: {
       if (!el.contains(e.target as Node)) return;
       // Los enlaces del menú cambian de pantalla solos; si fue un botón (abrir el menú), se busca de nuevo.
       if (!paso) { setTimeout(() => setVuelta((v) => v + 1), 450); return; }
-      if (paso.modo === "pasa") setTimeout(avanzar, 420);
+      if (paso.modo === "pasa" && !paso.hasta) setTimeout(avanzar, 420);
     };
     document.addEventListener("click", toque, true);
     return () => document.removeEventListener("click", toque, true);
@@ -196,8 +205,8 @@ function Recorrido({ punto, lista, hechos, esc, ruta, ir, listo }: {
           <div className="gu-b" style={{ left: 0, top: caja.y + caja.h + PAD, right: 0, bottom: 0 }} />
           <div className="gu-b" style={{ left: 0, top: caja.y - PAD, width: Math.max(caja.x - PAD, 0), height: caja.h + PAD * 2 }} />
           <div className="gu-b" style={{ left: caja.x + caja.w + PAD, top: caja.y - PAD, right: 0, height: caja.h + PAD * 2 }} />
-          <div className="gu-hueco" style={{ left: caja.x - PAD, top: caja.y - PAD, width: caja.w + PAD * 2, height: caja.h + PAD * 2 }} />
-          {intercepta && <button type="button" className="gu-tapa" aria-label={accion} style={{ left: caja.x - PAD, top: caja.y - PAD, width: caja.w + PAD * 2, height: caja.h + PAD * 2 }} onClick={() => (paso!.modo === "final" ? terminar(paso!) : avanzar())} />}
+          <div className="gu-hueco" style={{ left: caja.x - PAD, top: caja.y - PAD, width: caja.w + PAD * 2, height: caja.h + PAD * 2, borderRadius: caja.r }} />
+          {intercepta && <button type="button" className="gu-tapa" aria-label={accion} style={{ left: caja.x - PAD, top: caja.y - PAD, width: caja.w + PAD * 2, height: caja.h + PAD * 2, borderRadius: caja.r }} onClick={() => (paso!.modo === "final" ? terminar(paso!) : avanzar())} />}
           <span key={`p${i}${punto}${enRuta}`} className={`gu-puntero ${tactil ? "dedo" : "cursor"}`} style={{ left: cx, top: cy }} aria-hidden="true">
             {tactil
               ? <svg viewBox="0 0 24 24" width="44" height="44"><path d="M18 11V6a2 2 0 0 0-4 0M14 10V4a2 2 0 0 0-4 0v2M10 10.5V6a2 2 0 0 0-4 0v8" fill="none" /><path d="M18 8a2 2 0 1 1 4 0v6a8 8 0 0 1-8 8h-2c-2.8 0-4.5-.86-5.99-2.34l-3.6-3.6a2 2 0 0 1 2.83-2.82L7 15" /></svg>
@@ -217,7 +226,7 @@ function Recorrido({ punto, lista, hechos, esc, ruta, ir, listo }: {
           <div className="gu-pie">
             {perdido && !paso ? <button type="button" className="gu-sig" onClick={() => ir(P.ruta)}>Llévame<span>→</span></button>
               : perdido || paso?.modo === "leer" ? <button type="button" className="gu-sig" onClick={() => (perdido && paso?.modo === "final" ? terminar(paso) : avanzar())}>{perdido && paso?.modo === "final" ? "Entendido" : "Siguiente"}<span>→</span></button>
-              : <span className="gu-haz"><i />{accion}</span>}
+              : <><span className="gu-haz"><i />{accion}</span>{paso && <button type="button" className="gu-saltar" onClick={avanzar}>Saltar paso</button>}</>}
           </div>
         </div>
       )}

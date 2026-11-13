@@ -21,6 +21,8 @@ export type Paso = {
   opcional?: boolean;
   /** Al terminar el punto: cerrar la ventana abierta o limpiar el cobro. */
   despues?: "cerrar" | "limpiar";
+  /** El paso termina cuando aparece esto en pantalla (por ejemplo, la caja ya abierta). */
+  hasta?: string;
   /** Teclas a explicar (atajos). */
   teclas?: [string, string][];
 };
@@ -39,7 +41,7 @@ export const PUNTOS: Record<string, Punto> = {
   cobro: {
     id: "cobro", nombre: "Cobrar un servicio", ejemplo: "Ejemplo: le hiciste un Corte clásico a un cliente.", ruta: "/cobrar", ir: ['a[href="/cobrar"]'],
     pasos: [
-      { sel: ".caja-puerta", modo: "leer", opcional: true, t: "Primero se abre la caja", x: "Al empezar el día, quien abre escribe con cuánto efectivo arranca la caja para dar cambio. Con la caja cerrada no se puede cobrar.", h: "Toca Siguiente" },
+      { sel: ".caja-puerta form", modo: "pasa", opcional: true, hasta: "button.svc, button.cm-n", t: "Primero se abre la caja", x: "Al empezar el día se escribe con cuánto efectivo arranca la caja para dar cambio, y se toca Abrir caja. Sin caja abierta no se puede cobrar.", h: "Escribe el efectivo y toca Abrir caja" },
       { sel: "button.svc, button.cm-n", modo: "pasa", t: "Elige lo que le hiciste al cliente", x: "Toca el servicio. Si fueron dos, tócalo dos veces. El total se suma solo.", h: "Toca el primer servicio" },
       { sel: "button.per, .cm-quien button, button.on", modo: "leer", opcional: true, solo: "esc", t: "¿Quién lo atendió?", x: "Aquí eliges a la persona que hizo el servicio. La venta y su comisión se le cuentan a ella.", h: "Toca Siguiente" },
       { sel: "button.bc-info ~ button.bt", modo: "pasa", solo: "mov", opcional: true, t: "Ve al total", x: "Toca Cobrar para ver el total y elegir cómo te pagó.", h: "Toca Cobrar" },
