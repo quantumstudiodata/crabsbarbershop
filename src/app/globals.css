@@ -5013,3 +5013,26 @@ html, body { overscroll-behavior-y: none; }
 @media (prefers-reduced-motion: reduce) {
   .gu *, .gu-bien, .gu-bien * { animation-duration: .01ms !important; animation-delay: 0s !important; transition-duration: .01ms !important; }
 }
+
+/* Corte de caja: comisiones del corte y entregas */
+.ck-con > .ck-per, .ck-ent > .ck-per { display: grid; grid-template-columns: auto 1fr auto; gap: 10px; align-items: center; text-align: left; }
+.ck-con > .ck-ent { display: grid; justify-content: stretch; }
+.ck-per > span { display: flex; align-items: flex-start; flex-direction: column; font-weight: 600; font-size: 14px; }
+.ck-per > span small { font-weight: 400; font-size: 12px; color: var(--muted); }
+.ck-ent { display: grid; gap: 8px; padding: 10px 0; border-top: 1px solid rgba(30,45,60,.07); }
+.ck-ent:first-of-type { border-top: 0; padding-top: 4px; }
+.ck-seg { display: grid !important; grid-template-columns: repeat(3, 1fr); }
+.ck-seg button { justify-content: center; font-size: 12.5px; padding: 7px 6px; }
+
+/* Equipo: indicadores en palabras */
+.eqa-ind { display: grid; grid-template-columns: repeat(auto-fit, minmax(210px, 1fr)); gap: 10px; margin: 0 0 12px; }
+.eqa-ind > span { display: flex; gap: 10px; align-items: flex-start; padding: 12px 14px; border-radius: 18px; font-size: 13.5px; line-height: 1.4; color: var(--muted); animation: eqa-ind .5s cubic-bezier(.2,1.2,.3,1) both; }
+.eqa-ind > span b { color: var(--fg); font-weight: 650; }
+.eqa-ind svg { flex: none; width: 18px; height: 18px; margin-top: 1px; color: #4f5f78; }
+@keyframes eqa-ind { from { opacity: 0; transform: translateY(8px); } }
+.fa-serv > div { display: grid !important; grid-template-columns: 1fr 64px 84px; align-items: baseline; }
+.fa-serv > div > :not(:first-child) { text-align: right; }
+.fa-serv > .cab { font: 500 10.5px var(--f-mono); letter-spacing: .08em; text-transform: uppercase; color: var(--faint); }
+.fa-serv > div:not(.cab) + div { border-top: 1px solid rgba(30,45,60,.06); padding-top: 8px; }
+
+a.eqa-bt { display: flex; justify-content: center; align-items: center; text-decoration: none; color: #fff; }

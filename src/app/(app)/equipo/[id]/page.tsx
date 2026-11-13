@@ -78,7 +78,7 @@ export default async function Ficha({ params, searchParams }: { params: Promise<
   const periodoActual = enCurso && !enCurso.sinRegla ? <>Periodo en curso: {enCurso.fila.monto}</> : undefined;
   const cifras: [string, string, React.ReactNode?, boolean?][] = renta
     ? [["Ventas atribuidas", formatoDinero(r.vendido)], ["Renta del mes", formatoDinero(cuenta.renta)], ["Recibido", formatoDinero(cuenta.rentaPagada)], [`Por cobrar ${enMes}`, formatoDinero(cuenta.rentaPendiente), periodoActual, cuenta.rentaPendiente > 0]]
-    : [["Ventas atribuidas", formatoDinero(r.vendido)], [cuenta.sueldo ? "Le corresponde" : "Comisión generada", formatoDinero(cuenta.corresponde)], ["Pagado", formatoDinero(cuenta.pagado)], [`Por pagar ${enMes}`, formatoDinero(cuenta.saldo), periodoActual, cuenta.saldo > 0]];
+    : [["Ventas atribuidas", formatoDinero(r.vendido)], [cuenta.sueldo ? "Le corresponde" : "Comisión generada", formatoDinero(cuenta.corresponde)], [se.barberia.pagosEquipoAuto ? "Liquidado" : "Pagado", formatoDinero(cuenta.pagado)], [se.barberia.pagosEquipoAuto ? `Por liquidar ${enMes}` : `Por pagar ${enMes}`, formatoDinero(cuenta.saldo), periodoActual, cuenta.saldo > 0]];
   cifras[0][2] = <>{r.servicios} {r.servicios === 1 ? "servicio" : "servicios"}{res.n ? <><br />★ {res.prom.toFixed(1)} en {res.n} {res.n === 1 ? "reseña" : "reseñas"}</> : null}</>;
 
   const sinActividad = r.servicios === 0 && cuenta.corresponde === 0 && cuenta.pagado === 0 && cuenta.renta === 0;
@@ -92,7 +92,8 @@ export default async function Ficha({ params, searchParams }: { params: Promise<
     ...(enCurso && !enCurso.sinRegla ? [{ clave: "periodo", titulo: "Periodo en curso", pendiente: enCurso.fila.monto, nota: `${dato("Periodo")}${dato(renta ? "Fecha límite" : "Fecha de pago") ? `, ${renta ? "vence" : "se paga"} el ${dato(renta ? "Fecha límite" : "Fecha de pago").toLowerCase()}` : ""}`,
       renglones: detalle.filter(([a]) => !["Periodo", "Fecha de pago", "Fecha límite", "Saldo pendiente", "Pendiente", "Forma de pago"].includes(a)) }] : []),
   ];
-  const pagar = enCurso && enCurso.fila.puedePagar ? <RegistrarPago filas={[enCurso.fila]} regreso={`/equipo/${u.id}${q}`} texto={renta ? "Registrar cobro" : "Registrar pago"} clase="eq2-pri eqa-bt" /> : null;
+  const auto = se.barberia.pagosEquipoAuto;
+  const pagar = enCurso && enCurso.fila.puedePagar && !auto ? <RegistrarPago filas={[enCurso.fila]} regreso={`/equipo/${u.id}${q}`} texto={renta ? "Registrar cobro" : "Registrar pago"} clase="eq2-pri eqa-bt" /> : null;
   const info = (
     <dl className="fa-dl">
       <dt>Horario</dt><dd>{h.horas || "Sin horario"}</dd>
@@ -132,12 +133,17 @@ export default async function Ficha({ params, searchParams }: { params: Promise<
           )}
           <div className="fa-dos">
             <section className="glass fa-card">
-              <span className="lab">Lo que más hace</span>
-              {r.top.length ? <div className="eq2-tabla">{r.top.slice(0, 5).map((t) => <div key={t.nombre}><span>{t.nombre}</span><b>{t.veces}</b></div>)}</div> : <Vacio icono="lista" titulo="Sin servicios este mes" texto="Cuando atienda a su primer cliente del mes, aquí verás lo que más hace." />}
+              <div className="entre"><span className="lab">Servicios cobrados</span>{r.servicios > 0 && <small className="muted">{r.servicios} en total</small>}</div>
+              {r.top.length ? (
+                <div className="eq2-tabla fa-serv">
+                  <div className="cab"><span>Servicio</span><span>Cantidad</span><span>Cobrado</span></div>
+                  {r.top.map((t) => <div key={t.nombre}><span>{t.nombre}</span><b>{t.veces}</b><span className="num">{formatoDinero(t.monto)}</span></div>)}
+                </div>
+              ) : <Vacio icono="lista" titulo="Sin servicios este mes" texto="Cuando cobre su primer servicio del mes, aquí aparecerá con su cantidad." />}
             </section>
             <section className="glass fa-card">
-              <div className="entre"><span className="lab">Pagos</span>{puedePagar && pagosRecientes.length > 0 && <Link className="eq2-link" href={`/equipo/pagos?persona=${u.id}`}>Ver todos</Link>}</div>
-              {pagosRecientes.length ? <div className="eq2-tabla">{pagosRecientes.map((x) => <div key={x.id}><span>{fecha(x.creadoEn)}{x.tipo === "renta" ? ", renta" : ""}</span><b>{formatoDinero(x.monto)}</b></div>)}</div> : <Vacio icono="efectivo" titulo="Sin pagos registrados" texto="Cada pago que le registres aparecerá aquí con su fecha y monto." />}
+              <div className="entre"><span className="lab">{auto ? "Comisiones liquidadas" : "Pagos"}</span>{(puedePagar || auto) && pagosRecientes.length > 0 && <Link className="eq2-link" href={`/equipo/pagos?persona=${u.id}`}>Ver todos</Link>}</div>
+              {pagosRecientes.length ? <div className="eq2-tabla">{pagosRecientes.map((x) => <div key={x.id}><span>{fecha(x.creadoEn)}{x.tipo === "renta" ? ", renta" : ""}</span><b>{formatoDinero(x.monto)}</b></div>)}</div> : <Vacio icono="efectivo" titulo={auto ? "Sin comisiones liquidadas" : "Sin pagos registrados"} texto={auto ? "Cada periodo liquidado aparecerá aquí con su fecha y monto." : "Cada pago que le registres aparecerá aquí con su fecha y monto."} />}
             </section>
           </div>
           <details className="eq2-mas solo-movil fa-det">

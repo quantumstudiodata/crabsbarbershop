@@ -9,6 +9,7 @@ import { BarraCaja, CajaCerrada, CajaModal, CajaPendiente, type Turno } from "./
 import { FormCobro } from "./FormCobro";
 import type { Promo } from "@/lib/promociones";
 import { ModoFoco } from "./ModoFoco";
+import { comisionesDeTurno, entregasDeCorte } from "@/lib/comisionesCorte";
 
 export const metadata = { title: "Cobro" };
 
@@ -35,15 +36,21 @@ export default async function Cobrar({ searchParams }: { searchParams: Promise<{
     : null;
   let turno: Turno | null = null;
   if (t) {
-    const [datos, [abrio], folio] = await Promise.all([
+    // Quien no ve al equipo completo solo ve su propia comisión en el corte.
+    const verTodo = s.puede("ventas.ver_todas") || s.puede("equipo.pagar");
+    const mio = <T extends { id: string }>(xs: T[]) => (verTodo ? xs : xs.filter((x) => x.id === s.usuario.id));
+    const [datos, [abrio], folio, comisiones, entregas] = await Promise.all([
       movimientosDeTurno(s.barberia.id, t.id, t.fondoInicial),
       db.select({ nombre: schema.usuarios.nombre, avatar: schema.usuarios.avatar }).from(schema.usuarios).where(and(eq(schema.usuarios.id, t.abiertoPor), eq(schema.usuarios.barberiaId, s.barberia.id))),
       folioCorte(s.barberia.id, t.abiertoEn),
+      comisionesDeTurno(s.barberia.id, t.id),
+      s.barberia.pagosEquipoAuto ? entregasDeCorte(s.barberia.id, zona, s.barberia.pagosEquipoDesde) : Promise.resolve([]),
     ]);
     turno = {
       desde: horaCorta(t.abiertoEn, zona), abrio: abrio?.nombre.split(" ")[0] ?? "", abrioAvatar: abrio?.avatar ?? "iniciales", abiertoEn: t.abiertoEn.toISOString(), dia: fechaLarga(t.fechaOperativa).toLowerCase(),
       deOtroDia: t.fechaOperativa < fechaLocal(new Date(), zona), folioCorte: folio, m: datos.m, esperado: datos.esperado,
       ventas: datos.ventas, ventasEfectivo: datos.ventasEfectivo, propinas: datos.propinasTotal, otros: datos.otrosPorMetodo.map((x) => ({ metodo: x.metodo, total: x.total, ventas: x.ventas })),
+      comisiones: mio(comisiones), entregas: mio(entregas), verTodo,
     };
   }
   const folioVenta = `${s.barberia.folioPrefijo}-${String(s.barberia.siguienteFolio).padStart(6, "0")}`;

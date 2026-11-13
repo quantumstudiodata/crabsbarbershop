@@ -75,19 +75,22 @@ export default async function Resumen({ searchParams }: { searchParams: Promise<
   const hastaV = p.hasta > hoy ? hoy : p.hasta;
   const mejor = [...r.porDia.entries()].filter(([d]) => d >= p.desde && d <= hastaV).sort((a, b) => b[1] - a[1])[0];
   const ingresos = r.netas + rentas;
-  const resultado = ingresos - egresos - pagadoEquipo;
   // Lo pendiente con la misma cuenta que Equipo: comisión y sueldo del periodo, menos pagos y faltantes autorizados.
   const { ventas: delPeriodo } = await ventasEntre(bId, p.desde, hastaV, { zona });
   const pagadasP = delPeriodo.filter((x) => x.estado === "pagada");
   const cuentas = await Promise.all(equipo.map(async (e) => ({ id: e.id, c: await cuentaDe(bId, e.id, p.desde, hastaV, pagadasP) })));
   const conPend = cuentas.filter((x) => x.c.regla && x.c.regla.tipo !== "renta" && x.c.saldo > 0);
   const pendEquipo = conPend.reduce((a, x) => a + x.c.saldo, 0);
+  // Con comisiones automáticas lo del equipo se resta solo conforme se genera: no queda nada "por pagar".
+  const auto = s.barberia.pagosEquipoAuto;
+  const costoEquipo = auto ? pagadoEquipo + pendEquipo : pagadoEquipo;
+  const resultado = ingresos - egresos - costoEquipo;
   const nombreDe = (id: string) => (equipo.find((x) => x.id === id)?.nombre ?? r.porBarbero.find((x) => x.id === id)?.nombre ?? "").split(" ")[0];
   const topCats = [...cats].sort((a, b) => b.monto - a.monto).slice(0, 3).map((c) => c.categoria);
   const signo = (n: number) => (n < 0 ? `−${$(-n)}` : $(n));
   const lista = (xs: string[]) => (xs.length < 2 ? xs.join("") : `${xs.slice(0, -1).join(", ")} y ${xs[xs.length - 1]}`);
   const pendientes = [
-    ...(pendEquipo > 0 && s.puede("equipo.pagar") ? [{ titulo: "Pagos pendientes al equipo", detalle: `${lista(conPend.map((g) => nombreDe(g.id)))}, ${$(pendEquipo)}`, href: "/equipo" }] : []),
+    ...(!auto && pendEquipo > 0 && s.puede("equipo.pagar") ? [{ titulo: "Pagos pendientes al equipo", detalle: `${lista(conPend.map((g) => nombreDe(g.id)))}, ${$(pendEquipo)}`, href: "/equipo" }] : []),
     ...(conDif.length ? [{ titulo: conDif.length === 1 ? "Un corte con diferencia" : `${conDif.length} cortes con diferencia`, detalle: conDif.length === 1 ? `${(conDif[0].diferencia ?? 0) < 0 ? "Faltaron" : "Sobraron"} ${$(Math.abs(conDif[0].diferencia ?? 0))} el ${fechaCorta(conDif[0].fechaOperativa)}` : "Revisa qué pasó en cada uno", href: "/analitica/cortes" }] : []),
   ];
   const totalVentas = Math.max(1, ...r.porBarbero.map((x) => x.monto));
@@ -140,10 +143,19 @@ export default async function Resumen({ searchParams }: { searchParams: Promise<
           <div className="rs-cab"><b>Resultado financiero</b>{s.puede("reportes.ver") && <Ir href="/analitica/finanzas" titulo="Ir a Finanzas" />}</div>
           <div className="rs-f"><span><span>Ingresos</span><small>Ventas netas {$(r.netas)}{rentas ? ` y rentas ${$(rentas)}` : ""}</small></span><b>{$(ingresos)}</b></div>
           <div className="rs-f"><span><span>Egresos del negocio</span><small>{topCats.length ? lista(topCats) : "Sin egresos registrados"}</small></span><b>{egresos ? `−${$(egresos)}` : "$0"}</b></div>
-          <div className="rs-f"><span><span>Pagos al equipo realizados</span><small>Comisiones y sueldos ya pagados</small></span><b>{pagadoEquipo ? `−${$(pagadoEquipo)}` : "$0"}</b></div>
-          <div className="rs-f tot"><span>Resultado después de pagos realizados</span><b>{signo(resultado)}</b></div>
-          <div className="rs-f porpagar"><span><span>Pendiente de pagar al equipo</span><small>Comisiones y sueldos que aún no se pagan</small></span><b>{$(pendEquipo)}</b></div>
-          {pendEquipo > 0 && <small className="rs-nota">Si se pagan hoy, el resultado sería {signo(resultado - pendEquipo)}.</small>}
+          {auto ? (
+            <>
+              <div className="rs-f"><span><span>Comisiones y sueldos del equipo</span><small>Se restan solos conforme se generan</small></span><b>{costoEquipo ? `−${$(costoEquipo)}` : "$0"}</b></div>
+              <div className="rs-f tot"><span>Resultado</span><b>{signo(resultado)}</b></div>
+            </>
+          ) : (
+            <>
+              <div className="rs-f"><span><span>Pagos al equipo realizados</span><small>Comisiones y sueldos ya pagados</small></span><b>{pagadoEquipo ? `−${$(pagadoEquipo)}` : "$0"}</b></div>
+              <div className="rs-f tot"><span>Resultado después de pagos realizados</span><b>{signo(resultado)}</b></div>
+              <div className="rs-f porpagar"><span><span>Pendiente de pagar al equipo</span><small>Comisiones y sueldos que aún no se pagan</small></span><b>{$(pendEquipo)}</b></div>
+              {pendEquipo > 0 && <small className="rs-nota">Si se pagan hoy, el resultado sería {signo(resultado - pendEquipo)}.</small>}
+            </>
+          )}
         </section>
       </div>
 
@@ -201,12 +213,14 @@ export default async function Resumen({ searchParams }: { searchParams: Promise<
           </div>
         </details>
         <details className="glass rs-acc">
-          <summary><span><b>Resultado financiero</b><small>Después de pagos realizados</small></span><b>{signo(resultado)}</b><Icono n="abajo" /></summary>
+          <summary><span><b>Resultado financiero</b><small>{auto ? "Con las comisiones ya restadas" : "Después de pagos realizados"}</small></span><b>{signo(resultado)}</b><Icono n="abajo" /></summary>
           <div className="rs-acc-c">
             <div className="rs-f"><span><span>Ingresos</span><small>Ventas netas{rentas ? ` y rentas ${$(rentas)}` : ""}</small></span><b>{$(ingresos)}</b></div>
             <div className="rs-f"><span><span>Egresos del negocio</span><small>{topCats.length ? lista(topCats) : "Sin egresos"}</small></span><b>{egresos ? `−${$(egresos)}` : "$0"}</b></div>
-            <div className="rs-f"><span><span>Pagos al equipo realizados</span></span><b>{pagadoEquipo ? `−${$(pagadoEquipo)}` : "$0"}</b></div>
-            <div className="rs-f porpagar"><span><span>Pendiente al equipo</span><small>{pendEquipo > 0 ? `Si se paga hoy: ${signo(resultado - pendEquipo)}` : "Nada pendiente"}</small></span><b>{$(pendEquipo)}</b></div>
+            {auto ? <div className="rs-f"><span><span>Comisiones y sueldos del equipo</span></span><b>{costoEquipo ? `−${$(costoEquipo)}` : "$0"}</b></div> : <>
+              <div className="rs-f"><span><span>Pagos al equipo realizados</span></span><b>{pagadoEquipo ? `−${$(pagadoEquipo)}` : "$0"}</b></div>
+              <div className="rs-f porpagar"><span><span>Pendiente al equipo</span><small>{pendEquipo > 0 ? `Si se paga hoy: ${signo(resultado - pendEquipo)}` : "Nada pendiente"}</small></span><b>{$(pendEquipo)}</b></div>
+            </>}
             {s.puede("reportes.ver") && <Link className="eq2-link" href="/analitica/finanzas">Ver finanzas</Link>}
           </div>
         </details>

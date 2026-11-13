@@ -12,6 +12,11 @@ import { abrirCaja, cerrarCaja, registrarGasto, registrarMovimiento, type Estado
 export type Turno = {
   desde: string; abrio: string; abrioAvatar: string; abiertoEn: string; dia: string; deOtroDia: boolean; folioCorte: string; m: MovimientosTurno; esperado: number; ventas: number; ventasEfectivo?: number;
   propinas: number; otros: { metodo: string; total: number; ventas: number }[];
+  /** Comisión de cada persona por las ventas de este turno (quien no ve al equipo, solo la suya). */
+  comisiones?: { id: string; nombre: string; avatar: string; servicios: number; monto: number }[];
+  /** Comisiones por entregar en efectivo: se deciden en el corte. */
+  entregas?: { id: string; nombre: string; avatar: string; monto: number; detalle: string }[];
+  verTodo?: boolean;
 };
 type Vista = "retiro" | "gasto" | "corte";
 
@@ -235,15 +240,24 @@ function CortePasos({ turno, accion, cerrando, error, contado, setContado, limit
   const total = metodos.reduce((a, x) => a + x.total, 0);
   const grupos = turno.otros.filter((o) => o.total > 0).map((o) => ({ metodo: o.metodo, total: o.total, ventas: o.ventas, icono: iconoDe(o.metodo), enLinea: EN_LINEA.includes(o.metodo) }));
   const conComprobantes = evidencias && grupos.length > 0;
-  const pasos = conComprobantes ? 4 : 3;
+  const comisiones = turno.comisiones ?? [];
+  const entregas = turno.entregas ?? [];
+  const conComisiones = comisiones.length > 0 || entregas.length > 0;
+  const nombres = ["Resumen del turno", ...(conComisiones ? ["Comisiones"] : []), "Efectivo", ...(conComprobantes ? ["Comprobantes"] : []), "Cierre"];
+  const pasos = nombres.length;
+  const n = (x: string) => nombres.indexOf(x) + 1;
   const [paso, setPaso] = useState(1);
   const [faltan, setFaltan] = useState(() => grupos.filter((g) => !g.enLinea).length);
   const [archivos, setArchivos] = useState(0);
+  // Cada entrega sale de la caja salvo que se elija otra cosa.
+  const [decision, setDecision] = useState<Record<string, string>>(() => Object.fromEntries(entregas.map((e) => [e.id, "caja"])));
+  const deCaja = entregas.filter((e) => decision[e.id] === "caja").reduce((a, e) => a + e.monto, 0);
+  const esperado = turno.esperado - deCaja;
   const c = leerPesos(contado);
-  const dif = c === null ? null : c - turno.esperado;
-  const nombre = ["Resumen del turno", "Efectivo", ...(conComprobantes ? ["Comprobantes"] : []), "Cierre"][paso - 1];
+  const dif = c === null ? null : c - esperado;
+  const nombre = nombres[paso - 1];
   const esCierre = paso === pasos;
-  const puedeSeguir = paso !== 2 || c !== null;
+  const puedeSeguir = paso !== n("Efectivo") || c !== null;
   const qr = grupos.filter((g) => g.enLinea).reduce((a, g) => a + g.ventas, 0);
   return (
     <Modal abierto cerrar={cerrar} etiqueta={`Folio ${turno.folioCorte}`} titulo="Corte de caja">
@@ -270,10 +284,40 @@ function CortePasos({ turno, accion, cerrando, error, contado, setContado, limit
           {turno.propinas > 0 && <small className="muted">Propinas aparte {formatoDinero(turno.propinas)}</small>}
         </div>
 
-        <div className="pila" hidden={paso !== 2}>
+        {conComisiones && (
+          <div className="pila ck-com" hidden={paso !== n("Comisiones")}>
+            {comisiones.length > 0 && (
+              <div className="ck-con">
+                <span className="ck-lab">{turno.verTodo ? "Lo que le toca a cada quien por este corte" : "Lo que te toca por tus servicios de este corte"}</span>
+                {comisiones.map((x) => (
+                  <div key={x.id} className="ck-per"><Avatar avatar={x.avatar} nombre={x.nombre} t={26} /><span>{x.nombre.split(" ")[0]}<small>{x.servicios} {x.servicios === 1 ? "servicio" : "servicios"}</small></span><b className="num">{formatoDinero(x.monto)}</b></div>
+                ))}
+              </div>
+            )}
+            {entregas.length > 0 && (
+              <div className="ck-con">
+                <span className="ck-lab">Hoy toca pagar</span>
+                {entregas.map((e) => (
+                  <div key={e.id} className="ck-ent">
+                    <input type="hidden" name={`entrega:${e.id}`} value={decision[e.id] ?? "caja"} />
+                    <div className="ck-per"><Avatar avatar={e.avatar} nombre={e.nombre} t={26} /><span>{e.nombre.split(" ")[0]}<small>Comisión {e.detalle}</small></span><b className="num">{formatoDinero(e.monto)}</b></div>
+                    <div className="seg ck-seg" role="radiogroup" aria-label={`Cómo se le paga a ${e.nombre.split(" ")[0]}`}>
+                      {([["caja", "De la caja"], ["manana", "Mañana"], ["transferencia", "Transferencia"]] as const).map(([k, t]) => (
+                        <button key={k} type="button" role="radio" aria-checked={decision[e.id] === k} className={decision[e.id] === k ? "on" : ""} onClick={() => setDecision((d) => ({ ...d, [e.id]: k }))}>{t}</button>
+                      ))}
+                    </div>
+                  </div>
+                ))}
+                <small className="muted">Lo que se paga de la caja se descuenta del efectivo que debe haber. Si hoy no hay cambio, elige Mañana y saldrá en el siguiente corte.</small>
+              </div>
+            )}
+          </div>
+        )}
+
+        <div className="pila" hidden={paso !== n("Efectivo")}>
           <label className="campo">
             <span>¿Cuánto efectivo contaste?</span>
-            <input className="input grande" name="contado" inputMode="decimal" placeholder={formatoDinero(turno.esperado)} value={contado} onChange={(e) => setContado(e.target.value)} required />
+            <input className="input grande" name="contado" inputMode="decimal" placeholder={formatoDinero(esperado)} value={contado} onChange={(e) => setContado(e.target.value)} required />
           </label>
           {dif !== null && <span className={`conteo-l ${dif === 0 ? "ok" : "dif"}`}><Icono n={dif === 0 ? "palomita" : "reloj"} />{dif === 0 ? "Coincide con el sistema" : dif > 0 ? `Sobran ${formatoDinero(dif)}` : `Faltan ${formatoDinero(-dif)}`}</span>}
           <div className="ck-con">
@@ -283,12 +327,13 @@ function CortePasos({ turno, accion, cerrando, error, contado, setContado, limit
             {m.propinasEfectivo > 0 && <div><span>Propinas en efectivo</span><span className="num">+{formatoDinero(m.propinasEfectivo)}</span></div>}
             {m.entradas > 0 && <div><span>Entradas</span><span className="num">+{formatoDinero(m.entradas)}</span></div>}
             <div><span>Retiros y gastos</span><span className="num">−{formatoDinero(m.retiros + m.gastosDeCaja + m.devolucionesEfectivo)}</span></div>
-            <div className="t"><span>Efectivo esperado</span><b className="num">{formatoDinero(turno.esperado)}</b></div>
+            {deCaja > 0 && <div><span>Pago de comisiones</span><span className="num">−{formatoDinero(deCaja)}</span></div>}
+            <div className="t"><span>Efectivo esperado</span><b className="num">{formatoDinero(esperado)}</b></div>
           </div>
         </div>
 
         {conComprobantes && (
-          <div className="pila" hidden={paso !== 3}>
+          <div className="pila" hidden={paso !== n("Comprobantes")}>
             <small className="muted">Sube las fotos o archivos de cada forma de pago, en el orden que quieras.</small>
             <EvidenciasCorte grupos={grupos} obligatorio cambio={(f, n) => { setFaltan(f); setArchivos(n); }} dinero={formatoDinero} />
           </div>
@@ -314,7 +359,7 @@ function CortePasos({ turno, accion, cerrando, error, contado, setContado, limit
           {paso > 1 ? <button type="button" className="ck-atras" aria-label="Anterior" onClick={() => setPaso(paso - 1)}><Icono n="izquierda" /></button> : <span />}
           {esCierre
             ? <button key="cerrar" type="submit" className="bt" disabled={cerrando || c === null || (conComprobantes && faltan > 0)}>{cerrando ? "Cerrando…" : "Cerrar caja"}<Fl /></button>
-            : <button key="seguir" type="button" className="bt" disabled={!puedeSeguir} onClick={() => setPaso(paso + 1)}>{paso === 1 ? "Contar efectivo" : paso === 2 && conComprobantes ? "Comprobantes" : "Continuar"}<Fl /></button>}
+            : <button key="seguir" type="button" className="bt" disabled={!puedeSeguir} onClick={() => setPaso(paso + 1)}>{nombres[paso] === "Comisiones" ? "Ver comisiones" : nombres[paso] === "Efectivo" ? "Contar efectivo" : nombres[paso] === "Comprobantes" ? "Comprobantes" : "Continuar"}<Fl /></button>}
         </div>
       </form>
     </Modal>

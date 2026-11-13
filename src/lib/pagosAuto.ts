@@ -13,6 +13,8 @@ import { formatoDinero } from "./money";
 /** Marca con la que se reconocen los pagos que registró el sistema. */
 export const MARCA_AUTO = "Pago automático";
 export const MARCA_RENTA = "Renta automática";
+/** Comisión ya liquidada que falta entregar en efectivo: se entrega (o se pasa a transferencia) en el corte de caja. */
+export const POR_ENTREGAR = "Por entregar de caja";
 
 /**
  * Pagos al equipo automáticos: cada periodo de pago ya vencido se da por pagado en su fecha de pago,
@@ -20,7 +22,7 @@ export const MARCA_RENTA = "Renta automática";
  * aunque nadie registre los pagos. La renta de silla tiene su propio interruptor: se da por cobrada en su fecha límite.
  * Es idempotente: cada periodo se paga una sola vez aunque varias pantallas lo pidan al mismo tiempo.
  */
-export const liquidarAutomaticos = cache(async (barberiaId: string) => {
+export const liquidarAutomaticos = cache(async (barberiaId: string, incluirHoy = false) => {
   const [b] = await db.select({ auto: s.barberias.pagosEquipoAuto, desdePago: s.barberias.pagosEquipoDesde, rentas: s.barberias.rentasAuto, desdeRenta: s.barberias.rentasDesde, zona: s.barberias.zonaHoraria })
     .from(s.barberias).where(eq(s.barberias.id, barberiaId)).limit(1);
   if (!b || (!(b.auto && b.desdePago) && !(b.rentas && b.desdeRenta))) return;
@@ -43,16 +45,20 @@ export const liquidarAutomaticos = cache(async (barberiaId: string) => {
         await tx.execute(sql`select pg_advisory_xact_lock(hashtext(${`auto-${p.id}`}))`);
         const [ult] = await tx.select({ semana: sql<string | null>`max(${s.pagosComision.semana})::text` }).from(s.pagosComision)
           .where(and(eq(s.pagosComision.barberiaId, barberiaId), eq(s.pagosComision.barberoId, p.id), like(s.pagosComision.nota, `%${marca}%`)));
-        let f = ult?.semana && ult.semana >= desdeCuenta ? sumarDias(ult.semana, 1) : desdeCuenta;
+        // Se revisa de nuevo el último periodo liquidado: si después se cobró algo más, se liquida solo la diferencia.
+        let f = ult?.semana && ult.semana >= desdeCuenta ? ult.semana : desdeCuenta;
         for (let i = 0; i < 90; i++) {
           const per = periodoDePago(r, f);
           if (per.pago > hoy) break;
+          // Un periodo que termina hoy se liquida en el corte de caja (con lo vendido en el día), no antes.
+          if (per.hasta >= hoy && !incluirHoy) break;
           const desde = per.desde < desdeCuenta ? desdeCuenta : per.desde;
           const { ventas } = await ventasEntre(barberiaId, desde, per.hasta, { zona: b.zona, barberoId: p.id });
           const c = await cuentaDe(barberiaId, p.id, desde, per.hasta, ventas.filter((v) => v.estado === "pagada"));
           const monto = Math.round((renta ? c.rentaPendiente : c.saldo) / 100) * 100;
           if (monto > 0) {
-            const forma = NOMBRE_FORMA_PAGO[r.formaPago ?? "efectivo"] ?? "Efectivo de caja";
+            const efectivo = (r.formaPago ?? "efectivo") === "efectivo";
+            const forma = !renta && efectivo ? POR_ENTREGAR : NOMBRE_FORMA_PAGO[r.formaPago ?? "efectivo"] ?? "Efectivo de caja";
             const periodo = desde === per.hasta ? fechaCorta(desde) : `del ${fechaCorta(desde)} al ${fechaCorta(per.hasta)}`;
             await tx.insert(s.pagosComision).values({
               barberiaId, barberoId: p.id, tipo: renta ? "renta" : "pago", monto, semana: per.hasta,

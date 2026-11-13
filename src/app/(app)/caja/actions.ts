@@ -1,7 +1,8 @@
 "use server";
 
 import { ventasDeCitasPagadas } from "@/lib/pagos";
-import { and, eq } from "drizzle-orm";
+import { and, eq, like, sql } from "drizzle-orm";
+import { POR_ENTREGAR, liquidarAutomaticos } from "@/lib/pagosAuto";
 import { revalidatePath } from "next/cache";
 import { requerirSesion } from "@/lib/auth";
 import { compararConteo, requiereExplicacion } from "@/lib/caja";
@@ -112,6 +113,22 @@ export async function cerrarCaja(_: EstadoCaja, form: FormData): Promise<EstadoC
     }
   }
   const datos = await movimientosDeTurno(s.barberia.id, turno.id, turno.fondoInicial);
+  // Comisiones automáticas: lo que se paga hoy se liquida al cerrar; cada entrega en efectivo se decide aquí
+  // (de la caja, mañana o por transferencia). Lo que sale de la caja se descuenta del efectivo esperado.
+  type Entrega = { id: string; barberoId: string; monto: number; nota: string; nombre: string; decision: string };
+  let entregas: Entrega[] = [];
+  if (s.barberia.pagosEquipoAuto) {
+    await liquidarAutomaticos(s.barberia.id, true);
+    const pend = await db.select({ id: schema.pagosComision.id, barberoId: schema.pagosComision.barberoId, monto: schema.pagosComision.monto, nota: schema.pagosComision.nota, nombre: schema.usuarios.nombre })
+      .from(schema.pagosComision).innerJoin(schema.usuarios, eq(schema.usuarios.id, schema.pagosComision.barberoId))
+      .where(and(eq(schema.pagosComision.barberiaId, s.barberia.id), eq(schema.pagosComision.tipo, "pago"), like(schema.pagosComision.nota, `${POR_ENTREGAR}:%`), sql`${schema.pagosComision.monto} > 0`));
+    // Solo se tocan las que se mostraron en el corte; las demás siguen pendientes.
+    const verTodo = s.puede("ventas.ver_todas") || s.puede("equipo.pagar");
+    entregas = pend.filter((x) => verTodo || x.barberoId === s.usuario.id)
+      .map((x) => ({ ...x, decision: texto(form, `entrega:${x.barberoId}`) })).filter((x) => ["caja", "transferencia"].includes(x.decision));
+  }
+  const deCaja = entregas.filter((x) => x.decision === "caja").reduce((a, x) => a + x.monto, 0);
+  datos.esperado -= deCaja;
   // Con la función activa, cada forma de pago (que no sea efectivo) con cobros necesita su evidencia.
   if (s.barberia.usaEvidenciaCorte) {
     // Los cobros con QR y los anticipos en línea ya están verificados por Stripe: no piden comprobante.
@@ -129,10 +146,20 @@ export async function cerrarCaja(_: EstadoCaja, form: FormData): Promise<EstadoC
       .where(and(eq(schema.turnosCaja.id, turno.id), eq(schema.turnosCaja.estado, "abierto")))
       .returning({ id: schema.turnosCaja.id });
     if (filas.length === 0) return;
+    for (const e of entregas) {
+      const resto = e.nota.slice(POR_ENTREGAR.length + 2);
+      if (e.decision === "caja") {
+        await tx.insert(schema.movimientosCaja).values({ barberiaId: s.barberia.id, turnoId: turno.id, tipo: "retiro", monto: e.monto, concepto: `Pago de comisiones a ${e.nombre.split(" ")[0]}`, usuarioId: s.usuario.id });
+        await tx.update(schema.pagosComision).set({ nota: `Efectivo de caja: ${resto} (entregado en el corte)`.slice(0, 200) }).where(eq(schema.pagosComision.id, e.id));
+      } else {
+        await tx.update(schema.pagosComision).set({ nota: `Transferencia: ${resto}`.slice(0, 200) }).where(eq(schema.pagosComision.id, e.id));
+      }
+    }
     if (evidencias.length) await tx.insert(schema.evidenciasCorte).values(evidencias.map((e) => ({ ...e, barberiaId: s.barberia.id, turnoId: turno.id, subidoPor: s.usuario.id })));
     await registrar(tx, {
       barberiaId: s.barberia.id, usuarioId: s.usuario.id, tipo: "caja",
-      accion: `${s.usuario.nombre} hizo el corte de caja. ${r.texto}`, detalle: { esperado: datos.esperado, contado, diferencia: r.diferencia, notas, verificacion, evidencias: evidencias.length || undefined },
+      accion: `${s.usuario.nombre} hizo el corte de caja. ${r.texto}`, detalle: { esperado: datos.esperado, contado, diferencia: r.diferencia, notas, verificacion, evidencias: evidencias.length || undefined,
+        comisiones: entregas.length ? entregas.map((e) => `${e.nombre.split(" ")[0]} ${formatoDinero(e.monto)} ${e.decision === "caja" ? "de la caja" : "por transferencia"}`).join(", ") : undefined },
     });
   });
   const zona = s.barberia.zonaHoraria;

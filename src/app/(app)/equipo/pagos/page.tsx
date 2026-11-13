@@ -80,13 +80,13 @@ export default async function Pagos({ searchParams }: { searchParams: Promise<{ 
       <AvisoUrl aviso={q.aviso} error={q.error} />
       <div className="eq2-tit">
         <Link href="/equipo" className="eq2-atr" aria-label="Volver a Equipo"><Icono n="izquierda" /></Link>
-        <span><small>Equipo</small><h1>Pagos del equipo</h1></span>
+        <span><small>Equipo</small><h1>{se.barberia.pagosEquipoAuto ? "Historial de comisiones" : "Pagos del equipo"}</h1></span>
       </div>
 
       <section className="glass pg-resumen subir" aria-label="Este mes">
         <span className="lab">{filtro ? `${filtro.nombre.split(" ")[0]}, este mes` : "Este mes"}</span>
         <div className="pg-kpis">
-          <span><small>Pagado al equipo</small><b>{formatoDinero(mes?.pagado ?? 0)}</b><em>{mes?.nPagos ?? 0} {mes?.nPagos === 1 ? "pago" : "pagos"}</em></span>
+          <span><small>{se.barberia.pagosEquipoAuto ? "Comisiones liquidadas" : "Pagado al equipo"}</small><b>{formatoDinero(mes?.pagado ?? 0)}</b><em>{mes?.nPagos ?? 0} {mes?.nPagos === 1 ? "pago" : "pagos"}</em></span>
           {(mes?.renta ?? 0) > 0 && <span><small>Renta cobrada</small><b>{formatoDinero(mes!.renta)}</b><em>de silla</em></span>}
         </div>
       </section>
