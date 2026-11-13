@@ -1,4 +1,4 @@
-import { and, eq } from "drizzle-orm";
+import { and, eq, gt, inArray, isNull, sql } from "drizzle-orm";
 import { asentarCitasPagadas } from "@/lib/pagos";
 import { cobraEnLinea } from "@/lib/stripe";
 import { requerirSesion } from "@/lib/auth";
@@ -32,7 +32,9 @@ export default async function Cobrar({ searchParams }: { searchParams: Promise<{
     ? await db.select().from(schema.citas).where(and(eq(schema.citas.id, q.cita), eq(schema.citas.barberiaId, s.barberia.id))).limit(1)
     : [];
   const desdeCita = cita && !cita.ventaId && !["cancelada", "no_asistio", "expirada"].includes(cita.estado)
-    ? { id: cita.id, folio: cita.folio, cliente: cita.clienteNombre, barberoId: cita.barberoId, servicioIds: cita.servicios.map((x) => x.servicioId), pagado: cita.pagado }
+    ? { id: cita.id, folio: cita.folio, cliente: cita.clienteNombre, barberoId: cita.barberoId, servicioIds: cita.servicios.map((x) => x.servicioId),
+      // Una transferencia por confirmar se da por hecha al cobrar.
+      pagado: Math.min(cita.pagado + (cita.estadoPago === "transferencia" ? cita.transferenciaMonto : 0), cita.total) }
     : null;
   let turno: Turno | null = null;
   if (t) {
@@ -46,11 +48,15 @@ export default async function Cobrar({ searchParams }: { searchParams: Promise<{
       comisionesDeTurno(s.barberia.id, t.id),
       s.barberia.pagosEquipoAuto ? entregasDeCorte(s.barberia.id, zona, s.barberia.pagosEquipoDesde) : Promise.resolve([]),
     ]);
+    // Citas que ya se atendieron y no se han cobrado: el corte avisa antes de cerrar.
+    const [sinCobrar] = s.barberia.usaCitas ? await db.select({ n: sql<number>`count(*)::int` }).from(schema.citas)
+      .where(and(eq(schema.citas.barberiaId, s.barberia.id), isNull(schema.citas.ventaId), inArray(schema.citas.estado, ["llego", "en_atencion", "completada"]),
+        gt(schema.citas.inicio, new Date(Date.now() - 7 * 86400000)), sql`(${schema.citas.estado} = 'completada' or ${schema.citas.fin} < now())`)) : [{ n: 0 }];
     turno = {
       desde: horaCorta(t.abiertoEn, zona), abrio: abrio?.nombre.split(" ")[0] ?? "", abrioAvatar: abrio?.avatar ?? "iniciales", abiertoEn: t.abiertoEn.toISOString(), dia: fechaLarga(t.fechaOperativa).toLowerCase(),
       deOtroDia: t.fechaOperativa < fechaLocal(new Date(), zona), folioCorte: folio, m: datos.m, esperado: datos.esperado,
       ventas: datos.ventas, ventasEfectivo: datos.ventasEfectivo, propinas: datos.propinasTotal, otros: datos.otrosPorMetodo.map((x) => ({ metodo: x.metodo, total: x.total, ventas: x.ventas })),
-      comisiones: mio(comisiones), entregas: mio(entregas), verTodo,
+      comisiones: mio(comisiones), entregas: mio(entregas), verTodo, sinCobrar: sinCobrar?.n ?? 0,
     };
   }
   const folioVenta = `${s.barberia.folioPrefijo}-${String(s.barberia.siguienteFolio).padStart(6, "0")}`;

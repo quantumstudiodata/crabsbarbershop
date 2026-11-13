@@ -17,6 +17,8 @@ export type Turno = {
   /** Comisiones por entregar en efectivo: se deciden en el corte. */
   entregas?: { id: string; nombre: string; avatar: string; monto: number; detalle: string }[];
   verTodo?: boolean;
+  /** Citas atendidas que siguen sin cobrar. */
+  sinCobrar?: number;
 };
 type Vista = "retiro" | "gasto" | "corte";
 
@@ -282,6 +284,9 @@ function CortePasos({ turno, accion, cerrando, error, contado, setContado, limit
             </div>
           </div>
           {turno.propinas > 0 && <small className="muted">Propinas aparte {formatoDinero(turno.propinas)}</small>}
+          {(turno.sinCobrar ?? 0) > 0 && (
+            <a className="ck-aviso" href="/citas?vista=lista"><Icono n="reloj" /><span><b>{turno.sinCobrar === 1 ? "Hay una cita atendida sin cobrar" : `Hay ${turno.sinCobrar} citas atendidas sin cobrar`}</b><small>Cóbralas antes de cerrar para que el corte cuadre.</small></span><Icono n="derecha" /></a>
+          )}
         </div>
 
         {conComisiones && (

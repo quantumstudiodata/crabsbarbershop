@@ -3,7 +3,7 @@
 import { and, eq, gt, inArray, sql } from "drizzle-orm";
 import { headers } from "next/headers";
 import { randomBytes } from "node:crypto";
-import { leerConfig, montoAPagar } from "@/lib/agenda";
+import { instante, leerConfig, montoAPagar } from "@/lib/agenda";
 import { pagosLinea } from "@/lib/db/schema";
 import { cobraEnLinea, crearIntento, MINIMO_STRIPE } from "@/lib/stripe";
 import { cargoEnLinea } from "@/lib/cargo";
@@ -72,6 +72,8 @@ export async function reservar(slug: string, d: DatosReserva, apartar = false): 
     .where(and(eq(schema.citas.barberiaId, n.b.id), eq(schema.citas.clienteTelefono, tel), inArray(schema.citas.estado, ["en_espera", "llego"]), gt(schema.citas.inicio, new Date())));
   if (c >= 3) return { error: "Ya tienes 3 citas pendientes con nosotros. Para otra, comunícate al negocio." };
   void (await headers());
+  // Con poco tiempo antes de la cita no alcanza a llegar y revisarse una transferencia.
+  if (d.transferencia && instante(d.fecha, d.minuto, n.b.zonaHoraria) - Date.now() < 3 * 3600000) return { error: "Para citas en menos de 3 horas, paga con tarjeta o en el negocio." };
   const r = await crearCita(n.b, { servicioIds, persona: d.persona, fecha: d.fecha, minuto: d.minuto, nombre, telefono: tel, observaciones: String(d.notas ?? ""), origen: "linea", apartar });
   if ("error" in r) return { error: r.error };
   // Pagará por transferencia a la cuenta del negocio: se guarda cuánto, y el negocio lo confirma cuando llegue.

@@ -26,7 +26,7 @@ type Props = {
 };
 
 const esBarbero = (r: string) => r === "barbera" || r === "encargada";
-const valorPuesto = (p: Persona) => (p.puestoId ? `puesto:${p.puestoId}` : `rol:${p.rol === "encargada" ? "barbera" : p.rol}`);
+const valorPuesto = (p: Persona) => (p.puestoId ? `puesto:${p.puestoId}` : `rol:${p.rol}`);
 const total = (g: GrupoPermisos[]) => g.reduce((a, x) => a + x.permisos.length, 0);
 
 /** Minutos que faltan, actualizado cada segundo. */

@@ -5036,3 +5036,7 @@ html, body { overscroll-behavior-y: none; }
 .fa-serv > div:not(.cab) + div { border-top: 1px solid rgba(30,45,60,.06); padding-top: 8px; }
 
 a.eqa-bt { display: flex; justify-content: center; align-items: center; text-decoration: none; color: #fff; }
+
+.ck-aviso { display: grid; grid-template-columns: auto 1fr auto; gap: 10px; align-items: center; padding: 11px 14px; border-radius: 14px; background: #14171c; color: #fff; text-decoration: none; }
+.ck-aviso span { display: flex; flex-direction: column; } .ck-aviso b { font-size: 13.5px; } .ck-aviso small { font-size: 12px; color: #b5bfcc; }
+.ck-aviso svg { width: 17px; height: 17px; }

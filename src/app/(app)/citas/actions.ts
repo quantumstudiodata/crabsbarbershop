@@ -1,9 +1,10 @@
 "use server";
 
-import { and, eq, sql } from "drizzle-orm";
+import { and, eq, isNull, sql } from "drizzle-orm";
 import { formatoDinero } from "@/lib/money";
 import { reembolsarCita } from "@/lib/pagos";
 import { revalidatePath } from "next/cache";
+import { darPorRecibida } from "@/lib/transferencias";
 import { requerirSesion } from "@/lib/auth";
 import { aMin, instante, leerConfig, type Horario, type ModoPago } from "@/lib/agenda";
 import { crearCita, disponibilidadDia, encolarAviso, equipoAgenda, serviciosDeCita, telefonoValido, textoCita } from "@/lib/citas";
@@ -278,11 +279,21 @@ export async function confirmarTransferencia(id: string): Promise<Res> {
   if (s.vista) return { error: "En la vista previa no se guardan cambios." };
   const [c] = await db.select().from(schema.citas).where(and(eq(schema.citas.id, id), eq(schema.citas.barberiaId, s.barberia.id))).limit(1);
   if (!c || c.estadoPago !== "transferencia") return { error: "Esa transferencia ya se confirmó o ya no aplica." };
-  const pagado = Math.min(c.pagado + c.transferenciaMonto, c.total);
-  await db.update(schema.citas).set({ pagado, transferenciaMonto: 0, estadoPago: pagado >= c.total ? "pagada" : "anticipo", metodoPago: "Transferencia", actualizadoEn: new Date() }).where(eq(schema.citas.id, id));
-  await registrar(db, { barberiaId: s.barberia.id, usuarioId: s.usuario.id, tipo: "venta", accion: `${s.usuario.nombre} confirmó la transferencia de ${formatoDinero(c.transferenciaMonto)} de la cita ${c.folio}` });
+  await darPorRecibida(s.barberia.id, c.id, { usuarioId: s.usuario.id, nombre: s.usuario.nombre, motivo: "manual" });
   revalidatePath("/", "layout");
   return { mensaje: "Transferencia confirmada." };
+}
+
+/** El cliente mandó su comprobante por WhatsApp: se anota para que el lugar quede asegurado y la titular lo revise. */
+export async function comprobantePorWhatsApp(id: string): Promise<Res> {
+  const s = await requerirSesion("citas.modificar");
+  if (s.vista) return { error: "En la vista previa no se guardan cambios." };
+  const [c] = await db.select({ folio: schema.citas.folio, estadoPago: schema.citas.estadoPago }).from(schema.citas).where(and(eq(schema.citas.id, id), eq(schema.citas.barberiaId, s.barberia.id))).limit(1);
+  if (!c || c.estadoPago !== "transferencia") return { error: "Esa transferencia ya se confirmó o ya no aplica." };
+  await db.update(schema.citas).set({ transferenciaComprobanteEn: new Date(), actualizadoEn: new Date() }).where(and(eq(schema.citas.id, id), isNull(schema.citas.transferenciaComprobanteEn)));
+  await registrar(db, { barberiaId: s.barberia.id, usuarioId: s.usuario.id, tipo: "venta", accion: `${s.usuario.nombre} anotó que el cliente de la cita ${c.folio} mandó su comprobante por WhatsApp` });
+  revalidatePath("/", "layout");
+  return { mensaje: "Anotado." };
 }
 
 /** Foto o PDF del comprobante de transferencia que subió el cliente, para revisarlo antes de confirmar. */

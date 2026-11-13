@@ -82,20 +82,26 @@ export const PERMISOS_POR_ROL: Record<Rol, Permiso[]> = {
   // En el local hay una sola computadora: cualquiera puede cobrar lo que hizo otra persona.
   // Los barberos también abren y cierran la caja: son quienes cobran.
   barbera: ["ventas.registrar", "ventas.registrar_otros", "caja.operar", "caja.retiros", "citas.ver", "citas.modificar"],
-  encargada: ["ventas.registrar", "ventas.registrar_otros", "caja.operar", "caja.retiros", "citas.ver", "citas.modificar"],
+  // Atiende como barbero y supervisa el día: ventas y cortes del equipo, gastos, agenda, reseñas y analítica.
+  // Los pagos al equipo, los usuarios y los ajustes del negocio quedan con la titular.
+  encargada: [
+    "ventas.registrar", "ventas.registrar_otros", "ventas.descuento", "ventas.cancelar", "ventas.ver_todas",
+    "caja.operar", "caja.retiros", "cortes.ver", "gastos.ver", "gastos.registrar",
+    "citas.ver", "citas.modificar", "citas.cancelar", "citas.pagos", "citas.horarios",
+    "resenas.responder", "reportes.ver", "servicios.ver",
+  ],
 };
 
 export const NOMBRE_ROL: Record<Rol, string> = {
   duena: "Titular",
   contador: "Administrador",
   barbera: "Barbero",
-  // El rol de encargado ya no existe; las cuentas que lo tenían se tratan como barbero.
-  encargada: "Barbero",
+  encargada: "Encargada",
   admin: "Soporte técnico",
 };
 
-/** Las cuatro plantillas, en el orden en que se muestran. */
-export const PLANTILLAS: Rol[] = ["duena", "contador", "barbera", "admin"];
+/** Las plantillas, en el orden en que se muestran. */
+export const PLANTILLAS: Rol[] = ["duena", "contador", "encargada", "barbera", "admin"];
 
 /** Traduce permisos guardados con nombres anteriores a los actuales. */
 export function expandirPermisos(xs: string[]): Permiso[] {
@@ -117,7 +123,7 @@ export function permisosDe(rol: Rol, extra: string[] = [], quitados: string[] = 
 
 /** Quién puede asignar qué plantilla: solo Titular y Soporte técnico pueden crear a alguien con todo el poder. */
 export function rolesAsignables(rol: Rol, conPuesto = false): Rol[] {
-  if (!conPuesto && (rol === "admin" || rol === "duena")) return ["duena", "contador", "barbera", "admin"];
+  if (!conPuesto && (rol === "admin" || rol === "duena")) return ["duena", "contador", "encargada", "barbera", "admin"];
   return ["contador", "barbera"];
 }
 
@@ -128,7 +134,7 @@ export const DESCRIPCION_ROL: Record<Rol, string> = {
   duena: "Dueño del negocio, con acceso a todo",
   contador: "Administra el negocio: egresos, cortes, pagos y reportes",
   barbera: "Cobra sus servicios y opera la caja",
-  encargada: "Cobra sus servicios y opera la caja",
+  encargada: "Atiende clientes y supervisa el día: cortes, ventas del equipo, agenda y analítica",
   admin: "Mantiene el sistema y ayuda con problemas técnicos",
 };
 

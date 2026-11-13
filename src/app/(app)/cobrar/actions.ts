@@ -4,6 +4,7 @@ import { randomBytes } from "node:crypto";
 
 import { and, eq, inArray, sql } from "drizzle-orm";
 import { revalidatePath } from "next/cache";
+import { darPorRecibida } from "@/lib/transferencias";
 import { requerirSesion } from "@/lib/auth";
 import { comisionDeServicio, elegirRegla } from "@/lib/comisiones";
 import { copiaRegla, equipoQueAtiende, reglasDe, cajaOAbrir } from "@/lib/datos";
@@ -119,6 +120,8 @@ export async function registrarVenta(_: EstadoCobro, form: FormData): Promise<Es
   let anticipo = 0;
   let anticipoNombre = "Anticipo en línea";
   if (e.citaId) {
+    // Una transferencia de la reserva que aún no se confirmaba se da por hecha al cobrar la cita.
+    await darPorRecibida(bId, e.citaId, { usuarioId: s.usuario.id, nombre: s.usuario.nombre, motivo: "cobro" });
     const [c] = await db.select({ pagado: schema.citas.pagado, metodo: schema.citas.metodoPago }).from(schema.citas).where(and(eq(schema.citas.id, e.citaId), eq(schema.citas.barberiaId, bId))).limit(1);
     anticipo = Math.min(c?.pagado ?? 0, total);
     // Si lo pagó por transferencia a la cuenta del negocio, el pago se registra como transferencia.
