@@ -19,7 +19,7 @@ const apariencia = {
 /** Página de pago del cliente: lo que paga, propina opcional y el formulario de Stripe. */
 export function Pagar(p: {
   token: string; negocio: string; estado: string; cuenta: string; secreto: string | null; llavePublica: string;
-  conceptos: Concepto[]; descuento: number; monto: number; propina: number; propinaFija: boolean; folio: string | null; tarjeta: string; encuesta: string | null; pagadoTxt: string | null;
+  conceptos: Concepto[]; descuento: number; monto: number; propina: number; cargo: number; propinaFija: boolean; folio: string | null; tarjeta: string; encuesta: string | null; pagadoTxt: string | null;
 }) {
   const promesa = useMemo<Promise<Stripe | null> | null>(() => (p.llavePublica && p.cuenta ? loadStripe(p.llavePublica, { stripeAccount: p.cuenta, locale: "es-419" }) : null), [p.llavePublica, p.cuenta]);
   return (
@@ -48,18 +48,19 @@ function Formulario(p: Parameters<typeof Pagar>[0]) {
   const elements = useElements();
   const router = useRouter();
   const [propina, setPropina] = useState(p.propina);
+  const [cargo, setCargo] = useState(p.cargo);
   const [otra, setOtra] = useState("");
   const [cambiando, setCambiando] = useState(false);
   const [pagando, setPagando] = useState(false);
   const [listo, setListo] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const opciones = [0, 10, 15, 20].map((pct) => ({ pct, monto: Math.round((p.monto * pct) / 100 / 100) * 100 }));
-  const total = p.monto + propina;
+  const total = p.monto + propina + cargo;
   const cambiar = async (monto: number) => {
     if (p.propinaFija || monto === propina) return;
     setCambiando(true); setError(null);
     const r = await elegirPropina(p.token, monto);
-    if (r.error) setError(r.error); else { setPropina(monto); await elements?.fetchUpdates(); }
+    if (r.error) setError(r.error); else { setPropina(monto); setCargo(r.cargo ?? 0); await elements?.fetchUpdates(); }
     setCambiando(false);
   };
   // Después de pagar, espera la confirmación de Stripe para mostrar el comprobante.
@@ -90,11 +91,12 @@ function Formulario(p: Parameters<typeof Pagar>[0]) {
             onBlur={() => { const v = Math.round(Number(otra || 0) * 100); if (otra) cambiar(Math.min(Math.max(v, 0), p.monto)); }} /></label>
         </div>
       )}
+      {cargo > 0 && <div className="pg-cargo"><span>Comisión por pago con tarjeta</span><b>{formatoDinero(cargo)}</b></div>}
       <div className="pg-stripe"><PaymentElement options={{ layout: "tabs" }} /></div>
       <small className="pg-seguro">Pago seguro con Stripe. {p.negocio} y Crabs no ven ni guardan los datos de tu tarjeta.</small>
       {error && <p className="aviso error" role="alert">{error}</p>}
       <div className="pg-pie">
-        <span><small>{propina > 0 ? "Total con propina" : "Total"}</small><b>{formatoDinero(total)}</b></span>
+        <span><small>{propina > 0 ? "Total con propina" : "Total"}{cargo > 0 ? " y comisión" : ""}</small><b>{formatoDinero(total)}</b></span>
         <button className="bt grande" disabled={!stripe || pagando || cambiando}>{pagando ? "Pagando…" : `Pagar ${formatoDinero(total)}`}</button>
       </div>
     </form>
@@ -107,7 +109,7 @@ function Recibo(p: Parameters<typeof Pagar>[0]) {
       <section className="pg-ok" role="status">
         <PalomitaAnimada />
         <h1>Pago recibido</h1>
-        <b className="big">{formatoDinero(p.monto + p.propina)}</b>
+        <b className="big">{formatoDinero(p.monto + p.propina + p.cargo)}</b>
         <span className="muted">Confirmado por Stripe{p.tarjeta ? `, con ${p.tarjeta}` : ""}</span>
       </section>
       <section className="glass pg-comp" aria-label="Comprobante">
@@ -117,7 +119,8 @@ function Recibo(p: Parameters<typeof Pagar>[0]) {
         {p.pagadoTxt && <div className="entre"><span className="muted">Fecha</span><span>{p.pagadoTxt}</span></div>}
         <Conceptos conceptos={p.conceptos} descuento={p.descuento} />
         {p.propina > 0 && <div className="entre"><span className="muted">Propina</span><span>{formatoDinero(p.propina)}</span></div>}
-        <div className="entre pg-tot"><span>Total pagado</span><b>{formatoDinero(p.monto + p.propina)}</b></div>
+        {p.cargo > 0 && <div className="entre"><span className="muted">Comisión por pago con tarjeta</span><span>{formatoDinero(p.cargo)}</span></div>}
+        <div className="entre pg-tot"><span>Total pagado</span><b>{formatoDinero(p.monto + p.propina + p.cargo)}</b></div>
         <small className="muted">Guarda esta página: es tu comprobante y siempre muestra el estado real del pago.</small>
       </section>
       {p.encuesta && (

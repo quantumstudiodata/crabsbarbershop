@@ -1,5 +1,6 @@
 "use server";
 
+import { cargoEnLinea } from "@/lib/cargo";
 import { randomBytes } from "node:crypto";
 
 import { and, eq, inArray, sql } from "drizzle-orm";
@@ -199,25 +200,27 @@ async function prepararQr(s: Sesion, plan: PlanVenta, propina: PropinaVenta, lin
   if (cobro < MINIMO_STRIPE) return { error: `El cobro con QR debe ser de al menos ${formatoDinero(MINIMO_STRIPE)}. Cóbralo con otro método.` };
   const [previo] = await db.select().from(pagosLinea)
     .where(and(eq(pagosLinea.barberiaId, b.id), eq(pagosLinea.estado, "pendiente"), sql`${pagosLinea.intento} is not null`, sql`${pagosLinea.plan}->'plan'->>'clave' = ${plan.clave}`)).limit(1);
-  if (previo && Date.now() - previo.creadoEn.getTime() < 25 * 60000) return { qr: { id: previo.id, url: `${base}/pagar/${previo.token}`, total: previo.monto + previo.propina, vence: previo.creadoEn.getTime() + 30 * 60000 } };
+  if (previo && Date.now() - previo.creadoEn.getTime() < 25 * 60000) return { qr: { id: previo.id, url: `${base}/pagar/${previo.token}`, total: previo.monto + previo.propina + Number((previo.detalle as { cargo?: number })?.cargo ?? 0), vence: previo.creadoEn.getTime() + 30 * 60000 } };
   const equipo = await equipoQueAtiende(b.id);
   const nombre = (id: string) => equipo.find((x) => x.id === id)?.nombre.split(" ")[0] ?? "";
   const token = randomBytes(12).toString("base64url");
   const propinaFija = propina?.monto ?? 0;
+  // La comisión de Stripe la paga el cliente (decisión del negocio): se suma al cobro y no se registra como egreso.
+  const cargo = cargoEnLinea(plan.total - anticipo + propinaFija);
   let pagoId: string | null = null;
   try {
     const [pago] = await db.insert(pagosLinea).values({
       barberiaId: b.id, tipo: "venta", token, monto: plan.total - anticipo, propina: propinaFija, creadoPor: s.usuario.id,
       plan: { plan, propina, propinaPara: propina?.barberoId ?? lineas[0]?.barberoId ?? "", anticipo },
-      detalle: { negocio: b.nombre, conceptos: lineas.map((l) => ({ nombre: l.nombre, con: nombre(l.barberoId), precio: l.precio })), propinaFija: propinaFija > 0, descuento: plan.descuentoTotal, anticipo },
+      detalle: { negocio: b.nombre, conceptos: lineas.map((l) => ({ nombre: l.nombre, con: nombre(l.barberoId), precio: l.precio })), propinaFija: propinaFija > 0, descuento: plan.descuentoTotal, anticipo, cargo },
     }).returning();
     pagoId = pago.id;
     const pi = await crearIntento(b.stripeCuenta!, {
-      monto: plan.total - anticipo + propinaFija, descripcion: `${b.nombre}: ${lineas.map((l) => l.nombre).join(", ")}`,
+      monto: plan.total - anticipo + propinaFija + cargo, descripcion: `${b.nombre}: ${lineas.map((l) => l.nombre).join(", ")}`,
       metadata: { pagoId: pago.id, barberiaId: b.id, tipo: "venta" }, clave: `qr-${pago.id}`,
     });
     await db.update(pagosLinea).set({ intento: pi.id }).where(eq(pagosLinea.id, pago.id));
-    return { qr: { id: pago.id, url: `${base}/pagar/${token}`, total: plan.total - anticipo + propinaFija, vence: Date.now() + 30 * 60000 } };
+    return { qr: { id: pago.id, url: `${base}/pagar/${token}`, total: plan.total - anticipo + propinaFija + cargo, vence: Date.now() + 30 * 60000 } };
   } catch (err) {
     console.error(err);
     // Sin intento de pago el enlace no sirve: se cancela para que no aparezca como pendiente.

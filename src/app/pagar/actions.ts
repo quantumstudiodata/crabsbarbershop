@@ -1,8 +1,9 @@
 "use server";
 
-import { and, eq } from "drizzle-orm";
+import { and, eq, sql } from "drizzle-orm";
 import { db, schema } from "@/lib/db";
 import { pagosLinea } from "@/lib/db/schema";
+import { cargoEnLinea } from "@/lib/cargo";
 import { verificarPago } from "@/lib/pagos";
 import { stripe } from "@/lib/stripe";
 
@@ -14,7 +15,7 @@ async function pagoPendiente(token: string) {
 }
 
 /** El cliente elige propina: se ajusta el monto del intento antes de pagar. La propina va de 0 al 100% del servicio. */
-export async function elegirPropina(token: string, propina: number): Promise<{ ok?: boolean; error?: string; total?: number }> {
+export async function elegirPropina(token: string, propina: number): Promise<{ ok?: boolean; error?: string; total?: number; cargo?: number }> {
   const x = await pagoPendiente(token);
   if (!x || x.p.estado !== "pendiente") return { error: "Este pago ya no está disponible." };
   const d = x.p.detalle as { propinaFija?: boolean };
@@ -22,9 +23,13 @@ export async function elegirPropina(token: string, propina: number): Promise<{ o
   const monto = Math.round(Number(propina));
   if (!Number.isFinite(monto) || monto < 0 || monto > x.p.monto) return { error: "Elige una propina válida." };
   try {
-    await stripe().paymentIntents.update(x.p.intento!, { amount: x.p.monto + monto }, { stripeAccount: x.cuenta });
-    await db.update(pagosLinea).set({ propina: monto }).where(and(eq(pagosLinea.id, x.p.id), eq(pagosLinea.estado, "pendiente")));
-    return { ok: true, total: x.p.monto + monto };
+    // La comisión por pagar con tarjeta se recalcula con la propina incluida (si el cobro la lleva).
+    const conCargo = "cargo" in (x.p.detalle as object);
+    const cargo = conCargo ? cargoEnLinea(x.p.monto + monto) : 0;
+    await stripe().paymentIntents.update(x.p.intento!, { amount: x.p.monto + monto + cargo }, { stripeAccount: x.cuenta });
+    await db.update(pagosLinea).set({ propina: monto, ...(conCargo ? { detalle: sql`${pagosLinea.detalle} || ${JSON.stringify({ cargo })}::jsonb` } : {}) })
+      .where(and(eq(pagosLinea.id, x.p.id), eq(pagosLinea.estado, "pendiente")));
+    return { ok: true, total: x.p.monto + monto + cargo, cargo };
   } catch (err) {
     console.error(err);
     return { error: "No se pudo actualizar la propina. Intenta de nuevo." };

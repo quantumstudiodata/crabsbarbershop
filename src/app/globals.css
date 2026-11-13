@@ -5352,7 +5352,7 @@ html:has(.fx) body::before,html:has(.fx) body::after{display:none!important}
 @media (prefers-reduced-motion: reduce) { .fx-raiz .fx [class]::before { animation: none !important; background-position-y: -3px !important; } }
 
 /* Reservas: fondo con textura de ruido en vez de degradado; inicio sencillo y horarios pequeños */
-html:has(.fx) { background: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='180' height='180'%3E%3Cfilter id='n'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='.85' numOctaves='3' stitchTiles='stitch'/%3E%3CfeColorMatrix values='0 0 0 0 1 0 0 0 0 1 0 0 0 0 1 0 0 0 .07 0'/%3E%3C/filter%3E%3Crect width='100%25' height='100%25' filter='url(%23n)'/%3E%3C/svg%3E") 0 0 / 180px 180px repeat, #16181c !important; background-color: #16181c !important; }
+html:has(.fx) { background: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='180' height='180'%3E%3Cfilter id='n'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='.75' numOctaves='3' stitchTiles='stitch'/%3E%3CfeColorMatrix values='0 0 0 0 1 0 0 0 0 1 0 0 0 0 1 0 0 0 .2 0'/%3E%3C/filter%3E%3Crect width='100%25' height='100%25' filter='url(%23n)'/%3E%3C/svg%3E") 0 0 / 180px 180px repeat, #16181c !important; background-color: #16181c !important; }
 .fx-raiz .fx { background: transparent !important; }
 .fx-raiz .fx .fx-prog { background: rgba(22,24,28,.9) !important; }
 @media (min-width: 960px) { .fx-raiz .fx .fx-panel { background: rgba(255,255,255,.04) !important; } .fx-raiz .fx .fx-panel::before { display: none; } }
@@ -5368,3 +5368,6 @@ html:has(.fx) { background: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.
 .fx-ini-hrs button { padding: 6px 11px; font-size: 12.5px; }
 .fx-ini-info { border-radius: 16px; padding: 0 14px; } .fx-ini-info div { padding: 10px 0; font-size: 13px; }
 .fx-ini-wa { padding: 11px; border-radius: 13px; font-size: 13.5px; }
+
+.pg-cargo { display: flex; justify-content: space-between; gap: 10px; padding: 10px 2px; font-size: 13.5px; color: var(--muted); border-top: 1px solid var(--line); }
+.pg-cargo b { color: var(--fg); font-weight: 600; }

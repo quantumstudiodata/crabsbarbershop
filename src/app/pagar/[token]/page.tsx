@@ -10,7 +10,7 @@ import { Pagar } from "./Pagar";
 export const dynamic = "force-dynamic";
 export const metadata = { title: "Pago de tu servicio", robots: { index: false } };
 
-type Detalle = { negocio?: string; conceptos?: { nombre: string; con: string; precio: number }[]; propinaFija?: boolean; descuento?: number };
+type Detalle = { negocio?: string; conceptos?: { nombre: string; con: string; precio: number }[]; propinaFija?: boolean; descuento?: number; cargo?: number };
 
 /** Página que abre el cliente al escanear el QR del cobro. El formulario de tarjeta es de Stripe, dentro de la página. */
 export default async function PaginaPago({ params }: { params: Promise<{ token: string }> }) {
@@ -33,6 +33,6 @@ export default async function PaginaPago({ params }: { params: Promise<{ token: 
     <Pagar token={p.token} negocio={b.nombre} estado={p.estado} cuenta={b.cuenta ?? ""} secreto={secreto}
       llavePublica={process.env.NEXT_PUBLIC_STRIPE_PUBLISHABLE_KEY ?? ""}
       conceptos={(d.conceptos ?? []).map((c) => ({ ...c, precioTxt: formatoDinero(c.precio) }))} descuento={d.descuento ?? 0}
-      monto={p.monto} propina={p.propina} propinaFija={!!d.propinaFija} folio={folio} encuesta={encuesta} pagadoTxt={p.pagadoEn ? new Intl.DateTimeFormat("es-MX", { timeZone: b.zona, day: "numeric", month: "long", year: "numeric", hour: "2-digit", minute: "2-digit", hour12: false }).format(p.pagadoEn) : null} tarjeta={p.tarjeta} />
+      monto={p.monto} propina={p.propina} cargo={Number(d.cargo ?? 0)} propinaFija={!!d.propinaFija} folio={folio} encuesta={encuesta} pagadoTxt={p.pagadoEn ? new Intl.DateTimeFormat("es-MX", { timeZone: b.zona, day: "numeric", month: "long", year: "numeric", hour: "2-digit", minute: "2-digit", hour12: false }).format(p.pagadoEn) : null} tarjeta={p.tarjeta} />
   );
 }

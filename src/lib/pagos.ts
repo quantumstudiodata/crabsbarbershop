@@ -168,7 +168,9 @@ export async function confirmarPago(pi: Stripe.PaymentIntent, cuenta: string) {
   if (p.tipo === "venta") {
     const datos = p.plan as { plan: PlanVenta; propina: PropinaVenta; propinaPara: string; anticipo?: number } | null;
     if (!datos) return { omitido: "sin_plan" };
-    const propinaCliente = Math.max(cobrado - p.monto, 0);
+    // Lo que el cliente pagó de más es propina, sin contar la comisión de tarjeta que él cubrió.
+    const cargoQr = Number((p.detalle as { cargo?: number })?.cargo ?? 0);
+    const propinaCliente = Math.max(cobrado - p.monto - cargoQr, 0);
     const r = await db.transaction(async (tx) => {
       const marcado = await tx.update(pagosLinea).set({ estado: "pagado", pagadoEn: new Date(), tarjeta, propina: propinaCliente })
         .where(and(eq(pagosLinea.id, p.id), inArray(pagosLinea.estado, ["pendiente", "cancelado"]))).returning({ id: pagosLinea.id });
