@@ -7,6 +7,7 @@ import { Icono } from "@/components/Icono";
 import { aHora, montoAPagar, type ConfigCitas } from "@/lib/agenda";
 import { cargoEnLinea } from "@/lib/cargo";
 import { formatoDinero } from "@/lib/money";
+import { Cangrejo } from "./Cangrejo";
 import { Inicio, type DatosInicio } from "./Inicio";
 import { PagoTarjeta } from "./PagoReserva";
 import { cotizar, diasPublicos, horariosPublicos, reservar } from "../actions";
@@ -184,7 +185,7 @@ export function Reservar(p: {
       : paso === 5 ? { t: <Monto valor={total} />, s: "Pagas en el negocio" }
         : { t: cuando || <Monto valor={total} />, s: cuando ? `${quien ? `con ${quien.nombre}` : "con quien esté libre"}, ${formatoDinero(total)}` : `${nombres(elegidos)}, ${duracion} min` };
   const boton = paso < 5
-    ? <button type="button" className="fx-go" disabled={!listo} onClick={() => ir(paso + 1)}>Continuar<Icono n="derecha" /></button>
+    ? <button type="button" className="fx-go" disabled={!listo} onClick={() => ir(paso + 1)}>{(paso === 0 || paso === 3) && <Cangrejo />}Continuar<Icono n="derecha" /></button>
     : <button type="button" className="fx-go" disabled={pend} onClick={confirmar}>{pend ? "Reservando…" : "Reservar"}<Icono n="derecha" /></button>;
 
   const resumen = [
@@ -195,7 +196,7 @@ export function Reservar(p: {
   ];
 
   return (
-    <div className={`fx ${enInicio ? "fx-en-inicio" : ""}`} data-cg={enInicio ? "tarjeta" : paso === 0 || paso === 3 ? "boton" : "tarjeta"}>
+    <div className={`fx ${enInicio ? "fx-en-inicio" : ""}`}>
       <aside className="fx-panel" aria-label="Tu cita">
         <div className="fx-marca"><img className="fx-palabra" src="/logo-crabs.png" alt={p.negocio} width={946} height={209} /><small>Reserva tu cita en menos de un minuto</small></div>
         <ol className="fx-res">
@@ -268,7 +269,7 @@ export function Reservar(p: {
           {paso === 1 && (
             <>
               <h1 className="fx-h">¿Quién te atiende?<small>Elige a alguien o a quien esté libre</small></h1>
-              <div className="fx-barberos" role="radiogroup" aria-label="Quién te atiende">
+              <div className="fx-barberos" role="radiogroup" aria-label="Quién te atiende"><Cangrejo />
                 {personas.map((e, i) => {
                   const on = (persona ?? "") === e.id;
                   return (
@@ -286,7 +287,7 @@ export function Reservar(p: {
           {paso === 2 && (
             <>
               <h1 className="fx-h">¿Qué día?<small>{quien ? `Días con lugar con ${quien.nombre}` : "Días con lugar"}</small></h1>
-              <div className="fx-cal">
+              <div className="fx-cal"><Cangrejo />
                 <span className="fx-lab">{mesVisible.replace(/^./, (x) => x.toUpperCase())}</span>
                 <div className="fx-cal-g">
                   {["L", "M", "M", "J", "V", "S", "D"].map((d, i) => <small key={i}>{d}</small>)}
@@ -324,7 +325,7 @@ export function Reservar(p: {
           {paso === 4 && (
             <>
               <h1 className="fx-h">¿A nombre de quién?<small>Te mandamos tu comprobante por WhatsApp. No necesitas cuenta.</small></h1>
-              <div className="fx-campos">
+              <div className="fx-campos"><Cangrejo />
                 <label className="fx-campo"><span>Nombre</span><input value={nombre} onChange={(e) => setNombre(e.target.value)} autoComplete="name" maxLength={80} placeholder="Tu nombre" autoFocus /></label>
                 <label className="fx-campo"><span>WhatsApp</span><input type="tel" inputMode="tel" value={tel} onChange={(e) => setTel(e.target.value)} autoComplete="tel" placeholder="10 dígitos" /></label>
                 <label className="fx-campo fx-ancho"><span>Algo que debamos saber</span><input value={notas} onChange={(e) => setNotas(e.target.value)} maxLength={300} placeholder="Opcional" /></label>
@@ -336,7 +337,7 @@ export function Reservar(p: {
           {paso === 5 && fecha && minuto !== null && (
             <>
               <h1 className="fx-h">Confirma tu cita</h1>
-              <div className="fx-when">
+              <div className="fx-when"><Cangrejo />
                 <span className="fx-when-d"><small>{DIAS[dow(fecha)]}</small><b>{Number(fecha.slice(8))}</b></span>
                 <span className="fx-when-t"><b>{aHora(minuto)} a {aHora(minuto + (cot?.duracion ?? duracion))}</b><small>{DIAS_L[dow(fecha)]} {Number(fecha.slice(8))} de {MESES[Number(fecha.slice(5, 7)) - 1]}, {quien ? `con ${quien.nombre}` : "con quien esté libre"}</small></span>
                 <button type="button" onClick={() => ir(2)}>Cambiar</button>

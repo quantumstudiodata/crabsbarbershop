@@ -2,6 +2,7 @@
 
 import { useEffect, useState } from "react";
 import { Icono } from "@/components/Icono";
+import { Cangrejo } from "./Cangrejo";
 import { aHora } from "@/lib/agenda";
 
 type Servicio = { id: string; nombre: string; precio: number; duracionMin: number; promo: { nombre: string; precio: number } | null };
@@ -59,7 +60,7 @@ export function Inicio(p: {
   const wa = p.datos.whatsapp.replace(/\D/g, "");
   return (
     <section className="fx-ini">
-      <div className="fx-ini-hero fx-cg">
+      <div className="fx-ini-hero"><Cangrejo />
         <p className="fx-ini-sal">{saludo}</p>
         <h1>Agenda tu cita</h1>
         {estado && <span className={`fx-ini-est ${estado.abierto ? "si" : ""}`}><i />{estado.t}</span>}

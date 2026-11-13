@@ -5338,18 +5338,21 @@ html:has(.fx) body::before,html:has(.fx) body::after{display:none!important}
 .fx-ini-info div:last-child { border-bottom: 0; } .fx-ini-info b { color: #eef1f5; font-weight: 600; }
 .fx-ini-wa { display: block; padding: 14px; border-radius: 16px; box-shadow: inset 0 0 0 1px rgba(255,255,255,.13); text-align: center; font-weight: 600; font-size: 14.5px; color: #eef1f5; text-decoration: none; }
 
-/* El cangrejo, pequeño: se asoma detrás de la tarjeta de cada paso; si el paso no tiene tarjeta, sobre el botón Continuar. */
-@keyframes fx-cg-asoma { 0%, 15% { background-position-y: 22px; } 35%, 100% { background-position-y: -3px; } }
-@keyframes fx-cg-tamb { 0%, 100% { transform: translateY(0); } 50% { transform: translateY(-1.5px); } }
-.fx-raiz .fx[data-cg="tarjeta"] :is(.fx-ini-hero, .fx-barberos, .fx-cal, .fx-campos, .fx-when) { position: relative; overflow: visible !important; }
-.fx-raiz .fx[data-cg="tarjeta"] :is(.fx-ini-hero, .fx-barberos, .fx-cal, .fx-campos, .fx-when)::before,
-.fx-raiz .fx[data-cg="boton"] .fx-go::before {
-  content: ""; position: absolute; right: 22px; top: -16px; width: 32px; height: 16px; z-index: 2; pointer-events: none;
-  background: url(/cangrejo-blanco.png) center 22px / 32px 32px no-repeat; animation: fx-cg-asoma 1.3s cubic-bezier(.2,1.3,.35,1) .45s both;
-}
-.fx-raiz .fx[data-cg="boton"] .fx-go { position: relative; overflow: visible; }
-.fx-raiz .fx[data-cg="boton"] .fx-go::before { right: 14px; top: -16px; animation: fx-cg-asoma 1.3s cubic-bezier(.2,1.3,.35,1) .45s both, fx-cg-tamb 2.4s ease-in-out 2s infinite; }
-@media (prefers-reduced-motion: reduce) { .fx-raiz .fx [class]::before { animation: none !important; background-position-y: -3px !important; } }
+/* El cangrejo, pequeño: se asoma detrás de la tarjeta de cada paso; si el paso no tiene tarjeta, sobre el botón Continuar.
+   Piezas del logo: cuerpo, tenazas que abren y cierran, y ojos que parpadean. */
+.fx-raiz .fx :is(.fx-ini-hero, .fx-barberos, .fx-cal, .fx-campos, .fx-when, .fx-go) { position: relative; overflow: visible !important; }
+.fx-cg { position: absolute; right: 22px; top: -16px; width: 32px; height: 16px; overflow: hidden; z-index: 2; pointer-events: none; font-style: normal; }
+.fx-go .fx-cg { right: 14px; }
+.fx-cg b { position: absolute; left: 0; top: 0; width: 32px; height: 32px; background: url(/cangrejo-blanco.png) center / 32px 32px no-repeat; transform: translateY(22px); animation: fx-cg-sube 1s cubic-bezier(.2,1.3,.35,1) .45s forwards; }
+.fx-cg .cu { clip-path: inset(41.5% 31.25% 0 31.25%); }
+.fx-cg .t1 { clip-path: inset(0 68.75% 50% 0); transform-origin: 22% 44%; animation: fx-cg-sube 1s cubic-bezier(.2,1.3,.35,1) .45s forwards, fx-cg-ti 3.2s ease-in-out 1.6s infinite; }
+.fx-cg .t2 { clip-path: inset(0 0 50% 68.75%); transform-origin: 78% 44%; animation: fx-cg-sube 1s cubic-bezier(.2,1.3,.35,1) .45s forwards, fx-cg-td 3.2s ease-in-out 1.75s infinite; }
+.fx-cg .oj { clip-path: inset(0 31.25% 58.5% 31.25%); transform-origin: 50% 33%; animation: fx-cg-sube 1s cubic-bezier(.2,1.3,.35,1) .45s forwards, fx-cg-parpa 3.8s ease-in-out 1.4s infinite; }
+@keyframes fx-cg-sube { to { transform: translateY(-3px); } }
+@keyframes fx-cg-ti { 0%, 55%, 100% { rotate: 0deg; } 62% { rotate: -16deg; } 68% { rotate: 2deg; } 74% { rotate: -14deg; } 82% { rotate: 0deg; } }
+@keyframes fx-cg-td { 0%, 55%, 100% { rotate: 0deg; } 62% { rotate: 16deg; } 68% { rotate: -2deg; } 74% { rotate: 14deg; } 82% { rotate: 0deg; } }
+@keyframes fx-cg-parpa { 0%, 44%, 52%, 100% { scale: 1 1; } 48% { scale: 1 .12; } }
+@media (prefers-reduced-motion: reduce) { .fx-cg b { animation: none !important; transform: translateY(-3px); } }
 
 /* Reservas: fondo con textura de ruido en vez de degradado; inicio sencillo y horarios pequeños */
 html:has(.fx) { background: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='180' height='180'%3E%3Cfilter id='n'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='.75' numOctaves='3' stitchTiles='stitch'/%3E%3CfeColorMatrix values='0 0 0 0 1 0 0 0 0 1 0 0 0 0 1 0 0 0 .2 0'/%3E%3C/filter%3E%3Crect width='100%25' height='100%25' filter='url(%23n)'/%3E%3C/svg%3E") 0 0 / 180px 180px repeat, #16181c !important; background-color: #16181c !important; }
