@@ -36,6 +36,9 @@ export default async function Cobrar({ searchParams }: { searchParams: Promise<{
       // Una transferencia por confirmar se da por hecha al cobrar.
       pagado: Math.min(cita.pagado + (cita.estadoPago === "transferencia" ? cita.transferenciaMonto : 0), cita.total) }
     : null;
+  // Si un servicio de la cita se eliminó después de agendarla, igual aparece para cobrarla.
+  const faltantes = desdeCita ? desdeCita.servicioIds.filter((id) => !servicios.some((x) => x.id === id)) : [];
+  if (faltantes.length) servicios.push(...await db.select().from(schema.servicios).where(and(eq(schema.servicios.barberiaId, s.barberia.id), inArray(schema.servicios.id, faltantes))));
   let turno: Turno | null = null;
   if (t) {
     // Quien no ve al equipo completo solo ve su propia comisión en el corte.

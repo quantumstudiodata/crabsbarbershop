@@ -1,4 +1,4 @@
-import { and, asc, eq } from "drizzle-orm";
+import { and, asc, eq, isNull } from "drizzle-orm";
 import { cobraEnLinea } from "@/lib/stripe";
 import type { Metadata } from "next";
 import { notFound } from "next/navigation";
@@ -36,7 +36,7 @@ export default async function PaginaReservar({ params, searchParams }: { params:
   }
   const [servicios, cats, equipo, promos] = await Promise.all([
     db.select().from(schema.servicios).where(and(eq(schema.servicios.barberiaId, b.id), eq(schema.servicios.activo, true))).orderBy(asc(schema.servicios.orden), asc(schema.servicios.nombre)),
-    db.select().from(schema.categoriasServicio).where(eq(schema.categoriasServicio.barberiaId, b.id)).orderBy(asc(schema.categoriasServicio.orden)),
+    db.select().from(schema.categoriasServicio).where(and(eq(schema.categoriasServicio.barberiaId, b.id), isNull(schema.categoriasServicio.eliminadoEn))).orderBy(asc(schema.categoriasServicio.orden)),
     equipoAgenda(b.id),
     b.usaPromociones ? db.select().from(schema.promociones).where(eq(schema.promociones.barberiaId, b.id)) : Promise.resolve([]),
   ]);

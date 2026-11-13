@@ -188,7 +188,7 @@ export function TablaServicios({ servicios: inicialS, categorias: inicialC, pued
           <Modal abierto cerrar={() => setBorrarCat(null)} etiqueta="Eliminar categoría" titulo={`¿Eliminar ${borrarCat.nombre}?`}>
             {conVentas.length === 0 ? (
               <>
-                <p className="muted">{borrarCat.total ? `Sus ${borrarCat.total === 1 ? "servicio no tiene" : `${borrarCat.total} servicios no tienen`} ventas registradas, así que se eliminan con la categoría.` : "No tiene servicios. Se elimina sin afectar nada."}</p>
+                <p className="muted">{borrarCat.total ? `Sus ${borrarCat.total === 1 ? "servicio se elimina" : `${borrarCat.total} servicios se eliminan`} con la categoría. Desaparecen de Ajustes, Cobro y reservas; el historial se conserva.` : "No tiene servicios. Desaparece de la lista y queda en el historial."}</p>
                 <div className="acciones"><button type="button" className="bt peligro" disabled={pendiente} onClick={() => correr(() => eliminarCategoria(borrarCat.id, ""), quitar)}>Sí, eliminar<Fl /></button></div>
               </>
             ) : (
@@ -203,7 +203,12 @@ export function TablaServicios({ servicios: inicialS, categorias: inicialC, pued
                   <button type="button" className="bt peligro chico" style={{ justifySelf: "start" }} disabled={pendiente || !destino} onClick={() => correr(() => eliminarCategoria(borrarCat.id, destino), quitar)}>Reasignar y eliminar</button>
                 </div>
                 <div className="opcion-borrar">
-                  <b>Opción 2. Archivar categoría</b>
+                  <b>Opción 2. Eliminar la categoría con sus servicios</b>
+                  <small>Desaparecen de Ajustes, Cobro y reservas. Las ventas anteriores y el historial se conservan.</small>
+                  <button type="button" className="bt peligro chico" style={{ justifySelf: "start" }} disabled={pendiente} onClick={() => correr(() => eliminarCategoria(borrarCat.id, ""), () => { setServicios(servicios.filter((x) => x.categoria !== borrarCat.nombre)); setCats(cats.filter((x) => x.id !== borrarCat.id)); setBorrarCat(null); })}>Eliminar todo</button>
+                </div>
+                <div className="opcion-borrar">
+                  <b>Opción 3. Archivar categoría</b>
                   <small>La categoría y sus servicios dejarán de estar disponibles para nuevos cobros. El historial se conservará.</small>
                   <button type="button" className="bt sec solo chico" style={{ justifySelf: "start" }} disabled={pendiente} onClick={() => correr(() => eliminarCategoria(borrarCat.id, null), () => { setCats(cats.map((x) => (x.id === borrarCat.id ? { ...x, activo: false } : x))); setServicios(servicios.map((x) => (x.categoria === borrarCat.nombre ? { ...x, activo: false } : x))); setBorrarCat(null); })}>Archivar categoría</button>
                 </div>
@@ -216,7 +221,7 @@ export function TablaServicios({ servicios: inicialS, categorias: inicialC, pued
 
       {borrar && (
         <Modal abierto cerrar={() => setBorrar(null)} etiqueta="Eliminar servicio" titulo={`¿Eliminar ${borrar.nombre}?`}>
-          <p className="muted">Si ya se cobró alguna vez, solo se oculta para no perder las ventas pasadas.</p>
+          <p className="muted">Desaparece de Ajustes, Cobro y reservas. Las ventas pasadas, las citas que lo tengan y el historial se conservan.</p>
           <div className="acciones">
             <button type="button" className="bt peligro" disabled={pendiente} onClick={() => correr(() => eliminarServicio(borrar.id), (r) => { setServicios(r.mensaje?.includes("ocultó") ? servicios.map((x) => (x.id === borrar.id ? { ...x, activo: false } : x)) : servicios.filter((x) => x.id !== borrar.id)); setBorrar(null); })}>Sí, eliminar<Fl /></button>
           </div>

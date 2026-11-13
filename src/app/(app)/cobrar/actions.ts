@@ -77,7 +77,10 @@ export async function registrarVenta(_: EstadoCobro, form: FormData): Promise<Es
 
   // Precios siempre desde la base de datos, nunca desde el navegador.
   const ids = [...new Set(e.lineas.map((l) => l.servicioId))];
-  const svc = await db.select().from(schema.servicios).where(and(eq(schema.servicios.barberiaId, bId), eq(schema.servicios.activo, true), inArray(schema.servicios.id, ids)));
+  // Los servicios de una cita se cobran aunque después se hayan eliminado u ocultado.
+  const deCita = e.citaId ? ((await db.select({ sv: schema.citas.servicios }).from(schema.citas).where(and(eq(schema.citas.id, e.citaId), eq(schema.citas.barberiaId, bId))).limit(1))[0]?.sv ?? []).map((x) => x.servicioId) : [];
+  const svc = await db.select().from(schema.servicios).where(and(eq(schema.servicios.barberiaId, bId), inArray(schema.servicios.id, ids)))
+    .then((xs) => xs.filter((x) => x.activo || deCita.includes(x.id)));
   if (svc.length !== ids.length) return { error: "Uno de los servicios ya no está disponible. Recarga la página." };
   const equipo = new Set((await equipoQueAtiende(bId)).map((u) => u.id));
   for (const l of e.lineas) {
