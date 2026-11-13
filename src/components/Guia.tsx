@@ -268,14 +268,14 @@ function Recorrido({ punto, lista, hechos, esc, ruta, ir, listo }: {
   );
 }
 
-/** El cangrejo del logo asomándose: tenazas, ojos y medio cuerpo, que parpadean; las tenazas abren y cierran. */
+/** El cangrejo del logo, pequeño, asomado detrás del botón: tenazas y ojos que parpadean; tamborilea con las tenazas como esperando. */
 function Asoma() {
   return (
-    <span className="gu-asoma" aria-hidden="true">
-      <span className="gu-cang">
-        <i className="pa" /><i className="cu" /><i className="t1" /><i className="t2" /><i className="oj" />
-      </span>
-    </span>
+    <i className="gu-sobre" aria-hidden="true">
+      <b className="gu-cang">
+        <i className="cu" /><i className="t1" /><i className="t2" /><i className="oj" />
+      </b>
+    </i>
   );
 }
 
@@ -287,11 +287,10 @@ function Bienvenida({ nombre, empezar }: { nombre: string; empezar: () => void }
       <div className="gu-aura" aria-hidden="true" />
       <div className="gu-grano" aria-hidden="true" />
       <div className="gu-bien-c">
-        <Asoma />
         <span className="gu-marca">Crabs Barbershop</span>
         <h1 className="gu-saludo" aria-label={`Hola, ${nombre}`}><span><i>Hola,</i></span> <span><b>{nombre}</b></span></h1>
         <p className="gu-frase">Te llevo por toda la app. Te señalo dónde tocar y para qué sirve cada botón.</p>
-        <button type="button" className="gu-empezar" onClick={() => { setSale(true); setTimeout(empezar, 800); }}>Empezar<span>→</span></button>
+        <button type="button" className="gu-empezar" onClick={() => { setSale(true); setTimeout(empezar, 800); }}><Asoma />Empezar<span>→</span></button>
         <small className="gu-dura">Unos 5 minutos</small>
       </div>
     </div>
@@ -304,11 +303,10 @@ function Cierre({ nombre, terminar }: { nombre: string; terminar: () => void }) 
       <div className="gu-aura" aria-hidden="true" />
       <div className="gu-grano" aria-hidden="true" />
       <div className="gu-bien-c">
-        <Asoma />
         <span className="gu-marca">Crabs Barbershop</span>
         <h1 className="gu-saludo" aria-label={`Listo, ${nombre}`}><span><i>Listo,</i></span> <span><b>{nombre}</b></span></h1>
         <p className="gu-frase">Ya conoces tu app. Todo lo que viste está a un toque cuando lo necesites.</p>
-        <button type="button" className="gu-empezar" onClick={terminar}>Empezar a trabajar<span>→</span></button>
+        <button type="button" className="gu-empezar" onClick={terminar}><Asoma />Empezar a trabajar<span>→</span></button>
       </div>
     </div>
   );

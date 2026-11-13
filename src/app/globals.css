@@ -5121,24 +5121,21 @@ a.eqa-bt { display: flex; justify-content: center; align-items: center; text-dec
 .gu-calma .gu-dura { animation-delay: 2s; }
 .gu-cierre.gu-calma .gu-empezar { animation-delay: 1.6s, 2.4s; }
 
-/* Cangrejo que se asoma: piezas del logo (tenazas y ojos) recortadas de la misma imagen */
-.gu-asoma { --w: clamp(120px, 14vw, 170px); position: relative; width: var(--w); height: calc(var(--w) * .68); overflow: hidden; margin-bottom: -6px;
-  -webkit-mask-image: linear-gradient(#000 78%, transparent); mask-image: linear-gradient(#000 78%, transparent); }
-.gu-cang { position: absolute; left: 0; top: 0; width: var(--w); height: var(--w); transform: translateY(70%); animation: gu-asomar 1.1s cubic-bezier(.2,1.3,.35,1) .35s forwards, gu-flota 3.8s ease-in-out 1.6s infinite; }
+/* Cangrejo pequeño asomado detrás del botón Empezar: piezas del logo recortadas de la misma imagen */
+.gu-empezar { position: relative; }
+.gu-sobre { --w: 48px; position: absolute; left: 50%; bottom: calc(100% - 4px); width: var(--w); height: 27px; margin-left: calc(var(--w) / -2); overflow: hidden; pointer-events: none; }
+.gu-cang { position: absolute; left: 0; top: 0; width: var(--w); height: var(--w); transform: translateY(70%); animation: gu-asomar .8s cubic-bezier(.2,1.3,.35,1) 2.7s forwards; }
+.gu-cierre .gu-cang { animation-delay: 2.5s; }
 .gu-cang i { position: absolute; inset: 0; background: url(/cangrejo-blanco.png) center/100% 100% no-repeat; }
-.gu-cang .t1 { clip-path: inset(0 68.75% 50% 0); transform-origin: 22% 44%; animation: gu-tenaza-i 4.2s ease-in-out 1.8s infinite; }
-.gu-cang .t2 { clip-path: inset(0 0 50% 68.75%); transform-origin: 78% 44%; animation: gu-tenaza-d 4.2s ease-in-out 1.8s infinite; }
-.gu-cang .cu { clip-path: inset(43% 31.25% 0 31.25%); }
-.gu-cang .pa { clip-path: inset(50% 0 0 0); transform-origin: 50% 60%; animation: gu-patas 2.4s ease-in-out 1.8s infinite; }
-@keyframes gu-patas { 50% { transform: translateY(1.5px) scaleX(1.015); } }
-.gu-cang .oj { clip-path: inset(0 31.25% 57% 31.25%); transform-origin: 50% 33%; animation: gu-parpadea 3.6s ease-in-out 1.4s infinite, gu-mira 7s ease-in-out 2s infinite; }
+.gu-cang .cu { clip-path: inset(41.5% 31.25% 0 31.25%); }
+.gu-cang .t1 { clip-path: inset(0 68.75% 50% 0); transform-origin: 22% 44%; animation: gu-toca-i .5s ease-in-out 3.6s infinite alternate; }
+.gu-cang .t2 { clip-path: inset(0 0 50% 68.75%); transform-origin: 78% 44%; animation: gu-toca-d .5s ease-in-out 3.85s infinite alternate; }
+.gu-cang .oj { clip-path: inset(0 31.25% 58.5% 31.25%); transform-origin: 50% 33%; animation: gu-parpadea 2.4s ease-in-out 3.4s infinite; }
 @keyframes gu-asomar { to { transform: translateY(0); } }
-@keyframes gu-flota { 0%, 100% { translate: 0 0; } 50% { translate: 0 3px; } }
-@keyframes gu-tenaza-i { 0%, 62%, 100% { transform: rotate(0); } 68% { transform: rotate(-14deg); } 72% { transform: rotate(2deg); } 77% { transform: rotate(-12deg); } 82% { transform: rotate(0); } }
-@keyframes gu-tenaza-d { 0%, 62%, 100% { transform: rotate(0); } 68% { transform: rotate(14deg); } 72% { transform: rotate(-2deg); } 77% { transform: rotate(12deg); } 82% { transform: rotate(0); } }
+@media (prefers-reduced-motion: reduce) { .gu-cang { transform: none; } }
+@keyframes gu-toca-i { to { transform: rotate(-12deg); } }
+@keyframes gu-toca-d { to { transform: rotate(12deg); } }
 @keyframes gu-parpadea { 0%, 44%, 52%, 100% { scale: 1 1; } 48% { scale: 1 .12; } }
-@keyframes gu-mira { 0%, 30%, 100% { translate: 0 0; } 40%, 55% { translate: -3% 0; } 65%, 80% { translate: 3% 0; } }
-.gu-calma .gu-asoma + .gu-marca { margin-top: 18px; }
 @media (prefers-reduced-motion: reduce) { .gu-cang, .gu-cang i { animation: none !important; transform: none !important; } }
 
 .cal-ahora.fuera i { opacity: .45; } .cal-ahora.fuera i::before { animation: none; } .cal-ahora.fuera span { background: #8a95a3; } .cal-ahora.fuera::after { display: none; }
