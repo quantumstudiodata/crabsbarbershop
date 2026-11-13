@@ -294,6 +294,7 @@ function Bienvenida({ nombre, empezar }: { nombre: string; empezar: () => void }
   useLayoutEffect(() => { document.body.style.overflow = "hidden"; return () => { document.body.style.overflow = ""; }; }, []);
   return (
     <div className={`gu-bien gu-calma ${sale ? "sale" : ""}`} role="dialog" aria-modal="true" aria-label="Bienvenida">
+      <button type="button" className="gu-bien-salir" onClick={() => salir()}>Salir de mi cuenta</button>
       <div className="gu-aura" aria-hidden="true" />
       <div className="gu-grano" aria-hidden="true" />
       <div className="gu-bien-c">

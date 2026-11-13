@@ -5202,3 +5202,8 @@ a.eqa-bt { display: flex; justify-content: center; align-items: center; text-dec
   .ticket .cobro-ok { display: none; }
 }
 @keyframes ok-sube { from { opacity: 0; transform: translateY(14px); } }
+
+/* Bienvenida: salida discreta arriba a la derecha */
+.gu-bien-salir { position: absolute; top: calc(16px + env(safe-area-inset-top, 0px)); right: 16px; z-index: 2; border: 1px solid rgba(255,255,255,.1); background: rgba(255,255,255,.04);
+  color: #8794a7; font: 500 13px var(--f-body); padding: 9px 16px; border-radius: 999px; cursor: pointer; opacity: 0; animation: gu-sube .6s ease 1.2s forwards; transition: color .2s, background .2s; }
+.gu-bien-salir:hover { color: #e3e8ef; background: rgba(255,255,255,.08); }
