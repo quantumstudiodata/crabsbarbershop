@@ -12,6 +12,8 @@ export const metadata: Metadata = {
   description: "Cobros, caja y reportes de Crabs Barbería.",
   applicationName: "Crabs",
   appleWebApp: { capable: true, title: "Crabs", statusBarStyle: "default" },
+  // Next solo escribe "mobile-web-app-capable"; el iPhone necesita también la versión de Apple para abrir a pantalla completa.
+  other: { "apple-mobile-web-app-capable": "yes" },
 };
 
 export const viewport: Viewport = {
