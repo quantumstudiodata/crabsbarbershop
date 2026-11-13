@@ -5218,7 +5218,9 @@ a.eqa-bt { display: flex; justify-content: center; align-items: center; text-dec
 body { min-height: 100lvh; }
 @media (max-width: 760px) {
   /* Safari 26 pinta las franjas de arriba y abajo con el color de fondo de la página: el del encabezado del logo. */
-  html:has(.entrada) { background: linear-gradient(180deg, #dfe6ec 0 50%, #f5f7f9 50% 100%); background-color: #dfe6ec; }
+  /* Safari 26: la franja de abajo toma el color de fondo de la página (el del formulario) y la de arriba el del encabezado fijo. */
+  html:has(.entrada) { background: #f5f7f9; background-color: #f5f7f9; }
+  .entrada .marca { position: sticky; top: 0; z-index: 2; background-color: #dfe6ec; }
   .entrada { min-height: 100lvh; }
   .entrada .marca { padding-top: calc(32px + env(safe-area-inset-top, 0px)); }
   .entrada .form-entrada { background: #f5f7f9; padding-bottom: calc(40px + env(safe-area-inset-bottom, 0px)); }
