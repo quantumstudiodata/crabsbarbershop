@@ -1,7 +1,7 @@
 "use client";
 
 import Link from "next/link";
-import { useState, useTransition } from "react";
+import { useEffect, useState, useTransition } from "react";
 import { useRouter } from "next/navigation";
 import { Icono } from "@/components/Icono";
 import { cambiarEstadoCita, comprobantePorWhatsApp, confirmarTransferencia, verComprobante } from "./citas/actions";
@@ -19,6 +19,9 @@ export function Pendientes({ items, className = "" }: { items: Pendiente[]; clas
   const [revisar, setRevisar] = useState<{ x: Pendiente; datos?: string; error?: string } | null>(null);
   const [recordar, setRecordar] = useState<Pendiente | null>(null);
   const [enviados, setEnviados] = useState<string[]>([]);
+  // Respaldo en este dispositivo: si el servidor no lo guardó (por ejemplo, en vista previa), "Listo" igual se respeta al recargar.
+  useEffect(() => { try { const g = JSON.parse(localStorage.getItem("crabs-recordados") ?? "[]"); if (Array.isArray(g)) setHechos((h) => [...h, ...g]); } catch {} }, []);
+  const recordado = (id: string) => { try { const g = JSON.parse(localStorage.getItem("crabs-recordados") ?? "[]"); localStorage.setItem("crabs-recordados", JSON.stringify([...(Array.isArray(g) ? g : []), id].slice(-20))); } catch {} };
   const recibida = (x: Pendiente) => iniciar(async () => { const r = await confirmarTransferencia(x.citaId); if (r.error) setError(r.error); else { setError(null); setRevisar(null); setHechos((h) => [...h, x.id]); router.refresh(); } });
   const porWhats = (x: Pendiente) => iniciar(async () => { const r = await comprobantePorWhatsApp(x.citaId); if (r.error) setError(r.error); else { setError(null); router.refresh(); } });
   const abrir = (x: Pendiente) => { setRevisar({ x }); verComprobante(x.citaId).then((r) => setRevisar({ x, datos: r.datos, error: r.error })); };
@@ -74,7 +77,7 @@ export function Pendientes({ items, className = "" }: { items: Pendiente[]; clas
                 );
               })}
             </div>
-            <div className="acciones"><button type="button" className="bt" onClick={() => { setHechos((h) => [...h, recordar.id]); marcarConsejos([`rec-${recordar.dia}`]).catch(() => {}); setRecordar(null); }}>Listo<Icono n="palomita" /></button></div>
+            <div className="acciones"><button type="button" className="bt" onClick={() => { setHechos((h) => [...h, recordar.id]); recordado(recordar.id); marcarConsejos([`rec-${recordar.dia}`]).catch(() => {}); setRecordar(null); }}>Listo<Icono n="palomita" /></button></div>
           </div>
         </Modal>
       )}

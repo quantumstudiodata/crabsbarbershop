@@ -1,6 +1,6 @@
 import Link from "next/link";
 import { Vacio } from "../Vacio";
-import { and, desc, eq, gte, isNull, lt, sql } from "drizzle-orm";
+import { and, desc, eq, sql } from "drizzle-orm";
 import { alias } from "drizzle-orm/pg-core";
 import { AvisoUrl } from "@/components/Encabezado";
 import { Icono } from "@/components/Icono";
@@ -27,10 +27,8 @@ export default async function Pagos({ searchParams }: { searchParams: Promise<{ 
   const persona = personas.some((p) => p.id === q.persona) ? q.persona! : "";
   const limite = Math.min(Math.max(Number(q.n) || 30, 30), 300);
   const quien = alias(schema.usuarios, "quien");
-  const [revision, sinAsignar, pagos] = await Promise.all([
+  const [revision, pagos] = await Promise.all([
     faltantesEnRevision(se.barberia.id),
-    db.select({ n: sql<number>`count(*)::int` }).from(schema.turnosCaja)
-      .where(and(eq(schema.turnosCaja.barberiaId, se.barberia.id), eq(schema.turnosCaja.estado, "cerrado"), lt(schema.turnosCaja.diferencia, 0), isNull(schema.turnosCaja.faltanteRegla), gte(schema.turnosCaja.fechaOperativa, sumarDias(hoy, -60)))),
     db.select({ id: schema.pagosComision.id, tipo: schema.pagosComision.tipo, monto: schema.pagosComision.monto, nota: schema.pagosComision.nota, creadoEn: schema.pagosComision.creadoEn, nombre: schema.usuarios.nombre, avatar: schema.usuarios.avatar, registro: quien.nombre })
       .from(schema.pagosComision).innerJoin(schema.usuarios, eq(schema.usuarios.id, schema.pagosComision.barberoId)).innerJoin(quien, eq(quien.id, schema.pagosComision.usuarioId))
       .where(and(eq(schema.pagosComision.barberiaId, se.barberia.id), ...(persona ? [eq(schema.pagosComision.barberoId, persona)] : [])))
@@ -46,7 +44,6 @@ export default async function Pagos({ searchParams }: { searchParams: Promise<{ 
   }).from(schema.pagosComision)
     .where(and(eq(schema.pagosComision.barberiaId, se.barberia.id), sql`(${schema.pagosComision.creadoEn} at time zone ${zona})::date >= ${inicioMes}::date`, ...(persona ? [eq(schema.pagosComision.barberoId, persona)] : [])));
   const puedeAutorizar = se.puede("equipo.autorizar");
-  const nSinAsignar = sinAsignar[0]?.n ?? 0;
   const url = (x: { persona?: string; n?: number }) => {
     const u = new URLSearchParams();
     const pe = x.persona ?? persona;
@@ -91,21 +88,14 @@ export default async function Pagos({ searchParams }: { searchParams: Promise<{ 
         </div>
       </section>
 
-      {(revision.length > 0 || nSinAsignar > 0) && (
+      {/* Solo los faltantes que se van a descontar del pago de alguien: eso sí es parte de sus comisiones. */}
+      {revision.length > 0 && (
         <section id="faltantes" className="eq2-sec">
-          <span className="lab">Faltantes de caja</span>
-          {nSinAsignar > 0 && se.puede("cortes.ver") && (
-            <Link href="/analitica/cortes" className="glass eq2-alerta">
-              <b className="eq2-num">{nSinAsignar}</b>
-              <span><b>{nSinAsignar === 1 ? "Corte con faltante" : "Cortes con faltante"}</b><small>Elige quién cubre cada faltante en Corte de caja</small></span>
-              <span className="eq2-ir">Revisar<Icono n="derecha" /></span>
-            </Link>
-          )}
-          {revision.length > 0 && (
+          <span className="lab">Descuentos por faltante de caja</span>
             <div className="glass eq2-lista">
               {revision.map((f) => (
                 <div key={f.id} className="eq2-fila sin">
-                  <span><b>{f.nombre}</b><small>Corte del {fechaCorta(f.fecha)}, en revisión</small></span>
+                  <span><b>{f.nombre}</b><small>Faltó dinero en el corte del {fechaCorta(f.fecha)}. Si se autoriza, se descuenta de su pago</small></span>
                   <span className="eq2-m"><b>{formatoDinero(f.monto)}</b></span>
                   {puedeAutorizar && (
                     <div className="eq-facc">
@@ -116,7 +106,6 @@ export default async function Pagos({ searchParams }: { searchParams: Promise<{ 
                 </div>
               ))}
             </div>
-          )}
         </section>
       )}
 

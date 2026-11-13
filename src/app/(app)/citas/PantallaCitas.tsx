@@ -229,7 +229,7 @@ function LineaAhora({ zona, ini, fin, px, col }: { zona: string; ini: number; fi
   const pos = Math.min(Math.max(m, ini), fin);
   return (
     <div className={`cal-ahora ${fuera ? `fuera ${fuera}` : ""}`} style={{ top: (pos - ini) * px, ["--x" as string]: col ? `calc(46px + (100% - 46px) * ${col.i} / ${col.de})` : "46px", ["--w" as string]: col ? `calc((100% - 46px) / ${col.de})` : "calc(100% - 46px)" }} aria-label={`Ahora, ${txt}`}>
-      <span>{fuera === "antes" ? `${txt}, aún no abre` : fuera === "despues" ? `${txt}, ya cerró` : txt}</span><i />
+      <span title={fuera === "antes" ? "Aún no abre" : fuera === "despues" ? "Ya cerró" : undefined}>{txt}</span><i />
     </div>
   );
 }

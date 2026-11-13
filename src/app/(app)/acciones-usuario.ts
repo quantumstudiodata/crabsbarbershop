@@ -1,6 +1,6 @@
 "use server";
 
-import { eq } from "drizzle-orm";
+import { eq, sql } from "drizzle-orm";
 import { revalidatePath } from "next/cache";
 import { requerirSesion } from "@/lib/auth";
 import { esAvatar } from "@/lib/avatares";
@@ -31,7 +31,9 @@ export async function marcarConsejos(ids: string[]) {
   if (s.vista) return;
   const limpios = ids.filter((x) => typeof x === "string" && /^[a-z0-9-]{1,40}$/.test(x)).slice(0, 20);
   if (!limpios.length) return;
-  const [u] = await db.select({ v: schema.usuarios.consejosVistos }).from(schema.usuarios).where(eq(schema.usuarios.id, s.usuario.id)).limit(1);
-  const todos = [...new Set([...(u?.v ?? []), ...limpios])].slice(-200);
-  await db.update(schema.usuarios).set({ consejosVistos: todos }).where(eq(schema.usuarios.id, s.usuario.id));
+  // En una sola instrucción: si la guía y un pendiente se marcan al mismo tiempo, ninguno borra al otro.
+  const col = schema.usuarios.consejosVistos;
+  await db.update(schema.usuarios).set({
+    consejosVistos: sql`(select coalesce(jsonb_agg(x), '[]'::jsonb) from (select distinct jsonb_array_elements_text(coalesce(${col}, '[]'::jsonb) || ${JSON.stringify(limpios)}::jsonb) as x) t)`,
+  }).where(eq(schema.usuarios.id, s.usuario.id));
 }

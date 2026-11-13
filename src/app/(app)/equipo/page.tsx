@@ -74,6 +74,7 @@ export default async function Equipo({ searchParams }: { searchParams: Promise<{
   return (
     <div className="eq2 eqa">
       <AvisoUrl aviso={q0.aviso} error={q0.error} />
+      <div className="eqa-cab"><h1>Equipo</h1><small>{filas.length} {filas.length === 1 ? "persona activa" : "personas activas"}</small></div>
       <aside className="glass eqa-res">
         <div className="entre"><span className="lab">{m.nombre}</span><MesEquipo mes={m.mes} hoy={m.hoy} /></div>
         <span className="eqa-total"><small className="lab-ay">Ventas atribuidas<Ayuda titulo="Ventas atribuidas">Total cobrado por los servicios que realizó el equipo, con cualquier forma de pago. No corresponde a lo que se le paga a cada persona.</Ayuda></small><b>{formatoDinero(total.vendido)}</b><em>{total.servicios} {total.servicios === 1 ? "servicio" : "servicios"}</em>{cal?.n ? <em>★ {cal.prom.toFixed(1)} de calificación en {cal.n} {cal.n === 1 ? "reseña" : "reseñas"}</em> : null}</span>
@@ -92,7 +93,6 @@ export default async function Equipo({ searchParams }: { searchParams: Promise<{
         </nav>
       </aside>
       <section className="eqa-col">
-        <div className="eqa-cab"><h1>Equipo</h1><small>{filas.length} {filas.length === 1 ? "persona activa" : "personas activas"}</small></div>
         {indicadores.length > 0 && (
           <div className="eqa-ind" aria-label="Rendimiento del equipo">
             {indicadores.map((x, k) => <span key={k} className="glass" style={{ animationDelay: `${k * 70}ms` }}><Icono n={x.icono} /><span>{x.texto}</span></span>)}

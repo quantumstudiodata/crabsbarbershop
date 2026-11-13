@@ -3342,7 +3342,8 @@ a.eq2-fila:hover { background: rgba(255,255,255,.45); }
 
 /* ---------- Equipo A: resumen a la izquierda y lista con barra de aporte ---------- */
 .eq2.eqa { width: min(1040px, 100%); grid-template-columns: 300px minmax(0, 1fr); gap: 24px; align-items: start; }
-.eqa > .aviso { grid-column: 1 / -1; }
+.eqa > .aviso, .eqa > .eqa-cab { grid-column: 1 / -1; }
+.eqa > .eqa-cab { margin-bottom: -10px; }
 .eqa-res { display: grid; gap: 16px; padding: 22px; border-radius: 22px; box-shadow: var(--sh1), var(--hi); position: sticky; top: 96px; }
 .eqa-total { display: grid; gap: 4px; } .eqa-total small { font-size: 12.5px; color: var(--muted); }
 .eqa-total b { font: 800 52px/1 var(--f-display); font-variant-numeric: tabular-nums; } .eqa-total em { font-style: normal; font-size: 12.5px; color: var(--faint); }
@@ -4471,7 +4472,7 @@ html, body { overscroll-behavior-y: none; }
 .cal-ahora { position: absolute; left: 0; right: 0; height: 0; z-index: 3; pointer-events: none; transition: top 30s linear; }
 .cal-ahora i { position: absolute; left: var(--x); width: var(--w); top: -1px; height: 2px; border-radius: 2px; background: #3f5568; box-shadow: 0 0 0 1px rgba(255,255,255,.6); }
 .cal-ahora i::before { content: ""; position: absolute; left: -5px; top: -4px; width: 10px; height: 10px; border-radius: 50%; background: #3f5568; box-shadow: 0 0 0 3px rgba(63,85,104,.18); animation: cal-latido 2s ease-in-out infinite; }
-.cal-ahora::after { content: ""; position: absolute; left: 46px; right: 0; top: 0; border-top: 1px dashed rgba(63,85,104,.35); }
+.cal-ahora::after { content: ""; position: absolute; left: 46px; right: 0; top: 0; border-top: 1px solid rgba(63,85,104,.16); }
 .cal-ahora span { position: absolute; left: 0; top: -9px; padding: 1px 5px; border-radius: 6px; background: #3f5568; color: #fff; font: 600 10px var(--f-mono); }
 @keyframes cal-latido { 50% { box-shadow: 0 0 0 6px rgba(63,85,104,0); } }
 @media (prefers-reduced-motion: reduce) { .cal-ahora, .cal-ahora i::before { transition: none; animation: none; } }
@@ -5136,7 +5137,7 @@ a.eqa-bt { display: flex; justify-content: center; align-items: center; text-dec
 .gu-calma .gu-asoma + .gu-marca { margin-top: 18px; }
 @media (prefers-reduced-motion: reduce) { .gu-cang, .gu-cang i { animation: none !important; transform: none !important; } }
 
-.cal-ahora.fuera i { opacity: .55; } .cal-ahora.fuera span { opacity: .85; }
+.cal-ahora.fuera i { opacity: .45; } .cal-ahora.fuera i::before { animation: none; } .cal-ahora.fuera span { background: #8a95a3; } .cal-ahora.fuera::after { display: none; }
 .cal-ahora.despues { transform: translateY(-100%); }
 
 .gu-b { transition: background .25s ease; }
@@ -5144,22 +5145,19 @@ a.eqa-bt { display: flex; justify-content: center; align-items: center; text-dec
 
 .eq2-fila > span small.pend { margin-top: 3px; font-size: 12.5px; }
 
-/* Comprobante de corte: ticket blanco sobre papel arrugado, con el logo arriba */
-.rc-papel { display: grid; justify-items: center; gap: 14px; padding: 26px 18px 30px; border-radius: 16px; background-color: #e7e7e4;
-  background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='600' height='600'%3E%3Cfilter id='p'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='.011' numOctaves='5' seed='7'/%3E%3CfeDiffuseLighting lighting-color='%23f4f4f1' surfaceScale='2.4'%3E%3CfeDistantLight azimuth='35' elevation='52'/%3E%3C/feDiffuseLighting%3E%3C/filter%3E%3Crect width='100%25' height='100%25' filter='url(%23p)'/%3E%3C/svg%3E");
-  background-size: 600px 600px; box-shadow: inset 0 0 0 1px rgba(0,0,0,.04); }
-.rc-logo { width: 104px; height: auto; filter: contrast(1.1); }
-.rc-papel .recibo-c { width: min(100%, 340px); background: #fff; border: 1.5px dotted #6b6f76; border-radius: 2px; padding: 18px 18px 20px; gap: 14px; font-size: 13.5px; color: #15171b;
-  box-shadow: 0 1px 2px rgba(0,0,0,.06), 0 12px 26px rgba(30,30,25,.12); }
-.rc-papel .rc-tit { display: block; font-size: 16.5px; font-weight: 700; margin-bottom: 4px; }
-.rc-papel .rc-cab b { font-size: 15px; }
-.rc-papel .rc-cab { border: 0; border-bottom: 1.5px dotted #8a8e95; }
-.rc-papel .rc-tot { border: 0; border-top: 1.5px dotted #8a8e95; }
-.rc-papel .lab { font: 700 12px var(--f-mono); letter-spacing: .14em; color: #15171b; text-transform: uppercase; }
-.rc-papel .rc-sec > div { font-size: 13.5px; }
+/* Comprobante de corte: en pantalla se ve igual que siempre; al imprimir o guardar en PDF sale como ticket blanco sobre papel arrugado, con el logo. */
+.rc-papel { display: contents; }
+.rc-logo { display: none; }
 @media print {
-  body.imprimiendo-ticket .rc-papel { background: none !important; box-shadow: none; padding: 0; }
-  body.imprimiendo-ticket .rc-logo { width: 40mm; }
+  body.imprimiendo-ticket { -webkit-print-color-adjust: exact; print-color-adjust: exact; }
+  body.imprimiendo-ticket .rc-papel { display: grid; justify-items: center; gap: 7mm; padding: 12mm 10mm 14mm; margin: 0 auto; width: 150mm; background-color: #e7e7e4 !important;
+    background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='600' height='600'%3E%3Cfilter id='p'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='.011' numOctaves='5' seed='7'/%3E%3CfeDiffuseLighting lighting-color='%23f4f4f1' surfaceScale='2.4'%3E%3CfeDistantLight azimuth='35' elevation='52'/%3E%3C/feDiffuseLighting%3E%3C/filter%3E%3Crect width='100%25' height='100%25' filter='url(%23p)'/%3E%3C/svg%3E");
+    background-size: 600px 600px; }
+  body.imprimiendo-ticket .rc-logo { display: block; width: 44mm; height: auto; }
+  body.imprimiendo-ticket .rc-papel .recibo-c { width: 118mm; border: 1.5px dotted #555 !important; border-radius: 1mm; box-shadow: 0 1mm 4mm rgba(30,30,25,.18); }
+  body.imprimiendo-ticket .rc-papel .rc-cab { border: 0; border-bottom: 1.5px dotted #555; }
+  body.imprimiendo-ticket .rc-papel .rc-tot { border: 0; border-top: 1.5px dotted #555; }
+  body.imprimiendo-ticket .rc-papel .lab { font-family: var(--f-mono); font-weight: 700; letter-spacing: .14em; }
 }
 
 /* Pantallas vacías: amplias, centradas y con un ícono que flota suave */
