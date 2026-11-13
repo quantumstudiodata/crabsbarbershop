@@ -1,4 +1,4 @@
-import { and, asc, eq, isNull } from "drizzle-orm";
+import { and, asc, desc, eq, gte, isNull, ne, sql } from "drizzle-orm";
 import { cobraEnLinea } from "@/lib/stripe";
 import type { Metadata } from "next";
 import { notFound } from "next/navigation";
@@ -34,11 +34,14 @@ export default async function PaginaReservar({ params, searchParams }: { params:
       </main>
     );
   }
-  const [servicios, cats, equipo, promos] = await Promise.all([
+  const [servicios, cats, equipo, promos, [cal], [buena]] = await Promise.all([
     db.select().from(schema.servicios).where(and(eq(schema.servicios.barberiaId, b.id), eq(schema.servicios.activo, true))).orderBy(asc(schema.servicios.orden), asc(schema.servicios.nombre)),
     db.select().from(schema.categoriasServicio).where(and(eq(schema.categoriasServicio.barberiaId, b.id), isNull(schema.categoriasServicio.eliminadoEn))).orderBy(asc(schema.categoriasServicio.orden)),
     equipoAgenda(b.id),
     b.usaPromociones ? db.select().from(schema.promociones).where(eq(schema.promociones.barberiaId, b.id)) : Promise.resolve([]),
+    // Para el inicio: calificación de los clientes y una reseña reciente buena, sin el nombre de quien la escribió.
+    db.select({ n: sql<number>`count(*)::int`, prom: sql<number>`coalesce(avg(${schema.resenas.calificacion}), 0)::float` }).from(schema.resenas).where(eq(schema.resenas.barberiaId, b.id)),
+    db.select({ c: schema.resenas.comentario }).from(schema.resenas).where(and(eq(schema.resenas.barberiaId, b.id), gte(schema.resenas.calificacion, 4), ne(schema.resenas.comentario, ""))).orderBy(desc(schema.resenas.creadoEn)).limit(1),
   ]);
   const ocultas = new Set(cats.filter((c) => !c.activo).map((c) => c.nombre));
   const visibles = servicios.filter((s) => !ocultas.has(s.categoria));
@@ -61,6 +64,7 @@ export default async function PaginaReservar({ params, searchParams }: { params:
       cuenta={b.transferenciaClabe ? { banco: b.transferenciaBanco, clabe: b.transferenciaClabe, titular: b.transferenciaTitular } : null}
       enLinea={cobraEnLinea(b) ? { llave: process.env.NEXT_PUBLIC_STRIPE_PUBLISHABLE_KEY!, cuenta: b.stripeCuenta! } : null}
       regreso={regreso}
+      inicio={{ horario: b.horario, cerrados: b.diasCerrados ?? [], zona: b.zonaHoraria, whatsapp: b.whatsapp, resenas: cal?.n ? { promedio: cal.prom, n: cal.n, comentario: (buena?.c ?? "").slice(0, 160) } : null }}
     />
   );
 }

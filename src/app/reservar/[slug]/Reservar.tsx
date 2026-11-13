@@ -7,6 +7,7 @@ import { Icono } from "@/components/Icono";
 import { aHora, montoAPagar, type ConfigCitas } from "@/lib/agenda";
 import { cargoEnLinea } from "@/lib/cargo";
 import { formatoDinero } from "@/lib/money";
+import { Inicio, type DatosInicio } from "./Inicio";
 import { PagoTarjeta } from "./PagoReserva";
 import { cotizar, diasPublicos, horariosPublicos, reservar } from "../actions";
 
@@ -51,9 +52,15 @@ export function Reservar(p: {
   enLinea: { llave: string; cuenta: string } | null;
   cuenta?: { banco: string; clabe: string; titular: string } | null;
   regreso?: { href: string; texto: string } | null;
+  inicio?: DatosInicio;
 }) {
   const router = useRouter();
   const [paso, setPaso] = useState(0);
+  // Primero se ve el inicio del negocio; "Reservar" abre el paso a paso.
+  const [enInicio, setEnInicio] = useState(!!p.inicio);
+  // Hora que el cliente tocó en el inicio: se propone sola al llegar al día y la hora.
+  const [pref, setPref] = useState<{ fecha: string; minuto: number } | null>(null);
+  const [libres, setLibres] = useState<{ fecha: string; hoy: boolean; xs: number[] } | null>(null);
   const [dir, setDir] = useState(1);
   const [cat, setCat] = useState("");
   const [svc, setSvc] = useState<string[]>([]);
@@ -105,6 +112,22 @@ export function Reservar(p: {
     horariosPublicos(p.slug, fecha, svc, persona).then((h) => { if (vivo) setHoras(h); });
     return () => { vivo = false; };
   }, [fecha, persona, paso]); // eslint-disable-line react-hooks/exhaustive-deps
+  // Horarios libres de hoy (o de mañana) para el inicio, con el primer servicio como referencia.
+  useEffect(() => {
+    if (!p.inicio || !p.servicios.length) return;
+    let vivo = true;
+    (async () => {
+      for (const k of [0, 1]) {
+        const f = sumar(p.hoy, k);
+        const xs = await horariosPublicos(p.slug, f, [p.servicios[0].id], null).catch(() => [] as number[]);
+        if (!vivo) return;
+        if (xs.length) { setLibres({ fecha: f, hoy: k === 0, xs }); return; }
+      }
+    })();
+    return () => { vivo = false; };
+  }, []); // eslint-disable-line react-hooks/exhaustive-deps
+  useEffect(() => { if (paso === 2 && pref && dias?.[pref.fecha] && !fecha) setFecha(pref.fecha); }, [paso, dias]); // eslint-disable-line react-hooks/exhaustive-deps
+  useEffect(() => { if (paso === 3 && pref && fecha === pref.fecha && minuto === null && horas?.includes(pref.minuto)) setMinuto(pref.minuto); }, [paso, horas]); // eslint-disable-line react-hooks/exhaustive-deps
   // El precio final depende del día y la hora (promociones): se recalcula si algo cambia.
   useEffect(() => { setCot(null); }, [svc.join(","), fecha, minuto]); // eslint-disable-line react-hooks/exhaustive-deps
   useEffect(() => {
@@ -116,6 +139,7 @@ export function Reservar(p: {
 
   // Si no hay a quién elegir, el paso Barbero se salta.
   const saltaBarbero = (p.opciones.cualquiera ? 1 : 0) + (p.opciones.elegir ? p.equipo.length : 0) <= 1;
+  const empezar = () => { setEnInicio(false); setPaso(0); setDir(1); window.scrollTo({ top: 0 }); };
   const ir = (n: number) => { const m = n === 1 && saltaBarbero ? (n > paso ? 2 : 0) : n; setError(null); setDir(m > paso ? 1 : -1); setPaso(m); window.scrollTo({ top: 0, behavior: "smooth" }); };
   const listo = [svc.length > 0, true, !!fecha, minuto !== null, nombre.trim().length > 1 && tel.replace(/\D/g, "").length >= 10, true][paso];
   const avanzar = (n: number) => setTimeout(() => ir(n), 220);
@@ -171,7 +195,7 @@ export function Reservar(p: {
   ];
 
   return (
-    <div className="fx">
+    <div className={`fx ${enInicio ? "fx-en-inicio" : ""}`} data-cg={enInicio ? "tarjeta" : paso === 0 || paso === 3 ? "boton" : "tarjeta"}>
       <aside className="fx-panel" aria-label="Tu cita">
         <div className="fx-marca"><img className="fx-palabra" src="/logo-crabs.png" alt={p.negocio} width={946} height={209} /><small>Reserva tu cita en menos de un minuto</small></div>
         <ol className="fx-res">
@@ -186,6 +210,21 @@ export function Reservar(p: {
       <main className="fx-main">
         {p.regreso && <a href={p.regreso.href} className="fx-regreso"><Icono n="izquierda" />{p.regreso.texto}</a>}
         <header className="fx-top"><img className="fx-palabra" src="/logo-crabs.png" alt={p.negocio} width={946} height={209} /></header>
+        {enInicio && p.inicio ? (
+          <>
+            <Inicio negocio={p.negocio} servicios={p.servicios} equipo={p.equipo} elegir={p.opciones.elegir} datos={p.inicio} libres={libres}
+              empezar={empezar}
+              conServicio={(id) => { setSvc([id]); empezar(); }}
+              conPersona={(id) => { setPersona(id); empezar(); }}
+              conHora={(f, m) => { setPref({ fecha: f, minuto: m }); empezar(); }} />
+            <footer className="fx-barra">
+              <div>
+                <span className="fx-barra-t"><b>Reserva tu cita</b><small>{p.negocio}</small></span>
+                <button type="button" className="fx-go" onClick={empezar}>Reservar<Icono n="derecha" /></button>
+              </div>
+            </footer>
+          </>
+        ) : (<>
         <div className="fx-prog" aria-label={`Paso ${paso + 1} de ${PASOS.length}`}>
           <span className="fx-prog-t"><b>{PASOS[paso]}</b><small>Paso {paso + 1 - (saltaBarbero && paso > 1 ? 1 : 0)} de {PASOS.length - (saltaBarbero ? 1 : 0)}</small></span>
           <span className="fx-prog-b"><i style={{ width: `${((paso + 1) / PASOS.length) * 100}%` }} /></span>
@@ -335,12 +374,13 @@ export function Reservar(p: {
         ) : (
           <footer className="fx-barra">
             <div>
-              {paso > 0 && <button type="button" className="fx-atras" onClick={() => ir(paso - 1)} aria-label="Atrás"><Icono n="izquierda" /></button>}
+              {(paso > 0 || p.inicio) && <button type="button" className="fx-atras" onClick={() => (paso === 0 ? setEnInicio(true) : ir(paso - 1))} aria-label="Atrás"><Icono n="izquierda" /></button>}
               <span className="fx-barra-t"><b>{barra.t}</b><small>{barra.s}</small></span>
               {boton}
             </div>
           </footer>
         )}
+        </>)}
       </main>
     </div>
   );
