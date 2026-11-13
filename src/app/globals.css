@@ -5358,7 +5358,7 @@ html:has(.fx) body::before,html:has(.fx) body::after{display:none!important}
 
 /* Reservas: fondo con textura de ruido en vez de degradado; inicio sencillo y horarios pequeños */
 /* Polvo fino (imagen que se repite) sobre grano de película. */
-html:has(.fx) { background: url(/grunge.png?v=4) 0 0 / 640px 640px repeat, url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='180' height='180'%3E%3Cfilter id='n'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='.95' numOctaves='2' stitchTiles='stitch'/%3E%3CfeColorMatrix values='0 0 0 0 1 0 0 0 0 1 0 0 0 0 1 0 0 0 .075 0'/%3E%3C/filter%3E%3Crect width='100%25' height='100%25' filter='url(%23n)'/%3E%3C/svg%3E") 0 0 / 160px 160px repeat, #111316 !important; background-color: #111316 !important; }
+html:has(.fx) { background: url(/grunge.png?v=4) 0 0 / 640px 640px repeat, url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='180' height='180'%3E%3Cfilter id='n'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='.95' numOctaves='2' stitchTiles='stitch'/%3E%3CfeColorMatrix values='0 0 0 0 1 0 0 0 0 1 0 0 0 0 1 0 0 0 .065 0'/%3E%3C/filter%3E%3Crect width='100%25' height='100%25' filter='url(%23n)'/%3E%3C/svg%3E") 0 0 / 160px 160px repeat, #0c0d0f !important; background-color: #0c0d0f !important; }
 .fx-raiz .fx { background: transparent !important; }
 .fx-raiz .fx .fx-prog { background: rgba(22,24,28,.9) !important; }
 @media (min-width: 960px) { .fx-raiz .fx .fx-panel { background: rgba(255,255,255,.04) !important; } .fx-raiz .fx .fx-panel::before { display: none; } }
@@ -5385,4 +5385,4 @@ html:has(.fx) { background: url(/grunge.png?v=4) 0 0 / 640px 640px repeat, url("
 .fx-raiz .fx :is(.fx-hrs button, .fx-ini-hrs button):not(.on) { background: #1d2024 !important; }
 .fx-raiz .fx .fx-ini-prox, .fx-raiz .fx .fx-ini-est { background: rgba(255,255,255,.07); }
 
-.fx-raiz .fx .fx-prog { background: rgba(17,19,22,.9) !important; }
+.fx-raiz .fx .fx-prog { background: rgba(12,13,15,.9) !important; }
