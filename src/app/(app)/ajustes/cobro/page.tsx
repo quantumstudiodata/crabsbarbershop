@@ -81,6 +81,7 @@ export default async function ConfigurarNegocio({ searchParams }: { searchParams
         ]} />
         <Funciones funciones={[
           { clave: "promociones", nombre: "Promociones", activa: b.usaPromociones, encendida: `Se crean en Servicios, pestaña Promociones, y se aplican solas al cobrar. ${nPromos} ${nPromos === 1 ? "activa" : "activas"} hoy.`, apagada: "No se aplican promociones al cobrar." },
+          { clave: "reembolsos", nombre: "Aceptar reembolsos", activa: b.aceptaReembolsos, encendida: "Al cancelar una cita o venta pagada en línea, el dinero se devuelve al cliente desde la app.", apagada: "Lo pagado en línea no se devuelve: la cita se cambia de día. Solo la titular puede hacer una excepción." },
         ]} />
       </Bloque>
 

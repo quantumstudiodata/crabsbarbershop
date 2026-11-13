@@ -229,6 +229,26 @@ export async function reembolsarCita(citaId: string, quien: { barberiaId: string
   return { monto };
 }
 
+/**
+ * Devuelve en Stripe lo pagado en línea de una venta (cobro con QR o anticipo de su cita).
+ * La venta la cancela quien llama; aquí solo se reembolsa y se ajusta la cita ligada.
+ */
+export async function reembolsarVenta(ventaId: string, barberiaId: string): Promise<{ monto: number; error?: string }> {
+  const pagos = await db.select().from(pagosLinea).where(and(eq(pagosLinea.ventaId, ventaId), eq(pagosLinea.estado, "pagado")));
+  if (!pagos.length) return { monto: 0 };
+  const [b] = await db.select().from(schema.barberias).where(eq(schema.barberias.id, barberiaId)).limit(1);
+  if (!b?.stripeCuenta) return { monto: 0, error: "La cuenta de Stripe del negocio no está conectada; no se puede devolver el pago desde la app." };
+  let monto = 0;
+  for (const p of pagos) {
+    if (!p.intento) continue;
+    await stripe().refunds.create({ payment_intent: p.intento, reason: "requested_by_customer" }, { stripeAccount: b.stripeCuenta, idempotencyKey: `reemb-${p.id}` });
+    await db.update(pagosLinea).set({ estado: "reembolsado" }).where(eq(pagosLinea.id, p.id));
+    if (p.citaId) await db.update(schema.citas).set({ pagado: sql`greatest(${schema.citas.pagado} - ${p.monto}, 0)`, estadoPago: "sin_pago", actualizadoEn: new Date() }).where(eq(schema.citas.id, p.citaId));
+    monto += p.monto;
+  }
+  return { monto };
+}
+
 /** Stripe avisó que cambió la cuenta conectada de un negocio (datos completos, cobros habilitados). */
 export async function actualizarCuenta(a: Stripe.Account) {
   await db.update(schema.barberias).set({ stripeEstado: estadoDeCuenta(a) }).where(eq(schema.barberias.stripeCuenta, a.id));

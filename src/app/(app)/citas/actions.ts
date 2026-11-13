@@ -77,8 +77,15 @@ export async function cancelarCita(id: string, motivo: string): Promise<Res> {
   if (s.vista) return { error: "En la vista previa no se guardan cambios." };
   const [c] = await db.select().from(schema.citas).where(and(eq(schema.citas.id, id), eq(schema.citas.barberiaId, s.barberia.id))).limit(1);
   if (!c || ["cancelada", "completada", "expirada"].includes(c.estado)) return { error: "Esa cita ya no se puede cancelar." };
-  // Los pagos en línea no se reembolsan: una cita pagada se reagenda. Si de verdad hay que devolver, se hace desde Stripe.
-  if (c.pagado > 0) return { error: "Esta cita ya está pagada y el pago no es reembolsable. Cámbiala a otro día u hora en lugar de cancelarla." };
+  // Lo pagado no se reembolsa salvo que el negocio lo acepte o la titular haga una excepción: entonces se devuelve en Stripe desde aquí.
+  let nota = "";
+  if (c.pagado > 0) {
+    const titular = s.usuario.rol === "duena" || s.usuario.rol === "admin";
+    if (!s.barberia.aceptaReembolsos && !titular) return { error: "Esta cita ya está pagada y el pago no es reembolsable. Cámbiala a otro día u hora en lugar de cancelarla." };
+    const r = await reembolsarCita(c.id, { barberiaId: s.barberia.id, usuarioId: s.usuario.id, nombre: s.usuario.nombre }).catch((e) => ({ monto: 0, error: e instanceof Error ? e.message : "No se pudo devolver el pago." }));
+    if (r.error) return { error: r.error };
+    nota = r.monto ? ` Se devolvieron ${formatoDinero(r.monto)} al cliente.` : " Lo pagado por transferencia se devuelve desde tu banco.";
+  }
   await db.transaction(async (tx) => {
     await tx.update(schema.citas).set({ estado: "cancelada", motivoCancelacion: String(motivo ?? "").slice(0, 200) || "Cancelada por el negocio", actualizadoEn: new Date() }).where(eq(schema.citas.id, id));
     await tx.update(schema.notificacionesCita).set({ estado: "omitida" }).where(and(eq(schema.notificacionesCita.citaId, id), eq(schema.notificacionesCita.estado, "pendiente")));
@@ -86,7 +93,7 @@ export async function cancelarCita(id: string, motivo: string): Promise<Res> {
     await registrar(tx, { barberiaId: s.barberia.id, usuarioId: s.usuario.id, tipo: "venta", accion: `${s.usuario.nombre} canceló la cita ${c.folio} de ${c.clienteNombre}`, detalle: { motivo } });
   });
   revalidatePath("/citas");
-  return { mensaje: "Cita cancelada." };
+  return { mensaje: `Cita cancelada.${nota}` };
 }
 
 /** Cambia el día, la hora o la persona de una cita, revisando que el nuevo horario esté libre. */

@@ -178,6 +178,7 @@ const FUNCIONES = {
   dividir: ["usaDividirPago", "Dividir pago", "configuracion.cobros"],
   metas: ["usaMetas", "Metas de ventas", "configuracion.metas"],
   promociones: ["usaPromociones", "Promociones", "configuracion.cobros"],
+  reembolsos: ["aceptaReembolsos", "Aceptar reembolsos", "configuracion.cobros"],
   apertura: ["aperturaManual", "Apertura de caja", "configuracion.caja"],
   corte: ["corteObligatorio", "Cierre de caja obligatorio", "configuracion.caja"],
   evidencia: ["usaEvidenciaCorte", "Evidencias del corte de caja", "configuracion.caja"],

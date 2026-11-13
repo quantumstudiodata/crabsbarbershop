@@ -1,5 +1,6 @@
 "use server";
 
+import { reembolsarVenta } from "@/lib/pagos";
 import { and, eq, sql } from "drizzle-orm";
 import { revalidatePath } from "next/cache";
 import { requerirSesion } from "@/lib/auth";
@@ -34,6 +35,19 @@ export async function cancelarVenta(form: FormData) {
     if (v.venta.registradaPor !== s.usuario.id || !reciente || v.turno.estado !== "abierto") {
       volver(regreso, { error: `Solo puedes corregir tus cobros de los últimos ${MINUTOS_CORRECCION} minutos. Pide al encargado que la cancele.` });
     }
+  }
+
+  // Pagada en línea: el dinero se devuelve en Stripe desde aquí. Si el negocio no acepta reembolsos, solo la titular puede hacer la excepción.
+  const enLinea = await db.select({ id: schema.pagosLinea.id }).from(schema.pagosLinea).where(and(eq(schema.pagosLinea.ventaId, v.venta.id), eq(schema.pagosLinea.estado, "pagado")));
+  let reembolso = 0;
+  if (enLinea.length) {
+    const titular = s.usuario.rol === "duena" || s.usuario.rol === "admin";
+    if (!s.barberia.aceptaReembolsos && !titular) volver(regreso, { error: "Se pagó en línea y el negocio no hace reembolsos. Si el cliente no pudo venir, cambia su cita de día; si hay que devolver el dinero, pídelo a la titular." });
+    const r = await reembolsarVenta(v.venta.id, s.barberia.id).catch((e) => ({ monto: 0, error: e instanceof Error ? e.message : "No se pudo devolver el pago." }));
+    if (r.error) volver(regreso, { error: r.error });
+    reembolso = r.monto;
+    await registrar(db, { barberiaId: s.barberia.id, usuarioId: s.usuario.id, tipo: "venta",
+      accion: `${s.usuario.nombre} devolvió ${formatoDinero(reembolso)} pagados en línea de la venta ${v.venta.folio}${s.barberia.aceptaReembolsos ? "" : " como excepción"}`, detalle: { motivo } });
   }
 
   let devolucion = 0;
