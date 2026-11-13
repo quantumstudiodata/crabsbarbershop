@@ -5390,3 +5390,44 @@ html:has(.fx) { background: url(/grunge.png?v=4) 0 0 / 640px 640px repeat, url("
 /* Pago con tarjeta en reservas: tarjeta oscura como el resto */
 .fx-raiz .fx .fx-tarjeta { background: #202329 !important; box-shadow: inset 0 0 0 1px rgba(255,255,255,.08), 0 12px 30px -18px rgba(0,0,0,.85) !important; }
 .fx-raiz .fx .fx-seguro { color: #8a94a2; }
+
+/* ===== Comprobante de la cita (después de reservar): mismo estilo grafito que la página de reservas ===== */
+html:has(.fx-raiz .mc) { background: url(/grunge.png?v=4) 0 0 / 640px 640px repeat, url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='160' height='160'%3E%3Cfilter id='n'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='.95' numOctaves='2' stitchTiles='stitch'/%3E%3CfeColorMatrix values='0 0 0 0 1 0 0 0 0 1 0 0 0 0 1 0 0 0 .065 0'/%3E%3C/filter%3E%3Crect width='100%25' height='100%25' filter='url(%23n)'/%3E%3C/svg%3E") 0 0 / 160px 160px repeat, #0c0d0f !important; background-color: #0c0d0f !important; }
+html:has(.fx-raiz .mc) body { background: transparent !important; }
+html:has(.fx-raiz .mc) body::before, html:has(.fx-raiz .mc) body::after { display: none !important; }
+.fx-raiz .mc { --fg: #eef1f5; --ink: #eef1f5; --muted: #98a2b0; --faint: #646e7b; --bg: #0c0d0f; color: #eef1f5; }
+.fx-raiz .mc .mc-cab img { filter: invert(1) brightness(1.15); }
+.fx-raiz .mc :is(.mc-recibo, .rv-tarjeta, .dt, .mc-listo) { background: #202329 !important; box-shadow: inset 0 0 0 1px rgba(255,255,255,.08), 0 18px 40px -24px rgba(0,0,0,.9) !important; border: 0 !important; }
+.fx-raiz .mc .mc-r-cab { background: none; }
+.fx-raiz .mc .mc-sello { background: #eef1f5; color: #121418; box-shadow: 0 0 0 6px rgba(255,255,255,.06); }
+.fx-raiz .mc .mc-sello.espera { background: linear-gradient(180deg, #61798e, #3f5568); color: #fff; box-shadow: 0 0 0 6px rgba(97,121,142,.18); }
+.fx-raiz .mc .mc-sello.gris { background: #3a3f46; color: #c9d1dc; }
+.fx-raiz .mc .mc-pasos li { background: rgba(255,255,255,.07); color: #98a2b0; }
+.fx-raiz .mc .mc-pasos li i { background: rgba(255,255,255,.1); color: #98a2b0; }
+.fx-raiz .mc .mc-pasos li.ok { color: #eef1f5; } .fx-raiz .mc .mc-pasos li.ok i { background: #eef1f5; color: #121418; }
+.fx-raiz .mc .mc-pasos li.espera { color: #c6d4e8; background: rgba(97,121,142,.2); } .fx-raiz .mc .mc-pasos li.espera i { background: #5a7184; color: #fff; }
+.fx-raiz .mc .mc-r-cuando { background: #2a2e34; box-shadow: inset 0 0 0 1px rgba(255,255,255,.08); }
+.fx-raiz .mc .mc-r-filas > div, .fx-raiz .mc .dt-f { border-bottom-color: rgba(255,255,255,.08); }
+.fx-raiz .mc .dt-cab { border-bottom-color: rgba(255,255,255,.12); }
+.fx-raiz .mc .mc-corte::before { border-top-color: rgba(255,255,255,.14); }
+.fx-raiz .mc .mc-corte::after { background: radial-gradient(circle at 0 50%, #0c0d0f 10px, transparent 10.5px), radial-gradient(circle at 100% 50%, #0c0d0f 10px, transparent 10.5px); }
+.fx-raiz .mc .dt-i, .fx-raiz .mc .mc-ayuda-i, .fx-raiz .mc .mc-listo-i { background: #eef1f5; color: #121418; }
+.fx-raiz .mc .dt-c { background: rgba(255,255,255,.08); color: #c9d1dc; } .fx-raiz .mc .dt-c.ok { background: #eef1f5; color: #121418; }
+.fx-raiz .mc .mc-subir { background: rgba(255,255,255,.03); border-color: rgba(255,255,255,.18); }
+.fx-raiz .mc .mc-subir:hover, .fx-raiz .mc .mc-subir.ok { background: #202329; border-color: rgba(255,255,255,.12); }
+.fx-raiz .mc .mc-subir-i { background: rgba(255,255,255,.08); color: #c9d1dc; } .fx-raiz .mc .mc-subir.ok .mc-subir-i { background: #eef1f5; color: #121418; }
+.fx-raiz .mc .mc-wa { background: rgba(255,255,255,.08); color: #eef1f5; }
+.fx-raiz .mc .bt { background: #eef1f5; color: #121418; }
+.fx-raiz .mc .bt.sec, .fx-raiz .mc .mc-cal { background: rgba(255,255,255,.06) !important; color: #eef1f5 !important; box-shadow: inset 0 0 0 1px rgba(255,255,255,.14) !important; border: 0 !important; }
+.fx-raiz .mc .bt.peligro { background: rgba(231,163,163,.12); color: #f0c2c2; }
+.fx-raiz .mc .icb { background: rgba(255,255,255,.06); border-color: rgba(255,255,255,.1); color: #c9d1dc; }
+.fx-raiz .mc .rv-barra { background: rgba(12,13,15,.9) !important; border-top-color: rgba(255,255,255,.08) !important; }
+.fx-raiz .mc :is(.mc-personas button, .mc-dias button, .mc-horas button) { background: #1d2024; border-color: rgba(255,255,255,.1); color: #eef1f5; }
+.fx-raiz .mc :is(.mc-personas button.on, .mc-dias button.on, .mc-horas button.on) { background: #eef1f5; color: #121418; border-color: #eef1f5; }
+.fx-raiz .mc .mc-dias button.on small { color: #5b6573; }
+.fx-raiz .mc .mc-cual { background: rgba(255,255,255,.1); color: #c9d1dc; }
+.fx-raiz .mc .mc-tramos { background: rgba(255,255,255,.06); } .fx-raiz .mc .mc-tramos button { color: #98a2b0; } .fx-raiz .mc .mc-tramos button.on { background: #eef1f5; color: #121418; }
+.fx-raiz .mc .mc-compara { background: rgba(255,255,255,.05); }
+.fx-raiz .mc .aviso { background: rgba(255,255,255,.06); color: #eef1f5; border-color: rgba(255,255,255,.1); }
+.fx-raiz .mc .muted { color: #98a2b0; }
+.fx-raiz .mc :is(.mc-lab, .lab) { color: #98a2b0 !important; }
