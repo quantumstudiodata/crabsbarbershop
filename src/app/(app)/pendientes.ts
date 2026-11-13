@@ -43,7 +43,10 @@ export async function pendientesDe(s: Sesion, hoy: string, zona: string, persona
   ]);
   // Citas de mañana: se les recuerda por WhatsApp con su enlace para cambiarla si lo necesitan.
   const manana = new Date(new Date(`${hoy}T12:00:00Z`).getTime() + 86400000).toISOString().slice(0, 10);
-  const deManana = s.puede("citas.modificar") ? await db.select({ id: schema.citas.id, cliente: schema.citas.clienteNombre, tel: schema.citas.clienteTelefono, inicio: schema.citas.inicio, token: schema.citas.token, barbero: schema.usuarios.nombre })
+  // Si ya marcó "Listo" en los recordatorios de mañana, no vuelve a salir (se guarda en su usuario).
+  const [yo] = await db.select({ v: schema.usuarios.consejosVistos }).from(schema.usuarios).where(eq(schema.usuarios.id, s.usuario.id)).limit(1);
+  const yaRecordo = (yo?.v ?? []).includes(`rec-${manana}`);
+  const deManana = s.puede("citas.modificar") && !yaRecordo ? await db.select({ id: schema.citas.id, cliente: schema.citas.clienteNombre, tel: schema.citas.clienteTelefono, inicio: schema.citas.inicio, token: schema.citas.token, barbero: schema.usuarios.nombre })
     .from(schema.citas).innerJoin(schema.usuarios, eq(schema.usuarios.id, schema.citas.barberoId))
     .where(and(eq(schema.citas.barberiaId, s.barberia.id), eq(schema.citas.estado, "en_espera"), sql`(${schema.citas.inicio} at time zone ${zona})::date = ${manana}::date`, ...(persona ? [eq(schema.citas.barberoId, persona)] : [])))
     .orderBy(schema.citas.inicio) : [];

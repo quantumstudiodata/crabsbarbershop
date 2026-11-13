@@ -289,7 +289,9 @@ export async function guardarCuentaTransferencia(d: { banco: string; clabe: stri
   const clabe = String(d.clabe ?? "").replace(/\D/g, "");
   const banco = String(d.banco ?? "").trim().slice(0, 40);
   const titular = String(d.titular ?? "").trim().replace(/\s+/g, " ").slice(0, 80);
-  if (clabe && !clabeValida(clabe)) return { error: "Revisa la CLABE: son 18 dígitos y el último no coincide." };
+  // Se acepta la CLABE (18 dígitos) o el número de una tarjeta de débito (16 dígitos): las dos reciben transferencias.
+  const problema = clabe ? revisarCuenta(clabe) : null;
+  if (problema) return { error: problema };
   if (clabe && (!banco || titular.length < 3)) return { error: "Escribe el banco y el nombre del titular de la cuenta." };
   const wa = String(d.whatsapp ?? "").replace(/\D/g, "");
   if (wa && (wa.length < 10 || wa.length > 13)) return { error: "El WhatsApp debe tener 10 dígitos." };
@@ -297,6 +299,23 @@ export async function guardarCuentaTransferencia(d: { banco: string; clabe: stri
   await registrar(db, { barberiaId: s.barberia.id, usuarioId: s.usuario.id, tipo: "ajuste", accion: clabe ? `${s.usuario.nombre} guardó la cuenta para transferencias (termina en ${clabe.slice(-4)})` : `${s.usuario.nombre} quitó la cuenta para transferencias` });
   revalidatePath("/", "layout");
   return { ok: true, n: Date.now() };
+}
+
+function revisarCuenta(c: string): string | null {
+  if (c.length === 18) return clabeValida(c) ? null : "Esa CLABE no es válida: el último dígito no coincide. Cópiala de nuevo desde tu banco.";
+  if (c.length === 16) return tarjetaValida(c) ? null : "Ese número de tarjeta no es válido. Revisa que esté bien escrito.";
+  return `Escribiste ${c.length} dígitos. La CLABE tiene 18 y el número de tarjeta 16.`;
+}
+
+/** Algoritmo de Luhn: el que usan todas las tarjetas para su último dígito. */
+function tarjetaValida(c: string) {
+  let suma = 0;
+  for (let i = 0; i < c.length; i++) {
+    let d = Number(c[c.length - 1 - i]);
+    if (i % 2 === 1) { d *= 2; if (d > 9) d -= 9; }
+    suma += d;
+  }
+  return suma % 10 === 0;
 }
 
 function clabeValida(c: string) {

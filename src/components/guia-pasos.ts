@@ -21,6 +21,10 @@ export type Paso = {
   opcional?: boolean;
   /** Al terminar el punto: cerrar la ventana abierta o limpiar el cobro. */
   despues?: "cerrar" | "limpiar";
+  /** Si lo señalado no existe (por ejemplo, todavía no hay ventas), se señala esto con otro texto. */
+  alt?: { sel: string; t: string; x: string };
+  /** El paso solo aplica si esto NO está en pantalla. */
+  siFalta?: string;
   /** El paso termina cuando aparece esto en pantalla (por ejemplo, la caja ya abierta). */
   hasta?: string;
   /** Teclas a explicar (atajos). */
@@ -61,7 +65,7 @@ export const PUNTOS: Record<string, Punto> = {
     id: "qr", nombre: "Cobro con QR", ejemplo: "El cliente paga con su tarjeta desde su celular.", ruta: "/cobrar", ir: ['a[href="/cobrar"]'],
     pasos: [
       { sel: "button.metodo|Pago con QR", modo: "leer", opcional: true, t: "Cobro con QR", x: "Eliges Pago con QR, le muestras el código al cliente y él paga con su tarjeta desde su celular. Ese dinero no entra al efectivo de la caja.", h: "Toca Siguiente" },
-      { sel: ".metodos, .estado-c, .estado-m", modo: "leer", t: "Cuando el cliente paga con tarjeta desde su celular", x: "Si el negocio tiene activos los cobros en línea, aquí aparece Pago con QR: le muestras el código y el cliente paga ahí mismo. Cuando se confirma, la venta se registra sola.", h: "Toca Siguiente" },
+      { sel: ".metodos, .estado-c, .estado-m", modo: "leer", siFalta: "button.metodo|Pago con QR", t: "Cuando el cliente paga con tarjeta desde su celular", x: "Si el negocio tiene activos los cobros en línea, aquí aparece Pago con QR: le muestras el código y el cliente paga ahí mismo. Cuando se confirma, la venta se registra sola.", h: "Toca Siguiente" },
     ],
   },
   retiro: {
@@ -109,13 +113,13 @@ export const PUNTOS: Record<string, Punto> = {
   cortesver: {
     id: "cortesver", nombre: "Cortes de caja", ejemplo: "Consulta cada corte y si tuvo diferencia.", ruta: "/analitica/cortes", ir: ['a[href="/analitica/cortes"]', 'a[href="/analitica"]'],
     pasos: [
-      { sel: ".rev-l, .hist-linea", modo: "leer", t: "Cada corte del equipo", x: "Aquí está cada cierre de caja: quién lo hizo, cuánto se vendió y si sobró o faltó dinero. Tócalo para ver el detalle y sus comprobantes.", h: "Toca Siguiente" },
+      { sel: ".rev-l, .hist-linea", modo: "leer", alt: { sel: "main .glass", t: "Aquí verás cada corte", x: "Todavía no hay cortes. Cada vez que alguien cierre la caja, aparecerá aquí con lo vendido y si sobró o faltó dinero." }, t: "Cada corte del equipo", x: "Aquí está cada cierre de caja: quién lo hizo, cuánto se vendió y si sobró o faltó dinero. Tócalo para ver el detalle y sus comprobantes.", h: "Toca Siguiente" },
     ],
   },
   ventas: {
     id: "ventas", nombre: "Ventas", ejemplo: "Todo lo cobrado: quién lo hizo y cómo pagaron.", ruta: "/analitica/ventas", ir: ['a[href="/analitica/ventas"]', 'a[href="/analitica"]'],
     pasos: [
-      { sel: ".hist-linea", modo: "leer", t: "Cada renglón es una venta", x: "Ves la hora, los servicios, el folio y el total. Tócala para ver el detalle o el ticket.", h: "Toca Siguiente" },
+      { sel: ".hist-linea", modo: "leer", alt: { sel: "main .glass", t: "Aquí verás cada venta", x: "Todavía no hay ventas. En cuanto cobres la primera, aparecerá aquí con su hora, servicios, folio y total." }, t: "Cada renglón es una venta", x: "Ves la hora, los servicios, el folio y el total. Tócala para ver el detalle o el ticket.", h: "Toca Siguiente" },
       { sel: "button.campo-f, button.input", modo: "leer", opcional: true, t: "Busca lo que necesites", x: "Filtra por fechas o por persona para encontrar una venta en segundos.", h: "Toca Siguiente" },
     ],
   },
@@ -128,7 +132,7 @@ export const PUNTOS: Record<string, Punto> = {
   agenda: {
     id: "agenda", nombre: "Citas y agenda", ejemplo: "Todas las citas de la semana de un vistazo.", ruta: "/citas", ir: ['a[href="/citas"]', 'a[href="/clientes"]'],
     pasos: [
-      { sel: ".cal-semana, .cal-dia, .ln-linea, .ag-cuerpo, main section.glass", modo: "leer", t: "Tu agenda", x: "Cada bloque es una cita. Tócala para marcar que llegó, cobrarla o cambiarla de horario. La línea azul es la hora actual.", h: "Toca Siguiente" },
+      { sel: ".cal-semana, .cal-dia, .ln-linea, .ag-cuerpo, main section.glass", modo: "leer", t: "Tu agenda", x: "Aquí ves tu semana. Cada cita aparece como un bloque con su hora y el cliente: tócala para marcar que llegó, cobrarla o cambiarla de horario.", h: "Toca Siguiente" },
       { sel: "button.ag-bt|Compartir", modo: "leer", opcional: true, t: "Que reserven solos", x: "Comparte tu enlace o tu QR y tus clientes apartan su lugar a cualquier hora.", h: "Toca Siguiente" },
     ],
   },
@@ -136,7 +140,7 @@ export const PUNTOS: Record<string, Punto> = {
     id: "resenas", nombre: "Reseñas", ejemplo: "Lo que opinan los clientes de su servicio.", ruta: "/clientes/resenas", ir: ['a[href="/clientes/resenas"]', 'a[href="/clientes"]'],
     pasos: [
       { sel: ".eq-rres", modo: "leer", t: "Tu calificación", x: "El promedio de estrellas y cuántas reseñas llevas.", h: "Toca Siguiente" },
-      { sel: ".eq-res, .eq-relleno, .eq-vacio", modo: "leer", opcional: true, t: "Lo que dijeron", x: "Cada reseña con su comentario. Al cobrar, comparte la encuesta para que te califiquen.", h: "Toca Siguiente" },
+      { sel: ".eq-res", modo: "leer", opcional: true, alt: { sel: ".eq-relleno, .eq-vacio", t: "Aquí llegan las reseñas", x: "Todavía no hay reseñas. Al cobrar, comparte la encuesta con el cliente y su opinión aparecerá aquí." }, t: "Lo que dijeron", x: "Cada reseña con su comentario. Al cobrar, comparte la encuesta para que te califiquen.", h: "Toca Siguiente" },
     ],
   },
   analitica: {
@@ -150,7 +154,7 @@ export const PUNTOS: Record<string, Punto> = {
   equipo: {
     id: "equipo", nombre: "Equipo", ejemplo: "Cuánto le toca a cada quien y cuándo se paga.", ruta: "/equipo", ir: ['a[href="/equipo"]', 'a[href="/analitica"]'],
     pasos: [
-      { sel: ".eq2-fila, .eqc-fila", modo: "leer", t: "Cada persona del equipo", x: "Lo que lleva vendido, su comisión y cuándo le toca cobrar. Tócala para ver todo su detalle.", h: "Toca Siguiente" },
+      { sel: ".eq2-fila, .eqc-fila", modo: "leer", alt: { sel: "main .glass", t: "Aquí verás a tu equipo", x: "Cuando des de alta a quienes atienden, aquí verás lo que vende cada quien y su comisión." }, t: "Cada persona del equipo", x: "Lo que lleva vendido, su comisión y cuándo le toca cobrar. Tócala para ver todo su detalle.", h: "Toca Siguiente" },
     ],
   },
   ajustes: {

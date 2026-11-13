@@ -49,7 +49,7 @@ export function leerConfig(raw: unknown): ConfigCitas {
     enLinea: r.enLinea ?? d.enLinea,
     anticipacionMinMin: num(r.anticipacionMinMin, d.anticipacionMinMin, 0, 7 * 24 * 60),
     anticipacionMaxDias: num(r.anticipacionMaxDias, d.anticipacionMaxDias, 1, 180),
-    margenMin: num(r.margenMin, d.margenMin, 0, 120),
+    margenMin: num(r.margenMin, d.margenMin, 0, 180),
     pasoMin: num(r.pasoMin, d.pasoMin, 5, 120),
     elegirBarbero: r.elegirBarbero ?? d.elegirBarbero,
     cualquierBarbero: r.cualquierBarbero ?? d.cualquierBarbero,
@@ -159,7 +159,17 @@ export function horariosLibres(p: {
   const maximo = p.ahora + c.anticipacionMaxDias * 864e5;
   const mios = p.ocupados.filter((o) => o.persona === p.persona || o.persona === null);
   const libres: number[] = [];
-  for (let m = p.ventana[0]; m + p.duracion <= p.ventana[1]; m += c.pasoMin) {
+  // Horarios a ofrecer: cada "pasoMin" desde que abre, y además justo cuando termina cada cita más su descanso
+  // (con horarios cada hora y una cita de 11:00 a 12:00 con 30 min de descanso, también se ofrece 12:30).
+  const inicioDia = instante(p.fecha, 0, p.zona);
+  const candidatos = new Set<number>();
+  for (let m = p.ventana[0]; m + p.duracion <= p.ventana[1]; m += c.pasoMin) candidatos.add(m);
+  for (const o of mios) {
+    if (o.persona === null) continue;
+    const m = Math.round((o.fin + c.margenMin * 60000 - inicioDia) / 60000);
+    if (m > p.ventana[0] && m + p.duracion <= p.ventana[1]) candidatos.add(m);
+  }
+  for (const m of [...candidatos].sort((a, b) => a - b)) {
     const ini = instante(p.fecha, m, p.zona), fin = ini + p.duracion * 60000;
     if (ini < minimo || ini > maximo) continue;
     const choca = mios.some((o) => {

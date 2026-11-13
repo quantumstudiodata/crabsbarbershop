@@ -33,7 +33,7 @@ export function CuentaTransferencia({ cuenta }: { cuenta: { banco: string; clabe
         <Modal abierto cerrar={() => setAbierto(false)} etiqueta="Cuenta para transferencias" titulo="Cuenta para transferencias">
           <form className="pila" onSubmit={(e) => { e.preventDefault(); guardar(d); }}>
             <label className="campo"><span>Banco</span><input className="input" value={d.banco} onChange={(e) => setD({ ...d, banco: e.target.value })} maxLength={40} placeholder="Ejemplo: BBVA" /></label>
-            <label className="campo"><span>CLABE</span><input className="input" inputMode="numeric" value={d.clabe} onChange={(e) => setD({ ...d, clabe: e.target.value.replace(/[^\d ]/g, "") })} maxLength={22} placeholder="18 dígitos" /></label>
+            <label className="campo"><span>CLABE o número de tarjeta</span><input className="input" inputMode="numeric" value={d.clabe} onChange={(e) => setD({ ...d, clabe: e.target.value.replace(/[^\d ]/g, "") })} maxLength={22} placeholder="CLABE de 18 dígitos o tarjeta de 16" /></label>
             <label className="campo"><span>A nombre de</span><input className="input" value={d.titular} onChange={(e) => setD({ ...d, titular: e.target.value })} maxLength={80} placeholder="Como aparece en el banco" /></label>
             <label className="campo"><span>WhatsApp del negocio</span><input className="input" inputMode="tel" value={d.whatsapp} onChange={(e) => setD({ ...d, whatsapp: e.target.value })} placeholder="10 dígitos, para recibir comprobantes" /></label>
             <small className="muted">Se comparte con tus clientes para que te paguen. Revisa que esté bien escrita.</small>

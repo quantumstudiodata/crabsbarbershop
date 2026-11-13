@@ -6,6 +6,7 @@ import { useRouter } from "next/navigation";
 import { Icono } from "@/components/Icono";
 import { cambiarEstadoCita, comprobantePorWhatsApp, confirmarTransferencia, verComprobante } from "./citas/actions";
 import { Modal } from "@/components/ui";
+import { marcarConsejos } from "./acciones-usuario";
 import type { Pendiente } from "./pendientes";
 
 const ICONO = { llegar: "reloj", cobrar: "efectivo", pago: "palomita", transferencia: "cobro", recordar: "enviar" } as const;
@@ -73,7 +74,7 @@ export function Pendientes({ items, className = "" }: { items: Pendiente[]; clas
                 );
               })}
             </div>
-            <div className="acciones"><button type="button" className="bt" onClick={() => { setHechos((h) => [...h, recordar.id]); setRecordar(null); }}>Listo<Icono n="palomita" /></button></div>
+            <div className="acciones"><button type="button" className="bt" onClick={() => { setHechos((h) => [...h, recordar.id]); marcarConsejos([`rec-${recordar.dia}`]).catch(() => {}); setRecordar(null); }}>Listo<Icono n="palomita" /></button></div>
           </div>
         </Modal>
       )}

@@ -98,6 +98,9 @@ function Recorrido({ punto, lista, hechos, esc, ruta, ir, listo }: {
   const [caja, setCaja] = useState<Caja | null>(null);
   const [perdido, setPerdido] = useState(false);
   const [festejo, setFestejo] = useState(false);
+  // Mientras pasa de un paso a otro no se muestra el sombreado viejo.
+  const [pasando, setPasando] = useState(false);
+  const [usaAlt, setUsaAlt] = useState(false);
   const [abierta, setAbierta] = useState(false);
   const [vuelta, setVuelta] = useState(0);
   const iRef = useRef(0);
@@ -111,37 +114,42 @@ function Recorrido({ punto, lista, hechos, esc, ruta, ir, listo }: {
   const terminar = useCallback((p?: Paso) => {
     if (p?.despues === "cerrar") document.querySelector<HTMLElement>("[role=dialog] .cerrar-x")?.click();
     if (p?.despues === "limpiar") (document.querySelector<HTMLElement>("button.svc, button.cm-n") ?? document.body).dispatchEvent(new KeyboardEvent("keydown", { key: "Escape", bubbles: true }));
-    setFestejo(true);
-    setTimeout(() => { setFestejo(false); listo(); }, 1500);
+    setCaja(null); setFestejo(true);
+    setTimeout(() => { setFestejo(false); listo(); }, 1100);
   }, [listo]);
 
   const avanzar = useCallback(() => {
-    setCaja(null); elRef.current = null;
+    setCaja(null); elRef.current = null; setPasando(true);
     const n = iRef.current;
     if (n + 1 >= pasos.length) terminar(pasos[n]); else setI(n + 1);
   }, [pasos, terminar]);
 
-  // Busca lo que hay que señalar; si un paso opcional no está, se salta.
+  // Busca lo que hay que señalar; si un paso opcional no está, se salta. Si no existe y hay alternativa (pantalla vacía), se señala esa.
   useEffect(() => {
     if (festejo) return;
-    setPerdido(false); setCaja(null); elRef.current = null;
+    setPerdido(false); setCaja(null); setUsaAlt(false); elRef.current = null;
     let vivo = true, intentos = 0;
+    if (paso?.siFalta && buscar(paso.siFalta)) { setTimeout(avanzar, 0); return; }
     const sel = paso ? paso.sel : selIr;
     if (!paso) window.scrollTo({ top: 0, behavior: "smooth" });
+    const limite = paso ? 18 : 30;
     const t = setInterval(() => {
       if (!vivo) return;
-      const el = buscar(sel);
       intentos++;
+      let el = buscar(sel);
+      let alt = false;
+      if (!el && paso?.alt && intentos > 6) { el = buscar(paso.alt.sel); alt = !!el; }
       if (el) {
         clearInterval(t);
-        el.scrollIntoView({ block: "center", behavior: "smooth" });
+        const r = el.getBoundingClientRect();
+        if (r.top < 70 || r.bottom > window.innerHeight - 40) el.scrollIntoView({ block: r.height > window.innerHeight * 0.6 ? "start" : "center", behavior: "smooth" });
         elRef.current = el;
-        setTimeout(() => vivo && setCaja(medir(el)), 350);
-      } else if (intentos > 16) {
+        setUsaAlt(alt); setCaja(medir(el)); setPasando(false);
+      } else if (intentos > limite) {
         clearInterval(t);
-        if (paso?.opcional) avanzar(); else setPerdido(true);
+        if (paso?.opcional) avanzar(); else { setPerdido(true); setPasando(false); }
       }
-    }, 200);
+    }, 120);
     return () => { vivo = false; clearInterval(t); };
   }, [paso, selIr, i, enRuta, festejo, ruta, vuelta]); // eslint-disable-line react-hooks/exhaustive-deps
 
@@ -168,8 +176,8 @@ function Recorrido({ punto, lista, hechos, esc, ruta, ir, listo }: {
     const toque = (e: MouseEvent) => {
       if (!el.contains(e.target as Node)) return;
       // Los enlaces del menú cambian de pantalla solos; si fue un botón (abrir el menú), se busca de nuevo.
-      if (!paso) { setTimeout(() => setVuelta((v) => v + 1), 450); return; }
-      if (paso.modo === "pasa" && !paso.hasta) setTimeout(avanzar, 420);
+      if (!paso) { setPasando(true); setCaja(null); setTimeout(() => setVuelta((v) => v + 1), 300); return; }
+      if (paso.modo === "pasa" && !paso.hasta) { setPasando(true); setTimeout(avanzar, 260); }
     };
     document.addEventListener("click", toque, true);
     return () => document.removeEventListener("click", toque, true);
@@ -177,8 +185,8 @@ function Recorrido({ punto, lista, hechos, esc, ruta, ir, listo }: {
 
   const n = lista.indexOf(punto) + 1;
   const tactil = !esc;
-  const titulo = !paso ? `Vamos a ${P.nombre}` : paso.t;
-  const texto = !paso ? (enRuta ? "" : `Toca aquí para entrar. ${P.ejemplo}`) : paso.x;
+  const titulo = !paso ? `Vamos a ${P.nombre}` : usaAlt && paso.alt ? paso.alt.t : paso.t;
+  const texto = !paso ? (enRuta ? "" : `Toca aquí para entrar. ${P.ejemplo}`) : usaAlt && paso.alt ? paso.alt.x : paso.x;
   const accion = !paso ? "Toca aquí" : paso.h;
   const intercepta = !!paso && paso.modo !== "pasa";
 
@@ -192,6 +200,9 @@ function Recorrido({ punto, lista, hechos, esc, ruta, ir, listo }: {
     const abajo = caja.y + caja.h + PAD + 18;
     gy = abajo + 230 < vh ? abajo : Math.max(caja.y - PAD - 18 - 230, 70);
     if (!esc && gy < 120 && abajo + 200 > vh) gy = 120;
+    // Si lo señalado es muy grande (una agenda, una lista), el globo va abajo, sobre el mismo elemento, sin tapar su encabezado.
+    // La lista está a la izquierda salvo que lo señalado empiece muy a la izquierda; el globo va del lado contrario.
+    if (caja.h > vh * 0.45) { gy = vh - 250; if (esc) gx = caja.x < 330 ? Math.max(caja.x + 24, 16) : Math.min(caja.x + caja.w - gw - 24, vw - gw - 16); }
   }
   const cx = caja ? caja.x + Math.min(caja.w / 2, esc ? 140 : caja.w / 2) : vw / 2;
   const cy = caja ? caja.y + caja.h / 2 : vh / 2;
@@ -214,7 +225,7 @@ function Recorrido({ punto, lista, hechos, esc, ruta, ir, listo }: {
             <i />
           </span>
         </>
-      ) : <div className="gu-b" style={{ inset: 0 }} />}
+      ) : <div className={`gu-b ${pasando || festejo ? "suave" : ""}`} style={{ inset: 0 }} />}
 
       {!festejo && (caja || perdido) && (
         <div key={`g${i}${punto}${enRuta}`} className="gu-globo" style={caja ? { left: gx, top: gy, width: gw } : { left: (vw - gw) / 2, top: Math.max(vh / 2 - 140, 70), width: gw }}>
@@ -257,6 +268,17 @@ function Recorrido({ punto, lista, hechos, esc, ruta, ir, listo }: {
   );
 }
 
+/** El cangrejo del logo asomándose: solo sus tenazas y sus ojos, que parpadean; las tenazas abren y cierran. */
+function Asoma() {
+  return (
+    <span className="gu-asoma" aria-hidden="true">
+      <span className="gu-cang">
+        <i className="t1" /><i className="t2" /><i className="oj" />
+      </span>
+    </span>
+  );
+}
+
 function Bienvenida({ nombre, empezar }: { nombre: string; empezar: () => void }) {
   const [sale, setSale] = useState(false);
   useLayoutEffect(() => { document.body.style.overflow = "hidden"; return () => { document.body.style.overflow = ""; }; }, []);
@@ -265,10 +287,7 @@ function Bienvenida({ nombre, empezar }: { nombre: string; empezar: () => void }
       <div className="gu-aura" aria-hidden="true" />
       <div className="gu-grano" aria-hidden="true" />
       <div className="gu-bien-c">
-        <span className="gu-sello2" aria-hidden="true">
-          {/* eslint-disable-next-line @next/next/no-img-element */}
-          <img src="/cangrejo-blanco.png" alt="" />
-        </span>
+        <Asoma />
         <span className="gu-marca">Crabs Barbershop</span>
         <h1 className="gu-saludo" aria-label={`Hola, ${nombre}`}><span><i>Hola,</i></span> <span><b>{nombre}</b></span></h1>
         <p className="gu-frase">Te llevo por toda la app. Te señalo dónde tocar y para qué sirve cada botón.</p>
@@ -285,10 +304,7 @@ function Cierre({ nombre, terminar }: { nombre: string; terminar: () => void }) 
       <div className="gu-aura" aria-hidden="true" />
       <div className="gu-grano" aria-hidden="true" />
       <div className="gu-bien-c">
-        <span className="gu-sello2" aria-hidden="true">
-          {/* eslint-disable-next-line @next/next/no-img-element */}
-          <img src="/cangrejo-blanco.png" alt="" />
-        </span>
+        <Asoma />
         <span className="gu-marca">Crabs Barbershop</span>
         <h1 className="gu-saludo" aria-label={`Listo, ${nombre}`}><span><i>Listo,</i></span> <span><b>{nombre}</b></span></h1>
         <p className="gu-frase">Ya conoces tu app. Todo lo que viste está a un toque cuando lo necesites.</p>

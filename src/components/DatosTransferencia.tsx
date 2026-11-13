@@ -11,7 +11,8 @@ const agrupar = (c: string) => c.replace(/(\d{3})(\d{3})(\d{11})(\d)/, "$1 $2 $3
 export function DatosTransferencia({ cuenta, monto, concepto, compartir }: { cuenta: CuentaTransferencia; monto?: number; concepto?: string; compartir?: boolean }) {
   const [copiado, setCopiado] = useState("");
   const copiar = async (k: string, v: string) => { try { await navigator.clipboard.writeText(v); setCopiado(k); setTimeout(() => setCopiado(""), 1600); } catch { /* sin portapapeles */ } };
-  const texto = [`Banco: ${cuenta.banco}`, `CLABE: ${cuenta.clabe}`, `A nombre de: ${cuenta.titular}`, ...(monto ? [`Monto: ${formatoDinero(monto)}`] : []), ...(concepto ? [`Concepto: ${concepto}`] : [])].join("\n");
+  const tipo = cuenta.clabe.length === 16 ? "Tarjeta" : "CLABE";
+  const texto = [`Banco: ${cuenta.banco}`, `${tipo}: ${cuenta.clabe}`, `A nombre de: ${cuenta.titular}`, ...(monto ? [`Monto: ${formatoDinero(monto)}`] : []), ...(concepto ? [`Concepto: ${concepto}`] : [])].join("\n");
   const fila = (k: string, t: string, v: string, mostrar = v) => (
     <button type="button" className="dt-f" onClick={() => copiar(k, v)}>
       <span><small>{t}</small><b>{mostrar}</b></span>
@@ -21,7 +22,7 @@ export function DatosTransferencia({ cuenta, monto, concepto, compartir }: { cue
   return (
     <div className="dt">
       <div className="dt-cab"><span className="dt-i" aria-hidden="true"><Icono n="cobro" /></span><span><b>Transferencia</b><small>{cuenta.banco}, sin comisión</small></span>{monto ? <b className="dt-m">{formatoDinero(monto)}</b> : null}</div>
-      {fila("clabe", "CLABE", cuenta.clabe, agrupar(cuenta.clabe))}
+      {fila("clabe", tipo, cuenta.clabe, agrupar(cuenta.clabe))}
       {fila("titular", "A nombre de", cuenta.titular)}
       {concepto && fila("concepto", "Concepto", concepto)}
       <div className="dt-acc">

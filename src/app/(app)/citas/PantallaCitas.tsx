@@ -221,11 +221,14 @@ function LineaAhora({ zona, ini, fin, px, col }: { zona: string; ini: number; fi
   const leer = () => { const x = new Intl.DateTimeFormat("en-GB", { timeZone: zona, hour: "2-digit", minute: "2-digit", second: "2-digit", hour12: false }).formatToParts(new Date()); const v = (t: string) => Number(x.find((y) => y.type === t)?.value ?? 0); return (v("hour") % 24) * 60 + v("minute") + v("second") / 60; };
   const [m, setM] = useState<number | null>(null);
   useEffect(() => { setM(leer()); const t = setInterval(() => setM(leer()), 30000); return () => clearInterval(t); }, [zona]); // eslint-disable-line react-hooks/exhaustive-deps
-  if (m === null || m < ini || m > fin) return null;
+  if (m === null) return null;
   const hh = Math.floor(m), txt = `${String(Math.floor(hh / 60)).padStart(2, "0")}:${String(hh % 60).padStart(2, "0")}`;
+  // Fuera del horario la línea se queda en la orilla (arriba antes de abrir, abajo ya cerrado) para saber dónde va el día.
+  const fuera = m < ini ? "antes" : m > fin ? "despues" : "";
+  const pos = Math.min(Math.max(m, ini), fin);
   return (
-    <div className="cal-ahora" style={{ top: (m - ini) * px, ["--x" as string]: col ? `calc(46px + (100% - 46px) * ${col.i} / ${col.de})` : "46px", ["--w" as string]: col ? `calc((100% - 46px) / ${col.de})` : "calc(100% - 46px)" }} aria-label={`Ahora, ${txt}`}>
-      <span>{txt}</span><i />
+    <div className={`cal-ahora ${fuera ? `fuera ${fuera}` : ""}`} style={{ top: (pos - ini) * px, ["--x" as string]: col ? `calc(46px + (100% - 46px) * ${col.i} / ${col.de})` : "46px", ["--w" as string]: col ? `calc((100% - 46px) / ${col.de})` : "calc(100% - 46px)" }} aria-label={`Ahora, ${txt}`}>
+      <span>{fuera === "antes" ? `${txt}, aún no abre` : fuera === "despues" ? `${txt}, ya cerró` : txt}</span><i />
     </div>
   );
 }

@@ -247,7 +247,7 @@ export async function guardarConfigCitas(d: {
   if (!horario) return { error: "Revisa el horario del negocio: la apertura va antes que el cierre." };
   const cerrados = [...new Set((d.diasCerrados ?? []).filter((x) => FECHA.test(x)))].sort().slice(0, 60);
   const n = (t: string, min: number, max: number) => { const v = Number(String(t).trim()); return Number.isFinite(v) && v >= min && v <= max ? v : null; };
-  const antMin = n(d.anticipacionMinHoras, 0, 168), antMax = n(d.anticipacionMaxDias, 1, 180), margen = n(d.margenMin, 0, 120), paso = n(d.pasoMin ?? "15", 5, 120), cancelar = n(d.cancelarHorasAntes, 0, 168);
+  const antMin = n(d.anticipacionMinHoras, 0, 168), antMax = n(d.anticipacionMaxDias, 1, 180), margen = n(d.margenMin, 0, 180), paso = n(d.pasoMin ?? "15", 5, 120), cancelar = n(d.cancelarHorasAntes, 0, 168);
   if (antMin === null || antMax === null || margen === null || cancelar === null) return { error: "Revisa las cantidades de anticipación, margen y cancelación." };
   let valor = 0;
   if (d.pagoModo === "anticipo_pct") { const v = n(d.pagoValor, 1, 100); if (v === null) return { error: "El porcentaje de anticipo va de 1 a 100." }; valor = Math.round(v * 100); }

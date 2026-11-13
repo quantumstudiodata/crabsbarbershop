@@ -6,6 +6,19 @@ const negocio = { "1": ["10:00", "20:00"], "2": ["10:00", "20:00"], "3": ["10:00
 const rot: Rotacion[] = [{ persona1: "bere", persona2: "leo", dia1: 1, dia2: 3, semanaInicio: "2026-11-09", activo: true }];
 
 describe("agenda", () => {
+  it("horarios cada hora y el siguiente justo después del descanso", () => {
+    const fecha = "2026-11-10";
+    const ahora = instante(fecha, 7 * 60, Z);
+    const config = { ...CONFIG_CITAS, pasoMin: 60, margenMin: 30 };
+    const cita = { persona: "bere", inicio: instante(fecha, 660, Z), fin: instante(fecha, 720, Z) };
+    const libres = horariosLibres({ fecha, zona: Z, ahora, duracion: 60, config, ventana: [600, 1200], persona: "bere", ocupados: [cita] });
+    // Ocupado de 11:00 a 12:00 más 30 min de descanso: no se ofrece 12:00; sí 12:30 y luego 13:00.
+    expect(libres.includes(720)).toBe(false);
+    expect(libres.includes(750)).toBe(true);
+    expect(libres.includes(780)).toBe(true);
+    // 10:00 sí se ofrece (cabe antes de las 11:00) y los demás siguen cada hora: 14:00, 15:00...
+    expect(libres.includes(840)).toBe(true);
+  });
   it("instante respeta la zona del negocio", () => {
     // Monterrey es UTC-6: 10:00 local = 16:00 UTC.
     expect(new Date(instante("2026-11-10", 600, Z)).toISOString()).toBe("2026-11-10T16:00:00.000Z");
