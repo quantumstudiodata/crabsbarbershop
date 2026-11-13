@@ -2,7 +2,7 @@
 export function Cangrejo() {
   return (
     <i className="fx-cg" aria-hidden="true">
-      <b className="cu" /><b className="t1" /><b className="t2" /><b className="oj" />
+      <span className="fx-cg-c"><b className="cu" /><b className="t1" /><b className="t2" /><b className="oj" /></span>
     </i>
   );
 }
