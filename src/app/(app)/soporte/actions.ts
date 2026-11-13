@@ -5,7 +5,7 @@ import { revalidatePath } from "next/cache";
 import { requerirSesion } from "@/lib/auth";
 import { MAX_ADJUNTO, TIPOS_ADJUNTO } from "@/lib/archivo";
 import { db, schema as t } from "@/lib/db";
-import { crearPrueba, datosDemostracion, eliminarPrueba, limpiarTemporales, negocioDePrueba, restablecerPrueba } from "@/lib/pruebas";
+import { crearPrueba, datosDemostracion, eliminarPrueba, empezarDeCero, limpiarTemporales, negocioDePrueba, restablecerPrueba } from "@/lib/pruebas";
 import { ESTADOS_SOLICITUD, type EstadoSolicitud, PRIORIDADES, type Prioridad } from "@/lib/soporte";
 import { texto } from "@/lib/volver";
 
@@ -112,4 +112,22 @@ export async function limpiarRegistros(_: EstadoSoporte): Promise<EstadoSoporte>
   await soporte();
   const r = await limpiarTemporales();
   return { ok: true, mensaje: `Se borraron ${r.sesiones} sesiones vencidas y ${r.errores} errores de hace más de 90 días.` };
+}
+
+/** Empezar de cero: borra los movimientos de un negocio y conserva su configuración. Hay que escribir el nombre exacto. */
+export async function empezarDeCeroNegocio(_: EstadoSoporte, form: FormData): Promise<EstadoSoporte> {
+  const s = await soporte();
+  const id = texto(form, "negocioId", 40);
+  const [b] = await db.select({ nombre: t.barberias.nombre }).from(t.barberias).where(eq(t.barberias.id, id)).limit(1);
+  if (!b) return { error: "No se encontró el negocio." };
+  if (texto(form, "confirmar", 80).trim() !== b.nombre) return { error: `Escribe ${b.nombre} tal cual para confirmar.` };
+  try {
+    const r = await empezarDeCero(id);
+    console.info("empezar_de_cero", { negocio: id, por: s.usuario.id, ventas: r.ventas, cortes: r.cortes });
+    revalidatePath(`/soporte/negocios/${id}`);
+    revalidatePath("/", "layout");
+    return { ok: true, mensaje: `${r.nombre} quedó en cero: se borraron ${r.ventas} ventas, ${r.cortes} cortes, ${r.egresos} egresos, ${r.pagos} pagos al equipo y ${r.citas} citas. La configuración sigue igual.` };
+  } catch (e) {
+    return { error: e instanceof Error ? e.message : "No se pudo completar." };
+  }
 }

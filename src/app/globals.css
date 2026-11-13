@@ -5185,3 +5185,7 @@ a.eqa-bt { display: flex; justify-content: center; align-items: center; text-dec
 .gu-cargando i { width: 7px; height: 7px; border-radius: 50%; background: #8a97aa; animation: gu-punto 1s ease-in-out infinite; }
 .gu-cargando i:nth-child(2) { animation-delay: .15s; } .gu-cargando i:nth-child(3) { animation-delay: .3s; }
 @keyframes gu-punto { 0%, 100% { opacity: .3; transform: translateY(0); } 50% { opacity: 1; transform: translateY(-3px); } }
+
+/* Soporte: empezar de cero */
+.cero-s { display: flex; align-items: center; justify-content: space-between; gap: 16px; flex-wrap: wrap; margin-top: 14px; }
+.cero-s > div { display: grid; gap: 3px; max-width: 560px; } .cero-s b { font-size: 15px; } .cero-s small { font-size: 13px; color: var(--muted); line-height: 1.45; }

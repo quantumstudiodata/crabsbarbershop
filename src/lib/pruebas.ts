@@ -46,6 +46,56 @@ async function borrarMovimientos(tx: Tx, b: string) {
   await tx.update(t.barberias).set({ siguienteFolio: 1 }).where(eq(t.barberias.id, b));
 }
 
+/** Movimientos de un negocio (de prueba o real) para la vista previa antes de empezar de cero. */
+export async function conteoMovimientos(id: string) {
+  const n = async (tabla: typeof t.ventas | typeof t.gastos | typeof t.turnosCaja | typeof t.pagosComision | typeof t.citas | typeof t.historial) =>
+    (await db.select({ n: sql<number>`count(*)::int` }).from(tabla).where(eq(tabla.barberiaId, id)))[0].n;
+  const [ventas, egresos, cortes, pagos, citas, historial] = await Promise.all([n(t.ventas), n(t.gastos), n(t.turnosCaja), n(t.pagosComision), n(t.citas), n(t.historial)]);
+  return { ventas, egresos, cortes, pagos, citas, historial };
+}
+
+/**
+ * Empezar de cero: borra todo lo que se registró (ventas, cortes, egresos, pagos al equipo, citas, reseñas e historial)
+ * y conserva la configuración: cuentas, servicios, precios, formas de pago, horarios, metas y ajustes.
+ * Sirve para quitar las pruebas antes de empezar a usar la app de verdad. No se puede deshacer.
+ */
+export async function empezarDeCero(id: string) {
+  if (!/^[0-9a-f-]{36}$/.test(id)) throw new Error("Negocio no válido.");
+  const [b] = await db.select().from(t.barberias).where(eq(t.barberias.id, id)).limit(1);
+  if (!b) throw new Error("No existe ese negocio.");
+  const antes = await conteoMovimientos(id);
+  const hoy = fechaLocal(new Date(), b.zonaHoraria);
+  await db.transaction(async (tx) => {
+    await tx.execute(sql`select set_config('crabs.limpieza', 'si', true)`);
+    // Primero lo que depende de citas y cortes, luego las ventas.
+    await tx.delete(t.comprobantesCita).where(eq(t.comprobantesCita.barberiaId, id));
+    await tx.delete(t.notificacionesCita).where(eq(t.notificacionesCita.barberiaId, id));
+    await tx.delete(t.pagosLinea).where(eq(t.pagosLinea.barberiaId, id));
+    await tx.delete(t.resenas).where(eq(t.resenas.barberiaId, id));
+    await tx.delete(t.citas).where(eq(t.citas.barberiaId, id));
+    await tx.delete(t.evidenciasCorte).where(eq(t.evidenciasCorte.barberiaId, id));
+    await tx.delete(t.faltantesCaja).where(eq(t.faltantesCaja.barberiaId, id));
+    await tx.delete(t.comprobantes).where(eq(t.comprobantes.barberiaId, id));
+    await tx.delete(t.gastos).where(eq(t.gastos.barberiaId, id));
+    await tx.delete(t.propinas).where(eq(t.propinas.barberiaId, id));
+    await tx.delete(t.pagos).where(eq(t.pagos.barberiaId, id));
+    await tx.delete(t.conceptos).where(eq(t.conceptos.barberiaId, id));
+    await tx.delete(t.movimientosCaja).where(eq(t.movimientosCaja.barberiaId, id));
+    await tx.delete(t.ventas).where(eq(t.ventas.barberiaId, id));
+    await tx.delete(t.ajustesCierre).where(eq(t.ajustesCierre.barberiaId, id));
+    await tx.delete(t.turnosCaja).where(eq(t.turnosCaja.barberiaId, id));
+    await tx.delete(t.pagosComision).where(eq(t.pagosComision.barberiaId, id));
+    await tx.delete(t.historial).where(eq(t.historial.barberiaId, id));
+    // Los pagos y rentas automáticos cuentan desde hoy; los gastos fijos vuelven a registrarse en su siguiente fecha.
+    await tx.update(t.barberias).set({
+      siguienteFolio: 1,
+      ...(b.pagosEquipoDesde ? { pagosEquipoDesde: hoy } : {}),
+      ...(b.rentasDesde ? { rentasDesde: hoy } : {}),
+    }).where(eq(t.barberias.id, id));
+  });
+  return { nombre: b.nombre, ...antes };
+}
+
 export async function restablecerPrueba(id: string) {
   const b = await negocioDePrueba(id);
   if (!b) throw new Error("Solo se pueden restablecer negocios de prueba.");

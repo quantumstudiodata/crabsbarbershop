@@ -8,6 +8,8 @@ import { solicitudes } from "@/lib/plataforma";
 import Link from "next/link";
 import { hace } from "@/lib/soporte";
 import { CabezaSoporte, ListaSolicitudes } from "../../Comunes";
+import { conteoMovimientos } from "@/lib/pruebas";
+import { EmpezarDeCero } from "./EmpezarDeCero";
 
 export const metadata = { title: "Ficha del negocio" };
 
@@ -46,13 +48,14 @@ export default async function Ficha({ params, searchParams }: { params: Promise<
       </section>
       <nav className="chips-s grande" aria-label="Apartados">{PESTANAS.map(([k, v]) => <Link key={k} href={`/soporte/negocios/${id}?ver=${k}`} aria-current={ver === k ? "page" : undefined}>{v}</Link>)}</nav>
       {ver === "info" && <Info b={b} />}
+      {ver === "info" && <EmpezarDeCero id={b.id} nombre={b.nombre} conteo={await conteoMovimientos(b.id)} />}
       {ver === "usuarios" && <Usuarios id={id} />}
       {ver === "config" && <Config b={b} />}
       {ver === "actividad" && <Actividad id={id} />}
       {ver === "ventas" && <Ventas b={b} />}
       {ver === "solicitudes" && <section className="glass panel-s"><ListaSolicitudes filas={await solicitudes({ negocioId: id, estado: "" })} vacio="Este negocio no ha enviado solicitudes." /></section>}
       {ver === "diagnostico" && <Diagnostico b={b} />}
-      <p className="ayuda-txt">Consulta de solo lectura. Para modificar la configuración o intervenir en una cuenta real se necesita un permiso específico y la autorización del propietario.</p>
+      <p className="ayuda-txt">Consulta de solo lectura, salvo Empezar de cero. Para modificar la configuración o intervenir en una cuenta real se necesita un permiso específico y la autorización del propietario.</p>
     </>
   );
 }
