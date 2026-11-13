@@ -16,7 +16,7 @@ import { Icono } from "@/components/Icono";
 import { PanelIdeas } from "@/components/PanelIdeas";
 import { VentanaVivo } from "@/components/VentanaVivo";
 import { AvisoPagoLinea } from "@/components/AvisoPagoLinea";
-import { Consejos } from "@/components/Consejos";
+import { Guia } from "@/components/Guia";
 import { requerirSesion } from "@/lib/auth";
 import { describirRegla, elegirRegla } from "@/lib/comisiones";
 import { copiaRegla, reglasDe } from "@/lib/datos";
@@ -80,14 +80,34 @@ export default async function LayoutApp({ children }: { children: React.ReactNod
         ideas: s.puede("ideas.decidir"), ayuda: !soporte, soporte: soporte && !s.vista,
       }} />
       <VentanaVivo />
-      {!s.vista && <Suspense fallback={null}><ConsejosDe usuario={s.usuario.id} /></Suspense>}
+      {!s.vista && <Suspense fallback={null}><GuiaDe usuario={s.usuario.id} nombre={s.usuario.nombre.split(" ")[0]} puntos={puntosGuia(s, atiende)} /></Suspense>}
       {s.barberia.usaCitas && s.puede("citas.ver") && <AvisoPagoLinea />}
     </>
   );
 }
 
-/** Recorridos de consejos que esta persona ya vio (guardado en su usuario). */
-async function ConsejosDe({ usuario }: { usuario: string }) {
+/** Lo que la guía de primer uso le enseña a esta persona, según lo que su puesto puede hacer. */
+function puntosGuia(s: Awaited<ReturnType<typeof requerirSesion>>, atiende: boolean): string[] {
+  const cobra = s.puede("ventas.registrar") || s.puede("ventas.registrar_otros");
+  const citas = s.barberia.usaCitas;
+  return [
+    "acc",
+    ...(cobra ? ["cobro", "atajos", "qr"] : []),
+    ...(s.puede("caja.retiros") ? ["retiro", "gasto"] : s.puede("gastos.registrar") ? ["egreso"] : []),
+    ...(s.puede("caja.operar") ? ["corte"] : s.puede("cortes.ver") ? ["cortesver"] : []),
+    ...(cobra || s.puede("ventas.ver_todas") ? ["ventas"] : []),
+    ...(citas && s.puede("citas.modificar") ? ["citas"] : []),
+    ...(citas && s.puede("citas.ver") ? ["agenda"] : []),
+    ...(s.puede("reportes.ver") ? ["analitica"] : []),
+    ...(s.puede("ventas.ver_todas") || s.puede("equipo.pagar") ? ["equipo"] : []),
+    ...(atiende || s.puede("resenas.responder") ? ["resenas"] : []),
+    ...(s.usuario.rol === "duena" || s.usuario.rol === "admin" ? ["ajustes"] : []),
+    ...(s.usuario.rol === "contador" ? ["libreta"] : []),
+  ];
+}
+
+/** Guía de primer uso: se muestra hasta que la persona la termina (guardado en su usuario). */
+async function GuiaDe({ usuario, nombre, puntos }: { usuario: string; nombre: string; puntos: string[] }) {
   const [u] = await db.select({ v: schema.usuarios.consejosVistos }).from(schema.usuarios).where(eq(schema.usuarios.id, usuario)).limit(1).catch(() => [] as { v: string[] }[]);
-  return <Consejos vistos={u?.v ?? []} />;
+  return <Guia vistos={u?.v ?? []} puntos={puntos} nombre={nombre} />;
 }
