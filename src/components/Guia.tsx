@@ -129,9 +129,10 @@ function Recorrido({ punto, lista, hechos, esc, ruta, ir, listo }: {
     if (festejo) return;
     setPerdido(false); setCaja(null); setUsaAlt(false); elRef.current = null;
     let vivo = true, intentos = 0;
+    // Si no está en la pantalla del punto, la guía lo lleva sola.
+    if (!enRuta) { const t = setTimeout(() => ir(P.ruta), 900); return () => { vivo = false; clearTimeout(t); }; }
     if (paso?.siFalta && buscar(paso.siFalta)) { setTimeout(avanzar, 0); return; }
     const sel = paso ? paso.sel : selIr;
-    if (!paso) window.scrollTo({ top: 0, behavior: "smooth" });
     const limite = paso ? 18 : 30;
     const t = setInterval(() => {
       if (!vivo) return;
@@ -227,7 +228,16 @@ function Recorrido({ punto, lista, hechos, esc, ruta, ir, listo }: {
         </>
       ) : <div className={`gu-b ${pasando || festejo ? "suave" : ""}`} style={{ inset: 0 }} />}
 
-      {!festejo && (caja || perdido) && (
+      {!festejo && !enRuta && (
+        <div key={`v${punto}`} className="gu-globo gu-viaje" style={{ left: (vw - gw) / 2, top: Math.max(vh / 2 - 110, 70), width: gw }}>
+          <span className="gu-num">{String(n).padStart(2, "0")}<small>/{String(lista.length).padStart(2, "0")}</small><em>{P.nombre}</em></span>
+          <h3>Te llevo a {P.nombre}</h3>
+          <p>{P.ejemplo}</p>
+          <div className="gu-pie"><span className="gu-cargando" aria-hidden="true"><i /><i /><i /></span><button type="button" className="gu-sig" onClick={() => ir(P.ruta)}>Ir ahora<span>→</span></button></div>
+        </div>
+      )}
+
+      {!festejo && enRuta && (caja || perdido) && (
         <div key={`g${i}${punto}${enRuta}`} className="gu-globo" style={caja ? { left: gx, top: gy, width: gw } : { left: (vw - gw) / 2, top: Math.max(vh / 2 - 140, 70), width: gw }}>
           <span className="gu-num">{String(n).padStart(2, "0")}<small>/{String(lista.length).padStart(2, "0")}</small><em>{P.nombre}</em></span>
           <h3>{titulo}</h3>

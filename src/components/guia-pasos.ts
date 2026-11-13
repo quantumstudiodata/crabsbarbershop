@@ -113,13 +113,13 @@ export const PUNTOS: Record<string, Punto> = {
   cortesver: {
     id: "cortesver", nombre: "Cortes de caja", ejemplo: "Consulta cada corte y si tuvo diferencia.", ruta: "/analitica/cortes", ir: ['a[href="/analitica/cortes"]', 'a[href="/analitica"]'],
     pasos: [
-      { sel: ".rev-l, .hist-linea", modo: "leer", alt: { sel: "main .glass", t: "Aquí verás cada corte", x: "Todavía no hay cortes. Cada vez que alguien cierre la caja, aparecerá aquí con lo vendido y si sobró o faltó dinero." }, t: "Cada corte del equipo", x: "Aquí está cada cierre de caja: quién lo hizo, cuánto se vendió y si sobró o faltó dinero. Tócalo para ver el detalle y sus comprobantes.", h: "Toca Siguiente" },
+      { sel: ".rev-l, .tabla-c tbody tr", modo: "leer", alt: { sel: ".vacio-g", t: "Aquí verás cada corte", x: "Todavía no hay cortes. Cada vez que alguien cierre la caja, aparecerá aquí con lo vendido y si sobró o faltó dinero." }, t: "Cada corte del equipo", x: "Aquí está cada cierre de caja: quién lo hizo, cuánto se vendió y si sobró o faltó dinero. Tócalo para ver el detalle y sus comprobantes.", h: "Toca Siguiente" },
     ],
   },
   ventas: {
     id: "ventas", nombre: "Ventas", ejemplo: "Todo lo cobrado: quién lo hizo y cómo pagaron.", ruta: "/analitica/ventas", ir: ['a[href="/analitica/ventas"]', 'a[href="/analitica"]'],
     pasos: [
-      { sel: ".hist-linea", modo: "leer", alt: { sel: "main .glass", t: "Aquí verás cada venta", x: "Todavía no hay ventas. En cuanto cobres la primera, aparecerá aquí con su hora, servicios, folio y total." }, t: "Cada renglón es una venta", x: "Ves la hora, los servicios, el folio y el total. Tócala para ver el detalle o el ticket.", h: "Toca Siguiente" },
+      { sel: ".hist-linea", modo: "leer", alt: { sel: ".vacio-g, main p.muted", t: "Aquí verás cada venta", x: "Todavía no hay ventas. En cuanto cobres la primera, aparecerá aquí con su hora, servicios, folio y total." }, t: "Cada renglón es una venta", x: "Ves la hora, los servicios, el folio y el total. Tócala para ver el detalle o el ticket.", h: "Toca Siguiente" },
       { sel: "button.campo-f, button.input", modo: "leer", opcional: true, t: "Busca lo que necesites", x: "Filtra por fechas o por persona para encontrar una venta en segundos.", h: "Toca Siguiente" },
     ],
   },
@@ -154,7 +154,7 @@ export const PUNTOS: Record<string, Punto> = {
   equipo: {
     id: "equipo", nombre: "Equipo", ejemplo: "Cuánto le toca a cada quien y cuándo se paga.", ruta: "/equipo", ir: ['a[href="/equipo"]', 'a[href="/analitica"]'],
     pasos: [
-      { sel: ".eq2-fila, .eqc-fila", modo: "leer", alt: { sel: "main .glass", t: "Aquí verás a tu equipo", x: "Cuando des de alta a quienes atienden, aquí verás lo que vende cada quien y su comisión." }, t: "Cada persona del equipo", x: "Lo que lleva vendido, su comisión y cuándo le toca cobrar. Tócala para ver todo su detalle.", h: "Toca Siguiente" },
+      { sel: ".eq2-fila, .eqc-fila", modo: "leer", alt: { sel: ".vacio-g, .eq-vacio", t: "Aquí verás a tu equipo", x: "Cuando des de alta a quienes atienden, aquí verás lo que vende cada quien y su comisión." }, t: "Cada persona del equipo", x: "Lo que lleva vendido, su comisión y cuándo le toca cobrar. Tócala para ver todo su detalle.", h: "Toca Siguiente" },
     ],
   },
   ajustes: {
