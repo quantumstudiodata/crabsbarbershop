@@ -63,7 +63,7 @@ function VentanaClave({ c, cerrar }: { c: ClaveVisible | null; cerrar: () => voi
           <div className="clave" style={{ marginTop: 6 }}>{ms > 0 ? c.clave : "Expiró"}</div>
         </div>
         <p className="ayuda-txt">
-          Puedes volver a verla desde la lista mientras corre el tiempo.
+          Dura 30 minutos desde que se generó: vence a las {new Date(c.expira).toLocaleTimeString("es-MX", { hour: "numeric", minute: "2-digit" })}. Si la vuelves a abrir, verás el tiempo que le queda.
           <br />
           Al entrar, tendrá que elegir una propia.
         </p>
@@ -81,7 +81,7 @@ function VentanaClave({ c, cerrar }: { c: ClaveVisible | null; cerrar: () => voi
 function Estado({ p }: { p: Persona }) {
   const ms = useRestante(p.claveHasta);
   if (!p.activo) return <span className="chip-e off"><i />Desactivado</span>;
-  if (p.debeCambiar) return <span className="chip-e pendiente"><i />Acceso pendiente{p.claveHasta && ms > 0 ? `, ${Math.ceil(ms / 60000)} min` : ""}</span>;
+  if (p.debeCambiar) return <span className="chip-e pendiente"><i />Acceso pendiente{p.claveHasta && ms > 0 ? `, vence en ${Math.ceil(ms / 60000)} min` : ""}</span>;
   return <span className="chip-e ok"><i />Activo</span>;
 }
 
