@@ -9,5 +9,5 @@ export function zoomPagina(): number {
   return z > 0 ? z : 1;
 }
 
-/** Se ejecuta antes de pintar: solo navegadores con zoom estándar (Chrome, Edge 128+, Firefox 126+). */
-export const SCRIPT_COMPACTA = `if("currentCSSZoom" in document.documentElement)document.documentElement.setAttribute("data-zoom","ok")`;
+/** Se ejecuta antes de pintar. Chrome, Edge y Firefox (126+) usan el zoom estándar; Safari se queda sin reducir. */
+export const SCRIPT_COMPACTA = `try{var u=navigator.userAgent;if(CSS.supports("zoom","1")&&!(/safari/i.test(u)&&!/chrome|chromium|crios|edg|android/i.test(u)))document.documentElement.setAttribute("data-zoom","ok")}catch(e){}`;
