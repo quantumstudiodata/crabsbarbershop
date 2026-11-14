@@ -349,7 +349,8 @@ export async function folioCorte(barberiaId: string, abiertoEn: Date) {
   const [{ n }] = await db
     .select({ n: sql<number>`count(*)::int` })
     .from(s.turnosCaja)
-    .where(and(eq(s.turnosCaja.barberiaId, barberiaId), lte(s.turnosCaja.abiertoEn, abiertoEn)));
+    // La base guarda microsegundos y JavaScript solo milisegundos: se suma 1 ms para que el turno se cuente a sí mismo.
+    .where(and(eq(s.turnosCaja.barberiaId, barberiaId), lte(s.turnosCaja.abiertoEn, new Date(abiertoEn.getTime() + 1))));
   return `C-${String(n).padStart(6, "0")}`;
 }
 
