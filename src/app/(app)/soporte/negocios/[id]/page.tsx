@@ -1,4 +1,5 @@
 import { and, desc, eq, gte, isNull, lt, sql } from "drizzle-orm";
+import { ocultarSensibles, resumenError } from "@/lib/sensibles";
 import { notFound } from "next/navigation";
 import { db, schema as t } from "@/lib/db";
 import { fechaLocal, fechaLarga } from "@/lib/fechas";
@@ -236,7 +237,7 @@ async function Diagnostico({ b }: { b: typeof t.barberias.$inferSelect }) {
         </section>
         <section className="glass panel-s">
           <span className="lab">2. ¿Hubo errores al guardar?</span>
-          {errores.length ? errores.map(({ e, quien }) => <div key={e.id} className="error-s"><small>{hace(e.creadoEn)}, {e.ruta}{quien ? `, ${quien.split(" ")[0]}` : ""}</small><code>{e.mensaje}</code></div>)
+          {errores.length ? errores.map(({ e, quien }) => <div key={e.id} className="error-s"><small>{hace(e.creadoEn)}, {e.ruta}{quien ? `, ${quien.split(" ")[0]}` : ""}</small><b className="error-tit">{resumenError(ocultarSensibles(e.mensaje))}</b><details className="error-det"><summary>Ver el mensaje técnico</summary><code>{ocultarSensibles(e.mensaje)}</code></details></div>)
             : <p className="muted chico-t">Sin errores registrados en los últimos 7 días.</p>}
         </section>
         <section className="glass panel-s">

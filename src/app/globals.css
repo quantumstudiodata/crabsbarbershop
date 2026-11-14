@@ -5528,3 +5528,21 @@ html:has(.fx-raiz .mc) body::before, html:has(.fx-raiz .mc) body::after { displa
 /* Detalle de error: título legible y el mensaje técnico plegado */
 .error-tit { display: block; font-size: 16px; line-height: 1.4; margin-bottom: 8px; }
 .error-det { margin-bottom: 14px; } .error-det summary { cursor: pointer; font-size: 13px; color: var(--muted); margin-bottom: 8px; }
+
+/* Soporte en celular: tablas que se deslizan sin encimarse, formularios en dos columnas y filas sin saltos. */
+@media (max-width: 760px) {
+  .sim-s table { table-layout: auto; min-width: 760px; }
+  .sim-s th:first-child, .sim-s td.f { position: sticky; left: 0; z-index: 1; width: 150px; min-width: 150px; background: #f3f6f9; }
+  .sim-s th, .sim-s td.c-sim { padding-left: 6px; padding-right: 6px; }
+  .sim-s .chip-p { font-size: 11px; padding: 2px 8px; }
+  .tabla-l .desliza table { min-width: 520px; }
+  .form-vista { display: grid; grid-template-columns: 1fr 1fr; align-items: end; }
+  .form-vista .campo { min-width: 0; }
+  .form-vista .campo > :not(span) { width: 100%; }
+  .form-vista .bt { grid-column: 1 / -1; justify-content: center; order: 5; }
+  .form-vista .c-pag { order: 2; } .form-vista .c-neg { order: 3; grid-column: 1 / -1; } .form-vista .c-disp { order: 4; grid-column: 1 / -1; }
+  .form-vista .c-disp .seg { display: inline-flex; flex-direction: row; }
+  .fila-s.plana { flex-wrap: nowrap; }
+  .fila-s.plana .t-s { min-width: 0; flex: 1; }
+  .error-s .error-tit { font-size: 13.5px; margin: 4px 0; }
+}

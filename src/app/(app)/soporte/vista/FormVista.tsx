@@ -18,9 +18,9 @@ export function FormVista({ puestos, negocios, inicial }: { puestos: Op[]; negoc
   return (
     <div className="form-vista">
       <div className="campo"><span>Puesto</span><Selector etiqueta="Puesto" opciones={puestos} valor={como} onChange={setComo} /></div>
-      {negocios.length > 1 && <div className="campo"><span>Negocio de referencia</span><Selector etiqueta="Negocio de referencia" opciones={negocios} valor={negocio} onChange={setNegocio} /></div>}
-      <div className="campo"><span>Página</span><Selector etiqueta="Página" opciones={PAGINAS} valor={pagina} onChange={setPagina} /></div>
-      <div className="campo"><span>Dispositivo</span>
+      {negocios.length > 1 && <div className="campo c-neg"><span>Negocio de referencia</span><Selector etiqueta="Negocio de referencia" opciones={negocios} valor={negocio} onChange={setNegocio} /></div>}
+      <div className="campo c-pag"><span>Página</span><Selector etiqueta="Página" opciones={PAGINAS} valor={pagina} onChange={setPagina} /></div>
+      <div className="campo c-disp"><span>Dispositivo</span>
         <div className="seg" role="radiogroup" aria-label="Dispositivo">
           <label><input type="radio" name="disp" checked={disp === "escritorio"} onChange={() => setDisp("escritorio")} />Escritorio</label>
           <label><input type="radio" name="disp" checked={disp === "movil"} onChange={() => setDisp("movil")} />Móvil</label>
