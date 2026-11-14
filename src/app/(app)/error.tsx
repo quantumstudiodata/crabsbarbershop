@@ -8,6 +8,14 @@ export default function Error({ error, reset }: { error: Error & { digest?: stri
   useEffect(() => {
     const v = document.cookie.includes("crabs_vista=");
     setVista(v);
+    // Si la pestaña quedó con una versión anterior de la app, se recarga una vez para tomar la nueva.
+    try {
+      if (/Failed to find Server Action|Loading chunk|ChunkLoadError|Failed to fetch dynamically imported module/i.test(error.message) && sessionStorage.getItem("crabs-recarga") !== location.pathname) {
+        sessionStorage.setItem("crabs-recarga", location.pathname);
+        location.reload();
+        return;
+      }
+    } catch {}
     // Se registra para Soporte; los bloqueos de la vista previa no son fallos.
     if (!v) fetch("/api/errores", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ mensaje: error.message || "Error sin mensaje", digest: error.digest, ruta: location.pathname }) }).catch(() => {});
   }, [error]);
