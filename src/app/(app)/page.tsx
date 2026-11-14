@@ -205,6 +205,7 @@ function InicioVista(v: Vista) {
 
       {/* Escritorio */}
       <div className="ini-rejilla solo-escritorio">
+        <div className="ini-izq">
         <section className="glass ini-hoy subir d1">
           <div className="ini-hoy-c">
             <div><span className="lab">{v.barbero ? "Hoy llevas" : "Hoy llevan"}</span><b className="ini-big"><Cuenta valor={v.total} /></b></div>
@@ -227,6 +228,11 @@ function InicioVista(v: Vista) {
           </div>
           {v.verMas && <Link className="ini-link" href={v.verMas.href}>{v.verMas.texto}</Link>}
         </section>
+          <section className="glass ini-card subir d2">
+            <span className="lab">Equipo hoy</span>
+            {listaEquipo}
+          </section>
+        </div>
         <div className={`ini-der ${v.citas ? "con-citas" : ""}`}>
           <Pendientes items={v.pendientes} className="subir d2" />
           {v.citas && (
@@ -238,10 +244,6 @@ function InicioVista(v: Vista) {
               {v.citas.length > 3 && <small className="muted">y {v.citas.length - 3} más</small>}
             </section>
           )}
-          <section className="glass ini-card subir d2">
-            <span className="lab">Equipo hoy</span>
-            {listaEquipo}
-          </section>
         </div>
       </div>
 

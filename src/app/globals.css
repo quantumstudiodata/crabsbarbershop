@@ -3060,8 +3060,7 @@ html:has(.capa) body, html:has(.velo-c) body, html:has(.velo-hoja) body, html:ha
 .ini-link { font-size: 12.5px; font-weight: 600; color: var(--accent); text-decoration: none; }
 .ini-link:hover { color: var(--fg); }
 .ini-hoy > .ini-link { align-self: flex-start; }
-.ini-der { display: grid; gap: 20px; grid-template-rows: 1fr; min-width: 0; }
-.ini-der.con-citas { grid-template-rows: auto 1fr; }
+.ini-izq, .ini-der { display: grid; gap: 20px; align-content: start; min-width: 0; }
 .ini-card { display: grid; gap: 4px; align-content: start; padding: 18px 22px; border-radius: 20px; }
 .ini-card > .entre, .ini-card > .lab { margin-bottom: 4px; }
 .ini-cita { display: grid; grid-template-columns: 52px minmax(0, 1fr) auto; gap: 10px; padding: 8px 0; font-size: 13.5px; }
@@ -4161,6 +4160,12 @@ html, body { overscroll-behavior-y: none; }
 
 /* Inicio: pendientes por registrar */
 .pnd { display: grid; gap: 6px; padding: 16px 18px; border-radius: 22px; }
+/* En columnas angostas (escritorio con ventana o zoom reducido, celular pequeño), los dos botones bajan debajo del texto. */
+.pnd { container-type: inline-size; }
+@container (max-width: 540px) {
+  .pnd-f:has(.pnd-dos) { grid-template-columns: auto minmax(0, 1fr); row-gap: 8px; }
+  .pnd-f:has(.pnd-dos) > .pnd-dos { grid-column: 2; justify-self: start; }
+}
 .pnd-n { font: 600 10.5px var(--f-mono); padding: 2px 8px; border-radius: 999px; background: #13171c; color: #fff; }
 .pnd-l { display: grid; }
 .pnd-f { display: grid; grid-template-columns: auto minmax(0,1fr) auto; gap: 12px; align-items: center; padding: 11px 0; border-top: 1px solid rgba(30,45,60,.08); }
