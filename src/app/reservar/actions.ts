@@ -75,8 +75,6 @@ export async function reservar(slug: string, d: DatosReserva, apartar = false): 
     if (c >= tope) return { error: tope === 1 ? "Ya tienes una cita próxima. Puedes cambiarla desde tu comprobante o escribirnos para agendar otra." : `Ya tienes ${c} citas próximas. Para agendar otra, escríbenos y con gusto te ayudamos.` };
   }
   void (await headers());
-  // Con poco tiempo antes de la cita no alcanza a llegar y revisarse una transferencia.
-  if (d.transferencia && instante(d.fecha, d.minuto, n.b.zonaHoraria) - Date.now() < 3 * 3600000) return { error: "Para citas en menos de 3 horas, paga con tarjeta o en el negocio." };
   const r = await crearCita(n.b, { servicioIds, persona: d.persona, fecha: d.fecha, minuto: d.minuto, nombre, telefono: tel, observaciones: String(d.notas ?? ""), origen: "linea", apartar });
   if ("error" in r) return { error: r.error };
   // Pagará por transferencia a la cuenta del negocio: se guarda cuánto, y el negocio lo confirma cuando llegue.

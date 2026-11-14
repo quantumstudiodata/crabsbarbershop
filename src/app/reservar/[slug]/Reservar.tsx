@@ -174,18 +174,16 @@ export function Reservar(p: {
   const personas = [...(p.opciones.cualquiera ? [{ id: "", nombre: "Quien esté libre", avatar: "" }] : []), ...(p.opciones.elegir ? p.equipo : [])];
   const visibles = cat ? p.servicios.filter((s) => s.categoria === cat) : p.servicios;
   const anticipa = p.pago.modo === "anticipo_fijo" || p.pago.modo === "anticipo_pct";
-  // Con menos de 3 horas para la cita no se ofrece transferencia: no alcanza a llegar y revisarse.
-  const pronto = !!fecha && minuto != null && new Date(`${fecha}T00:00:00`).getTime() + minuto * 60000 - Date.now() < 3 * 3600000;
-  const conTransferencia = pagaTransferencia && !pronto;
+  // La transferencia se ofrece siempre que el negocio tenga cuenta registrada, sin importar qué tan pronto sea la cita.
+  const conTransferencia = pagaTransferencia;
   const opcionesPago: [FormaPago, string, string][] = (!pagaEnLinea && !pagaTransferencia) ? [] : [
-    ...(p.pago.modo === "opcional" || (pronto && !pagaEnLinea) ? [["negocio", "En el negocio", pronto && p.pago.modo !== "opcional" ? "Tu cita es pronto: pagas al llegar" : "Al terminar tu servicio"] as [FormaPago, string, string]] : []),
+    ...(p.pago.modo === "opcional" ? [["negocio", "En el negocio", "Al terminar tu servicio"] as [FormaPago, string, string]] : []),
     ...(pagaEnLinea ? (anticipa
       ? [["anticipo", "Anticipo con tarjeta", "El resto en el negocio"], ["total", "Todo con tarjeta", "Ahora, en línea"]] as [FormaPago, string, string][]
       : [["total", "Con tarjeta", "Ahora, en línea"]] as [FormaPago, string, string][]) : []),
     ...(conTransferencia ? [["transferencia", anticipa ? "Anticipo por transferencia" : "Transferencia", "Te damos la CLABE al reservar"] as [FormaPago, string, string]] : []),
   ];
   const primeraForma = opcionesPago[0]?.[0] ?? "negocio";
-  useEffect(() => { if (pronto && forma === "transferencia") setForma(primeraForma); }, [pronto, forma, primeraForma]);
 
   // Lo que muestra la barra (teléfono) y el panel (escritorio).
   const barra = paso === 0
@@ -370,7 +368,6 @@ export function Reservar(p: {
                   </div>
                 </div>
               )}
-              {pagaTransferencia && pronto && <p className="fx-politica">La transferencia solo está disponible para citas con más de 3 horas de anticipación, para que alcance a llegar y revisarse.</p>}
               {p.pago.politica && <p className="fx-politica">{p.pago.politica}{forma !== "negocio" ? " Lo pagado no es reembolsable; si no puedes venir, cambia tu cita a otro día." : ""}{forma === "transferencia" ? " Tu cita queda apartada; el negocio la confirma cuando llegue tu transferencia." : ""}</p>}
             </>
           )}

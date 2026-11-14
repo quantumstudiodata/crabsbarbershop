@@ -5522,3 +5522,6 @@ html:has(.fx-raiz .mc) body::before, html:has(.fx-raiz .mc) body::after { displa
 /* Reservar: la barra fija de abajo se esconde mientras el botón principal está a la vista. */
 .fx-barra { transition: transform .3s ease, opacity .3s ease; }
 .fx-barra.oculta { transform: translateY(120%); opacity: 0; pointer-events: none; }
+
+/* Cobro: desglose debajo del total cuando hay propina */
+.desglose-p { justify-content: flex-end; margin-top: -6px; font-size: 13px; }

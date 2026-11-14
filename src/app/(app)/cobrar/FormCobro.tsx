@@ -295,7 +295,7 @@ export function FormCobro(p: {
           <b>{nServ ? `${nServ} ${nServ === 1 ? "servicio seleccionado" : "servicios seleccionados"}` : "Elige un servicio"}</b>
           <small>{nServ ? "Ver detalle de la venta" : ultima ? `Venta ${ultima.folio} cobrada` : "Toca un servicio para agregarlo"}</small>
         </button>
-        <span className="bc-total num">{formatoDinero(total)}</span>
+        <span className="bc-total num">{formatoDinero(total + prop)}</span>
         <button type="button" className="bt" disabled={!nServ} onClick={() => setHoja(true)}>Cobrar</button>
       </div>
       {ultima && lineas.length === 0 && !hoja && okCerrado !== ultima.folio && (
@@ -442,11 +442,12 @@ export function FormCobro(p: {
         {descPromo > 0 && <div className="renglon promo-t"><span className="muted">Ahorro por promociones</span><b className="num">−{formatoDinero(descPromo)}</b></div>}
         {anticipo > 0 && <div className="renglon promo-t"><span className="muted">Anticipo pagado en línea</span><b className="num">−{formatoDinero(anticipo)}</b></div>}
         <div className="renglon" style={{ alignItems: "center" }}>
-          <span className="lab">{anticipo > 0 ? "Por cobrar" : "Total"}{prop > 0 ? ` más ${formatoDinero(prop)} de propina` : ""}</span>
-          <span className="big">{formatoDinero(total)}</span>
+          <span className="lab">{anticipo > 0 ? "Por cobrar" : "Total"}</span>
+          <span className="big">{formatoDinero(total + prop)}</span>
         </div>
+        {prop > 0 && <div className="renglon desglose-p"><span className="muted">{formatoDinero(total)} de servicios + {formatoDinero(prop)} de propina</span></div>}
         {estado.error && <p className="aviso error" role="alert">{estado.error}</p>}
-        <button className="bt grande" data-paso="cobrar" disabled={enviando || lineas.length === 0}>{enviando ? (conQr ? "Preparando el QR…" : "Guardando…") : conQr ? `Mostrar QR para cobrar ${formatoDinero(total + prop)}` : `Cobrar ${formatoDinero(total)}`}<Fl /></button>
+        <button className="bt grande" data-paso="cobrar" disabled={enviando || lineas.length === 0}>{enviando ? (conQr ? "Preparando el QR…" : "Guardando…") : conQr ? `Mostrar QR para cobrar ${formatoDinero(total + prop)}` : `Cobrar ${formatoDinero(total + prop)}`}<Fl /></button>
         <div className="atajos" aria-label="Atajos de teclado">
           <span><span className="k">Enter</span> o <span className="k">flechas</span> Moverse</span>
           <span><span className="k">Espacio</span> Elegir</span>
