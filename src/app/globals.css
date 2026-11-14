@@ -490,7 +490,7 @@ a.vivo-t:hover { transform: translateX(-3px); }
 .fantasma:hover .ic { transform: translateY(-2px); }
 @media (max-width: 760px) { .efectivo-c { margin-left: 0; } }
 .caja-puerta { min-height: 62vh; display: grid; place-content: center; justify-items: center; gap: 14px; text-align: center; }
-.caja-puerta .icono-caja { width: 72px; height: 72px; border-radius: 24px; background: linear-gradient(150deg, #2b3a47, #13171c); box-shadow: 0 18px 30px -16px rgba(10,15,20,.7); animation: flota 4s ease-in-out infinite; }
+.caja-puerta .icono-caja { width: 72px; height: 72px; border-radius: 24px; background: linear-gradient(150deg, #2b3a47, #13171c); box-shadow: 0 18px 30px -16px rgba(10,15,20,.7); animation: vacio-entra .45s cubic-bezier(.2,.8,.2,1) both; }
 .caja-puerta .icono-caja .ic { width: 32px; height: 32px; }
 .caja-puerta.alerta .icono-caja { background: linear-gradient(150deg, #d39a4e, #a8702b); }
 .caja-puerta.alerta .icono-caja::after { content: ""; position: absolute; inset: -6px; border-radius: 28px; border: 2px solid rgba(197,138,62,.5); animation: pulso 2s ease-out infinite; }
@@ -5178,9 +5178,10 @@ a.eqa-bt { display: flex; justify-content: center; align-items: center; text-dec
 .vacio-g b { font-size: 16px; color: var(--fg); margin-top: 8px; }
 .vacio-g small { font-size: 13.5px; line-height: 1.5; color: var(--muted); max-width: 380px; }
 .vacio-g-i { width: 56px; height: 56px; border-radius: 18px; display: grid; place-items: center; color: #4f5f78; background: rgba(255,255,255,.75);
-  box-shadow: 0 10px 26px rgba(40,52,72,.12), inset 0 1px 0 #fff; animation: vacio-flota 4s ease-in-out infinite; }
+  box-shadow: 0 10px 26px rgba(40,52,72,.12), inset 0 1px 0 #fff; animation: vacio-entra .45s cubic-bezier(.2,.8,.2,1) both; }
 .vacio-g-i svg { width: 24px; height: 24px; }
-@keyframes vacio-flota { 50% { transform: translateY(-5px); } }
+/* Una sola entrada corta: el flotado infinito se veía lento y a saltos en Windows. */
+@keyframes vacio-entra { from { opacity: 0; transform: translateY(6px) scale(.96); } }
 .vacio-g.chico { min-height: 0; padding: 22px 18px; background: none; border: 0; box-shadow: none; }
 .vacio-g.chico .vacio-g-i { width: 44px; height: 44px; border-radius: 14px; animation: none; }
 .vacio-g.chico .vacio-g-i svg { width: 19px; height: 19px; }
