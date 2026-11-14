@@ -27,11 +27,11 @@ import { registrarGastosAutomaticos } from "@/lib/gastosAuto";
 /** Resumen de la semana pasada: lo vendido, las transferencias por comparar con el banco y lo que se salió de lo normal. */
 function TarjetaSemana({ r }: { r: ResumenSemana }) {
   return (
-    <section className="glass ini-sem subir d3" aria-label="Resumen de la semana">
-      <div className="entre"><span className="lab">Resumen de la semana</span><small className="muted">{r.periodo}</small></div>
+    <section className="glass ini-sem subir d3" aria-label="Semana pasada">
+      <div className="entre"><span className="lab">Semana pasada</span><small className="muted">{r.periodo}</small></div>
       <div className="ini-sem-c">
         <span><small>Vendido</small><b>{formatoDinero(r.ventas)}</b><em>{r.cambio === null ? `${r.servicios} servicios` : `${Math.abs(r.cambio)}% ${r.cambio >= 0 ? "más" : "menos"} que la anterior`}</em></span>
-        <span><small>Transferencias</small><b>{formatoDinero(r.transferencias.total)}</b><em>{r.transferencias.n ? `${r.transferencias.n} para comparar con tu banco` : "Ninguna esta semana"}</em></span>
+        <span><small>Transferencias</small><b>{formatoDinero(r.transferencias.total)}</b><em>{r.transferencias.n ? `${r.transferencias.n} para comparar con tu banco` : "Ninguna esa semana"}</em></span>
       </div>
       {r.alertas.length ? (
         <div className="ini-sem-a">
@@ -221,11 +221,11 @@ function InicioVista(v: Vista) {
               {v.meta.nota && <small className="muted">{v.meta.nota}</small>}
             </div>
           )}
-          <div className="ini-graf">
+          {v.servicios === 0 ? <p className="muted ini-sin-graf">La gráfica del día aparece con la primera venta.</p> : <div className="ini-graf">
             <Grafica id="inicio-hoy" actual={serie.actual} previo={serie.previo} etiquetas={serie.etiquetas} cadaEtiqueta={serie.cada} alto={150} enCurso={serie.enCurso}
               globos={serie.actual.map((x, i) => (x === null ? null : [`A las ${serie.etiquetas[i]}`, formatoDinero(x), "acumulado"] as [string, string, string]))}
               descripcion={`${v.barbero ? "Tus ventas" : "Ventas"} de hoy por hora contra el ${dia} pasado`} vacio="Se dibuja con la primera venta del día" />
-          </div>
+          </div>}
           {v.verMas && <Link className="ini-link" href={v.verMas.href}>{v.verMas.texto}</Link>}
         </section>
           <section className="glass ini-card ini-eq-izq subir d2">

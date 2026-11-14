@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect } from "react";
+import { useEffect, useRef } from "react";
 
 /** En Cobro la barra de arriba se esconde. Aparece al acercar el cursor a la orilla, al tocarla o, en el teléfono, al deslizar hacia arriba. */
 export function ModoFoco() {
@@ -18,18 +18,22 @@ export function ModoFoco() {
     };
     // Al abrir, en el teléfono el menú se ve: la página empieza arriba.
     if (window.matchMedia("(max-width: 760px)").matches) document.querySelector<HTMLElement>(".barra")?.classList.add("ver");
+    // En tablets (pantalla táctil sin cursor) el menú queda siempre visible: no hay cursor para hacerlo aparecer.
+    else if (window.matchMedia("(hover: none)").matches) document.querySelector<HTMLElement>(".barra")?.classList.add("ver");
     window.addEventListener("scroll", alDesplazar, { passive: true });
     return () => { document.body.classList.remove("foco"); window.removeEventListener("scroll", alDesplazar); };
   }, []);
   const barra = () => document.querySelector<HTMLElement>(".barra");
+  const entro = useRef(0);
   const mostrar = () => {
     const b = barra();
     if (!b) return;
+    entro.current = Date.now();
     b.classList.add("ver");
     const ocultar = () => { b.classList.remove("ver"); b.removeEventListener("mouseleave", ocultar); };
     b.addEventListener("mouseleave", ocultar);
   };
   return (
-    <div className="foco-zona" onMouseEnter={mostrar} onClick={() => barra()?.classList.toggle("ver")} aria-hidden="true" />
+    <div className="foco-zona" onMouseEnter={mostrar} onClick={() => { if (Date.now() - entro.current > 400) barra()?.classList.toggle("ver"); }} aria-hidden="true" />
   );
 }

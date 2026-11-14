@@ -127,6 +127,7 @@ export default async function Ficha({ params, searchParams }: { params: Promise<
               <section className="glass fa-cifras solo-escritorio">
                 {cifras.map(([t, v, sub, pend]) => <span key={t}><small className={`${pend ? "pend" : ""} lab-ay`}>{t}{t === "Ventas atribuidas" && <Ayuda titulo="Ventas atribuidas">Total cobrado por los servicios que realizó, con cualquier forma de pago. Sobre esto se calcula su comisión.</Ayuda>}</small><b>{v}</b>{sub && <em>{sub}</em>}</span>)}
               </section>
+              {vistas.length > 1 && <div className="solo-escritorio fa-per"><CuentaFicha vistas={vistas.filter((x) => x.clave === "periodo")} etiqueta={`${pendLabel} en el periodo en curso`} /></div>}
               <div className="solo-movil fa-mov"><CuentaFicha vistas={vistas} etiqueta={pendLabel}>{pagar}</CuentaFicha>
                 <small className="fa-ayuda">Ventas atribuidas: total cobrado por sus servicios con cualquier forma de pago. Sobre esto se calcula su comisión.{res.n ? ` Calificación de clientes: ★ ${res.prom.toFixed(1)} en ${res.n} ${res.n === 1 ? "reseña" : "reseñas"}.` : ""}</small></div>
             </>

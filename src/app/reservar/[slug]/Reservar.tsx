@@ -59,6 +59,16 @@ export function Reservar(p: {
   const [paso, setPaso] = useState(0);
   // Primero se ve el inicio del negocio; "Reservar" abre el paso a paso.
   const [enInicio, setEnInicio] = useState(!!p.inicio);
+  // En el inicio, la barra fija de abajo solo aparece cuando el botón "Reservar cita" ya no se ve.
+  const [ctaVisible, setCtaVisible] = useState(true);
+  useEffect(() => {
+    if (!enInicio) return;
+    const el = document.querySelector(".fx-ini-cta");
+    if (!el || typeof IntersectionObserver === "undefined") return;
+    const o = new IntersectionObserver(([e]) => setCtaVisible(e.isIntersecting), { threshold: 0.2 });
+    o.observe(el);
+    return () => o.disconnect();
+  }, [enInicio]);
   // Hora que el cliente tocó en el inicio: se propone sola al llegar al día y la hora.
   const [pref, setPref] = useState<{ fecha: string; minuto: number } | null>(null);
   const [libres, setLibres] = useState<{ fecha: string; hoy: boolean; xs: number[] } | null>(null);
@@ -218,7 +228,7 @@ export function Reservar(p: {
               conServicio={(id) => { setSvc([id]); empezar(); }}
               conPersona={(id) => { setPersona(id); empezar(); }}
               conHora={(f, m) => { setPref({ fecha: f, minuto: m }); empezar(); }} />
-            <footer className="fx-barra">
+            <footer className={`fx-barra ${ctaVisible ? "oculta" : ""}`}>
               <div>
                 <span className="fx-barra-t"><b>Reserva tu cita</b><small>{p.negocio}</small></span>
                 <button type="button" className="fx-go" onClick={empezar}>Reservar<Icono n="derecha" /></button>

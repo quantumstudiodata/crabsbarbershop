@@ -8,7 +8,7 @@ export default async function PaginaEncuesta({ params }: { params: Promise<{ tok
   const { token } = await params;
   const v = await ventaDeEncuesta(token);
   return (
-    <main className="enc-pag">
+    <main className="enc-pag fx">
       <section className="enc-tarjeta">
         {!v ? (
           <><h1>Encuesta no disponible</h1><p className="muted">Este enlace ya venció o no es válido.</p></>

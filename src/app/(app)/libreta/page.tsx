@@ -25,7 +25,7 @@ export default async function Libreta({ searchParams }: { searchParams: Promise<
   await registrarGastosAutomaticos(s.barberia.id);
   await liquidarAutomaticos(s.barberia.id);
   await asentarCitasPagadas(s.barberia.id);
-  if (!s.puede("reportes.exportar")) redirect("/");
+  if (!s.puede("reportes.exportar")) redirect("/?aviso=sin-permiso");
   const q = await searchParams;
   const zona = s.barberia.zonaHoraria;
   const hoy = fechaLocal(new Date(), zona);

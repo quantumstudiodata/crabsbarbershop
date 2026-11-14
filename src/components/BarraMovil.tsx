@@ -21,6 +21,9 @@ export function useAbrirPanel(cual: "ayuda" | "ideas", abrir: () => void) {
 
 
 /** Parte izquierda de la barra superior en el teléfono: saludo en Inicio, nombre de la sección en lo demás. */
+// Secciones que no están en la barra de abajo pero necesitan su nombre arriba.
+const OTRAS: [string, string][] = [["/historial", "Historial"], ["/ajustes", "Ajustes"], ["/soporte", "Soporte"], ["/libreta", "Datos"], ["/equipo", "Equipo"], ["/analitica", "Analítica"], ["/citas", "Citas"], ["/clientes", "Clientes"], ["/cambiar-contrasena", "Contraseña"]];
+
 export function TituloMovil({ negocio, nombre, fecha, items, grupos }: { negocio: string; nombre: string; fecha: string; items: ItemNav[]; grupos: SubNav[] }) {
   const ruta = usePathname();
   const router = useRouter();
@@ -34,7 +37,7 @@ export function TituloMovil({ negocio, nombre, fecha, items, grupos }: { negocio
   useEffect(() => { document.querySelector(".barra")?.classList.toggle("compacta-m", compacta); }, [compacta]);
   const enCobro = ruta.startsWith("/cobrar");
   const seccion = enCobro ? "Cobro" : items.find((i) => i.href !== "/" && enSeccion(ruta, i))?.texto
-    ?? (ruta.startsWith("/historial") ? "Historial" : ruta.startsWith("/ajustes") ? "Ajustes" : ruta.startsWith("/soporte") ? "Soporte" : ruta === "/" ? null : "");
+    ?? (ruta === "/" ? null : OTRAS.find(([r]) => ruta.startsWith(r))?.[1] ?? "");
   const grupo = grupoDe(ruta, grupos);
   // Al llegar a una pestaña que está fuera de la vista (por ejemplo Finanzas, al final), el menú se desliza hasta ella.
   const sub = useRef<HTMLElement>(null);

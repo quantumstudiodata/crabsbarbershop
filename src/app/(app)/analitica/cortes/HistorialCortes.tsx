@@ -74,7 +74,7 @@ export function TablaCortes({ cortes, corregir }: { cortes: Corte[]; corregir: b
                 <td><span className="folio">{c.folio}</span></td>
                 <td>{c.fechaCorta}</td>
                 <td className="muted">{c.horario}</td>
-                <td>{c.cerro.nombre && <span className="quien"><Avatar avatar={c.cerro.avatar} nombre={c.cerro.nombre} t={24} />{primer(c.cerro.nombre)}</span>}</td>
+                <td>{c.cerro.nombre ? <span className="quien"><Avatar avatar={c.cerro.avatar} nombre={c.cerro.nombre} t={24} />{primer(c.cerro.nombre)}</span> : <span className="muted">Sin registro</span>}</td>
                 <td><Estado d={c.diferencia} /></td>
                 <td className="der num">{$(c.total)}</td>
               </tr>
@@ -127,7 +127,7 @@ function Detalle({ c, cerrar, ajustar }: { c: Corte | null; cerrar: () => void; 
         {/* eslint-disable-next-line @next/next/no-img-element */}
         <img className="rc-logo" src="/logo-crabs.png" alt="Crabs" width={946} height={209} />
         <div className="recibo-c">
-          <div className="rc-cab"><span className="rc-tit">Corte de caja {c.folio}</span><b>{c.dia}</b><small>{c.horario}</small><small>Abrió {primer(c.abrio.nombre)}, cerró {primer(c.cerro.nombre)}</small></div>
+          <div className="rc-cab"><span className="rc-tit">Corte de caja {c.folio}</span><b>{c.dia}</b><small>{c.horario}</small><small>Abrió {primer(c.abrio.nombre) || "sin registro"}, cerró {primer(c.cerro.nombre) || "sin registro"}</small></div>
           <div className="rc-sec"><span className="lab">Cobros</span>
             {c.metodos.map((m) => <div key={m.metodo}><span>{m.metodo}</span><span className="num">{$(m.total)}</span></div>)}
             <div className="rc-tot"><span>Total vendido, {c.ventas} {c.ventas === 1 ? "venta" : "ventas"}</span><b className="num">{$(c.total)}</b></div>

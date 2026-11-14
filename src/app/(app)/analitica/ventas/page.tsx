@@ -27,7 +27,7 @@ export default async function Ventas({ searchParams }: { searchParams: Promise<Q
   // La misma pantalla para todos. El barbero consulta todo el historial, pero el encabezado y las gráficas son de sus propios datos.
   const verTodas = s.puede("ventas.ver_todas");
   const atiende = s.usuario.rol === "barbera" || s.usuario.rol === "encargada";
-  if (!verTodas && !atiende) redirect("/");
+  if (!verTodas && !atiende) redirect("/?aviso=sin-permiso");
   const q = await searchParams;
   const zona = s.barberia.zonaHoraria;
   const hoy = fechaLocal(new Date(), zona);

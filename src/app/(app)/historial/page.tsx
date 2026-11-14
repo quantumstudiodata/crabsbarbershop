@@ -23,7 +23,7 @@ export default async function Historial({ searchParams }: { searchParams: Promis
   // Quien no ve el historial completo (los barberos) solo ve lo de la operación:
   // ventas, caja y cambios de servicios y precios; de accesos, solo los suyos. Nada administrativo.
   const completo = s.puede("ventas.ver_todas");
-  if (!completo && s.usuario.rol !== "barbera" && s.usuario.rol !== "encargada") redirect("/");
+  if (!completo && s.usuario.rol !== "barbera" && s.usuario.rol !== "encargada") redirect("/?aviso=sin-permiso");
   const categorias = completo ? CATEGORIAS : CATEGORIAS.filter(([k]) => ["", "venta", "caja", "precio"].includes(k));
   const q = await searchParams;
   const zona = s.barberia.zonaHoraria ?? ZONA;
@@ -85,7 +85,7 @@ export default async function Historial({ searchParams }: { searchParams: Promis
 
   return (
     <>
-      <div>
+      <div className="hist-cab">
         <h1 className="titulo">Historial</h1>
         <p className="sub">{completo ? "Registro permanente de lo que pasa en el sistema. Nada se borra." : "Lo que pasa en el día a día: ventas, caja y cambios de servicios y precios."}</p>
       </div>

@@ -283,7 +283,7 @@ export function Personas(props: Props) {
         <h1 className="titulo">Usuarios</h1>
         {props.puedeEditar && (
           <span className="fila" style={{ gap: 8 }}>
-            <button type="button" className="bt sec solo" onClick={() => setNuevoPuesto((n) => n + 1)}><Icono n="mas" />Agregar puesto</button>
+            <button type="button" className="bt sec solo ag-puesto" aria-label="Agregar puesto" onClick={() => setNuevoPuesto((n) => n + 1)}><Icono n="mas" /><span>Agregar puesto</span></button>
             <button type="button" className="bt" onClick={() => setAlta((n) => n + 1)}>Agregar usuario<span className="fl" aria-hidden="true"><Icono n="mas" /></span></button>
           </span>
         )}
@@ -315,7 +315,7 @@ export function Personas(props: Props) {
             onClick={(e) => { if ((e.target as HTMLElement).closest(".acts")) return; abrirFila(p); }}
             onKeyDown={(e) => { if (e.key === "Enter" && e.target === e.currentTarget) abrirFila(p); }}>
             <Avatar avatar={p.avatar} nombre={p.nombre} t={34} />
-            <span className="nom"><b>{p.nombre}</b>{p.yo && <span className="etiqueta" style={{ padding: "1px 7px", marginLeft: 6 }}>Tú</span>}<small>{p.usuario}{p.formaTexto ? ` - ${p.formaTexto}` : ""}</small></span>
+            <span className="nom"><b>{p.nombre}</b>{p.yo && <span className="etiqueta" style={{ padding: "1px 7px", marginLeft: 6 }}>Tú</span>}<small>{p.usuario}{p.formaTexto ? ` - ${p.formaTexto}` : ""}</small>{(!p.activo || p.debeCambiar) && <span className="est-m"><Estado p={p} /></span>}</span>
             <span className={`rol-tag r-${p.rol}`}>{p.puesto}</span>
             <span className="est-col"><Estado p={p} /></span>
             <span className="acts">

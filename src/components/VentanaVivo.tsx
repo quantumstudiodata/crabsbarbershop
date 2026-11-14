@@ -7,11 +7,13 @@ import { Avatar } from "./Avatar";
 import { Icono } from "./Icono";
 import { hace, useVivo } from "./useVivo";
 
-const SEGUNDOS = 9;
+const SEGUNDOS = 5;
+const CLAVE_VISTO = "crabs-vivo-visto";
 
 /**
- * Actividad en vivo. Lo nuevo aparece como fantasma en la esquina y se desvanece solo,
- * para no tapar la pantalla. Tocando "En vivo" se deja fija la lista.
+ * Actividad en vivo. Solo lo nuevo se asoma, de uno en uno, y se va solo a los 5 segundos.
+ * Lo que ya se vio no vuelve a salir al cambiar de página. Las alertas (como el corte pendiente,
+ * que ya tiene su aviso en Inicio) y las solicitudes se ven al abrir la lista con "En vivo".
  */
 export function VentanaVivo() {
   const { eventos, solicitudes, alertas, nuevos } = useVivo();
@@ -30,11 +32,17 @@ export function VentanaVivo() {
   useEffect(() => {
     try { setFijo(sessionStorage.getItem("crabs-vivo-fijo") === "si"); } catch {}
   }, []);
-  // Al entrar se asoma lo reciente; después, solo cuando llega algo nuevo.
+  // Solo se asoma lo que todavía no se ha visto en esta sesión, aunque se recargue la página.
   useEffect(() => {
-    if (ruta.startsWith("/cobrar")) return;
-    if (primera.current && eventos.length) { primera.current = false; asomar(); }
-    else if (nuevos.size) asomar();
+    if (ruta.startsWith("/cobrar") || !eventos.length) return;
+    let visto = "";
+    try { visto = sessionStorage.getItem(CLAVE_VISTO) ?? ""; } catch {}
+    const ultimo = eventos[0].t;
+    if (primera.current) { primera.current = false; if (!visto) { try { sessionStorage.setItem(CLAVE_VISTO, ultimo); } catch {} return; } }
+    if (ultimo > visto || nuevos.size) {
+      try { sessionStorage.setItem(CLAVE_VISTO, ultimo); } catch {}
+      asomar();
+    }
   }, [eventos, nuevos, ruta]);
   useEffect(() => () => { if (reloj.current) clearTimeout(reloj.current); }, []);
 
@@ -44,26 +52,27 @@ export function VentanaVivo() {
     setMostrar(false);
     try { sessionStorage.setItem("crabs-vivo-fijo", v ? "si" : "no"); } catch {}
   };
-  const abierto = fijo || mostrar || solicitudes.length > 0 || alertas.length > 0;
-  const visibles = eventos.slice(0, fijo ? 6 : 3);
+  const abierto = fijo || mostrar;
+  const visibles = eventos.slice(0, fijo ? 6 : 1);
+  const urgentes = alertas.length + solicitudes.length;
 
   return (
     <aside className="vivo-pila" aria-label="Actividad en vivo" aria-live="polite">
       <button type="button" className="vivo-h" onClick={alternar} aria-pressed={fijo} title={fijo ? "Ocultar la lista" : "Dejar la lista a la vista"}>
         <span className="vivo"><b>En vivo</b></span>
-        {!abierto && eventos.length > 0 && <span className="contador-n">{eventos.length}</span>}
+        {!fijo && urgentes > 0 && <span className="contador-n">{urgentes}</span>}
         <Icono n={fijo ? "minimizar" : "arriba"} />
       </button>
       {abierto && (
         <div className={`vivo-tarjetas ${!fijo && mostrar ? "se-va" : ""}`} style={{ animationDuration: `${SEGUNDOS}s` }}>
-          {alertas.map((a) => (
+          {fijo && alertas.map((a) => (
             <Link key={a.id} href={a.href} className="vivo-t urgente alerta">
               <span className="icono-alerta"><Icono n="reloj" /></span>
               <span><b>{a.titulo}</b><small>{a.detalle}</small></span>
               <span />
             </Link>
           ))}
-          {solicitudes.map((s) => (
+          {fijo && solicitudes.map((s) => (
             <div key={s.id} className="vivo-t urgente">
               <Avatar avatar={s.avatar} nombre={s.nombre} t={32} />
               <span><b>{s.nombre.split(" ")[0]} pide restablecer su contraseña</b><small>{hace(s.t)}</small></span>

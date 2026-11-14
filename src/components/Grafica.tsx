@@ -67,12 +67,9 @@ export function Grafica({ id, actual, previo, etiquetas, alto = 170, ancho = 640
             <stop offset="0" stopColor="#8ea5b8" />
             <stop offset="1" stopColor="#2b3a47" />
           </linearGradient>
-          <pattern id={`r-${id}`} width="8" height="8" patternUnits="userSpaceOnUse" patternTransform="rotate(45)">
-            <line x1="0" y1="0" x2="0" y2="8" stroke="rgba(30,45,60,.08)" strokeWidth="3" />
-          </pattern>
         </defs>
         {[0.25, 0.5, 0.75].map((f) => <line key={f} className="r" x1="0" x2={ancho} y1={base - f * (alto - 36)} y2={base - f * (alto - 36)} />)}
-        {primerFuturo > 0 && <rect className="futuro" x={x(primerFuturo - 1)} y="4" width={ancho - x(primerFuturo - 1)} height={base - 4} fill={`url(#r-${id})`} />}
+        {primerFuturo > 0 && <rect className="futuro" x={x(primerFuturo - 1)} y="4" width={ancho - x(primerFuturo - 1)} height={base - 4} fill="rgba(30,45,60,.035)" />}
         {primerFuturo > 0 && ancho - x(primerFuturo - 1) > 110 && <text className="futuro-t" x={(x(primerFuturo - 1) + ancho) / 2} y={base - 8} textAnchor="middle">Aún no llega</text>}
         <line className="b" x1="0" x2={ancho} y1={base} y2={base} />
         {pPrev.length > 1 && <path className="p" d={curva(pPrev)} />}
