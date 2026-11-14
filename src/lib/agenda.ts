@@ -83,6 +83,18 @@ export function montoAPagar(total: number, pago: ConfigCitas["pago"]): { minimo:
 }
 
 export const aMin = (h: string) => { const [a, b] = h.split(":").map(Number); return a * 60 + b; };
+/** Fecha (AAAA-MM-DD) y minuto del día en la zona del negocio, para no mostrar horas que ya pasaron. */
+export function ahoraEnZona(zona: string, t = Date.now()): { fecha: string; min: number } {
+  const x = new Intl.DateTimeFormat("en-CA", { timeZone: zona, year: "numeric", month: "2-digit", day: "2-digit", hour: "2-digit", minute: "2-digit", hour12: false }).formatToParts(new Date(t));
+  const v = (k: string) => x.find((y) => y.type === k)?.value ?? "0";
+  return { fecha: `${v("year")}-${v("month")}-${v("day")}`, min: (Number(v("hour")) % 24) * 60 + Number(v("minute")) };
+}
+/** Quita las horas que ya pasaron si la fecha es hoy (por si la lista se cargó antes y no se ha actualizado). */
+export const sinPasadas = <T,>(fecha: string, xs: T[], minuto: (x: T) => number, zona: string) => {
+  const a = ahoraEnZona(zona);
+  return fecha < a.fecha ? [] : fecha === a.fecha ? xs.filter((x) => minuto(x) > a.min) : xs;
+};
+
 export const aHora = (m: number) => `${String(Math.floor(m / 60)).padStart(2, "0")}:${String(m % 60).padStart(2, "0")}`;
 
 /** Diferencia en minutos entre la hora local de una zona y UTC en un instante. */

@@ -3,7 +3,7 @@
 import { useEffect, useId, useMemo, useRef, useState, useTransition } from "react";
 import { createPortal } from "react-dom";
 import { Icono } from "@/components/Icono";
-import { aHora, type Horario } from "@/lib/agenda";
+import { aHora, sinPasadas, type Horario } from "@/lib/agenda";
 import { formatoDinero } from "@/lib/money";
 import { agendarCita, horariosAgenda, type CitaLista, type Res } from "./actions";
 import { CampoFecha } from "@/components/Calendario";
@@ -23,8 +23,8 @@ const TITULOS = ["¿Qué servicios?", "¿Cuándo y con quién?", "¿Para quién 
  * Nueva cita en tres pasos: servicios, cuándo y con quién, y los datos del cliente.
  * En escritorio es una ventana angosta; en el teléfono, una hoja que sube desde abajo. Solo se cierra con la X.
  */
-export function NuevaCita({ equipo, servicios, dia, hoy, horario, cerrados, cerrar, avisar, minutoInicial, personaInicial = "" }: {
-  equipo: Persona[]; servicios: Servicio[]; dia: string; hoy: string; horario: Horario; cerrados: string[]; minutoInicial?: number; personaInicial?: string;
+export function NuevaCita({ equipo, servicios, dia, hoy, horario, cerrados, cerrar, avisar, minutoInicial, personaInicial = "", zona = "America/Monterrey" }: {
+  zona?: string; equipo: Persona[]; servicios: Servicio[]; dia: string; hoy: string; horario: Horario; cerrados: string[]; minutoInicial?: number; personaInicial?: string;
   cerrar: () => void; avisar: (r: Res) => void;
 }) {
   const [paso, setPaso] = useState(0);
@@ -84,7 +84,7 @@ export function NuevaCita({ equipo, servicios, dia, hoy, horario, cerrados, cerr
 
   // Las horas libres se agrupan en mañana, tarde y noche para no mostrar una lista larga.
   const grupos = ([["m", "Mañana", 0, 720], ["t", "Tarde", 720, 1080], ["n", "Noche", 1080, 1440]] as const)
-    .map(([k, t, a, b]) => ({ k, t, xs: (libres ?? []).filter((x) => x.minuto >= a && x.minuto < b) })).filter((g) => g.xs.length);
+    .map(([k, t, a, b]) => ({ k, t, xs: sinPasadas(fecha, libres ?? [], (x) => x.minuto, zona).filter((x) => x.minuto >= a && x.minuto < b) })).filter((g) => g.xs.length);
   const tramoV = grupos.some((g) => g.k === tramo) ? tramo : grupos.find((g) => minuto !== null && g.xs.some((x) => x.minuto === minuto))?.k ?? grupos[0]?.k;
   const sel = elegidos.map((id) => servicios.find((s) => s.id === id)).filter(Boolean) as Servicio[];
   const mas = (id: string) => setElegidos((xs) => (xs.length >= 6 ? xs : [...xs, id]));

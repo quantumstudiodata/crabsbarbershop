@@ -33,7 +33,7 @@ export default async function Soporte() {
       </nav>
 
       <div className="tit-fuera">
-        <span className="lab">Solicitudes pendientes</span>
+        <span className="lab">Solicitudes abiertas</span>
         <Link className="link-c" href="/soporte/solicitudes">Ver todas<Icono n="derecha" /></Link>
       </div>
       <section className="glass panel-s protagonista-s subir">

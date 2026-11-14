@@ -5525,3 +5525,6 @@ html:has(.fx-raiz .mc) body::before, html:has(.fx-raiz .mc) body::after { displa
 
 /* Cobro: desglose debajo del total cuando hay propina */
 .desglose-p { justify-content: flex-end; margin-top: -6px; font-size: 13px; }
+/* Detalle de error: título legible y el mensaje técnico plegado */
+.error-tit { display: block; font-size: 16px; line-height: 1.4; margin-bottom: 8px; }
+.error-det { margin-bottom: 14px; } .error-det summary { cursor: pointer; font-size: 13px; color: var(--muted); margin-bottom: 8px; }

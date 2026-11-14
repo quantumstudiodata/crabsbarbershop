@@ -4,7 +4,7 @@ import { db, schema as t } from "@/lib/db";
 import { solicitudes } from "@/lib/plataforma";
 import { hace } from "@/lib/soporte";
 import { NOVEDADES } from "@/lib/novedades";
-import { ocultarSensibles } from "@/lib/sensibles";
+import { ocultarSensibles, resumenError } from "@/lib/sensibles";
 import { fechaLarga } from "@/lib/fechas";
 import { Icono } from "@/components/Icono";
 import { CabezaSoporte, ListaSolicitudes } from "../Comunes";
@@ -82,7 +82,7 @@ async function Errores({ buscar, negocio }: { buscar: string; negocio: string })
     <div className="lista-s">
       {grupos.map((g) => (
         <Link key={g.id} href={`/soporte/actividad/error/${g.id}`} className="fila-s">
-          <span className="t-s"><b className="mono-t">{ocultarSensibles(g.mensaje)}</b><small>{g.ruta || "Sin página"}, {g.origen}{g.negocios > 1 ? `, ${g.negocios} negocios` : ""}</small></span>
+          <span className="t-s"><b>{resumenError(ocultarSensibles(g.mensaje))}</b><small>{g.ruta || "Sin página"}, {g.origen}{g.negocios > 1 ? `, ${g.negocios} negocios` : ""}</small></span>
           <span className="meta-s">{g.veces > 1 && <span className="chip-p alerta">{g.veces} veces</span>}<small>{hace(g.ultima)}</small><Icono n="derecha" /></span>
         </Link>
       ))}

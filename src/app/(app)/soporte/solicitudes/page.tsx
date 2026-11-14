@@ -22,7 +22,7 @@ export default async function Solicitudes({ searchParams }: { searchParams: Prom
   const pendientes = filas.filter((f) => f.estado === "pendiente").length;
   return (
     <>
-      <CabezaSoporte titulo="Solicitudes de soporte" sub={pendientes ? `${pendientes} ${pendientes === 1 ? "pendiente" : "pendientes"} en esta lista` : "Nada pendiente en esta lista"} />
+      <CabezaSoporte titulo="Solicitudes de soporte" sub={filas.length ? `${filas.length} en esta lista, ${pendientes ? `${pendientes} sin atender` : "ninguna sin atender"}` : "No hay solicitudes en esta lista"} />
       <section className="glass panel-s">
         <div className="filtro-c">
           <form className="con-icono buscar-c" action="/soporte/solicitudes">

@@ -141,7 +141,7 @@ export function PantallaCitas(p: {
       {p.vista === "semana" && <VistaSemana citas={citas} semana={semana} horario={p.horarioNegocio} hoy={p.hoy} abrir={setVer} url={url} zona={p.zona} />}
 
       {ver && <DetalleCita c={ver} cerrar={() => setVer(null)} puede={p.puede} equipo={p.equipo} avisar={setAviso} />}
-      {agendar && <NuevaCita equipo={p.equipo} servicios={p.servicios} dia={p.dia} hoy={p.hoy} horario={p.horarioNegocio} cerrados={p.cerrados} minutoInicial={agendar.minuto} personaInicial={p.persona} cerrar={() => setAgendar(false)} avisar={setAviso} />}
+      {agendar && <NuevaCita zona={p.zona} equipo={p.equipo} servicios={p.servicios} dia={p.dia} hoy={p.hoy} horario={p.horarioNegocio} cerrados={p.cerrados} minutoInicial={agendar.minuto} personaInicial={p.persona} cerrar={() => setAgendar(false)} avisar={setAviso} />}
       {bloquear && <NuevoBloqueo equipo={p.equipo} dia={p.dia < p.hoy ? p.hoy : p.dia} personaInicial={p.persona} cerrar={() => setBloquear(false)} avisar={setAviso} />}
     </>
   );

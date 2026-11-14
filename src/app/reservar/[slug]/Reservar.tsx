@@ -4,7 +4,7 @@ import { useRouter } from "next/navigation";
 import { useEffect, useMemo, useRef, useState, useTransition } from "react";
 import { Avatar } from "@/components/Avatar";
 import { Icono } from "@/components/Icono";
-import { aHora, montoAPagar, type ConfigCitas } from "@/lib/agenda";
+import { aHora, montoAPagar, sinPasadas, type ConfigCitas } from "@/lib/agenda";
 import { cargoEnLinea } from "@/lib/cargo";
 import { formatoDinero } from "@/lib/money";
 import { Cangrejo } from "./Cangrejo";
@@ -79,6 +79,13 @@ export function Reservar(p: {
   const [dias, setDias] = useState<Record<string, boolean> | null>(null);
   const [fecha, setFecha] = useState<string | null>(null);
   const [horas, setHoras] = useState<number[] | null>(null);
+  const [, setTic] = useState(0);
+  useEffect(() => {
+    const t = setInterval(() => setTic((x) => x + 1), 60000);
+    const v = () => { if (document.visibilityState === "visible") setTic((x) => x + 1); };
+    document.addEventListener("visibilitychange", v);
+    return () => { clearInterval(t); document.removeEventListener("visibilitychange", v); };
+  }, []);
   const [tramo, setTramo] = useState("");
   const [minuto, setMinuto] = useState<number | null>(null);
   const [nombre, setNombre] = useState("");
@@ -167,7 +174,11 @@ export function Reservar(p: {
   });
 
   const fechas = Array.from({ length: Math.min(p.opciones.maxDias + 1, 45) }, (_, i) => sumar(p.hoy, i));
-  const grupos = TRAMOS.map(([k, t, a, b]) => ({ k, t, xs: (horas ?? []).filter((m) => m >= a && m < b) })).filter((g) => g.xs.length);
+  // Las horas que ya pasaron se quitan aunque la lista se haya cargado antes (pestaña abierta un rato).
+  const zonaN = p.inicio?.zona ?? "America/Monterrey";
+  const horasV = horas && fecha ? sinPasadas(fecha, horas, (m) => m, zonaN) : horas;
+  const libresV = libres ? { ...libres, xs: sinPasadas(libres.fecha, libres.xs, (m) => m, zonaN) } : null;
+  const grupos = TRAMOS.map(([k, t, a, b]) => ({ k, t, xs: (horasV ?? []).filter((m) => m >= a && m < b) })).filter((g) => g.xs.length);
   const tramoV = grupos.some((g) => g.k === tramo) ? tramo : grupos.find((g) => minuto !== null && g.xs.includes(minuto))?.k ?? grupos[0]?.k;
   const mesVisible = fecha ? MESES[Number(fecha.slice(5, 7)) - 1] : MESES[Number(p.hoy.slice(5, 7)) - 1];
   const cuando = fecha && minuto !== null ? `${DIAS[dow(fecha)]} ${Number(fecha.slice(8))}, ${aHora(minuto)}` : "";
@@ -221,7 +232,7 @@ export function Reservar(p: {
         <header className="fx-top"><img className="fx-palabra" src="/logo-crabs.png" alt={p.negocio} width={946} height={209} /></header>
         {enInicio && p.inicio ? (
           <>
-            <Inicio negocio={p.negocio} servicios={p.servicios} equipo={p.equipo} elegir={p.opciones.elegir} datos={p.inicio} libres={libres}
+            <Inicio negocio={p.negocio} servicios={p.servicios} equipo={p.equipo} elegir={p.opciones.elegir} datos={p.inicio} libres={libresV && libresV.xs.length ? libresV : null}
               empezar={empezar}
               conServicio={(id) => { setSvc([id]); empezar(); }}
               conPersona={(id) => { setPersona(id); empezar(); }}
@@ -318,8 +329,8 @@ export function Reservar(p: {
           {paso === 3 && fecha && (
             <>
               <h1 className="fx-h">¿A qué hora?<small>{DIAS_L[dow(fecha)].replace(/^./, (x) => x.toUpperCase())} {Number(fecha.slice(8))} de {MESES[Number(fecha.slice(5, 7)) - 1]}</small></h1>
-              {horas === null ? <div className="fx-cargando" aria-label="Buscando horarios"><i /><i /><i /><i /></div>
-                : horas.length === 0 ? <p className="fx-nota">Ese día ya no hay horarios. Elige otro día.</p>
+              {horasV === null ? <div className="fx-cargando" aria-label="Buscando horarios"><i /><i /><i /><i /></div>
+                : horasV.length === 0 ? <p className="fx-nota">Ese día ya no hay horarios. Elige otro día.</p>
                   : grupos.map((g) => (
                     <div key={g.k} className="fx-sec"><span className="fx-lab">{g.t}</span>
                       <div className="fx-hrs">

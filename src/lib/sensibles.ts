@@ -13,3 +13,17 @@ export function ocultarSensibles(texto: string): string {
     .replace(/(?<![\d-])(\+?\d{1,3}\s?)?\(?\d{3}\)?[\s-]?\d{3}[\s-]?\d{4}(?![\d-])/g, "[número]")
     .replace(/\b[A-Za-z0-9_-]{40,}\b/g, "[oculto]");
 }
+
+/** Título legible de un error técnico: una consulta fallida se resume con la tabla; lo demás, primera línea corta. */
+export function resumenError(mensaje: string): string {
+  const m = mensaje.replace(/^Error:\s*/, "");
+  const q = m.match(/^Failed query:\s*(select|insert into|update|delete from)\b[\s\S]*?(?:from|into|update)?\s*"([a-z_]+)"/i);
+  if (q) {
+    const tabla = (m.match(/\bfrom\s+"([a-z_]+)"/i) ?? m.match(/\binto\s+"([a-z_]+)"/i) ?? m.match(/^Failed query:\s*update\s+"([a-z_]+)"/i))?.[1] ?? q[2];
+    const accion = /^Failed query:\s*select/i.test(m) ? "leer" : /insert/i.test(m.slice(0, 40)) ? "guardar en" : /update/i.test(m.slice(0, 40)) ? "actualizar" : "borrar en";
+    return `Falló una consulta al ${accion} la tabla ${tabla.replace(/_/g, " ")}`;
+  }
+  if (/Loading chunk \d+ failed/i.test(m)) return "No se pudo cargar una parte de la página (versión anterior en caché)";
+  const linea = m.split("\n")[0];
+  return linea.length > 140 ? `${linea.slice(0, 140)}…` : linea;
+}

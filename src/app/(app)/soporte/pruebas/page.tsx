@@ -14,7 +14,7 @@ export default async function Pruebas() {
   const conteos = await Promise.all(pruebas.map((b) => conteoNegocio(b.id)));
   return (
     <>
-      <CabezaSoporte titulo="Mantenimiento de entornos de prueba" sub={`Solo actúa sobre negocios de prueba. Los ${reales.n} negocios reales quedan excluidos de todas estas operaciones.`} extra={<CrearPrueba />} />
+      <CabezaSoporte titulo="Mantenimiento de entornos de prueba" sub={`Solo actúa sobre negocios de prueba. ${reales.n === 1 ? "El negocio real queda excluido" : `Los ${reales.n} negocios reales quedan excluidos`} de todas estas operaciones.`} extra={<CrearPrueba />} />
       <div className="tit-fuera"><span className="lab">Negocios de prueba</span><span className="muted chico-t">{pruebas.length}</span></div>
       <section className="glass panel-s">
         {!pruebas.length ? <p className="muted vacio-s">No hay negocios de prueba. Crea uno para probar funciones sin tocar datos reales.</p> : (

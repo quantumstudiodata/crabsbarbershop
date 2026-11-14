@@ -1,5 +1,12 @@
 // Actualizaciones publicadas de la plataforma, la más reciente primero. Se agrega una línea con cada publicación.
 export const NOVEDADES: { fecha: string; texto: string }[] = [
+  { fecha: "2026-11-14", texto: "Soporte: errores con título legible y mensaje técnico plegado, conteo correcto de solicitudes abiertas y sin atender" },
+  { fecha: "2026-11-14", texto: "Reservas: transferencia disponible a cualquier hora; nunca se muestran horas que ya pasaron, aunque la página lleve rato abierta" },
+  { fecha: "2026-11-14", texto: "Cobro: el total incluye la propina con su desglose; folio del corte igual durante y después del cierre" },
+  { fecha: "2026-11-14", texto: "Laptops: la app se ve al 90% en pantallas bajas; avisos En vivo de uno en uno sin tapar la pantalla; página no encontrada en español" },
+  { fecha: "2026-11-14", texto: "Auditoría: tablet con menú completo en Cobro, una sola pestaña activa, paleta en grises azulados, gráficas sin punteado, ajustes de celular en Datos, Usuarios, Cortes e Historial, encuesta en grafito" },
+  { fecha: "2026-11-13", texto: "Reservas en grafito con pantalla de inicio, cangrejo animado, pago con tarjeta en modo oscuro y Apple Pay y Google Pay" },
+  { fecha: "2026-11-13", texto: "Comisiones automáticas en el corte, guía de primer uso por puesto, gastos frecuentes automáticos y reembolsos desde la app" },
   { fecha: "2026-11-09", texto: "Versión móvil tipo app: Inicio compacto, Cobro con categorías desplegables y barra de cobro, filtros en una fila, calendario emergente, listas paginadas, Datos con semanas en panel inferior; evidencias del corte obligatorias" },
   { fecha: "2026-11-09", texto: "Ventas igual para todos los puestos, Inicio del barbero con Ventas por barbero y Últimos servicios, Datos para el Administrador, evidencias en el corte de caja y ajustes en caja e impresión" },
   { fecha: "2026-11-09", texto: "Metas: la meta mensual se reparte en partes iguales entre los barberos" },

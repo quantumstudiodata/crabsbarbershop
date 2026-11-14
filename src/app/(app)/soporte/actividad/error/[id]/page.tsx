@@ -2,7 +2,7 @@ import { and, desc, eq } from "drizzle-orm";
 import Link from "next/link";
 import { notFound } from "next/navigation";
 import { db, schema as t } from "@/lib/db";
-import { ocultarSensibles } from "@/lib/sensibles";
+import { ocultarSensibles, resumenError } from "@/lib/sensibles";
 import { hace } from "@/lib/soporte";
 import { CabezaSoporte } from "../../../Comunes";
 
@@ -33,7 +33,8 @@ export default async function DetalleError({ params }: { params: Promise<{ id: s
     <>
       <CabezaSoporte titulo="Detalle del error" sub={`${operacion}, ${x.e.origen === "servidor" ? "en el servidor" : "en el navegador"}`} />
       <section className="glass panel-s">
-        <code className="error-grande">{ocultarSensibles(x.e.mensaje)}</code>
+        <b className="error-tit">{resumenError(ocultarSensibles(x.e.mensaje))}</b>
+        <details className="error-det"><summary>Ver el mensaje técnico completo</summary><code className="error-grande">{ocultarSensibles(x.e.mensaje)}</code></details>
         <div className="datos-l">
           <div><span>Cuándo</span><b>{cuando}</b></div>
           <div><span>Negocio</span>{x.e.barberiaId ? <Link className="enlace" href={`/soporte/negocios/${x.e.barberiaId}`}>{x.negocio}</Link> : <b>Sin sesión</b>}</div>
