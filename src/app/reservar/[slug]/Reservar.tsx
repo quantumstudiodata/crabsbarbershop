@@ -370,6 +370,7 @@ export function Reservar(p: {
                   </div>
                 </div>
               )}
+              {pagaTransferencia && pronto && <p className="fx-politica">La transferencia solo está disponible para citas con más de 3 horas de anticipación, para que alcance a llegar y revisarse.</p>}
               {p.pago.politica && <p className="fx-politica">{p.pago.politica}{forma !== "negocio" ? " Lo pagado no es reembolsable; si no puedes venir, cambia tu cita a otro día." : ""}{forma === "transferencia" ? " Tu cita queda apartada; el negocio la confirma cuando llegue tu transferencia." : ""}</p>}
             </>
           )}
