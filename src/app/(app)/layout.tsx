@@ -25,6 +25,8 @@ import { formatoDinero } from "@/lib/money";
 import { NOMBRE_ROL, PERMISOS_CONFIG, PLANTILLAS } from "@/lib/permisos";
 
 export const dynamic = "force-dynamic";
+// Ningún pedido de la app debe esperar más de un minuto: si algo se traba, falla rápido en lugar de bloquear 5 minutos.
+export const maxDuration = 60;
 
 export default async function LayoutApp({ children }: { children: React.ReactNode }) {
   const s = await requerirSesion();
