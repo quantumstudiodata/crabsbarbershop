@@ -2,6 +2,7 @@
 
 import { useRef, useState } from "react";
 import { createPortal } from "react-dom";
+import { zoomPagina } from "@/lib/zoom";
 
 /** Signo (?) con explicación. La nota flota sobre todo para que ninguna ventana la corte. */
 export function Ayuda({ titulo, children }: { titulo?: string; children: React.ReactNode; izq?: boolean }) {
@@ -13,7 +14,8 @@ export function Ayuda({ titulo, children }: { titulo?: string; children: React.R
     const ancho = 280;
     const x = Math.min(Math.max(12, r.left + r.width / 2 - ancho / 2), window.innerWidth - ancho - 12);
     const arriba = window.innerHeight - r.bottom < 200;
-    setPos({ x, y: arriba ? r.top - 10 : r.bottom + 10, arriba });
+    const z = zoomPagina();
+    setPos({ x: x / z, y: (arriba ? r.top - 10 : r.bottom + 10) / z, arriba });
   };
   return (
     <span ref={ref} className="ayuda" tabIndex={0} aria-label={titulo ? `Ayuda: ${titulo}` : "Ayuda"}

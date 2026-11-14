@@ -5439,3 +5439,8 @@ html:has(.fx-raiz .mc) body::before, html:has(.fx-raiz .mc) body::after { displa
 .fx-raiz .mc .aviso { background: rgba(255,255,255,.06); color: #eef1f5; border-color: rgba(255,255,255,.1); }
 .fx-raiz .mc .muted { color: #98a2b0; }
 .fx-raiz .mc :is(.mc-lab, .lab) { color: #98a2b0 !important; }
+
+/* Laptops (pantalla baja y ancha, con mouse): la app se dibuja al 90% para que no se vea con zoom. */
+@media (min-width: 1024px) and (max-height: 820px) and (hover: hover) and (pointer: fine) {
+  html[data-zoom="ok"]:has(header.barra) { zoom: .9; }
+}

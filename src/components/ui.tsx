@@ -2,6 +2,7 @@
 
 import { useEffect, useId, useLayoutEffect, useRef, useState, startTransition } from "react";
 import { createPortal } from "react-dom";
+import { zoomPagina } from "@/lib/zoom";
 import { Icono } from "./Icono";
 
 /** Ventana emergente. Se cierra con Esc o tocando fuera. */
@@ -104,7 +105,8 @@ export function Selector({ name, opciones, valor, inicial, onChange, etiqueta, c
     // La lista nunca se sale de la pantalla: si no cabe a la derecha, se recorre hacia la izquierda.
     const ancho = Math.min(Math.max(r.width, 200), window.innerWidth - 16);
     const x = Math.max(8, Math.min(r.left, window.innerWidth - ancho - 8));
-    setPos({ x, y: arriba ? r.top - 6 : r.bottom + 6, w: ancho, arriba });
+    const z = zoomPagina();
+    setPos({ x: x / z, y: (arriba ? r.top - 6 : r.bottom + 6) / z, w: ancho / z, arriba });
     setActivo(Math.max(0, opciones.findIndex((o) => o.valor === actual)));
   };
   useEffect(() => {

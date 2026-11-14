@@ -1,5 +1,6 @@
 "use client";
 
+import { zoomPagina } from "@/lib/zoom";
 import { usePathname, useRouter } from "next/navigation";
 import { useCallback, useEffect, useLayoutEffect, useMemo, useRef, useState } from "react";
 import { marcarConsejos } from "@/app/(app)/acciones-usuario";
@@ -33,7 +34,7 @@ function buscar(sel: string): HTMLElement | null {
 }
 
 // El resaltado sigue la forma del elemento: si es una píldora, el resaltado también.
-const medir = (e: HTMLElement): Caja => { const r = e.getBoundingClientRect(); const radio = parseFloat(getComputedStyle(e).borderTopLeftRadius) || 12; return { x: r.left, y: r.top, w: r.width, h: r.height, r: Math.min(radio + PAD, (r.height + PAD * 2) / 2) }; };
+const medir = (e: HTMLElement): Caja => { const r = e.getBoundingClientRect(); const z = zoomPagina(); const radio = parseFloat(getComputedStyle(e).borderTopLeftRadius) || 12; return { x: r.left / z, y: r.top / z, w: r.width / z, h: r.height / z, r: Math.min(radio + PAD, (r.height / z + PAD * 2) / 2) }; };
 const esEscritorio = () => typeof window !== "undefined" && window.matchMedia("(min-width: 821px)").matches;
 
 /**
@@ -192,8 +193,8 @@ function Recorrido({ punto, lista, hechos, esc, ruta, ir, listo }: {
   const intercepta = !!paso && paso.modo !== "pasa";
 
   // Globo: abajo del elemento si cabe; si no, arriba; en teléfono centrado.
-  const vw = typeof window === "undefined" ? 400 : window.innerWidth;
-  const vh = typeof window === "undefined" ? 800 : window.innerHeight;
+  const vw = typeof window === "undefined" ? 400 : window.innerWidth / zoomPagina();
+  const vh = typeof window === "undefined" ? 800 : window.innerHeight / zoomPagina();
   const gw = Math.min(esc ? 360 : 340, vw - 24);
   let gx = 12, gy = 80;
   if (caja) {

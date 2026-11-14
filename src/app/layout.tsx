@@ -1,4 +1,5 @@
 import type { Metadata, Viewport } from "next";
+import { SCRIPT_COMPACTA } from "@/lib/zoom";
 import { Big_Shoulders, IBM_Plex_Mono, Instrument_Sans } from "next/font/google";
 import { RegistrarServiceWorker } from "@/components/RegistrarServiceWorker";
 import "./globals.css";
@@ -30,6 +31,7 @@ export default function RootLayout({ children }: { children: React.ReactNode }) 
   return (
     <html lang="es-MX" className={`${display.variable} ${body.variable} ${mono.variable}`}>
       <body>
+        <script dangerouslySetInnerHTML={{ __html: SCRIPT_COMPACTA }} />
         {children}
         <RegistrarServiceWorker />
       </body>

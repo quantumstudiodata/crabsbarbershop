@@ -2,6 +2,7 @@
 
 import { useEffect, useLayoutEffect, useRef, useState } from "react";
 import { createPortal } from "react-dom";
+import { zoomPagina } from "@/lib/zoom";
 import { Icono } from "./Icono";
 
 const MESES = ["enero", "febrero", "marzo", "abril", "mayo", "junio", "julio", "agosto", "septiembre", "octubre", "noviembre", "diciembre"];
@@ -40,10 +41,11 @@ function Flotante({ ancla, className, children, label }: { ancla: React.RefObjec
   useLayoutEffect(() => {
     const r = ancla.current?.getBoundingClientRect();
     if (!r) return;
-    const alto = ref.current?.offsetHeight ?? 360, ancho = ref.current?.offsetWidth ?? 310;
+    const z = zoomPagina();
+    const alto = (ref.current?.offsetHeight ?? 360) * z, ancho = (ref.current?.offsetWidth ?? 310) * z;
     const limite = window.innerHeight - (window.matchMedia("(max-width: 760px)").matches && !document.querySelector(".capa") ? 100 : 0);
     const arriba = r.bottom + 8 + alto > limite && r.top - 8 - alto > 0;
-    setPos({ x: Math.max(8, Math.min(r.left, window.innerWidth - ancho - 8)), y: arriba ? r.top - 8 - alto : r.bottom + 8, arriba });
+    setPos({ x: Math.max(8, Math.min(r.left, window.innerWidth - ancho - 8)) / z, y: (arriba ? r.top - 8 - alto : r.bottom + 8) / z, arriba });
   }, [ancla]);
   return createPortal(
     <div ref={ref} data-flotante className={`${className} flotante`} role="dialog" aria-label={label} style={{ left: pos?.x ?? -9999, top: pos?.y ?? 0 }}>{children}</div>,
