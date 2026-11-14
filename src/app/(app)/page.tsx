@@ -228,7 +228,7 @@ function InicioVista(v: Vista) {
           </div>
           {v.verMas && <Link className="ini-link" href={v.verMas.href}>{v.verMas.texto}</Link>}
         </section>
-          <section className="glass ini-card subir d2">
+          <section className="glass ini-card ini-eq-izq subir d2">
             <span className="lab">Equipo hoy</span>
             {listaEquipo}
           </section>
@@ -244,6 +244,10 @@ function InicioVista(v: Vista) {
               {v.citas.length > 3 && <small className="muted">y {v.citas.length - 3} más</small>}
             </section>
           )}
+          <section className="glass ini-card ini-eq-der subir d2">
+            <span className="lab">Equipo hoy</span>
+            {listaEquipo}
+          </section>
         </div>
       </div>
 

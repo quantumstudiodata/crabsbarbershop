@@ -3061,6 +3061,8 @@ html:has(.capa) body, html:has(.velo-c) body, html:has(.velo-hoja) body, html:ha
 .ini-link:hover { color: var(--fg); }
 .ini-hoy > .ini-link { align-self: flex-start; }
 .ini-izq, .ini-der { display: grid; gap: 20px; align-content: start; min-width: 0; }
+/* Equipo hoy va en la columna que quede más corta: a la izquierda si hay pendientes, a la derecha si no. */
+.ini-rejilla:has(.ini-der .pnd) .ini-eq-der, .ini-rejilla:not(:has(.ini-der .pnd)) .ini-eq-izq { display: none; }
 .ini-card { display: grid; gap: 4px; align-content: start; padding: 18px 22px; border-radius: 20px; }
 .ini-card > .entre, .ini-card > .lab { margin-bottom: 4px; }
 .ini-cita { display: grid; grid-template-columns: 52px minmax(0, 1fr) auto; gap: 10px; padding: 8px 0; font-size: 13.5px; }
