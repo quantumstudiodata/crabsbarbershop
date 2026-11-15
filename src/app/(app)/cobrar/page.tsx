@@ -95,7 +95,7 @@ export default async function Cobrar({ searchParams }: { searchParams: Promise<{
             )}
           </>
         )}
-      {opera && <CajaModal inicial={q.caja === "cerrar" ? "corte" : q.caja === "retiro" || q.caja === "movimiento" ? "movimiento" : null} turno={turno} limiteDiferencia={s.barberia.limiteDiferenciaCaja} categorias={cats.filter((c) => !esCategoriaComisiones(c.nombre)).map((c) => c.nombre)} evidencias={s.barberia.usaEvidenciaCorte} egresos={s.puede("gastos.registrar")} />}
+      {opera && <CajaModal inicial={q.caja === "cerrar" ? "corte" : q.caja === "retiro" || q.caja === "movimiento" ? "movimiento" : null} turno={turno} limiteDiferencia={s.barberia.limiteDiferenciaCaja} categorias={cats.filter((c) => !esCategoriaComisiones(c.nombre)).map((c) => c.nombre)} evidencias={s.barberia.usaEvidenciaCorte} egresos={s.puede("gastos.registrar")} configurar={s.puede("configuracion.egresos") && !s.vista} />}
     </>
   );
 }

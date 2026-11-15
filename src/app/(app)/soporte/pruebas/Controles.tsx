@@ -22,7 +22,7 @@ export function CrearPrueba() {
           </div>
         ) : (
           <form action={accion} className="pila">
-            <p className="muted">Se crea con servicios de ejemplo, formas de pago y tres cuentas: Titular, Administrador y Barbero.</p>
+            <p className="muted">Se crea con servicios de ejemplo, formas de pago, citas y reservas en línea, comisiones automáticas y una cuenta de cada puesto: Titular, Administrador, Encargado y Barbero.</p>
             <label className="campo"><span>Nombre del negocio</span><input className="input" name="nombre" placeholder="Ejemplo: Barbería Demo" required minLength={3} maxLength={60} /></label>
             {e.error && <p className="aviso error">{e.error}</p>}
             <div className="acciones"><button className="bt" disabled={creando}>{creando ? "Creando…" : "Crear negocio"}<Fl /></button></div>

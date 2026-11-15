@@ -139,7 +139,7 @@ function Resumen({ r, cerrar }: { r: ResumenCorte; cerrar: () => void }) {
   );
 }
 
-export function CajaModal({ inicial, turno, limiteDiferencia, categorias, evidencias = false, egresos = false }: { inicial: Vista | null; turno: Turno | null; limiteDiferencia: number; categorias: string[]; evidencias?: boolean; /** Puede registrar egresos en Movimientos. */ egresos?: boolean }) {
+export function CajaModal({ inicial, turno, limiteDiferencia, categorias, evidencias = false, egresos = false, configurar = false }: { inicial: Vista | null; turno: Turno | null; limiteDiferencia: number; categorias: string[]; evidencias?: boolean; /** Puede registrar egresos en Movimientos. */ egresos?: boolean; /** Puede editar las categorías de gasto. */ configurar?: boolean }) {
   const [vista, setVista] = useState<Vista | null>(inicial);
   const [eMov, accMov, guardandoMov] = useActionState<EstadoCaja, FormData>(registrarMovimiento, {});
   const [eGasto, accGasto, guardandoGasto] = useActionState<EstadoCaja, FormData>(registrarGasto, {});
@@ -170,9 +170,9 @@ export function CajaModal({ inicial, turno, limiteDiferencia, categorias, eviden
   const atras = <button type="button" className="mov-atras" onClick={() => setVista("movimiento")}><Icono n="izquierda" />Elegir otra cosa</button>;
   if (vista === "movimiento") {
     const ops: [Vista, string, string, string][] = [
-      ["gasto", "etiqueta", "Pagué algo con dinero de la caja", "Agua, limpieza, productos, comida. Es un gasto del negocio."],
-      ["retiro", "salida", "Saqué dinero de la caja para guardarlo", "Para llevarlo al banco o ponerlo en otro lugar. No es un gasto."],
-      ["entrada", "entrada", "Puse dinero en la caja", "Para tener cambio. No es una venta."],
+      ["gasto", "etiqueta", "Pagué algo con dinero de la caja", "Compraste o pagaste algo para el negocio con el efectivo de la caja: agua, limpieza, productos. Cuenta como gasto."],
+      ["retiro", "salida", "Saqué dinero de la caja para guardarlo", "El dinero sigue siendo del negocio, solo cambia de lugar: al banco o a otro resguardo. No cuenta como gasto."],
+      ["entrada", "entrada", "Puse dinero en la caja", "Agregaste billetes o monedas para tener cambio. No cuenta como venta."],
     ];
     return (
       <Modal abierto cerrar={cerrar} etiqueta="Caja" titulo="¿Qué pasó con el dinero?">
@@ -183,7 +183,7 @@ export function CajaModal({ inicial, turno, limiteDiferencia, categorias, eviden
             </button>
           ))}
         </div>
-        {egresos && <p className="ayuda-txt" style={{ margin: "12px 0 0" }}>¿Pagaste con transferencia o tarjeta? Eso no sale de la caja. <a className="enlace" href="/analitica/finanzas?egreso=1">Regístralo aquí</a>.</p>}
+        {egresos && <p className="ayuda-txt" style={{ margin: "12px 0 0" }}>¿Pagaste un gasto con transferencia o tarjeta? Ese dinero no salió de la caja. <a className="enlace" href="/analitica/finanzas?egreso=1">Regístralo aquí</a>.</p>}
       </Modal>
     );
   }
@@ -216,7 +216,8 @@ export function CajaModal({ inicial, turno, limiteDiferencia, categorias, eviden
           <input type="hidden" name="categoria" value={categoria} />
           <input className="input grande" name="monto" inputMode="decimal" placeholder="$0" required autoFocus aria-label="Monto" />
           <input className="input" name="concepto" value={gasto} onChange={(e) => setGasto(e.target.value)} placeholder="¿Qué se pagó? Ejemplo: garrafón de agua" required aria-label="Qué se pagó" />
-          <div className="billetes">{categorias.map((c) => <button type="button" key={c} className={categoria === c ? "on" : ""} onClick={() => elegirCategoria(c)}>{c}</button>)}</div>
+          <div className="billetes">{categorias.map((c) => <button type="button" key={c} className={categoria === c ? "on" : ""} onClick={() => elegirCategoria(c)}>{c}</button>)}
+            {configurar && <a className="cat-conf" href="/ajustes/cobro" aria-label="Configurar categorías" title="Configurar categorías"><Icono n="ajustes" /></a>}</div>
           <p className="ayuda-txt" style={{ margin: 0 }}>Es un gasto del negocio. La caja tendrá menos dinero y el corte lo toma en cuenta.</p>
           {eGasto.error && <p className="aviso error">{eGasto.error}</p>}
           <div className="acciones"><button className="bt" disabled={guardandoGasto}>{guardandoGasto ? "Guardando…" : "Guardar"}<Fl /></button></div>

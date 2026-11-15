@@ -203,12 +203,6 @@ export default async function Finanzas({ searchParams }: { searchParams: Promise
               <div><span className="muted">Salió</span><span className="barra-m sal"><i style={{ width: `${(salio / maxB) * 100}%` }} /></span><b className="num">{$(salio)}</b></div>
             </div>
           </section>
-          {(porPagar > 0 || retirado > 0) && (
-            <div className="res-notas">
-              {porPagar > 0 && <span><b className="num">{$(porPagar)}</b> falta por pagar al equipo. Ya está restado del resultado.</span>}
-              {retirado > 0 && <span><b className="num">{$(retirado)}</b> se sacaron de la caja para guardarlos. No es gasto y no se resta.</span>}
-            </div>
-          )}
           {anterior && <p className="aviso-sutil">Mostrando {nombreP} hasta que empiece el mes.</p>}
         </>
       )}

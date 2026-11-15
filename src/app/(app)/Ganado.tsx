@@ -33,7 +33,7 @@ export async function ganadoDe(s: Sesion, zona: string, hoy: string): Promise<Ga
 export function TarjetaGanado({ g, className = "" }: { g: Ganado; className?: string }) {
   const cuando = g.hoy ? "hoy" : `el ${fechaCorta(g.pago)}`;
   return (
-    <section className={`glass ini-card ini-ganado ${className}`} aria-label={g.renta ? "Tu renta de silla" : "Lo que llevas ganado"}>
+    <div className={`ini-ganado ${className}`} role="group" aria-label={g.renta ? "Tu renta de silla" : "Lo que llevas ganado"}>
       <span className="lab lab-ay">{g.renta ? "Tu renta de silla" : "Llevas ganado"}
         <Ayuda titulo={g.renta ? "Tu renta de silla" : "Llevas ganado"}>{g.renta
           ? "Lo que te falta pagar de renta en este periodo. Lo que cobras por tus servicios es tuyo."
@@ -48,6 +48,6 @@ export function TarjetaGanado({ g, className = "" }: { g: Ganado; className?: st
         </span>
       </div>
       {g.verEquipo && <Link className="ini-link" href="/equipo">Ver lo del equipo</Link>}
-    </section>
+    </div>
   );
 }

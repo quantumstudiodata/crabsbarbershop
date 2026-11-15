@@ -160,6 +160,11 @@ type Vista = {
 function InicioVista(v: Vista) {
   const { s, hoy, zona } = v;
   const dia = nombreDia(new Date(`${hoy}T12:00:00Z`).getUTCDay());
+  // Alto aproximado de cada columna, para poner Equipo hoy en la que quede más corta.
+  const altoIzq = 110 + (v.meta ? 45 : 0) + (v.ganado ? 75 : 0) + (v.servicios > 0 ? 185 : 30);
+  const altoDer = (v.pendientes.length ? 60 + Math.min(v.pendientes.length, 3) * 80 + (v.pendientes.length > 3 ? 30 : 0) + 20 : 0) + (v.citas ? 45 + Math.max(1, Math.min(v.citas.length, 3)) * 28 + 20 : 0);
+  const altoEq = 55 + v.equipo.length * 33 + 20;
+  const equipoIzq = Math.abs(altoIzq + altoEq - altoDer) < Math.abs(altoIzq - (altoDer + altoEq));
   const serie = serieHoy(v.movs, hoy, zona);
   const pct = v.meta ? porcentaje(v.total, v.meta.monto) : 0;
   const barra = v.meta ? <div className="ini-meta" role="progressbar" aria-valuemin={0} aria-valuemax={100} aria-valuenow={Math.min(pct, 100)} aria-label="Avance de la meta"><i style={{ width: `${Math.max(Math.min(pct, 100), 2)}%` }} /></div> : null;
@@ -191,8 +196,8 @@ function InicioVista(v: Vista) {
             {v.meta ? <><b>{pct}%</b> de {v.barbero ? "tu meta" : "la meta"}</> : <><b>{v.clientes ? formatoDinero(Math.round(v.total / v.clientes)) : "$0"}</b> por cliente</>}</span>
         </div>
         {barra}
+        {v.ganado && <TarjetaGanado g={v.ganado} />}
       </section>
-      {v.ganado && <TarjetaGanado g={v.ganado} className="solo-movil subir d2" />}
       <Pendientes items={v.pendientes} className="solo-movil subir d2" />
       <AccionesMovil acciones={v.acciones.visibles} personalizar={v.acciones} />
       {siguiente && (
@@ -207,7 +212,7 @@ function InicioVista(v: Vista) {
       </section>
 
       {/* Escritorio */}
-      <div className="ini-rejilla solo-escritorio">
+      <div className="ini-rejilla solo-escritorio">{/* Equipo hoy va en la columna más corta; la última tarjeta de cada columna se estira para que las dos terminen parejas. */}
         <div className="ini-izq">
         <section className="glass ini-hoy subir d1">
           <div className="ini-hoy-c">
@@ -224,6 +229,7 @@ function InicioVista(v: Vista) {
               {v.meta.nota && <small className="muted">{v.meta.nota}</small>}
             </div>
           )}
+          {v.ganado && <TarjetaGanado g={v.ganado} />}
           {v.servicios === 0 ? <p className="muted ini-sin-graf">La gráfica del día aparece con la primera venta.</p> : <div className="ini-graf">
             <Grafica id="inicio-hoy" actual={serie.actual} previo={serie.previo} etiquetas={serie.etiquetas} cadaEtiqueta={serie.cada} alto={150} enCurso={serie.enCurso}
               globos={serie.actual.map((x, i) => (x === null ? null : [`A las ${serie.etiquetas[i]}`, formatoDinero(x), "acumulado"] as [string, string, string]))}
@@ -231,11 +237,10 @@ function InicioVista(v: Vista) {
           </div>}
           {v.verMas && <Link className="ini-link" href={v.verMas.href}>{v.verMas.texto}</Link>}
         </section>
-          {v.ganado && <TarjetaGanado g={v.ganado} className="subir d2" />}
-          <section className="glass ini-card ini-eq-izq subir d2">
+          {equipoIzq && <section className="glass ini-card subir d2">
             <span className="lab">Equipo hoy</span>
             {listaEquipo}
-          </section>
+          </section>}
         </div>
         <div className={`ini-der ${v.citas ? "con-citas" : ""}`}>
           <Pendientes items={v.pendientes} className="subir d2" />
@@ -248,10 +253,10 @@ function InicioVista(v: Vista) {
               {v.citas.length > 3 && <small className="muted">y {v.citas.length - 3} más</small>}
             </section>
           )}
-          <section className="glass ini-card ini-eq-der subir d2">
+          {!equipoIzq && <section className="glass ini-card subir d2">
             <span className="lab">Equipo hoy</span>
             {listaEquipo}
-          </section>
+          </section>}
         </div>
       </div>
 

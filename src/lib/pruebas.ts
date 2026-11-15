@@ -171,19 +171,25 @@ const SERVICIOS: [string, number, number, string][] = [
   ["Barba", 20, 10000, "Barba y paquetes"], ["Corte infantil", 25, 12000, "Niños y extras"],
 ];
 
-/** Crea un negocio de prueba con Titular, Administrador y Barbero. Devuelve las cuentas con su contraseña. */
+/**
+ * Crea un negocio de prueba con una cuenta de cada puesto (Titular, Administrador, Encargado y Barbero) y con las funciones
+ * que usa un negocio real: citas y reservas en línea, promociones y comisiones automáticas. Devuelve las cuentas con su contraseña.
+ */
 export async function crearPrueba(nombre: string) {
   const existentes = (await db.select({ u: t.usuarios.usuario }).from(t.usuarios)).map((x) => x.u);
   return db.transaction(async (tx) => {
-    const [b] = await tx.insert(t.barberias).values({ nombre, esPrueba: true, folioPrefijo: "PRB" }).returning();
+    const [b] = await tx.insert(t.barberias).values({
+      nombre, esPrueba: true, folioPrefijo: "PRB", usaCitas: true, slug: `prueba-${Math.random().toString(36).slice(2, 8)}`, usaPromociones: true,
+      pagosEquipoAuto: true, pagosEquipoDesde: fechaLocal(new Date(), "America/Monterrey"),
+    }).returning();
     const cuentas: { puesto: string; usuario: string; clave: string }[] = [];
-    for (const [rol, puesto] of [["duena", "Titular"], ["contador", "Administrador"], ["barbera", "Barbero"]] as const) {
+    for (const [rol, puesto] of [["duena", "Titular"], ["contador", "Administrador"], ["encargada", "Encargado"], ["barbera", "Barbero"]] as const) {
       const persona = `${puesto} Prueba ${nombre.split(" ")[0]}`;
       const usuario = sugerirUsuario(persona, existentes);
       existentes.push(usuario);
       const clave = contrasenaTemporal(persona);
       const [u] = await tx.insert(t.usuarios).values({ barberiaId: b.id, nombre: persona, usuario, rol, hash: await hashContrasena(clave), debeCambiar: false }).returning();
-      if (rol === "barbera") await tx.insert(t.reglasComision).values({ barberiaId: b.id, barberoId: u.id, tipo: "porcentaje", porcentaje: 4000 });
+      if (rol === "barbera" || rol === "encargada") await tx.insert(t.reglasComision).values({ barberiaId: b.id, barberoId: u.id, tipo: "porcentaje", porcentaje: 4000 });
       cuentas.push({ puesto, usuario, clave });
     }
     await tx.insert(t.servicios).values(SERVICIOS.map(([n, duracionMin, precio, categoria], orden) => ({ barberiaId: b.id, nombre: n, duracionMin, precio, categoria, orden })));
