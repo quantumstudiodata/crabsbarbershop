@@ -104,7 +104,7 @@ async function accionesDe(s: Sesion, turno: Turno | null | undefined, hoy: strin
     { k: "cobrar", href: "/cobrar", texto: "Cobrar", corto: "Cobrar", icono: "cobro", principal: true, dato: turno ? `Caja abierta desde ${horaCorta(turno.abiertoEn, zona)}` : "Abre la caja al cobrar", ok: s.puede("ventas.registrar") || s.puede("ventas.registrar_otros") },
     { k: "mias", href: `/citas?vista=lista&persona=${yo}`, texto: "Mis citas de hoy", corto: "Mis citas", icono: "reloj", dato: citasHoy ? `${citasHoy} por llegar` : "Sin pendientes", ok: barbero && citasHoy !== null },
     { k: "corte", href: "/cobrar?caja=cerrar", texto: "Realizar corte de caja", corto: "Corte", icono: "candado", aviso: corteAtrasado, dato: corteAtrasado ? "Pendiente" : turno ? undefined : "Caja cerrada", ok: s.puede("caja.operar") && !!turno },
-    { k: "retiro", href: "/cobrar?caja=retiro", texto: "Registrar retiro de caja", corto: "Retiro", icono: "salida", ok: s.puede("caja.retiros") && !!turno },
+    { k: "retiro", href: "/cobrar?caja=retiro", texto: "Sacar o meter efectivo", corto: "Efectivo", icono: "salida", ok: s.puede("caja.retiros") && !!turno },
     { k: "cita", href: "/citas?nueva=1", texto: "Agendar cita a cliente", corto: "Nueva cita", icono: "calendario", dato: !barbero && citasHoy ? `${citasHoy} por llegar` : undefined, ok: s.barberia.usaCitas && s.puede("citas.modificar") },
     { k: "compartir", href: "/citas?compartir=1", texto: "Compartir enlace para reservar", corto: "Compartir enlace", icono: "enviar", ok: s.barberia.usaCitas && !!s.barberia.slug && leerConfig(s.barberia.citasConfig).enLinea && s.puede("citas.ver") },
     { k: "egreso", href: "/analitica/finanzas?egreso=1", texto: "Registrar un egreso", corto: "Egreso", icono: "archivo", ok: s.puede("gastos.registrar") },
@@ -315,7 +315,7 @@ export default async function Inicio({ searchParams }: { searchParams: Promise<Q
       movs={pagadas.map((v) => ({ creadoEn: v.creadoEn, fecha: v.fecha, monto: v.total }))}
       meta={meta} citas={citas} equipo={filasEq} pendientes={pendientes}
       ultimos={filasUltimos(ventas.slice(0, 5), equipo, hoy, zona, await verificadosDe(ventas.slice(0, 5).map((v) => v.id)))}
-      verMas={{ href: "/analitica", texto: "Ver semana y mes en Analítica" }} verVentas={s.puede("ventas.ver_todas")}
+      verMas={{ href: "/analitica", texto: "Ver semana y mes en Reportes" }} verVentas={s.puede("ventas.ver_todas")}
       semana={s.puede("reportes.ver") && ["duena", "admin", "contador"].includes(s.usuario.rol) ? await registrarGastosAutomaticos(s.barberia.id).then(() => resumenSemana(s.barberia.id, zona)).catch(() => null) : null} />
   );
 }

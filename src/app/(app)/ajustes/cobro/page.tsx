@@ -90,7 +90,7 @@ export default async function ConfigurarNegocio({ searchParams }: { searchParams
         detalle={<Resumen filas={[
           ["Modelo de caja", b.modeloCaja === "individual" ? "Individual por trabajador" : "Compartida"],
           ["Apertura", b.aperturaManual ? "Manual, contando el fondo" : "Automática al primer cobro"],
-          ["Cierre de caja", b.corteObligatorio ? "Obligatorio cada día" : "No obligatorio"],
+          ["Corte de caja", b.corteObligatorio ? "Obligatorio cada día" : "No obligatorio"],
           ["Evidencias del corte", b.usaEvidenciaCorte ? "Se pueden adjuntar al cerrar" : "No se piden"],
           ...(b.aperturaManual ? [] : [["Fondo inicial sugerido", $(b.fondoPredeterminado)] as [string, string]]),
           ["Diferencia permitida", b.limiteDiferenciaCaja ? $(b.limiteDiferenciaCaja) : "Ninguna, toda diferencia se explica"],
@@ -113,10 +113,10 @@ export default async function ConfigurarNegocio({ searchParams }: { searchParams
         detalle={
           <div className="pila">
             {edita("egresos") ? <Funciones funciones={[{ clave: "pagosAuto", nombre: "Pagos al equipo automáticos", activa: b.pagosEquipoAuto,
-              encendida: "Cada periodo se da por pagado en su fecha de pago, con la forma de pago habitual de cada persona, y se anota solo en Finanzas y en la libreta. Los anticipos se registran a mano en Equipo.",
+              encendida: "Cada periodo se da por pagado en su fecha de pago, con la forma de pago habitual de cada persona, y se anota solo en Movimientos y en la libreta. Los anticipos se registran a mano en Equipo.",
               apagada: "Cada pago se registra a mano en Equipo. Lo que no se registre se acumula como pendiente." },
               { clave: "rentasAuto", nombre: "Renta de silla automática", activa: b.rentasAuto,
-              encendida: "Cada renta se da por cobrada en su fecha límite y se anota sola como ingreso en Finanzas y en la libreta. Si alguien no paga, se corrige en el historial de pagos.",
+              encendida: "Cada renta se da por cobrada en su fecha límite y se anota sola como ingreso en Movimientos y en la libreta. Si alguien no paga, se corrige en el historial de pagos.",
               apagada: "Cada cobro de renta se registra a mano en Equipo. Lo que no se registre se acumula como pendiente." }]} />
               : <Resumen filas={[["Pagos al equipo", b.pagosEquipoAuto ? "Automáticos" : "Se registran a mano"], ["Renta de silla", b.rentasAuto ? "Automática" : "Se registra a mano"]]} />}
             <CategoriasEgresos categorias={cats} puede={edita("egresos")} />

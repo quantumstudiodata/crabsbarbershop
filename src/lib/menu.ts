@@ -17,7 +17,7 @@ export function menuDe(rol: Rol, puede: (p: Permiso) => boolean, citas = false) 
   if (puede("ventas.ver_todas")) sub.push(["/analitica/ventas", "Ventas"]);
   if (equipo) sub.push(["/equipo", "Equipo"]);
   if (puede("cortes.ver")) sub.push(["/analitica/cortes", "Corte de caja"]);
-  if (puede("reportes.ver") || puede("gastos.ver")) sub.push(["/analitica/finanzas", "Finanzas"]);
+  if (puede("reportes.ver") || puede("gastos.ver")) sub.push(["/analitica/finanzas", "Movimientos"]);
   const clientes: [string, string][] = [];
   if (citas && puede("citas.ver")) clientes.push(["/citas", "Citas y agenda"]);
   if (equipo) clientes.push(["/clientes/resenas", "Reseñas"]);
@@ -26,7 +26,7 @@ export function menuDe(rol: Rol, puede: (p: Permiso) => boolean, citas = false) 
   items.push({ href: "/", texto: "Inicio", icono: "inicio" });
   if (cobra) items.push({ href: "/cobrar", texto: "Cobro", icono: "cobro" });
   if (atiende && !puede("ventas.ver_todas")) items.push({ href: "/analitica/ventas", texto: "Ventas", icono: "lista" });
-  if (analitica) items.push({ href: "/analitica", texto: "Analítica", icono: "grafica", tambien: equipo ? ["/equipo"] : undefined });
+  if (analitica) items.push({ href: "/analitica", texto: "Reportes", icono: "grafica", tambien: equipo ? ["/equipo"] : undefined });
   else if (equipo) items.push({ href: "/equipo", texto: "Equipo", icono: "persona" });
   if (clientes.length > 1) items.push({ href: "/clientes", texto: "Clientes", icono: "clientes", tambien: ["/citas"] });
   else if (clientes.length === 1) items.push({ href: clientes[0][0], texto: clientes[0][0] === "/citas" ? "Citas" : "Reseñas", icono: clientes[0][0] === "/citas" ? "calendario" : "estrella", tambien: ["/clientes"] });

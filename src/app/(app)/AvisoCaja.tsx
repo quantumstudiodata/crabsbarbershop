@@ -9,7 +9,7 @@ import { Modal } from "@/components/ui";
 export function AvisoCajaEmergente({ dia }: { dia: string }) {
   const [abierto, setAbierto] = useState(true);
   return (
-    <Modal abierto={abierto} cerrar={() => setAbierto(false)} etiqueta="Cierre de caja" titulo="Tienes un corte de caja pendiente" sinX>
+    <Modal abierto={abierto} cerrar={() => setAbierto(false)} etiqueta="Corte de caja" titulo="Tienes un corte de caja pendiente" sinX>
       <div className="aviso-corte">
         <span className="reloj-suave"><Icono n="reloj" /></span>
         <div>

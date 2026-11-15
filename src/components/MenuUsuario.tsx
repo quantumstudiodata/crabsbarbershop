@@ -14,7 +14,7 @@ import { abrirPanel } from "./BarraMovil";
 export function MenuUsuario(p: {
   nombre: string; usuario: string; rol: string; avatar: string; ajustes: boolean; historial: boolean; formaPago: string | null;
   /** Herramientas que van en este menú: Ideas, Ayuda y, en el teléfono, Soporte y las secciones que no caben abajo. */
-  mas?: { extra: { href: string; texto: string; icono: string }[]; ideas: boolean; ayuda: boolean; soporte: boolean };
+  mas?: { extra: { href: string; texto: string; icono: string }[]; ideas: boolean; ayuda: boolean; soporte: boolean; guia?: boolean };
 }) {
   const [abierto, setAbierto] = useState(false);
   const [elegir, setElegir] = useState(false);
@@ -56,11 +56,12 @@ export function MenuUsuario(p: {
           </div>
           <button type="button" role="menuitem" className="it" onClick={() => { setPerfil(true); setAbierto(false); }}><Icono n="usuario" />Mi perfil</button>
           {p.ajustes && <Link role="menuitem" className="it" href="/ajustes" onClick={() => setAbierto(false)}><Icono n="ajustes" />Ajustes</Link>}
-          {p.historial && <Link role="menuitem" className="it" href="/historial" onClick={() => setAbierto(false)}><Icono n="historial" />Historial</Link>}
+          {p.historial && <Link role="menuitem" className="it" href="/historial" onClick={() => setAbierto(false)}><Icono n="historial" />Actividad</Link>}
           {p.mas?.extra.map((i) => <Link key={i.href} role="menuitem" className="it solo-m-u" href={i.href} onClick={() => setAbierto(false)}><Icono n={i.icono} />{i.texto}</Link>)}
           {p.mas?.soporte && <Link role="menuitem" className="it solo-m-u" href="/soporte" onClick={() => setAbierto(false)}><Icono n="llave" />Soporte</Link>}
-          {p.mas?.ideas && <button type="button" role="menuitem" className="it" onClick={() => { setAbierto(false); abrirPanel("ideas"); }}><Icono n="chispa" />Ideas</button>}
+          {p.mas?.ideas && <button type="button" role="menuitem" className="it" onClick={() => { setAbierto(false); abrirPanel("ideas"); }}><Icono n="chispa" />Sugerencias</button>}
           {p.mas?.ayuda && <button type="button" role="menuitem" className="it" onClick={() => { setAbierto(false); abrirPanel("ayuda"); }}><Icono n="ayuda" />Ayuda</button>}
+          {p.mas?.guia && <button type="button" role="menuitem" className="it" onClick={() => { setAbierto(false); window.dispatchEvent(new Event("crabs:guia")); }}><Icono n="lista" />Guía de uso</button>}
           <div className="separador" style={{ margin: "4px 0" }} />
           <form action={salir}><button role="menuitem" className="it salir"><Icono n="salir" />Salir</button></form>
         </div>
@@ -78,7 +79,7 @@ export function MenuUsuario(p: {
           <div><small>Nombre</small><span>{p.nombre}</span></div>
           <div><small>Puesto</small><span>{p.rol}</span></div>
           <div><small>Usuario</small><span className="mono">{p.usuario}</span></div>
-          {p.formaPago && <div><small>Tipo de pago</small><span>{p.formaPago}</span></div>}
+          {p.formaPago && <div><small>Cómo se te paga</small><span>{p.formaPago}</span></div>}
         </div>
         <p className="ayuda-txt" style={{ textAlign: "center" }}>Para cambiar tus datos, pídeselo al titular.</p>
         <div className="acciones">

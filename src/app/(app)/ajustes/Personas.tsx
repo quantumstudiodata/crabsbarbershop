@@ -100,7 +100,7 @@ function Ficha({ p, props, cerrar, editar }: { p: Persona; props: Props; cerrar:
         <div className="perfil-datos">
           <div><small>Usuario</small><span className="mono">{p.usuario}</span></div>
           <div><small>Puesto</small><span>{p.puesto}</span></div>
-          {esBarbero(p.rol) ? p.formaTexto && <div><small>Forma de pago</small><span>{p.formaTexto}</span></div>
+          {esBarbero(p.rol) ? p.formaTexto && <div><small>Cómo se le paga</small><span>{p.formaTexto}</span></div>
             : <div><small>Remuneración</small><span>{p.remuneracionTexto || "Sin remuneración registrada"}</span></div>}
           {esBarbero(p.rol) && <div><small>Meta individual</small><span>{p.metaSemanal ? `${formatoDinero(p.metaSemanal)} a la semana` : "Se calcula sola"}</span></div>}
           <div><small>Permisos</small><span>{p.permisos.length} de {total(props.grupos)}</span></div>
@@ -186,7 +186,7 @@ function EditarPersona({ p, props, cerrar }: { p: Persona; props: Props; cerrar:
         <EditorPermisos grupos={props.grupos} marcados={marcados} cambiar={setMarcados} descuentoLibre={props.descuentoLibre} />
         {esBarbero(rol) && (
           <>
-            <span className="paso-t">Forma de pago</span>
+            <span className="paso-t">Cómo se le paga</span>
             <CamposFormaPago actual={p.forma} />
             <span className="paso-t">Meta individual</span>
             <label className="campo">
@@ -360,7 +360,7 @@ export function Personas(props: Props) {
           <div className="aviso-borrar">
             <span className="icono-alerta grande"><Icono n="basura" /></span>
             <p><b>{confirmar.p.nombre} ya tiene ventas o movimientos registrados.</b><br />
-              Si continúas, se borran para siempre su nombre, usuario, contraseña, avatar, forma de pago y permisos. Ya no podrá entrar.</p>
+              Si continúas, se borran para siempre su nombre, usuario, contraseña, avatar, cómo se le paga y permisos. Ya no podrá entrar.</p>
           </div>
           <p className="muted" style={{ fontSize: 13 }}>Sus ventas, cortes y pagos se quedan en los registros como &quot;Usuario eliminado&quot;, para que los reportes y la caja sigan cuadrando. Esto no se puede deshacer.</p>
           <div className="acciones">

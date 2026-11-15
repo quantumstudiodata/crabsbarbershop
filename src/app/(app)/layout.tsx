@@ -68,7 +68,7 @@ export default async function LayoutApp({ children }: { children: React.ReactNod
               avatar={s.usuario.avatar}
               ajustes={s.puede("usuarios.ver") || s.puede("servicios.ver") || s.puede("citas.horarios") || PERMISOS_CONFIG.some((p) => s.puede(p))}
               historial={s.puede("ventas.ver_todas") || atiende}
-              mas={{ extra: extraMovil, ideas: s.puede("ideas.decidir"), ayuda: !soporte, soporte: soporte && !s.vista }}
+              mas={{ extra: extraMovil, ideas: s.puede("ideas.decidir"), ayuda: !soporte, soporte: soporte && !s.vista, guia: !s.vista }}
               formaPago={atiende ? describirRegla(copiaRegla(elegirRegla(await reglasDe(s.barberia.id), s.usuario.id, null, new Date())), formatoDinero) : null}
             />
           </div>

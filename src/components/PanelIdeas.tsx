@@ -52,17 +52,17 @@ export function PanelIdeas() {
 
   return (
     <>
-      <button type="button" className="orbe" aria-label="Ideas para vender más" title="Ideas" onClick={() => setAbierto(true)}>
+      <button type="button" className="orbe" aria-label="Sugerencias para vender más" title="Sugerencias para vender más" onClick={() => setAbierto(true)}>
         <Icono n="chispa" />
       </button>
       {abierto && createPortal(
         <div className="capa" style={{ background: "rgba(30,42,54,.18)", placeItems: "stretch", padding: 0 }} onMouseDown={(e) => { if (e.target === e.currentTarget) setAbierto(false); }}>
-          <aside className="panel-ideas" role="dialog" aria-modal="true" aria-label="Ideas">
+          <aside className="panel-ideas" role="dialog" aria-modal="true" aria-label="Sugerencias para vender más">
             <div className="aurora" aria-hidden="true" />
             {CHISPAS.map(([x, y], i) => <i key={i} className="chispa" style={{ left: `${x}%`, top: `${y}%`, animationDelay: `${i * 0.5}s` }} aria-hidden="true" />)}
             <div className="entre">
               <span className="fila" style={{ gap: 8 }}>
-                <span className="lab" style={{ color: "var(--fg)" }}>Ideas para vender más</span>
+                <span className="lab" style={{ color: "var(--fg)" }}>Sugerencias para vender más</span>
                 <Ayuda titulo="¿De dónde salen?">
                   Se arman con dos cosas: los horarios en que llegan menos clientes, según las ventas registradas, y las fechas del año que mueven a una barbería.
                   <br /><br />Son solo sugerencias. Nada se publica ni cambia de precio por sí solo.

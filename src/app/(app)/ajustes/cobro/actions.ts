@@ -180,7 +180,7 @@ const FUNCIONES = {
   promociones: ["usaPromociones", "Promociones", "configuracion.cobros"],
   reembolsos: ["aceptaReembolsos", "Aceptar reembolsos", "configuracion.cobros"],
   apertura: ["aperturaManual", "Apertura de caja", "configuracion.caja"],
-  corte: ["corteObligatorio", "Cierre de caja obligatorio", "configuracion.caja"],
+  corte: ["corteObligatorio", "Corte de caja obligatorio", "configuracion.caja"],
   evidencia: ["usaEvidenciaCorte", "Evidencias del corte de caja", "configuracion.caja"],
   comprobantes: ["usaComprobantes", "Registro de comprobantes", "configuracion.egresos"],
   obligatorio: ["comprobanteObligatorio", "Comprobante obligatorio en egresos", "configuracion.egresos"],

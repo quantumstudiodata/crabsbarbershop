@@ -10,7 +10,7 @@ import { esFechaValida, fechaLocal, fechaLarga, horaCorta, ZONA } from "@/lib/fe
 import { Filtros } from "./Filtros";
 import { Lista, type FilaHistorial } from "./Lista";
 
-export const metadata = { title: "Historial" };
+export const metadata = { title: "Actividad" };
 
 const POR_PAGINA_ESCRITORIO = 10;
 const CATEGORIAS: [string, string][] = [["", "Todas las categorías"], ["venta", "Ventas"], ["caja", "Caja"], ["gasto", "Egresos"], ["precio", "Precios"], ["ajuste", "Configuración"], ["usuario", "Usuarios"], ["equipo", "Pagos al equipo"], ["idea", "Ideas"], ["acceso", "Accesos"]];
@@ -86,7 +86,7 @@ export default async function Historial({ searchParams }: { searchParams: Promis
   return (
     <>
       <div className="hist-cab">
-        <h1 className="titulo">Historial</h1>
+        <h1 className="titulo">Actividad</h1>
         <p className="sub">{completo ? "Registro permanente de lo que pasa en el sistema. Nada se borra." : "Lo que pasa en el día a día: ventas, caja y cambios de servicios y precios."}</p>
       </div>
       <Filtros categorias={categorias} gente={gente} hoy={hoy} periodo={p} />

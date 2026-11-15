@@ -90,7 +90,7 @@ async function equipo(bId: string, desde: string, hasta: string, zona: string): 
     db.select().from(schema.pagosComision).where(and(eq(schema.pagosComision.barberiaId, bId), gte(schema.pagosComision.semana, lunesDe(desde)), lte(schema.pagosComision.semana, hasta))),
   ]);
   const pagadas = ventas.filter((v) => v.estado === "pagada");
-  const filas: Filas = [["Persona", "Forma de pago", "Servicios", "Ventas generadas", "Comisión generada", "Propinas", "Pagos del negocio", "Renta pagada"]];
+  const filas: Filas = [["Persona", "Cómo se le paga", "Servicios", "Ventas generadas", "Comisión generada", "Propinas", "Pagos del negocio", "Renta pagada"]];
   for (const p of gente) {
     const cs = pagadas.flatMap((v) => v.conceptos.filter((c) => c.barberoId === p.id));
     const regla = copiaRegla(elegirRegla(reglas, p.id, null, new Date()));

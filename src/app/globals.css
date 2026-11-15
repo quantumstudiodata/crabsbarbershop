@@ -5546,3 +5546,14 @@ html:has(.fx-raiz .mc) body::before, html:has(.fx-raiz .mc) body::after { displa
   .fila-s.plana .t-s { min-width: 0; flex: 1; }
   .error-s .error-tit { font-size: 13.5px; margin: 4px 0; }
 }
+
+/* Caja: sin la cifra de efectivo, las acciones siguen a la derecha. Cuentas del efectivo plegadas en el cierre. */
+.estado-c .acc-c { margin-left: auto; }
+.ck-cuentas > summary { cursor: pointer; font-size: 13px; font-weight: 600; color: var(--muted); padding: 4px 0; list-style-position: inside; }
+.ck-cuentas[open] > summary { margin-bottom: 8px; }
+
+/* Bienvenida de la guía: dejarla para después u omitirla. */
+.gu-otras { display: flex; flex-wrap: wrap; justify-content: center; gap: 8px; margin-top: 16px; opacity: 0; animation: gu-sube .6s ease 1.8s forwards; }
+.gu-otras button { border: 1px solid rgba(255,255,255,.12); background: rgba(255,255,255,.05); color: #a9b4c3; font: 500 13px var(--f-body); padding: 9px 16px; border-radius: 999px; cursor: pointer; }
+.gu-otras button:hover { color: #eef2f6; background: rgba(255,255,255,.1); }
+.gu-dura { text-transform: none; letter-spacing: 0; font: 400 12px var(--f-body); }

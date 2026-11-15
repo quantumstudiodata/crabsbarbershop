@@ -63,7 +63,7 @@ export function periodoDePago(r: Calendario, hoy: string): { desde: string; hast
 
 /** Modalidad corta para las filas: "Comisión 50%", "Sueldo más 10%", "Renta de silla". */
 export function modalidadCorta(r: ReglaCopia | null): string {
-  if (!r) return "Sin forma de pago";
+  if (!r) return "Falta definir cómo se le paga";
   const pct = `${r.porcentaje / 100}%`;
   switch (r.tipo) {
     case "porcentaje": return `Comisión ${pct}`;

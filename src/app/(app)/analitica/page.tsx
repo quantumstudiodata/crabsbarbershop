@@ -142,7 +142,7 @@ export default async function Resumen({ searchParams }: { searchParams: Promise<
           </div>
         </section>
         <section className="glass rs-card subir d1" aria-label="Resultado financiero">
-          <div className="rs-cab"><b>Resultado financiero</b>{s.puede("reportes.ver") && <Ir href="/analitica/finanzas" titulo="Ir a Finanzas" />}</div>
+          <div className="rs-cab"><b>Resultado financiero</b>{s.puede("reportes.ver") && <Ir href="/analitica/finanzas" titulo="Ir a Movimientos" />}</div>
           <div className="rs-f"><span><span>Ingresos</span><small>Ventas netas {$(r.netas)}{rentas ? ` y rentas ${$(rentas)}` : ""}</small></span><b>{$(ingresos)}</b></div>
           <div className="rs-f"><span><span>Egresos del negocio</span><small>{topCats.length ? lista(topCats) : "Sin egresos registrados"}</small></span><b>{egresos ? `−${$(egresos)}` : "$0"}</b></div>
           {auto ? (

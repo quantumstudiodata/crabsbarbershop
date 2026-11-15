@@ -51,10 +51,27 @@ export function Guia({ vistos, puntos, nombre }: { vistos: string[]; puntos: str
   const fin = hechos.has("fin");
   const actual = lista.find((p) => !hechos.has(p));
   const [fase, setFase] = useState<"bienvenida" | "guia" | "festejo" | "cierre" | null>(null);
+  // La guía nunca obliga: se puede dejar para después (vuelve en la siguiente visita) u omitir (queda en el menú de la cuenta).
+  // El avance se conserva: al volver, sigue donde se quedó. Si ya se terminó, se puede repasar sin tocar lo guardado.
+  const [cerrada, setCerrada] = useState(true);
+  const [repaso, setRepaso] = useState(false);
+  useEffect(() => {
+    let pausa = false;
+    try { pausa = sessionStorage.getItem("crabs-guia-pausa") === "1"; } catch { /* sin almacenamiento */ }
+    setCerrada(pausa || vistos.includes("guia-omitida"));
+    const abrir = () => {
+      try { sessionStorage.removeItem("crabs-guia-pausa"); } catch { /* sin almacenamiento */ }
+      setHechos((h) => { if (!h.has("fin")) return h; setRepaso(true); return new Set(["inicio"]); });
+      setFase("guia"); setCerrada(false);
+    };
+    window.addEventListener("crabs:guia", abrir);
+    return () => window.removeEventListener("crabs:guia", abrir);
+  }, [vistos]);
+  const pausar = useCallback(() => { try { sessionStorage.setItem("crabs-guia-pausa", "1"); } catch { /* sin almacenamiento */ } setCerrada(true); }, []);
   useEffect(() => { if (esc === null || fin) return; setFase((f) => f ?? (hechos.has("inicio") ? "guia" : "bienvenida")); }, [esc, fin, hechos]);
 
   // Mientras dura la guía, ningún formulario se envía: se aprende sin registrar nada.
-  const activa = !!fase && !fin;
+  const activa = !!fase && !fin && !cerrada;
   useEffect(() => {
     if (!activa) return;
     // Abrir la caja sí se permite: es la operación normal del inicio del día y sin ella no se puede seguir.
@@ -66,11 +83,12 @@ export function Guia({ vistos, puntos, nombre }: { vistos: string[]; puntos: str
 
   const guardar = useCallback((ids: string[]) => {
     setHechos((h) => { const n = new Set(h); ids.forEach((i) => n.add(i)); return n; });
-    marcarConsejos(ids.map((i) => `guia-${i}`)).catch(() => {});
-  }, []);
+    if (!repaso) marcarConsejos(ids.map((i) => `guia-${i}`)).catch(() => {});
+  }, [repaso]);
 
-  if (!fase || fin || esc === null) return null;
-  if (fase === "bienvenida") return <Bienvenida nombre={nombre} empezar={() => { guardar(["inicio"]); setFase("guia"); }} />;
+  if (!fase || fin || esc === null || cerrada) return null;
+  if (fase === "bienvenida") return <Bienvenida nombre={nombre} empezar={() => { guardar(["inicio"]); setFase("guia"); }} despues={pausar}
+    omitir={() => { marcarConsejos(["guia-omitida"]).catch(() => {}); setCerrada(true); }} />;
   if (fase === "cierre" || !actual) return <Cierre nombre={nombre} terminar={() => { guardar(["fin"]); router.push("/"); }} />;
   return (
     <Recorrido
@@ -80,6 +98,7 @@ export function Guia({ vistos, puntos, nombre }: { vistos: string[]; puntos: str
       hechos={hechos}
       esc={esc}
       ruta={ruta}
+      pausar={pausar}
       ir={(r) => router.push(r)}
       listo={() => {
         const quedan = lista.filter((p) => p !== actual && !hechos.has(p)).length;
@@ -90,8 +109,8 @@ export function Guia({ vistos, puntos, nombre }: { vistos: string[]; puntos: str
   );
 }
 
-function Recorrido({ punto, lista, hechos, esc, ruta, ir, listo }: {
-  punto: string; lista: string[]; hechos: Set<string>; esc: boolean; ruta: string; ir: (r: string) => void; listo: () => void;
+function Recorrido({ punto, lista, hechos, esc, ruta, ir, listo, pausar }: {
+  punto: string; lista: string[]; hechos: Set<string>; esc: boolean; ruta: string; ir: (r: string) => void; listo: () => void; pausar: () => void;
 }) {
   const P = PUNTOS[punto];
   const pasos = useMemo(() => P.pasos.filter((p) => !p.solo || (p.solo === "esc") === esc), [P, esc]);
@@ -264,7 +283,7 @@ function Recorrido({ punto, lista, hechos, esc, ruta, ir, listo }: {
         <header onClick={() => setAbierta((a) => !a)}>
           <div><b>Tu primera vez</b><span>{lista.filter((x) => hechos.has(x)).length} de {lista.length}</span>
             {/* Siempre a la vista, también en el teléfono con la lista cerrada. */}
-            <button type="button" className="gu-salir-v" onClick={(e) => { e.stopPropagation(); salir(); }}>Salir</button>
+            <button type="button" className="gu-salir-v" onClick={(e) => { e.stopPropagation(); pausar(); }}>Seguir después</button>
           </div>
           <span className="gu-prog"><i style={{ width: `${(lista.filter((x) => hechos.has(x)).length / lista.length) * 100}%` }} /></span>
         </header>
@@ -292,7 +311,7 @@ function Asoma() {
   );
 }
 
-function Bienvenida({ nombre, empezar }: { nombre: string; empezar: () => void }) {
+function Bienvenida({ nombre, empezar, despues, omitir }: { nombre: string; empezar: () => void; despues: () => void; omitir: () => void }) {
   const [sale, setSale] = useState(false);
   useLayoutEffect(() => { document.body.style.overflow = "hidden"; return () => { document.body.style.overflow = ""; }; }, []);
   return (
@@ -303,8 +322,12 @@ function Bienvenida({ nombre, empezar }: { nombre: string; empezar: () => void }
       <div className="gu-bien-c">
         <h1 className="gu-saludo" aria-label={`Hola, ${nombre}`}><span><i>Hola,</i></span> <span><b>{nombre}</b></span></h1>
         <p className="gu-frase">Te llevo por toda la app. Te señalo dónde tocar y para qué sirve cada botón.</p>
-        <button type="button" className="gu-empezar" onClick={() => { setSale(true); setTimeout(empezar, 800); }}><Asoma />Empezar<span>→</span></button>
-        <small className="gu-dura">Unos 5 minutos</small>
+        <button type="button" className="gu-empezar" onClick={() => { setSale(true); setTimeout(empezar, 800); }}><Asoma />Comenzar guía<span>→</span></button>
+        <div className="gu-otras">
+          <button type="button" onClick={despues}>Recordármelo después</button>
+          <button type="button" onClick={omitir}>Omitir por ahora</button>
+        </div>
+        <small className="gu-dura">A tu ritmo. Puedes salir y seguir trabajando cuando quieras</small>
       </div>
     </div>
   );

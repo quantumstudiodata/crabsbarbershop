@@ -20,7 +20,7 @@ import { Movimientos, type DiaMovimientos, type Movimiento } from "./Movimientos
 import { liquidarAutomaticos } from "@/lib/pagosAuto";
 import { asentarCitasPagadas } from "@/lib/pagos";
 
-export const metadata = { title: "Finanzas" };
+export const metadata = { title: "Movimientos" };
 
 const $ = formatoDinero;
 const SUELDO = new Set(["sueldo", "mixto"]);
@@ -165,7 +165,7 @@ export default async function Finanzas({ searchParams }: { searchParams: Promise
       <div className="paso-c resta"><span><b>Gastos del negocio</b><small>egresos registrados</small></span><b className="num">{egresos ? `−${$(egresos)}` : $(0)}</b></div>
       {[...gastosP].sort((a, b) => b.monto - a.monto).map((g) => <div key={g.categoria} className="sub-c"><span>{g.categoria}</span><span className="num">{$(g.monto)}</span></div>)}
       <div className="paso-c total"><span><b>Lo que quedó</b></span><b className="num">{firma(quedo)}</b></div>
-      <p className="ayuda-txt">Los pagos al equipo se suman cuando alguien los registra con el botón Pagar en Ventas, eligiendo al barbero.</p>
+      <p className="ayuda-txt">Los pagos al equipo se suman cuando alguien los registra en Equipo, con Pagar al equipo.</p>
     </div>
   );
 

@@ -38,10 +38,9 @@ export function BarraCaja({ turno, folioVenta }: { turno: Turno; folioVenta: str
     <div className="estado-c subir">
       <span className="vivo"><b>Caja abierta</b></span>
       <span className="meta-c">{turno.desde} - Abrió {turno.abrio} - Folio {folioVenta}</span>
-      <span className="efectivo-c">Efectivo en caja <b>{formatoDinero(turno.esperado)}</b></span>
       <span className="acc-c">
-        <button type="button" className="fantasma" onClick={() => abrir("retiro")}><Icono n="salida" />Retiro</button>
-        <button type="button" className="fantasma" onClick={() => abrir("gasto")}><Icono n="etiqueta" />Gasto</button>
+        <button type="button" className="fantasma" onClick={() => abrir("retiro")}><Icono n="salida" />Sacar o meter efectivo</button>
+        <button type="button" className="fantasma" onClick={() => abrir("gasto")}><Icono n="etiqueta" />Gasto de caja</button>
         <button type="button" className="bt chico solo" onClick={() => abrir("corte")}><Icono n="candado" />Corte de caja</button>
       </span>
     </div>
@@ -62,12 +61,12 @@ function CajaMovil({ turno }: { turno: Turno }) {
   return (
     <div className="estado-m subir">
       <span className="vivo"><b>Caja abierta</b></span>
-      <span className="muted">{formatoDinero(turno.esperado)} en caja</span>
-      <button type="button" className="em-pts" aria-label="Retiro, gasto o corte de caja" aria-haspopup="menu" aria-expanded={menu} onClick={() => setMenu((x) => !x)}><Icono n="puntos" /></button>
+      <span className="muted">desde las {turno.desde}</span>
+      <button type="button" className="em-pts" aria-label="Efectivo, gasto o corte de caja" aria-haspopup="menu" aria-expanded={menu} onClick={() => setMenu((x) => !x)}><Icono n="puntos" /></button>
       {menu && (
         <div className="menu em-menu" role="menu">
-          <button type="button" role="menuitem" className="it" onClick={() => ir("retiro")}><Icono n="salida" />Retiro</button>
-          <button type="button" role="menuitem" className="it" onClick={() => ir("gasto")}><Icono n="etiqueta" />Gasto</button>
+          <button type="button" role="menuitem" className="it" onClick={() => ir("retiro")}><Icono n="salida" />Sacar o meter efectivo</button>
+          <button type="button" role="menuitem" className="it" onClick={() => ir("gasto")}><Icono n="etiqueta" />Gasto de caja</button>
           <button type="button" role="menuitem" className="it" onClick={() => ir("corte")}><Icono n="candado" />Corte de caja</button>
         </div>
       )}
@@ -101,7 +100,7 @@ export function CajaPendiente({ dia, opera }: { dia: string; opera: boolean }) {
   return (
     <section className="caja-puerta alerta subir">
       <span className="icono-caja"><Icono n="reloj" /></span>
-      <span className="lab">Cierre de caja</span>
+      <span className="lab">Corte de caja</span>
       <h1 className="titulo">Tienes un corte de caja pendiente</h1>
       <p className="muted">La caja del {dia} aún no se ha cerrado.<br />Realiza el corte para registrar el efectivo y finalizar la jornada.</p>
       {opera ? <button type="button" className="bt grande" style={{ width: "min(360px, 100%)" }} onClick={() => abrir("corte")}>Realizar corte de caja<Fl /></button>
@@ -136,7 +135,7 @@ function Resumen({ r, cerrar }: { r: ResumenCorte; cerrar: () => void }) {
   );
 }
 
-export function CajaModal({ inicial, turno, limiteDiferencia, categorias, evidencias = false }: { inicial: Vista | null; turno: Turno | null; limiteDiferencia: number; categorias: string[]; evidencias?: boolean }) {
+export function CajaModal({ inicial, turno, limiteDiferencia, categorias, evidencias = false, egresos = false }: { inicial: Vista | null; turno: Turno | null; limiteDiferencia: number; categorias: string[]; evidencias?: boolean; /** Puede registrar egresos en Movimientos. */ egresos?: boolean }) {
   const [vista, setVista] = useState<Vista | null>(inicial);
   const [eMov, accMov, guardandoMov] = useActionState<EstadoCaja, FormData>(registrarMovimiento, {});
   const [eGasto, accGasto, guardandoGasto] = useActionState<EstadoCaja, FormData>(registrarGasto, {});
@@ -164,15 +163,16 @@ export function CajaModal({ inicial, turno, limiteDiferencia, categorias, eviden
   if (!vista || !turno) return null;
 
   if (vista === "retiro") {
-    const sugeridos = tipoMov === "retiro" ? ["Depósito al banco", "Pago de servicios"] : ["Más cambio", "Reposición del fondo"];
+    const sugeridos = tipoMov === "retiro" ? ["Depósito al banco", "Resguardo"] : ["Más cambio", "Reposición del fondo"];
     return (
       <Modal abierto cerrar={cerrar} etiqueta="Caja" titulo={tipoMov === "retiro" ? "Sacar efectivo" : "Meter efectivo"}>
         <form action={accMov} className="pila">
           <input type="hidden" name="tipo" value={tipoMov} />
           <div className="seg" role="radiogroup" aria-label="Tipo">
-            <button type="button" className={tipoMov === "retiro" ? "on" : ""} onClick={() => setTipoMov("retiro")}><Icono n="salida" />Retiro</button>
-            <button type="button" className={tipoMov === "entrada" ? "on" : ""} onClick={() => setTipoMov("entrada")}><Icono n="entrada" />Entrada</button>
+            <button type="button" className={tipoMov === "retiro" ? "on" : ""} onClick={() => setTipoMov("retiro")}><Icono n="salida" />Sacar</button>
+            <button type="button" className={tipoMov === "entrada" ? "on" : ""} onClick={() => setTipoMov("entrada")}><Icono n="entrada" />Meter</button>
           </div>
+          <p className="ayuda-txt" style={{ margin: 0 }}>No es un gasto. Solo cambia el efectivo que debe haber en la caja.</p>
           <input className="input grande" name="monto" inputMode="decimal" placeholder="$0" required autoFocus aria-label="Monto" />
           <div className="pila-chica">
             <div className="billetes">{sugeridos.map((x) => <button type="button" key={x} className={concepto === x ? "on" : ""} onClick={() => setConcepto(x)}>{x}</button>)}</div>
@@ -193,6 +193,7 @@ export function CajaModal({ inicial, turno, limiteDiferencia, categorias, eviden
           <input className="input grande" name="monto" inputMode="decimal" placeholder="$0" required autoFocus aria-label="Monto" />
           <input className="input" name="concepto" value={gasto} onChange={(e) => setGasto(e.target.value)} placeholder="En qué se gastó" required aria-label="En qué se gastó" />
           <div className="billetes">{categorias.map((c) => <button type="button" key={c} className={categoria === c ? "on" : ""} onClick={() => elegirCategoria(c)}>{c}</button>)}</div>
+          <p className="ayuda-txt" style={{ margin: 0 }}>Se resta del efectivo del corte de hoy y aparece en Movimientos.{egresos ? <> ¿Lo pagaste con transferencia o tarjeta? <a className="enlace" href="/analitica/finanzas?egreso=1">Regístralo como egreso</a>.</> : null}</p>
           {eGasto.error && <p className="aviso error">{eGasto.error}</p>}
           <div className="acciones"><button className="bt" disabled={guardandoGasto}>{guardandoGasto ? "Guardando…" : "Guardar"}<Fl /></button></div>
         </form>
@@ -322,11 +323,16 @@ function CortePasos({ turno, accion, cerrando, error, contado, setContado, limit
         <div className="pila" hidden={paso !== n("Efectivo")}>
           <label className="campo">
             <span>¿Cuánto efectivo contaste?</span>
-            <input className="input grande" name="contado" inputMode="decimal" placeholder={formatoDinero(esperado)} value={contado} onChange={(e) => setContado(e.target.value)} required />
+            <input className="input grande" name="contado" inputMode="decimal" placeholder="$0" autoComplete="off" value={contado} onChange={(e) => setContado(e.target.value)} required />
           </label>
-          {dif !== null && <span className={`conteo-l ${dif === 0 ? "ok" : "dif"}`}><Icono n={dif === 0 ? "palomita" : "reloj"} />{dif === 0 ? "Coincide con el sistema" : dif > 0 ? `Sobran ${formatoDinero(dif)}` : `Faltan ${formatoDinero(-dif)}`}</span>}
+          <p className="ayuda-txt" style={{ margin: 0 }}>Cuenta los billetes y las monedas de la caja y escribe el total. Al continuar verás si coincide con lo registrado.</p>
+        </div>
+
+        <div className="pila" hidden={!esCierre}>
+          {dif !== null && <span className={`conteo-l ${dif === 0 ? "ok" : "dif"}`}><Icono n={dif === 0 ? "palomita" : "reloj"} />{dif === 0 ? "Coincide con lo registrado" : dif > 0 ? `Sobran ${formatoDinero(dif)}` : `Faltan ${formatoDinero(-dif)}`}</span>}
+          <details className="ck-cuentas">
+            <summary>Ver las cuentas del efectivo</summary>
           <div className="ck-con">
-            <span className="ck-lab">Conciliación de efectivo</span>
             <div><span>Fondo inicial</span><span className="num">{formatoDinero(m.fondoInicial)}</span></div>
             <div><span>Ventas en efectivo</span><span className="num">+{formatoDinero(m.cobrosEfectivo)}</span></div>
             {m.propinasEfectivo > 0 && <div><span>Propinas en efectivo</span><span className="num">+{formatoDinero(m.propinasEfectivo)}</span></div>}
@@ -335,6 +341,7 @@ function CortePasos({ turno, accion, cerrando, error, contado, setContado, limit
             {deCaja > 0 && <div><span>Pago de comisiones</span><span className="num">−{formatoDinero(deCaja)}</span></div>}
             <div className="t"><span>Efectivo esperado</span><b className="num">{formatoDinero(esperado)}</b></div>
           </div>
+          </details>
         </div>
 
         {conComprobantes && (
@@ -347,6 +354,7 @@ function CortePasos({ turno, accion, cerrando, error, contado, setContado, limit
         <div className="pila" hidden={!esCierre}>
           <div className="ck-con">
             <div><span>Total vendido</span><b className="num">{formatoDinero(total)}</b></div>
+            <div><span>Efectivo esperado</span><span className="num">{formatoDinero(esperado)}</span></div>
             <div><span>Efectivo contado</span><span>{c === null ? "Sin contar" : `${formatoDinero(c)}, ${dif === 0 ? "coincide" : dif! > 0 ? `sobran ${formatoDinero(dif!)}` : `faltan ${formatoDinero(-dif!)}`}`}</span></div>
             {conComprobantes && <div><span>Comprobantes</span><span>{faltan ? `Falta en ${faltan} ${faltan === 1 ? "forma de pago" : "formas de pago"}` : `${archivos} ${archivos === 1 ? "archivo" : "archivos"}, al menos uno por forma de pago`}</span></div>}
             {qr > 0 && <div><span>Pago con QR</span><span>{qr} {qr === 1 ? "verificado" : "verificados"} por Stripe</span></div>}
@@ -364,7 +372,7 @@ function CortePasos({ turno, accion, cerrando, error, contado, setContado, limit
           {paso > 1 ? <button type="button" className="ck-atras" aria-label="Anterior" onClick={() => setPaso(paso - 1)}><Icono n="izquierda" /></button> : <span />}
           {esCierre
             ? <button key="cerrar" type="submit" className="bt" disabled={cerrando || c === null || (conComprobantes && faltan > 0)}>{cerrando ? "Cerrando…" : "Cerrar caja"}<Fl /></button>
-            : <button key="seguir" type="button" className="bt" disabled={!puedeSeguir} onClick={() => setPaso(paso + 1)}>{nombres[paso] === "Comisiones" ? "Ver comisiones" : nombres[paso] === "Efectivo" ? "Contar efectivo" : nombres[paso] === "Comprobantes" ? "Comprobantes" : "Continuar"}<Fl /></button>}
+            : <button key="seguir" type="button" className="bt" disabled={!puedeSeguir} onClick={() => setPaso(paso + 1)}>{nombres[paso] === "Comisiones" ? "Ver comisiones" : nombres[paso] === "Efectivo" ? "Contar efectivo" : nombres[paso] === "Comprobantes" ? "Comprobantes" : nombre === "Efectivo" ? "Comparar" : "Continuar"}<Fl /></button>}
         </div>
       </form>
     </Modal>

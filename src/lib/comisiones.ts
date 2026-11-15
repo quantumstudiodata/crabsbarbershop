@@ -106,7 +106,7 @@ export function resumenSemana(input: {
 }
 
 export function describirRegla(r: ReglaCopia | null, formato: (c: number) => string): string {
-  if (!r) return "Sin forma de pago configurada";
+  if (!r) return "Falta definir cómo se le paga";
   const pct = `${r.porcentaje / 100}%`;
   const per = NOMBRE_PERIODO[(r.periodo as Periodo) ?? "semana"] ?? "a la semana";
   switch (r.tipo) {

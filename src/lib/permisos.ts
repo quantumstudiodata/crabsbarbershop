@@ -8,7 +8,7 @@ export const PERMISOS = {
   "ventas.modificar": "Modificar ventas realizadas",
   "servicios.editar": "Editar servicios y precios",
   "caja.operar": "Abrir y cerrar caja",
-  "caja.retiros": "Registrar retiros y gastos de caja",
+  "caja.retiros": "Sacar o meter efectivo y registrar gastos de caja",
   "cortes.ver": "Ver cortes de caja",
   "caja.corregir": "Corregir cortes",
   "gastos.ver": "Ver egresos",
@@ -26,8 +26,8 @@ export const PERMISOS = {
   "configuracion.caja": "Editar configuración de caja",
   "configuracion.metas": "Editar metas de ventas",
   "configuracion.egresos": "Editar egresos y finanzas",
-  "reportes.ver": "Ver analítica y finanzas",
-  "reportes.exportar": "Descargar analítica",
+  "reportes.ver": "Ver reportes y movimientos",
+  "reportes.exportar": "Descargar reportes",
   "ideas.decidir": "Gestionar ideas",
   "citas.ver": "Consultar citas",
   "citas.modificar": "Registrar y modificar citas",
@@ -145,7 +145,7 @@ export const GRUPOS_PERMISOS: { titulo: string; permisos: Permiso[] }[] = [
   { titulo: "Equipo y administración", permisos: ["ventas.ver_todas", "usuarios.ver", "usuarios.editar", "servicios.ver", "resenas.responder"] },
   { titulo: "Citas y agenda", permisos: ["citas.ver", "citas.modificar", "citas.cancelar", "citas.pagos", "citas.horarios"] },
   { titulo: "Configurar negocio", permisos: ["configuracion.ver", "configuracion.cobros", "configuracion.caja", "configuracion.metas", "configuracion.egresos", "configuracion.citas"] },
-  { titulo: "Analítica y finanzas", permisos: ["reportes.ver", "reportes.exportar"] },
+  { titulo: "Reportes y movimientos", permisos: ["reportes.ver", "reportes.exportar"] },
   { titulo: "Funciones adicionales", permisos: ["ideas.decidir"] },
 ];
 

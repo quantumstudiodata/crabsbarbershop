@@ -69,31 +69,31 @@ export const PUNTOS: Record<string, Punto> = {
     ],
   },
   retiro: {
-    id: "retiro", nombre: "Sacar efectivo", ejemplo: "Ejemplo: sacar $500 de la caja para depositarlos.", ruta: "/cobrar", ir: ['a[href="/cobrar"]'],
+    id: "retiro", nombre: "Sacar o meter efectivo", ejemplo: "Ejemplo: sacar $500 de la caja para depositarlos.", ruta: "/cobrar", ir: ['a[href="/cobrar"]'],
     pasos: [
-      { sel: "button.fantasma|Retiro", modo: "pasa", solo: "esc", t: "Sacar dinero de la caja", x: "Cada vez que alguien saca efectivo de la caja, se anota aquí. Así el corte cuadra al final del día.", h: "Toca Retiro" },
-      { sel: "button.em-pts", modo: "pasa", solo: "mov", t: "Sacar dinero de la caja", x: "Retiro, gasto y corte de caja viven en este botón.", h: "Toca los tres puntos" },
-      { sel: ".em-menu button|Retiro", modo: "pasa", solo: "mov", t: "Elige Retiro", x: "Cada vez que alguien saca efectivo, se anota aquí para que el corte cuadre.", h: "Toca Retiro" },
+      { sel: "button.fantasma|Sacar o meter efectivo", modo: "pasa", solo: "esc", t: "Sacar dinero de la caja", x: "Cada vez que alguien saca efectivo de la caja, se anota aquí. Así el corte cuadra al final del día.", h: "Toca Sacar o meter efectivo" },
+      { sel: "button.em-pts", modo: "pasa", solo: "mov", t: "Sacar dinero de la caja", x: "Efectivo, gasto y corte de caja viven en este botón.", h: "Toca los tres puntos" },
+      { sel: ".em-menu button|Sacar o meter efectivo", modo: "pasa", solo: "mov", t: "Elige Sacar o meter efectivo", x: "Cada vez que alguien saca efectivo, se anota aquí para que el corte cuadre.", h: "Toca Sacar o meter efectivo" },
       { sel: '.modal input[name="monto"], [role=dialog] input[name="monto"]', modo: "leer", t: "¿Cuánto sacas?", x: "Escribe la cantidad. Por ejemplo, $500 para llevarlos al banco.", h: "Toca Siguiente" },
       { sel: "[role=dialog] .billetes", modo: "leer", opcional: true, t: "¿Para qué?", x: "Elige el motivo o escríbelo. Queda guardado quién lo sacó y a qué hora.", h: "Toca Siguiente" },
-      { sel: "[role=dialog] form .acciones .bt", modo: "final", despues: CERRAR, t: "Guárdalo", x: "Con Guardar, el retiro se descuenta del efectivo que debe haber en la caja.", h: "Toca Guardar" },
+      { sel: "[role=dialog] form .acciones .bt", modo: "final", despues: CERRAR, t: "Guárdalo", x: "Con Guardar, lo que sacaste se descuenta del efectivo que debe haber en la caja.", h: "Toca Guardar" },
     ],
   },
   gasto: {
-    id: "gasto", nombre: "Registrar un gasto", ejemplo: "Ejemplo: pagar el garrafón de agua con dinero de la caja.", ruta: "/cobrar", ir: ['a[href="/cobrar"]'],
+    id: "gasto", nombre: "Registrar un gasto de caja", ejemplo: "Ejemplo: pagar el garrafón de agua con dinero de la caja.", ruta: "/cobrar", ir: ['a[href="/cobrar"]'],
     pasos: [
-      { sel: "button.fantasma|Gasto", modo: "pasa", solo: "esc", t: "Gastos pagados con la caja", x: "Si pagas algo con el efectivo de la caja, como el garrafón o productos de limpieza, se anota aquí.", h: "Toca Gasto" },
+      { sel: "button.fantasma|Gasto de caja", modo: "pasa", solo: "esc", t: "Gastos pagados con la caja", x: "Si pagas algo con el efectivo de la caja, como el garrafón o productos de limpieza, se anota aquí.", h: "Toca Gasto de caja" },
       { sel: "button.em-pts", modo: "pasa", solo: "mov", t: "Gastos pagados con la caja", x: "Si pagas algo con el efectivo de la caja, se anota desde este botón.", h: "Toca los tres puntos" },
-      { sel: ".em-menu button|Gasto", modo: "pasa", solo: "mov", t: "Elige Gasto", x: "Por ejemplo, el garrafón de agua.", h: "Toca Gasto" },
+      { sel: ".em-menu button|Gasto de caja", modo: "pasa", solo: "mov", t: "Elige Gasto de caja", x: "Por ejemplo, el garrafón de agua.", h: "Toca Gasto de caja" },
       { sel: '[role=dialog] input[name="monto"]', modo: "leer", t: "¿Cuánto costó?", x: "Escribe la cantidad, por ejemplo $40 del garrafón.", h: "Toca Siguiente" },
-      { sel: "[role=dialog] .billetes", modo: "leer", opcional: true, t: "Elige la categoría", x: "Así en Finanzas se ve en qué se va el dinero del negocio.", h: "Toca Siguiente" },
+      { sel: "[role=dialog] .billetes", modo: "leer", opcional: true, t: "Elige la categoría", x: "Así en Movimientos se ve en qué se va el dinero del negocio.", h: "Toca Siguiente" },
       { sel: "[role=dialog] form .acciones .bt", modo: "final", despues: CERRAR, t: "Guárdalo", x: "Con Guardar, el gasto se resta de la caja y aparece en los egresos del negocio.", h: "Toca Guardar" },
     ],
   },
   egreso: {
-    id: "egreso", nombre: "Registrar un gasto", ejemplo: "Ejemplo: el pago de la renta o del internet.", ruta: "/", ir: ['a[href="/"]'],
+    id: "egreso", nombre: "Registrar un egreso", ejemplo: "Ejemplo: el pago de la renta o del internet.", ruta: "/", ir: ['a[href="/"]'],
     pasos: [
-      { sel: 'a[href="/analitica/finanzas?egreso=1"]', modo: "final", t: "Gastos del negocio", x: "Aquí registras lo que paga el negocio: renta, luz, internet o productos. Se resta en Finanzas para ver la utilidad real.", h: "Toca Egreso" },
+      { sel: 'a[href="/analitica/finanzas?egreso=1"]', modo: "final", t: "Gastos del negocio", x: "Aquí registras lo que paga el negocio: renta, luz, internet o productos. Se resta en Movimientos para ver la utilidad real.", h: "Toca Egreso" },
     ],
   },
   corte: {
@@ -106,7 +106,7 @@ export const PUNTOS: Record<string, Punto> = {
       { sel: "[role=dialog] .ck-acc .bt", modo: "pasa", t: "Sigue al siguiente paso", x: "Toca el botón para continuar con el corte.", h: "Toca el botón" },
       { sel: "[role=dialog] .ck-com", modo: "leer", opcional: true, t: "Lo que le toca a cada quien", x: "La comisión que generó cada persona con las ventas de este corte. Si hoy toca pagar, eliges si sale de la caja, mañana o por transferencia.", h: "Toca Siguiente" },
       { sel: "[role=dialog] .ck-acc .bt|Contar efectivo", modo: "pasa", opcional: true, t: "Ahora a contar", x: "Toca para pasar al conteo del efectivo.", h: "Toca Contar efectivo" },
-      { sel: '[role=dialog] input[name="contado"]', modo: "leer", t: "¿Cuánto efectivo hay?", x: "Cuenta los billetes y monedas de la caja y escribe el total. La app te dice si coincide, si sobra o si falta.", h: "Toca Siguiente" },
+      { sel: '[role=dialog] input[name="contado"]', modo: "leer", t: "¿Cuánto efectivo hay?", x: "Cuenta los billetes y monedas de la caja y escribe el total. Después de escribirlo, la app te dice si coincide, si sobra o si falta.", h: "Toca Siguiente" },
       { sel: "[role=dialog] .ck-acc .bt", modo: "final", despues: CERRAR, t: "Cierra la caja", x: "En el último paso tocas Cerrar caja y el corte queda guardado con su folio.", h: "Toca el botón" },
     ],
   },
@@ -144,11 +144,11 @@ export const PUNTOS: Record<string, Punto> = {
     ],
   },
   analitica: {
-    id: "analitica", nombre: "Analítica", ejemplo: "Cuánto se vendió, cuánto se gastó y cuánto quedó.", ruta: "/analitica", ir: ['a[href="/analitica"]'],
+    id: "analitica", nombre: "Reportes", ejemplo: "Cuánto se vendió, cuánto se gastó y cuánto quedó.", ruta: "/analitica", ir: ['a[href="/analitica"]'],
     pasos: [
       { sel: ".rs-card", modo: "leer", t: "Cómo va el negocio", x: "Las ventas del mes contra el mes pasado, día por día.", h: "Toca Siguiente" },
       { sel: '.rs-card|Resultado financiero', modo: "leer", opcional: true, t: "Lo que de verdad quedó", x: "Ingresos menos gastos y pagos al equipo. Es la utilidad real.", h: "Toca Siguiente" },
-      { sel: 'a[href="/analitica/finanzas"]', modo: "leer", opcional: true, t: "Finanzas", x: "Ahí registras los gastos del negocio, como la renta, la luz o el internet.", h: "Toca Siguiente" },
+      { sel: 'a[href="/analitica/finanzas"]', modo: "leer", opcional: true, t: "Movimientos", x: "Ahí registras los gastos del negocio, como la renta, la luz o el internet.", h: "Toca Siguiente" },
     ],
   },
   equipo: {
