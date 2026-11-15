@@ -30,7 +30,8 @@ export async function ganadoDe(s: Sesion, zona: string, hoy: string): Promise<Ga
   }
 }
 
-export function TarjetaGanado({ g, className = "" }: { g: Ganado; className?: string }) {
+export function TarjetaGanado({ g, className = "", tarjeta = false }: { g: Ganado; className?: string; /** Como tarjeta propia en lugar de ir dentro de la de Hoy. */ tarjeta?: boolean }) {
+  if (tarjeta) return <section className={`glass ini-card ini-ganado-t ${className}`}><TarjetaGanado g={g} /></section>;
   const cuando = g.hoy ? "hoy" : `el ${fechaCorta(g.pago)}`;
   return (
     <div className={`ini-ganado ${className}`} role="group" aria-label={g.renta ? "Tu renta de silla" : "Lo que llevas ganado"}>

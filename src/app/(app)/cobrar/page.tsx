@@ -62,6 +62,11 @@ export default async function Cobrar({ searchParams }: { searchParams: Promise<{
       ventas: datos.ventas, ventasEfectivo: datos.ventasEfectivo, propinas: datos.propinasTotal, otros: datos.otrosPorMetodo.map((x) => ({ metodo: x.metodo, total: x.total, ventas: x.ventas })),
       comisiones: mio(comisiones), entregas: mio(entregas), verTodo, sinCobrar: sinCobrar?.n ?? 0,
       pagosEquipo: datos.movimientos.filter((x) => x.tipo === "retiro" && esPagoEquipo(x.concepto)).reduce((a, x) => a + x.monto, 0),
+      detalle: {
+        gastos: datos.gastos.map((g) => ({ concepto: g.concepto, monto: g.monto })),
+        sacado: datos.movimientos.filter((x) => x.tipo === "retiro" && !esPagoEquipo(x.concepto)).map((x) => ({ concepto: x.concepto, monto: x.monto })),
+        puesto: datos.movimientos.filter((x) => x.tipo === "entrada" && !esPagoAnulado(x.concepto)).map((x) => ({ concepto: x.concepto, monto: x.monto })),
+      },
       pagosAnulados: datos.movimientos.filter((x) => x.tipo === "entrada" && esPagoAnulado(x.concepto)).reduce((a, x) => a + x.monto, 0),
       otrosEgresos: s.puede("gastos.ver") ? (await db.select({ concepto: schema.gastos.concepto, metodo: schema.gastos.metodo, monto: schema.gastos.monto }).from(schema.gastos)
         .where(and(eq(schema.gastos.barberiaId, s.barberia.id), eq(schema.gastos.fecha, t.fechaOperativa), isNull(schema.gastos.turnoId), ne(schema.gastos.metodo, "efectivo"), isNull(schema.gastos.canceladoEn))))

@@ -164,7 +164,12 @@ function InicioVista(v: Vista) {
   const altoIzq = 110 + (v.meta ? 45 : 0) + (v.ganado ? 75 : 0) + (v.servicios > 0 ? 185 : 30);
   const altoDer = (v.pendientes.length ? 60 + Math.min(v.pendientes.length, 3) * 80 + (v.pendientes.length > 3 ? 30 : 0) + 20 : 0) + (v.citas ? 45 + Math.max(1, Math.min(v.citas.length, 3)) * 28 + 20 : 0);
   const altoEq = 55 + v.equipo.length * 33 + 20;
-  const equipoIzq = Math.abs(altoIzq + altoEq - altoDer) < Math.abs(altoIzq - (altoDer + altoEq));
+  // Se prueban las cuatro combinaciones (Equipo hoy y Llevas ganado en una u otra columna) y se queda la más pareja.
+  const altoGan = v.ganado ? 75 : 0;
+  const base = altoIzq - altoGan;
+  const reparto = [[true, true], [true, false], [false, true], [false, false]].map(([eq, gan]) => ({ eq, gan, d: Math.abs(base + (eq ? altoEq : 0) + (gan ? altoGan : 0) - (altoDer + (eq ? 0 : altoEq) + (gan || !altoGan ? 0 : altoGan + 40))) }))
+    .sort((a, b) => a.d - b.d)[0];
+  const equipoIzq = reparto.eq, ganadoIzq = reparto.gan;
   const serie = serieHoy(v.movs, hoy, zona);
   const pct = v.meta ? porcentaje(v.total, v.meta.monto) : 0;
   const barra = v.meta ? <div className="ini-meta" role="progressbar" aria-valuemin={0} aria-valuemax={100} aria-valuenow={Math.min(pct, 100)} aria-label="Avance de la meta"><i style={{ width: `${Math.max(Math.min(pct, 100), 2)}%` }} /></div> : null;
@@ -229,7 +234,7 @@ function InicioVista(v: Vista) {
               {v.meta.nota && <small className="muted">{v.meta.nota}</small>}
             </div>
           )}
-          {v.ganado && <TarjetaGanado g={v.ganado} />}
+          {v.ganado && ganadoIzq && <TarjetaGanado g={v.ganado} />}
           {v.servicios === 0 ? <p className="muted ini-sin-graf">La gráfica del día aparece con la primera venta.</p> : <div className="ini-graf">
             <Grafica id="inicio-hoy" actual={serie.actual} previo={serie.previo} etiquetas={serie.etiquetas} cadaEtiqueta={serie.cada} alto={150} enCurso={serie.enCurso}
               globos={serie.actual.map((x, i) => (x === null ? null : [`A las ${serie.etiquetas[i]}`, formatoDinero(x), "acumulado"] as [string, string, string]))}
@@ -244,6 +249,7 @@ function InicioVista(v: Vista) {
         </div>
         <div className={`ini-der ${v.citas ? "con-citas" : ""}`}>
           <Pendientes items={v.pendientes} className="subir d2" />
+          {v.ganado && !ganadoIzq && <TarjetaGanado g={v.ganado} tarjeta className="subir d2" />}
           {v.citas && (
             <section className="glass ini-card subir d2">
               <div className="entre"><span className="lab">{v.barbero ? "Tus próximas citas" : "Próximas citas"}</span><Link className="ini-link" href={v.barbero ? `/citas?persona=${s.usuario.id}` : "/citas"}>Agenda</Link></div>

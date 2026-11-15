@@ -4169,6 +4169,11 @@ html, body { overscroll-behavior-y: none; }
   .pnd-f:has(.pnd-dos) { grid-template-columns: auto minmax(0, 1fr); row-gap: 8px; }
   .pnd-f:has(.pnd-dos) > .pnd-dos { grid-column: 2; justify-self: start; }
 }
+/* Columna muy angosta (tablet): cualquier botón baja debajo del texto para que el texto no se apile palabra por palabra. */
+@container (max-width: 360px) {
+  .pnd-f { grid-template-columns: auto minmax(0, 1fr); row-gap: 8px; }
+  .pnd-f > :nth-child(3) { grid-column: 2; justify-self: start; }
+}
 .pnd-n { font: 600 10.5px var(--f-mono); padding: 2px 8px; border-radius: 999px; background: #13171c; color: #fff; }
 .pnd-l { display: grid; }
 .pnd-f { display: grid; grid-template-columns: auto minmax(0,1fr) auto; gap: 12px; align-items: center; padding: 11px 0; border-top: 1px solid rgba(30,45,60,.08); }
@@ -5580,10 +5585,13 @@ html:has(.fx-raiz .mc) body::before, html:has(.fx-raiz .mc) body::after { displa
 /* Inicio: lo que la persona lleva ganado en su periodo de pago. */
 .ini-ganado { display: grid; gap: 6px; padding-top: 12px; border-top: 1px solid var(--line); min-width: 0; }
 .ini-hoy-m .ini-ganado { margin-top: 12px; }
-.cat-conf { display: inline-grid; place-items: center; width: 30px; height: 30px; border-radius: 999px; color: var(--muted); border: 1px solid var(--line); background: rgba(255,255,255,.5); }
-.cat-conf svg { width: 14px; height: 14px; }
-.cat-conf:hover { color: var(--fg); background: #fff; }
+.cat-conf { display: inline-flex; align-items: center; gap: 5px; justify-self: start; color: var(--muted); font-size: 12.5px; font-weight: 500; text-decoration: none; }
+.cat-conf svg { width: 13px; height: 13px; }
+.cat-conf:hover { color: var(--fg); text-decoration: underline; }
+.ck-con > .ck-sub { padding-left: 14px; font-size: 12.5px; color: var(--muted); }
+.ini-card.ini-ganado-t .ini-ganado { padding-top: 0; border-top: 0; }
 .ig-fila { display: flex; flex-wrap: wrap; align-items: center; gap: 6px 18px; }
 .ig-num { font: 600 30px/1 var(--f-display); letter-spacing: -.01em; font-variant-numeric: tabular-nums; }
 .ig-det { display: grid; gap: 1px; font-size: 13px; color: var(--muted); min-width: 0; }
 @media (max-width: 760px) { .ig-num { font-size: 26px; } }
+.ini-hoy-c .lab { white-space: nowrap; }

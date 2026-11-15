@@ -55,7 +55,7 @@ export function CategoriasEgresos({ categorias, puede }: { categorias: Categoria
   const hacer = (f: () => Promise<EstadoGasto>, despues?: () => void) => iniciar(async () => { const r = await f(); setAviso(r); if (!r.error) despues?.(); });
   return (
     <section className="sub-cfg">
-      <div className="entre"><span><b>Categorías</b><small>{categorias.filter((c) => c.activo).length} en uso. Archivar una no cambia los egresos que ya la usan.</small></span>
+      <div className="entre"><span><b>Categorías</b><small>{categorias.filter((c) => c.activo).length} en uso. Agrupan los gastos para ver en qué se va el dinero. Son las mismas sin importar si el gasto se pagó con la caja, con transferencia o con tarjeta. Archivar una no cambia los gastos que ya la usan.</small></span>
         {puede && <button type="button" className="bt sec solo chico" onClick={() => setNueva(true)}><Icono n="mas" />Agregar categoría</button>}</div>
       <div className="lista-cfg">
         {(todas ? categorias : categorias.slice(0, 5)).map((c) => (
@@ -155,7 +155,7 @@ export function GastosFrecuentes({ gastos, categorias, metodos, puede }: { gasto
   const [pendiente, iniciar] = useTransition();
   return (
     <section className="sub-cfg">
-      <div className="entre"><span><b>Gastos frecuentes</b><small>Aparecen como atajo al registrar un egreso, con sus datos ya llenos.</small></span>
+      <div className="entre"><span><b>Gastos frecuentes</b><small>Lo que pagas seguido, como la renta o el internet. Aparecen como botón al registrar un egreso para no escribirlos cada vez. Si el importe nunca cambia, se pueden registrar solos.</small></span>
         {puede && gastos.length > 0 && <button type="button" className="bt sec solo chico" onClick={() => setForm({ g: null })}><Icono n="mas" />Crear gasto frecuente</button>}</div>
       {gastos.length === 0 ? (
         <div className="vacio-cfg">
@@ -198,7 +198,6 @@ export function OpcionesRegistro({ metodos, comprobantes, obligatorio = false, p
     ...(fun.comprobantes ? [["obligatorio", "Comprobante obligatorio", fun.obligatorio
       ? "Cada egreso pagado con transferencia o tarjeta necesita su comprobante para guardarse."
       : "El comprobante es opcional: se puede guardar el egreso sin adjuntarlo."] as ["obligatorio", string, string]] : []),
-    ["periodicidad", "Gastos que se repiten", fun.periodicidad ? "Cada egreso puede marcarse como diario, semanal, quincenal o mensual." : "Todos los egresos se registran como de una sola vez."],
   ];
   return (
     <section className="sub-cfg">

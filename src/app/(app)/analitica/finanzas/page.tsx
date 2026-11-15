@@ -1,9 +1,10 @@
+import { periodoDia } from "@/lib/periodo";
 import { and, desc, eq, gte, ilike, inArray, isNull, lte, or, sql, type SQL } from "drizzle-orm";
 import { registrarGastosAutomaticos } from "@/lib/gastosAuto";
 import { alias } from "drizzle-orm/pg-core";
 import { redirect } from "next/navigation";
 import { BarraFiltros } from "@/components/BarraFiltros";
-import { periodoEncabezado } from "@/components/CabeceraPeriodo";
+
 import { BotonCajon } from "@/components/Cajon";
 import { Icono } from "@/components/Icono";
 import { Paginacion } from "@/components/Paginacion";
@@ -139,7 +140,8 @@ export default async function Finanzas({ searchParams }: { searchParams: Promise
   }
 
   // Encabezado: el periodo elegido o el mes en curso (el día 1, el mes anterior).
-  const { p, anterior } = periodoEncabezado(f.periodo, hoy);
+  // Sin filtro, el encabezado muestra el resultado de hoy; la lista de abajo sigue siendo el historial completo.
+  const p = f.periodo ?? periodoDia(hoy, hoy), anterior = false;
   const enP = (col: unknown) => sql`(${col} at time zone ${zona})::date between ${p.desde}::date and ${p.hasta}::date`;
   const [rp, pagosP, gastosP, reglas, generadas, cats, frecuentes] = await Promise.all([
     verTodo ? resumenPeriodo(bId, p.desde, p.hasta, zona) : null,
@@ -168,7 +170,7 @@ export default async function Finanzas({ searchParams }: { searchParams: Promise
   const porPagar = comisionesMes.reduce((a, g) => a + Math.max(g.comision - pagosP.filter((x) => x.id === g.id && x.tipo === "pago").reduce((b, x) => b + x.monto, 0) - (falt.find((x) => x.usuarioId === g.id)?.monto ?? 0), 0), 0);
   // Resultado: lo vendido menos lo gastado y menos lo que le corresponde al equipo, ya pagado o todavía por pagar.
   const resultado = quedo - porPagar;
-  const nombreP = p.tipo === "mes" ? p.etiqueta.split(" ")[0].toLowerCase() : p.etiqueta.toLowerCase();
+  const nombreP = p.tipo === "dia" && p.desde === hoy ? "hoy" : p.tipo === "mes" ? p.etiqueta.split(" ")[0].toLowerCase() : p.etiqueta.toLowerCase();
   const maxB = Math.max(entro, salio, 1);
   const firma = (c: number) => (c < 0 ? `−${$(-c)}` : $(c));
 
@@ -207,7 +209,7 @@ export default async function Finanzas({ searchParams }: { searchParams: Promise
         </>
       )}
       <Movimientos abrirEgreso={q.egreso === "1"} dias={dias} registrar={s.puede("gastos.registrar")} hoy={hoy} cajaAbierta={!!turno} categorias={cats}
-        opciones={{ metodos: s.barberia.metodosEgreso, periodicidad: s.barberia.usaPeriodicidad, comprobantes: s.barberia.usaComprobantes, obligatorio: s.barberia.comprobanteObligatorio, frecuentes: frecuentes.map(({ id, concepto, categoria, monto, metodo, periodicidad }) => ({ id, concepto, categoria, monto, metodo, periodicidad })) }}
+        opciones={{ metodos: s.barberia.metodosEgreso, periodicidad: false, comprobantes: s.barberia.usaComprobantes, obligatorio: s.barberia.comprobanteObligatorio, frecuentes: frecuentes.map(({ id, concepto, categoria, monto, metodo, periodicidad }) => ({ id, concepto, categoria, monto, metodo, periodicidad })) }}
         filtros={<BarraFiltros p={f.periodo} hoy={hoy} personas={[]} persona="" buscar={f.buscar} sinPeriodo="Todas las fechas" textoBuscar="Buscar"
           descarga={s.puede("reportes.exportar") ? `/api/exportar?tipo=gastos${f.periodo ? `&desde=${f.periodo.desde}&hasta=${f.periodo.hasta}` : ""}` : undefined}
           extra={verTodo ? <SelectorUrl nombre="tipo" valor={tipo} opciones={TIPOS.map(([valor, texto]) => ({ valor, texto }))} etiqueta="Tipo de movimiento" /> : undefined} />} />

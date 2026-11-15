@@ -23,6 +23,8 @@ export type Turno = {
   pagosAnulados?: number;
   /** Gastos de hoy pagados con transferencia o tarjeta: no tocan el efectivo, solo se informan. */
   otrosEgresos?: { concepto: string; metodo: string; monto: number }[];
+  /** Cada gasto pagado con la caja y cada vez que se sacó o se puso dinero, para verlos en las cuentas. */
+  detalle?: { gastos: { concepto: string; monto: number }[]; sacado: { concepto: string; monto: number }[]; puesto: { concepto: string; monto: number }[] };
   /** Citas atendidas que siguen sin cobrar. */
   sinCobrar?: number;
 };
@@ -217,7 +219,8 @@ export function CajaModal({ inicial, turno, limiteDiferencia, categorias, eviden
           <input className="input grande" name="monto" inputMode="decimal" placeholder="$0" required autoFocus aria-label="Monto" />
           <input className="input" name="concepto" value={gasto} onChange={(e) => setGasto(e.target.value)} placeholder="¿Qué se pagó? Ejemplo: garrafón de agua" required aria-label="Qué se pagó" />
           <div className="billetes">{categorias.map((c) => <button type="button" key={c} className={categoria === c ? "on" : ""} onClick={() => elegirCategoria(c)}>{c}</button>)}
-            {configurar && <a className="cat-conf" href="/ajustes/cobro" aria-label="Configurar categorías" title="Configurar categorías"><Icono n="ajustes" /></a>}</div>
+</div>
+          {configurar && <a className="cat-conf" href="/ajustes/cobro"><Icono n="ajustes" />Editar categorías</a>}
           <p className="ayuda-txt" style={{ margin: 0 }}>Es un gasto del negocio. La caja tendrá menos dinero y el corte lo toma en cuenta.</p>
           {eGasto.error && <p className="aviso error">{eGasto.error}</p>}
           <div className="acciones"><button className="bt" disabled={guardandoGasto}>{guardandoGasto ? "Guardando…" : "Guardar"}<Fl /></button></div>
@@ -282,6 +285,7 @@ function CortePasos({ turno, accion, cerrando, error, contado, setContado, limit
   const deCaja = entregas.filter((e) => decision[e.id] === "caja").reduce((a, e) => a + e.monto, 0);
   const esperado = turno.esperado - deCaja;
   const anulados = turno.pagosAnulados ?? 0;
+  const det = turno.detalle ?? { gastos: [], sacado: [], puesto: [] };
   const c = leerPesos(contado);
   const dif = c === null ? null : c - esperado;
   const nombre = nombres[paso - 1];
@@ -360,12 +364,15 @@ function CortePasos({ turno, accion, cerrando, error, contado, setContado, limit
             <summary>Ver las cuentas del efectivo</summary>
           <div className="ck-con">
             <div><span>Con lo que se abrió la caja</span><span className="num">{formatoDinero(m.fondoInicial)}</span></div>
+            {m.entradas - anulados > 0 && <div><span>Dinero que se agregó después</span><span className="num">+{formatoDinero(m.entradas - anulados)}</span></div>}
+            {det.puesto.map((x, k) => <div key={`p${k}`} className="ck-sub"><span>{x.concepto}</span><span className="num">{formatoDinero(x.monto)}</span></div>)}
             <div><span>Ventas en efectivo</span><span className="num">+{formatoDinero(m.cobrosEfectivo)}</span></div>
             {m.propinasEfectivo > 0 && <div><span>Propinas en efectivo</span><span className="num">+{formatoDinero(m.propinasEfectivo)}</span></div>}
-            {m.entradas - anulados > 0 && <div><span>Dinero que se puso en la caja</span><span className="num">+{formatoDinero(m.entradas - anulados)}</span></div>}
             {m.gastosDeCaja > 0 && <div><span>Gastos pagados con la caja</span><span className="num">−{formatoDinero(m.gastosDeCaja)}</span></div>}
+            {det.gastos.map((x, k) => <div key={`g${k}`} className="ck-sub"><span>{x.concepto}</span><span className="num">{formatoDinero(x.monto)}</span></div>)}
             {(turno.pagosEquipo ?? 0) - anulados + deCaja > 0 && <div><span>Pagos al equipo</span><span className="num">−{formatoDinero((turno.pagosEquipo ?? 0) - anulados + deCaja)}</span></div>}
             {m.retiros - (turno.pagosEquipo ?? 0) > 0 && <div><span>Dinero que se sacó</span><span className="num">−{formatoDinero(m.retiros - (turno.pagosEquipo ?? 0))}</span></div>}
+            {det.sacado.map((x, k) => <div key={`s${k}`} className="ck-sub"><span>{x.concepto}</span><span className="num">{formatoDinero(x.monto)}</span></div>)}
             {m.devolucionesEfectivo > 0 && <div><span>Devoluciones en efectivo</span><span className="num">−{formatoDinero(m.devolucionesEfectivo)}</span></div>}
             <div className="t"><span>Efectivo esperado</span><b className="num">{formatoDinero(esperado)}</b></div>
           </div>
@@ -382,6 +389,8 @@ function CortePasos({ turno, accion, cerrando, error, contado, setContado, limit
         <div className="pila" hidden={!esCierre}>
           <div className="ck-con">
             <div><span>Total vendido</span><b className="num">{formatoDinero(total)}</b></div>
+            {comisiones.length > 0 && <div><span>{turno.verTodo ? "Comisiones de este corte" : "Tu comisión de este corte"}</span><span className="num">{turno.verTodo ? comisiones.map((x) => `${x.nombre.split(" ")[0]} ${formatoDinero(x.monto)}`).join(", ") : formatoDinero(comisiones.reduce((a, x) => a + x.monto, 0))}</span></div>}
+            {entregas.length > 0 && <div><span>Comisiones que se pagan hoy</span><span className="num">{entregas.map((e) => `${e.nombre.split(" ")[0]} ${formatoDinero(e.monto)} ${decision[e.id] === "caja" ? "de la caja" : decision[e.id] === "transferencia" ? "por transferencia" : "mañana"}`).join(", ")}</span></div>}
             <div><span>Efectivo esperado</span><span className="num">{formatoDinero(esperado)}</span></div>
             <div><span>Efectivo contado</span><span>{c === null ? "Sin contar" : `${formatoDinero(c)}, ${dif === 0 ? "coincide" : dif! > 0 ? `sobran ${formatoDinero(dif!)}` : `faltan ${formatoDinero(-dif!)}`}`}</span></div>
             {conComprobantes && <div><span>Comprobantes</span><span>{faltan ? `Falta en ${faltan} ${faltan === 1 ? "forma de pago" : "formas de pago"}` : `${archivos} ${archivos === 1 ? "archivo" : "archivos"}, al menos uno por forma de pago`}</span></div>}

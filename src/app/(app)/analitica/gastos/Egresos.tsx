@@ -102,7 +102,7 @@ const PERIODOS: [string, string][] = [["unica", "Una vez"], ["diaria", "Diaria"]
 
 export function Nuevo({ hoy, cajaAbierta, categorias, cerrar, otro, opciones }: { hoy: string; cajaAbierta: boolean; categorias: Categoria[]; cerrar: () => void; otro: () => void; opciones: OpcionesEgreso }) {
   const [e, accion, guardando] = useActionState<EstadoGasto, FormData>(registrarEgreso, {});
-  const [metodo, setMetodo] = useState<"efectivo" | "transferencia" | "tarjeta">((opciones.metodos[0] ?? "efectivo") as "efectivo");
+  const [metodo, setMetodo] = useState<"efectivo" | "transferencia" | "tarjeta">((["transferencia", "tarjeta", "efectivo"].find((x) => opciones.metodos.includes(x)) ?? "efectivo") as "efectivo");
   const [concepto, setConcepto] = useState("");
   const [monto, setMonto] = useState("");
   const [periodo, setPeriodo] = useState("unica");
@@ -156,9 +156,9 @@ export function Nuevo({ hoy, cajaAbierta, categorias, cerrar, otro, opciones }: 
           </div>
           <div className="campo"><span>Forma de pago</span>
             <div className="seg metodos-eg" role="radiogroup" aria-label="Forma de pago">
-              {opciones.metodos.includes("efectivo") && <button type="button" className={metodo === "efectivo" ? "on" : ""} onClick={() => setMetodo("efectivo")}><Icono n="efectivo" />Efectivo</button>}
               {opciones.metodos.includes("transferencia") && <button type="button" className={metodo === "transferencia" ? "on" : ""} onClick={() => setMetodo("transferencia")}><Icono n="enviar" />Transferencia</button>}
               {opciones.metodos.includes("tarjeta") && <button type="button" className={metodo === "tarjeta" ? "on" : ""} onClick={() => setMetodo("tarjeta")}><Icono n="tarjeta" />Tarjeta</button>}
+              {opciones.metodos.includes("efectivo") && <button type="button" className={metodo === "efectivo" ? "on" : ""} onClick={() => setMetodo("efectivo")}><Icono n="efectivo" />Efectivo</button>}
             </div>
           </div>
           {puedeCaja ? (
