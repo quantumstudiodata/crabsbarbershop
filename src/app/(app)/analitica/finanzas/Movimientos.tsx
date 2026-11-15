@@ -7,7 +7,7 @@ import { formatoDinero } from "@/lib/money";
 import { Cancelar, type FilaEgreso, Nuevo, type OpcionesEgreso } from "../gastos/Egresos";
 
 export type Movimiento = {
-  id: string; tipo: "venta" | "egreso" | "pago" | "renta"; titulo: string; sub: string; monto: number; cancelado?: boolean;
+  id: string; tipo: "venta" | "egreso" | "pago" | "renta" | "caja"; titulo: string; sub: string; monto: number; cancelado?: boolean;
   detalle: [string, string][]; comprobante?: { id: string; nombre: string }; egreso?: FilaEgreso;
 };
 export type DiaMovimientos = { fecha: string; titulo: string; neto: number; movs: Movimiento[] };

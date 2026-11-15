@@ -56,18 +56,19 @@ export function Guia({ vistos, puntos, nombre }: { vistos: string[]; puntos: str
   const [cerrada, setCerrada] = useState(true);
   const [repaso, setRepaso] = useState(false);
   useEffect(() => {
-    let pausa = false;
-    try { pausa = sessionStorage.getItem("crabs-guia-pausa") === "1"; } catch { /* sin almacenamiento */ }
-    setCerrada(pausa || vistos.includes("guia-omitida"));
+    let pausa = false, activa = false;
+    try { pausa = sessionStorage.getItem("crabs-guia-pausa") === "1"; activa = sessionStorage.getItem("crabs-guia-activa") === "1"; } catch { /* sin almacenamiento */ }
+    // Una guía que quedó a medias no se reanuda sola en otra visita (movería a la persona de pantalla): se continúa desde el menú de la cuenta.
+    setCerrada(pausa || vistos.includes("guia-omitida") || (vistos.includes("guia-inicio") && !activa));
     const abrir = () => {
-      try { sessionStorage.removeItem("crabs-guia-pausa"); } catch { /* sin almacenamiento */ }
+      try { sessionStorage.removeItem("crabs-guia-pausa"); sessionStorage.setItem("crabs-guia-activa", "1"); } catch { /* sin almacenamiento */ }
       setHechos((h) => { if (!h.has("fin")) return h; setRepaso(true); return new Set(["inicio"]); });
       setFase("guia"); setCerrada(false);
     };
     window.addEventListener("crabs:guia", abrir);
     return () => window.removeEventListener("crabs:guia", abrir);
   }, [vistos]);
-  const pausar = useCallback(() => { try { sessionStorage.setItem("crabs-guia-pausa", "1"); } catch { /* sin almacenamiento */ } setCerrada(true); }, []);
+  const pausar = useCallback(() => { try { sessionStorage.setItem("crabs-guia-pausa", "1"); sessionStorage.removeItem("crabs-guia-activa"); } catch { /* sin almacenamiento */ } setCerrada(true); }, []);
   useEffect(() => { if (esc === null || fin) return; setFase((f) => f ?? (hechos.has("inicio") ? "guia" : "bienvenida")); }, [esc, fin, hechos]);
 
   // Mientras dura la guía, ningún formulario se envía: se aprende sin registrar nada.
@@ -87,7 +88,7 @@ export function Guia({ vistos, puntos, nombre }: { vistos: string[]; puntos: str
   }, [repaso]);
 
   if (!fase || fin || esc === null || cerrada) return null;
-  if (fase === "bienvenida") return <Bienvenida nombre={nombre} empezar={() => { guardar(["inicio"]); setFase("guia"); }} despues={pausar}
+  if (fase === "bienvenida") return <Bienvenida nombre={nombre} empezar={() => { try { sessionStorage.setItem("crabs-guia-activa", "1"); } catch { /* sin almacenamiento */ } guardar(["inicio"]); setFase("guia"); }} despues={pausar}
     omitir={() => { marcarConsejos(["guia-omitida"]).catch(() => {}); setCerrada(true); }} />;
   if (fase === "cierre" || !actual) return <Cierre nombre={nombre} terminar={() => { guardar(["fin"]); router.push("/"); }} />;
   return (

@@ -33,5 +33,10 @@ export function requiereExplicacion(diferencia: number, limite: number): boolean
   return Math.abs(diferencia) > limite;
 }
 
+/** Una salida de caja que en realidad es un pago a alguien del equipo (a mano desde Equipo, o comisiones entregadas en el corte). */
+/** El dinero que regresó a la caja al anular un pago al equipo: se descuenta de los pagos, no cuenta como dinero que alguien puso. */
+export const esPagoAnulado = (concepto: string) => concepto.startsWith("Pago anulado a ");
+export const esPagoEquipo = (concepto: string) => /^Pago (de comisiones )?a /.test(concepto);
+
 /** Minutos que tiene alguien para anular su propio cobro si se equivocó. */
 export const MINUTOS_CORRECCION = 10;

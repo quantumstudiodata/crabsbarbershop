@@ -11,6 +11,8 @@ export type DatosFila = {
   renta: boolean; monto: string; estado: string; parcial: boolean; detalle: [string, string][]; puedePagar: boolean;
   /** Forma de pago habitual de la persona: efectivo | transferencia | otro. */
   forma?: string;
+  /** Hay una caja abierta: un pago en efectivo sale de ella. */
+  cajaAbierta?: boolean;
 };
 
 const FORMAS = [["efectivo", "Efectivo"], ["transferencia", "Transferencia"], ["otro", "Otro"]] as const;
@@ -42,6 +44,7 @@ export function FormPago({ f, regreso }: { f: DatosFila; regreso: string }) {
           <input type="hidden" name="tipo" value={f.renta ? "renta" : "pago"} />
           <div className="tarjeta-m pila">
             <div className="campo"><span>{f.renta ? "Forma en que pagó" : "Forma de pago"}</span><Formas name="forma" valor={forma} cambiar={setForma} /></div>
+            {!f.renta && (forma === "efectivo" || (dos && forma2 === "efectivo")) && <p className="ayuda-txt" style={{ margin: 0 }}>{f.cajaAbierta ? "El efectivo sale de la caja abierta. Se anota solo, no hace falta registrarlo otra vez en Cobro." : "La caja está cerrada: este pago no cambia ningún corte."}</p>}
             <label className="campo"><span>{dos ? "Monto con esta forma" : f.renta ? "Monto recibido" : "Monto pagado"}</span>
               <span className="pg-monto"><input className="input grande" name="monto" inputMode="decimal" placeholder={f.monto} value={monto} onChange={(e) => setMonto(e.target.value)} required />
                 {!dos && <button type="button" className="bt sec chico" onClick={() => setMonto(f.monto.replace(/[^\d.]/g, ""))}>Todo {f.monto}</button>}</span>

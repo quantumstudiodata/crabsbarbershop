@@ -69,11 +69,12 @@ export const PUNTOS: Record<string, Punto> = {
     ],
   },
   retiro: {
-    id: "retiro", nombre: "Sacar o meter efectivo", ejemplo: "Ejemplo: sacar $500 de la caja para depositarlos.", ruta: "/cobrar", ir: ['a[href="/cobrar"]'],
+    id: "retiro", nombre: "Sacar dinero de la caja", ejemplo: "Ejemplo: sacar $500 de la caja para llevarlos al banco.", ruta: "/cobrar", ir: ['a[href="/cobrar"]'],
     pasos: [
-      { sel: "button.fantasma|Sacar o meter efectivo", modo: "pasa", solo: "esc", t: "Sacar dinero de la caja", x: "Cada vez que alguien saca efectivo de la caja, se anota aquí. Así el corte cuadra al final del día.", h: "Toca Sacar o meter efectivo" },
-      { sel: "button.em-pts", modo: "pasa", solo: "mov", t: "Sacar dinero de la caja", x: "Efectivo, gasto y corte de caja viven en este botón.", h: "Toca los tres puntos" },
-      { sel: ".em-menu button|Sacar o meter efectivo", modo: "pasa", solo: "mov", t: "Elige Sacar o meter efectivo", x: "Cada vez que alguien saca efectivo, se anota aquí para que el corte cuadre.", h: "Toca Sacar o meter efectivo" },
+      { sel: "button.fantasma|Movimiento de caja", modo: "pasa", solo: "esc", t: "Sacar dinero de la caja", x: "Cada vez que alguien saca efectivo de la caja, se anota aquí. Así el corte cuadra al final del día.", h: "Toca Movimiento de caja" },
+      { sel: "button.em-pts", modo: "pasa", solo: "mov", t: "Sacar dinero de la caja", x: "Los movimientos y el corte de caja viven en este botón.", h: "Toca los tres puntos" },
+      { sel: ".em-menu button|Movimiento de caja", modo: "pasa", solo: "mov", t: "Elige Movimiento de caja", x: "Cada vez que alguien saca efectivo, se anota aquí para que el corte cuadre.", h: "Toca Movimiento de caja" },
+      { sel: "button.mov-op|Saqué dinero", modo: "pasa", t: "Di qué pasó", x: "Elige la frase que describe lo que hiciste. La app sabe cómo guardarlo.", h: "Toca Saqué dinero de la caja" },
       { sel: '.modal input[name="monto"], [role=dialog] input[name="monto"]', modo: "leer", t: "¿Cuánto sacas?", x: "Escribe la cantidad. Por ejemplo, $500 para llevarlos al banco.", h: "Toca Siguiente" },
       { sel: "[role=dialog] .billetes", modo: "leer", opcional: true, t: "¿Para qué?", x: "Elige el motivo o escríbelo. Queda guardado quién lo sacó y a qué hora.", h: "Toca Siguiente" },
       { sel: "[role=dialog] form .acciones .bt", modo: "final", despues: CERRAR, t: "Guárdalo", x: "Con Guardar, lo que sacaste se descuenta del efectivo que debe haber en la caja.", h: "Toca Guardar" },
@@ -82,12 +83,13 @@ export const PUNTOS: Record<string, Punto> = {
   gasto: {
     id: "gasto", nombre: "Registrar un gasto de caja", ejemplo: "Ejemplo: pagar el garrafón de agua con dinero de la caja.", ruta: "/cobrar", ir: ['a[href="/cobrar"]'],
     pasos: [
-      { sel: "button.fantasma|Gasto de caja", modo: "pasa", solo: "esc", t: "Gastos pagados con la caja", x: "Si pagas algo con el efectivo de la caja, como el garrafón o productos de limpieza, se anota aquí.", h: "Toca Gasto de caja" },
+      { sel: "button.fantasma|Movimiento de caja", modo: "pasa", solo: "esc", t: "Gastos pagados con la caja", x: "Si pagas algo con el efectivo de la caja, como el garrafón o productos de limpieza, se anota aquí.", h: "Toca Movimiento de caja" },
       { sel: "button.em-pts", modo: "pasa", solo: "mov", t: "Gastos pagados con la caja", x: "Si pagas algo con el efectivo de la caja, se anota desde este botón.", h: "Toca los tres puntos" },
-      { sel: ".em-menu button|Gasto de caja", modo: "pasa", solo: "mov", t: "Elige Gasto de caja", x: "Por ejemplo, el garrafón de agua.", h: "Toca Gasto de caja" },
+      { sel: ".em-menu button|Movimiento de caja", modo: "pasa", solo: "mov", t: "Elige Movimiento de caja", x: "", h: "Toca Movimiento de caja" },
+      { sel: "button.mov-op|Pagué algo", modo: "pasa", t: "Di qué pasó", x: "Por ejemplo, pagaste el garrafón de agua.", h: "Toca Pagué algo con dinero de la caja" },
       { sel: '[role=dialog] input[name="monto"]', modo: "leer", t: "¿Cuánto costó?", x: "Escribe la cantidad, por ejemplo $40 del garrafón.", h: "Toca Siguiente" },
       { sel: "[role=dialog] .billetes", modo: "leer", opcional: true, t: "Elige la categoría", x: "Así en Movimientos se ve en qué se va el dinero del negocio.", h: "Toca Siguiente" },
-      { sel: "[role=dialog] form .acciones .bt", modo: "final", despues: CERRAR, t: "Guárdalo", x: "Con Guardar, el gasto se resta de la caja y aparece en los egresos del negocio.", h: "Toca Guardar" },
+      { sel: "[role=dialog] form .acciones .bt", modo: "final", despues: CERRAR, t: "Guárdalo", x: "Con Guardar, el gasto se resta de la caja y aparece en Movimientos.", h: "Toca Guardar" },
     ],
   },
   egreso: {

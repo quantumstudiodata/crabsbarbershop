@@ -13,7 +13,7 @@ export type Corte = {
   id: string; folio: string; horario: string; dia: string; fechaCorta: string;
   abrio: { nombre: string; avatar: string }; cerro: { nombre: string; avatar: string };
   metodos: { metodo: string; total: number }[]; total: number; ventas: number;
-  fondo: number; ventasEfectivo: number; propinasEfectivo: number; entradas: number; retiros: number; gastos: number;
+  fondo: number; ventasEfectivo: number; propinasEfectivo: number; entradas: number; retiros: number; gastos: number; pagosEquipo: number; otrosEgresos: { concepto: string; metodo: string; monto: number }[];
   esperado: number; contado: number; diferencia: number; ajustado?: number; notas: string | null;
   movimientos: { hora: string; titulo: string; detalle: string; monto: number }[];
   ajustes: string[];
@@ -133,11 +133,13 @@ function Detalle({ c, cerrar, ajustar }: { c: Corte | null; cerrar: () => void; 
             <div className="rc-tot"><span>Total vendido, {c.ventas} {c.ventas === 1 ? "venta" : "ventas"}</span><b className="num">{$(c.total)}</b></div>
           </div>
           <div className="rc-sec"><span className="lab">Efectivo</span>
-            <div><span>Fondo inicial</span><span className="num">{$(c.fondo)}</span></div>
+            <div><span>Con lo que se abrió la caja</span><span className="num">{$(c.fondo)}</span></div>
             <div><span>Ventas en efectivo</span><span className="num">+{$(c.ventasEfectivo)}</span></div>
             {c.propinasEfectivo > 0 && <div><span>Propinas en efectivo</span><span className="num">+{$(c.propinasEfectivo)}</span></div>}
-            {c.entradas > 0 && <div><span>Entradas</span><span className="num">+{$(c.entradas)}</span></div>}
-            {c.retiros + c.gastos > 0 && <div><span>Retiros y gastos</span><span className="num">−{$(c.retiros + c.gastos)}</span></div>}
+            {c.entradas > 0 && <div><span>Dinero que se puso en la caja</span><span className="num">+{$(c.entradas)}</span></div>}
+            {c.gastos > 0 && <div><span>Gastos pagados con la caja</span><span className="num">−{$(c.gastos)}</span></div>}
+            {c.pagosEquipo > 0 && <div><span>Pagos al equipo</span><span className="num">−{$(c.pagosEquipo)}</span></div>}
+            {c.retiros > 0 && <div><span>Dinero que se sacó</span><span className="num">−{$(c.retiros)}</span></div>}
             <div><span>Debía haber</span><span className="num">{$(c.esperado)}</span></div>
             <div><span>Se contó</span><span className="num">{$(c.contado)}</span></div>
             <div className="rc-tot"><span>Diferencia</span><Estado d={c.diferencia} /></div>
@@ -147,8 +149,14 @@ function Detalle({ c, cerrar, ajustar }: { c: Corte | null; cerrar: () => void; 
               {c.movimientos.map((m, i) => <div key={i}><span>{m.hora} {m.titulo}<small>{m.detalle}</small></span><span className="num">{m.monto < 0 ? `−${$(-m.monto)}` : $(m.monto)}</span></div>)}
             </div>
           )}
+          {c.otrosEgresos.length > 0 && (
+            <div className="rc-sec"><span className="lab">Otros egresos del día</span>
+              {c.otrosEgresos.map((g, i) => <div key={i}><span>{g.concepto}<small>{g.metodo}</small></span><span className="num">{$(g.monto)}</span></div>)}
+              <p className="muted" style={{ fontSize: 12, margin: 0 }}>Pagados con transferencia o tarjeta. No salieron de la caja.</p>
+            </div>
+          )}
           {c.evidencias.length > 0 && (
-            <div className="rc-sec rc-evid"><span className="lab">Evidencias</span>
+            <div className="rc-sec rc-evid"><span className="lab">Fotos de comprobantes</span>
               {c.evidencias.map((e) => <div key={e.id}><span>{e.etiqueta || "General"}<small>{e.nombre}</small></span><button type="button" className="enlace" onClick={() => setFoto(e)}>Ver</button></div>)}
             </div>
           )}

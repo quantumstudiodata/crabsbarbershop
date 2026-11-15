@@ -128,7 +128,7 @@ function FormGasto({ g, categorias, metodos, cerrar }: { g: Gasto | null; catego
         <label className="campo"><span>Importe predeterminado (opcional)</span><input className="input" name="monto" inputMode="decimal" defaultValue={g?.monto ? String(g.monto / 100) : ""} placeholder="$0" /></label>
         <div className="campo"><span>Categoría</span><Selector etiqueta="Categoría" valor={categoria} onChange={setCategoria} opciones={categorias.map((c) => ({ valor: c, texto: c }))} /></div>
         <div className="campo"><span>Método de pago predeterminado</span><Selector etiqueta="Método" valor={metodo} onChange={setMetodo} opciones={METODOS.filter(([k]) => metodos.includes(k) || k === metodo).map(([k, t]) => ({ valor: k, texto: t }))} /></div>
-        <div className="campo"><span>Periodicidad (opcional)</span><Selector etiqueta="Periodicidad" valor={periodo} onChange={(v) => { setPeriodo(v); setDia("1"); }} opciones={PERIODOS.map(([k, t]) => ({ valor: k, texto: t }))} /></div>
+        <div className="campo"><span>Cada cuánto se repite (opcional)</span><Selector etiqueta="Periodicidad" valor={periodo} onChange={(v) => { setPeriodo(v); setDia("1"); }} opciones={PERIODOS.map(([k, t]) => ({ valor: k, texto: t }))} /></div>
         {puedeAuto && (
           <div className="cfg-auto">
             <Interruptor name="automatico" checked={auto} onChange={() => setAuto(!auto)} etiqueta="Se registra solo" />
@@ -198,7 +198,7 @@ export function OpcionesRegistro({ metodos, comprobantes, obligatorio = false, p
     ...(fun.comprobantes ? [["obligatorio", "Comprobante obligatorio", fun.obligatorio
       ? "Cada egreso pagado con transferencia o tarjeta necesita su comprobante para guardarse."
       : "El comprobante es opcional: se puede guardar el egreso sin adjuntarlo."] as ["obligatorio", string, string]] : []),
-    ["periodicidad", "Periodicidad", fun.periodicidad ? "Cada egreso puede marcarse como diario, semanal, quincenal o mensual." : "Todos los egresos se registran como de una sola vez."],
+    ["periodicidad", "Gastos que se repiten", fun.periodicidad ? "Cada egreso puede marcarse como diario, semanal, quincenal o mensual." : "Todos los egresos se registran como de una sola vez."],
   ];
   return (
     <section className="sub-cfg">

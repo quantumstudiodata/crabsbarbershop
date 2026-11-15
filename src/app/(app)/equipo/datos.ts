@@ -41,6 +41,8 @@ export async function cuentasEnCurso(barberiaId: string, zona: string, personas:
   const hoy = fechaLocal(new Date(), zona);
   const [cfg] = await db.select({ desde: s.barberias.pagosEquipoDesde, desdeRenta: s.barberias.rentasDesde }).from(s.barberias).where(eq(s.barberias.id, barberiaId)).limit(1);
   const reglas = await reglasDe(barberiaId);
+  const [abierta] = await db.select({ id: s.turnosCaja.id }).from(s.turnosCaja).where(and(eq(s.turnosCaja.barberiaId, barberiaId), eq(s.turnosCaja.estado, "abierto"))).limit(1);
+  const cajaAbierta = !!abierta;
   const periodos = new Map(personas.map((p) => { const r = elegirRegla(reglas, p.id, null, new Date()); return [p.id, { r, per: periodoDePago(r, hoy) }]; }));
   const inicio = [...[...periodos.values()].map((x) => x.per.desde), hoy].sort()[0];
   const { ventas } = await ventasEntre(barberiaId, inicio, hoy, { zona });
@@ -69,17 +71,18 @@ export async function cuentasEnCurso(barberiaId: string, zona: string, personas:
     const frecuencia = NOMBRE_FRECUENCIA[frecuenciaDe(r)] ?? "Semanal";
     const fila = {
       id: p.id, nombre: p.nombre, avatar: p.avatar, modalidad: modalidadCorta(c.regla), frecuencia, forma: r?.formaPago ?? "efectivo",
-      periodo, semana: hoy, renta, monto: formatoDinero(saldo), parcial: pagado > 0 && saldo > 0,
+      periodo, semana: hoy, renta, cajaAbierta, monto: formatoDinero(saldo), parcial: pagado > 0 && saldo > 0,
       estado: saldo <= 0 ? (renta ? "Cubierta" : "Al corriente") : pagado > 0 ? "Pago parcial" : "Pendiente",
       puedePagar: puedePagar && saldo > 0,
       detalle: (renta
         ? [["Periodo", periodo], ["Fecha límite", fechaLarga(per.pago)], ["Renta del periodo", formatoDinero(c.renta)], ["Recibido", formatoDinero(c.rentaPagada)],
           ...(anteriores ? [["De periodos anteriores", formatoDinero(anteriores)]] : []), ["Pendiente", formatoDinero(saldo)]]
-        : [["Periodo", periodo], ["Fecha de pago", fechaLarga(per.pago)], ["Forma de pago", NOMBRE_FORMA_PAGO[r?.formaPago ?? "efectivo"] ?? "Efectivo de caja"], ["Ventas atribuidas", formatoDinero(c.vendido)],
+        : [["Periodo", periodo], ["Fecha de pago", fechaLarga(per.pago)], ["Forma de pago", NOMBRE_FORMA_PAGO[r?.formaPago ?? "efectivo"] ?? "Efectivo de caja"], ["Ventas atendidas", formatoDinero(c.vendido)],
           ...(c.comision ? [["Comisión generada", formatoDinero(c.comision)]] : []), ...(c.sueldo ? [["Sueldo del periodo", formatoDinero(c.sueldo)]] : []),
           ["Pagos registrados", formatoDinero(c.pagado)], ...(c.faltantes ? [["Faltantes autorizados", `−${formatoDinero(c.faltantes)}`]] : []),
           ...(anteriores ? [["De periodos anteriores", formatoDinero(anteriores)]] : []), ["Saldo pendiente", formatoDinero(saldo)]]) as [string, string][],
     };
-    return { id: p.id, renta, saldo, anteriores, fila, sinRegla: !c.regla, pago: per.pago, frecuencia, modalidad: modalidadCorta(c.regla) };
+    return { id: p.id, renta, saldo, anteriores, fila, sinRegla: !c.regla, pago: per.pago, frecuencia, modalidad: modalidadCorta(c.regla),
+      cifras: { comision: c.comision, sueldo: c.sueldo, vendido: c.vendido, pagado, periodo, desde: per.desde, hasta: per.hasta } };
   }));
 }

@@ -1,3 +1,4 @@
+import { ganadoDe, TarjetaGanado, type Ganado } from "./Ganado";
 import { and, asc, eq, gt, or, sql } from "drizzle-orm";
 import { asentarCitasPagadas } from "@/lib/pagos";
 import Link from "next/link";
@@ -72,7 +73,7 @@ function filasUltimos(ventas: Venta[], gente: Gente, hoy: string, zona: string, 
         ...(v.conceptos.some((c) => c.descuento) ? [["Descuento", v.conceptos.filter((c) => c.descuento).map((c) => `${formatoDinero(c.descuento)} en ${c.nombre}`).join("; ")] as [string, string]] : []),
         ...(v.propinas.length ? [["Propina", v.propinas.map((x) => formatoDinero(x.monto)).join(" y ")] as [string, string]] : []),
         ["Pago", v.pagos.map((pg) => `${pg.metodo} ${formatoDinero(pg.monto)}`).join(" y ") || "Sin pago"],
-        ...(st ? [["Verificado por Stripe", `${st.estado === "reembolsado" ? "Pago devuelto al cliente" : "Pago confirmado"}${st.tarjeta ? `, ${st.tarjeta}` : ""}${st.referencia ? `, referencia ${st.referencia}` : ""}`] as [string, string]] : []),
+        ...(st ? [["Pago confirmado", `${st.estado === "reembolsado" ? "Pago devuelto al cliente" : "Pago confirmado"}${st.tarjeta ? `, ${st.tarjeta}` : ""}${st.referencia ? `, referencia ${st.referencia}` : ""}`] as [string, string]] : []),
         ["Registró", v.registradaPor.split(" ")[0]],
         ["Cuándo", `${fechaLarga(v.fecha)}, ${horaCorta(v.creadoEn, zona)}`],
         ...(v.estado === "cancelada" ? [["Cancelada", v.motivoCancelacion ?? ""] as [string, string]] : []),
@@ -104,7 +105,7 @@ async function accionesDe(s: Sesion, turno: Turno | null | undefined, hoy: strin
     { k: "cobrar", href: "/cobrar", texto: "Cobrar", corto: "Cobrar", icono: "cobro", principal: true, dato: turno ? `Caja abierta desde ${horaCorta(turno.abiertoEn, zona)}` : "Abre la caja al cobrar", ok: s.puede("ventas.registrar") || s.puede("ventas.registrar_otros") },
     { k: "mias", href: `/citas?vista=lista&persona=${yo}`, texto: "Mis citas de hoy", corto: "Mis citas", icono: "reloj", dato: citasHoy ? `${citasHoy} por llegar` : "Sin pendientes", ok: barbero && citasHoy !== null },
     { k: "corte", href: "/cobrar?caja=cerrar", texto: "Realizar corte de caja", corto: "Corte", icono: "candado", aviso: corteAtrasado, dato: corteAtrasado ? "Pendiente" : turno ? undefined : "Caja cerrada", ok: s.puede("caja.operar") && !!turno },
-    { k: "retiro", href: "/cobrar?caja=retiro", texto: "Sacar o meter efectivo", corto: "Efectivo", icono: "salida", ok: s.puede("caja.retiros") && !!turno },
+    { k: "retiro", href: "/cobrar?caja=movimiento", texto: "Registrar movimiento de caja", corto: "Movimiento", icono: "salida", ok: s.puede("caja.retiros") && !!turno },
     { k: "cita", href: "/citas?nueva=1", texto: "Agendar cita a cliente", corto: "Nueva cita", icono: "calendario", dato: !barbero && citasHoy ? `${citasHoy} por llegar` : undefined, ok: s.barberia.usaCitas && s.puede("citas.modificar") },
     { k: "compartir", href: "/citas?compartir=1", texto: "Compartir enlace para reservar", corto: "Compartir enlace", icono: "enviar", ok: s.barberia.usaCitas && !!s.barberia.slug && leerConfig(s.barberia.citasConfig).enLinea && s.puede("citas.ver") },
     { k: "egreso", href: "/analitica/finanzas?egreso=1", texto: "Registrar un egreso", corto: "Egreso", icono: "archivo", ok: s.puede("gastos.registrar") },
@@ -152,6 +153,7 @@ type Vista = {
   equipo: { id: string; nombre: string; avatar: string; monto: number; servicios: number; meta?: number }[];
   ultimos: FilaUltimo[]; verMas: { href: string; texto: string } | null; verVentas: boolean;
   semana?: ResumenSemana | null;
+  ganado?: Ganado | null;
 };
 
 /** Inicio: qué pasa hoy. Escritorio: acciones junto al saludo, la tarjeta de hoy con su gráfica y a la derecha citas y equipo. */
@@ -190,6 +192,7 @@ function InicioVista(v: Vista) {
         </div>
         {barra}
       </section>
+      {v.ganado && <TarjetaGanado g={v.ganado} className="solo-movil subir d2" />}
       <Pendientes items={v.pendientes} className="solo-movil subir d2" />
       <AccionesMovil acciones={v.acciones.visibles} personalizar={v.acciones} />
       {siguiente && (
@@ -228,6 +231,7 @@ function InicioVista(v: Vista) {
           </div>}
           {v.verMas && <Link className="ini-link" href={v.verMas.href}>{v.verMas.texto}</Link>}
         </section>
+          {v.ganado && <TarjetaGanado g={v.ganado} className="subir d2" />}
           <section className="glass ini-card ini-eq-izq subir d2">
             <span className="lab">Equipo hoy</span>
             {listaEquipo}
@@ -310,7 +314,7 @@ export default async function Inicio({ searchParams }: { searchParams: Promise<Q
   }).sort((a, b) => b.monto - a.monto);
   const acciones = await accionesDe(s, turno, hoy, zona, citas?.length ?? null, false);
   return (
-    <InicioVista s={s} hoy={hoy} zona={zona} avisos={avisos} acciones={acciones} barbero={false}
+    <InicioVista s={s} hoy={hoy} zona={zona} avisos={avisos} acciones={acciones} barbero={false} ganado={await ganadoDe(s, zona, hoy)}
       total={total} servicios={conceptos.length} clientes={deHoy.length} previo={previo}
       movs={pagadas.map((v) => ({ creadoEn: v.creadoEn, fecha: v.fecha, monto: v.total }))}
       meta={meta} citas={citas} equipo={filasEq} pendientes={pendientes}
@@ -352,7 +356,7 @@ async function InicioBarbero({ s, hoy, zona, turno, avisos }: { s: Sesion; hoy: 
   }).sort((a, b) => b.monto - a.monto);
   const acciones = await accionesDe(s, turno, hoy, zona, citas?.length ?? null, true);
   return (
-    <InicioVista s={s} hoy={hoy} zona={zona} avisos={avisos} acciones={acciones} barbero
+    <InicioVista s={s} hoy={hoy} zona={zona} avisos={avisos} acciones={acciones} barbero ganado={await ganadoDe(s, zona, hoy)}
       total={total} servicios={deHoy.length} clientes={clientesHoy} previo={previo}
       movs={mios.map((c) => ({ creadoEn: c.creadoEn, fecha: c.fecha, monto: c.precioCobrado }))}
       meta={s.barberia.usaMetas ? { monto: Math.max(metaHoy, 1), ayuda: mia?.aplica ? "Sale de la meta mensual del negocio y de tu forma de pago." : "Refleja tu meta de ventas y cuánto llevas de ella." } : null}

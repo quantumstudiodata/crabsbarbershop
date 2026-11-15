@@ -108,7 +108,7 @@ export default async function Resumen({ searchParams }: { searchParams: Promise<
       <div className="rs-esc solo-escritorio">
       <section className={`rs-com subir ${meta > 0 ? "" : "sin-meta"}`} aria-label="Resultado comercial">
         <div className="rs-ventas">
-          <span className="lab lab-ay">{p.tipo === "mes" ? `Ventas netas de ${nombreP.toLowerCase()}` : `Ventas netas, ${p.etiqueta}`}<Ayuda titulo="Ventas netas">Lo cobrado por servicios en el periodo, ya con descuentos aplicados. No incluye propinas ni ventas canceladas.</Ayuda></span>
+          <span className="lab lab-ay">{p.tipo === "mes" ? `Vendido en ${nombreP.toLowerCase()}` : `Vendido, ${p.etiqueta}`}<Ayuda titulo="Vendido">Lo cobrado por servicios en el periodo, ya con descuentos aplicados. No incluye propinas ni ventas canceladas.</Ayuda></span>
           <b className="rs-big">{$(r.netas)}</b>
           {v !== null && <span className="rs-chip">{v === 0 ? "Igual" : `${Math.abs(v)}% ${v > 0 ? "más" : "menos"}`} que {p.tipo === "mes" ? "el mes anterior a esta fecha" : "el periodo anterior"}</span>}
           <div className="rs-mini">
@@ -143,7 +143,7 @@ export default async function Resumen({ searchParams }: { searchParams: Promise<
         </section>
         <section className="glass rs-card subir d1" aria-label="Resultado financiero">
           <div className="rs-cab"><b>Resultado financiero</b>{s.puede("reportes.ver") && <Ir href="/analitica/finanzas" titulo="Ir a Movimientos" />}</div>
-          <div className="rs-f"><span><span>Ingresos</span><small>Ventas netas {$(r.netas)}{rentas ? ` y rentas ${$(rentas)}` : ""}</small></span><b>{$(ingresos)}</b></div>
+          <div className="rs-f"><span><span>Ingresos</span><small>Vendido {$(r.netas)}{rentas ? ` y rentas ${$(rentas)}` : ""}</small></span><b>{$(ingresos)}</b></div>
           <div className="rs-f"><span><span>Egresos del negocio</span><small>{topCats.length ? lista(topCats) : "Sin egresos registrados"}</small></span><b>{egresos ? `−${$(egresos)}` : "$0"}</b></div>
           {auto ? (
             <>
@@ -176,8 +176,8 @@ export default async function Resumen({ searchParams }: { searchParams: Promise<
           ) : <p className="muted rs-vacio">Sin servicios en estas fechas.</p>}
           {(s.puede("ventas.ver_todas") || s.puede("equipo.pagar")) && <Link href="/equipo" className="rs-ir">Ver equipo<Icono n="derecha" /></Link>}
         </section>
-        <section className="glass rs-card subir d2" aria-label="Ventas atribuidas">
-          <div className="rs-cab"><b>Ventas atribuidas</b><small>por quien atendió</small></div>
+        <section className="glass rs-card subir d2" aria-label="Ventas atendidas">
+          <div className="rs-cab"><b>Ventas atendidas</b><small>por quien atendió</small></div>
           {r.porBarbero.length ? r.porBarbero.map((b) => (
             <div key={b.id} className="rs-barra"><span>{b.nombre.split(" ")[0]}</span><i><em style={{ width: `${Math.max((b.monto / totalVentas) * 100, 2)}%` }} /></i><b>{$(b.monto)}</b></div>
           )) : <p className="muted rs-vacio">Sin ventas en estas fechas.</p>}
@@ -196,7 +196,7 @@ export default async function Resumen({ searchParams }: { searchParams: Promise<
       {/* Teléfono: la cifra del mes arriba y cada sección cerrada con su cifra clave; se abre al tocarla. */}
       <div className="rs-mov solo-movil">
         <section className="glass rs-mh">
-          <span className="lab lab-ay">{p.tipo === "mes" ? `Ventas netas de ${nombreP.toLowerCase()}` : `Ventas netas, ${p.etiqueta}`}<Ayuda titulo="Ventas netas">Lo cobrado por servicios en el periodo, ya con descuentos aplicados. No incluye propinas ni ventas canceladas.</Ayuda></span>
+          <span className="lab lab-ay">{p.tipo === "mes" ? `Vendido en ${nombreP.toLowerCase()}` : `Vendido, ${p.etiqueta}`}<Ayuda titulo="Vendido">Lo cobrado por servicios en el periodo, ya con descuentos aplicados. No incluye propinas ni ventas canceladas.</Ayuda></span>
           <div className="rs-mh-f">
             <span><b className="rs-big">{$(r.netas)}</b>{v !== null && <small>{v === 0 ? "Igual" : `${Math.abs(v)}% ${v > 0 ? "más" : "menos"}`} que {p.tipo === "mes" ? `${nombrePrev.toLowerCase()} a esta fecha` : "el periodo anterior"}</small>}</span>
             {meta > 0 && <span className="anillo-m rs-mini-anillo" role="img" aria-label={`${pct}% de la meta`} style={{ ["--p" as string]: Math.min(pct, 100) }}><span>{pct}%</span></span>}
@@ -217,7 +217,7 @@ export default async function Resumen({ searchParams }: { searchParams: Promise<
         <details className="glass rs-acc">
           <summary><span><b>Resultado financiero</b><small>{auto ? "Con las comisiones ya restadas" : "Después de pagos realizados"}</small></span><b>{signo(resultado)}</b><Icono n="abajo" /></summary>
           <div className="rs-acc-c">
-            <div className="rs-f"><span><span>Ingresos</span><small>Ventas netas{rentas ? ` y rentas ${$(rentas)}` : ""}</small></span><b>{$(ingresos)}</b></div>
+            <div className="rs-f"><span><span>Ingresos</span><small>Vendido{rentas ? ` y rentas ${$(rentas)}` : ""}</small></span><b>{$(ingresos)}</b></div>
             <div className="rs-f"><span><span>Egresos del negocio</span><small>{topCats.length ? lista(topCats) : "Sin egresos"}</small></span><b>{egresos ? `−${$(egresos)}` : "$0"}</b></div>
             {auto ? <div className="rs-f"><span><span>Comisiones y sueldos del equipo</span></span><b>{costoEquipo ? `−${$(costoEquipo)}` : "$0"}</b></div> : <>
               <div className="rs-f"><span><span>Pagos al equipo realizados</span></span><b>{pagadoEquipo ? `−${$(pagadoEquipo)}` : "$0"}</b></div>
@@ -236,7 +236,7 @@ export default async function Resumen({ searchParams }: { searchParams: Promise<
                 <i className="rs-mp-b"><em style={{ width: `${Math.max((b.monto / totalVentas) * 100, 2)}%` }} /></i>
               </div>
             ); })}
-            <small className="rs-nota">Ventas atribuidas: total cobrado por los servicios que realizó cada persona. No corresponde a lo que se le paga.</small>
+            <small className="rs-nota">Ventas atendidas: total cobrado por los servicios que realizó cada persona. No corresponde a lo que se le paga.</small>
           </div>
         </details>
         {pendientes.length > 0 && (

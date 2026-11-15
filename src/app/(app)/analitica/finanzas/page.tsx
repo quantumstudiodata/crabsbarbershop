@@ -16,6 +16,8 @@ import { fechaLarga, fechaLocal, horaCorta } from "@/lib/fechas";
 import { type ConsultaFiltros, leerFiltros, paginaDeRegistros, rangoDePagina } from "@/lib/filtros";
 import { esMovil } from "@/lib/dispositivo";
 import { formatoDinero } from "@/lib/money";
+import { esPagoEquipo } from "@/lib/caja";
+import { Ayuda } from "@/components/Ayuda";
 import { Movimientos, type DiaMovimientos, type Movimiento } from "./Movimientos";
 import { liquidarAutomaticos } from "@/lib/pagosAuto";
 import { asentarCitasPagadas } from "@/lib/pagos";
@@ -24,7 +26,7 @@ export const metadata = { title: "Movimientos" };
 
 const $ = formatoDinero;
 const SUELDO = new Set(["sueldo", "mixto"]);
-const TIPOS = [["", "Todos los movimientos"], ["ingresos", "Ingresos"], ["egresos", "Egresos"], ["equipo", "Pagos al equipo"]] as const;
+const TIPOS = [["", "Todos los movimientos"], ["ingresos", "Ingresos"], ["egresos", "Egresos"], ["equipo", "Pagos al equipo"], ["caja", "Dinero que entró o salió de la caja"]] as const;
 const METODO: Record<string, string> = { efectivo: "efectivo", transferencia: "transferencia", tarjeta: "tarjeta" };
 
 type Q = ConsultaFiltros & { tipo?: string; egreso?: string };
@@ -57,7 +59,12 @@ export default async function Finanzas({ searchParams }: { searchParams: Promise
     ver("equipo") || ver("ingresos") ? db.selectDistinct({ d: local(t.pagosComision.creadoEn) }).from(t.pagosComision).innerJoin(t.usuarios, eq(t.usuarios.id, t.pagosComision.barberoId))
       .where(and(eq(t.pagosComision.barberiaId, bId), ...(tipo === "equipo" ? [eq(t.pagosComision.tipo, "pago")] : tipo === "ingresos" ? [eq(t.pagosComision.tipo, "renta")] : []), ...enFechas(t.pagosComision.creadoEn), ...(texto ? [ilike(t.usuarios.nombre, texto)] : []))) : [],
   ]);
-  const todosDias = [...new Set([...diasV, ...diasG, ...diasP].map((x) => x.d))].sort().reverse();
+  // Dinero que se sacó o se puso en la caja sin ser gasto ni venta: se informa, pero no cuenta en los totales.
+  const movsCaja = verTodo && ver("caja") ? (await db.select({ id: t.movimientosCaja.id, tipo: t.movimientosCaja.tipo, monto: t.movimientosCaja.monto, concepto: t.movimientosCaja.concepto, creadoEn: t.movimientosCaja.creadoEn, quien: t.usuarios.nombre })
+    .from(t.movimientosCaja).innerJoin(t.usuarios, eq(t.usuarios.id, t.movimientosCaja.usuarioId))
+    .where(and(eq(t.movimientosCaja.barberiaId, bId), inArray(t.movimientosCaja.tipo, ["retiro", "entrada"]), ...enFechas(t.movimientosCaja.creadoEn), ...(texto ? [ilike(t.movimientosCaja.concepto, texto)] : [])))
+    .orderBy(desc(t.movimientosCaja.creadoEn)).limit(500)).filter((x) => !esPagoEquipo(x.concepto) && !x.concepto.startsWith("Pago anulado a ")) : [];
+  const todosDias = [...new Set([...diasV, ...diasG, ...diasP].map((x) => x.d).concat(movsCaja.map((x) => fechaLocal(x.creadoEn, zona))))].sort().reverse();
   // En el teléfono se pagina por movimientos (7 por página); en escritorio, siete días por página.
   const movil = await esMovil();
   const r = movil ? { pagina: 1, paginas: 1, dias: todosDias, desde: todosDias[todosDias.length - 1] ?? hoy, hasta: todosDias[0] ?? hoy } : rangoDePagina(todosDias, f.pagina);
@@ -114,8 +121,15 @@ export default async function Finanzas({ searchParams }: { searchParams: Promise
         detalle: [["Hora", horaCorta(p.creadoEn, zona)], ...(p.nota ? [["Nota", p.nota] as [string, string]] : [])],
       });
     }
+    for (const c of movsCaja.filter((x) => fechaLocal(x.creadoEn, zona) === d)) {
+      const sale = c.tipo === "retiro";
+      movs.push({
+        id: `c${c.id}`, tipo: "caja", titulo: c.concepto, sub: sale ? "Se sacó de la caja. No es un gasto" : "Se puso en la caja. No es una venta", monto: sale ? -c.monto : c.monto, t: c.creadoEn.getTime(),
+        detalle: [["Registró", `${c.quien.split(" ")[0]}, ${horaCorta(c.creadoEn, zona)}`], ["Cuenta en el resultado", "No. Solo cambia el efectivo de la caja"]],
+      });
+    }
     movs.sort((a, b) => b.t - a.t);
-    return { fecha: d, titulo: d === hoy ? "Hoy" : fechaLarga(d), neto: movs.filter((m) => !m.cancelado).reduce((a, m) => a + m.monto, 0), movs };
+    return { fecha: d, titulo: d === hoy ? "Hoy" : fechaLarga(d), neto: movs.filter((m) => !m.cancelado && m.tipo !== "caja").reduce((a, m) => a + m.monto, 0), movs };
   });
   let paginaMov = r.pagina, paginasMov = r.paginas, dias = todosLosDias;
   if (movil) {
@@ -141,6 +155,8 @@ export default async function Finanzas({ searchParams }: { searchParams: Promise
     categoriasGasto(bId, false),
     db.select().from(t.conceptosFrecuentes).where(eq(t.conceptosFrecuentes.barberiaId, bId)),
   ]);
+  const retirado = verTodo ? (await db.select({ concepto: t.movimientosCaja.concepto, monto: t.movimientosCaja.monto }).from(t.movimientosCaja)
+    .where(and(eq(t.movimientosCaja.barberiaId, bId), eq(t.movimientosCaja.tipo, "retiro"), enP(t.movimientosCaja.creadoEn)))).filter((x) => !esPagoEquipo(x.concepto)).reduce((a, x) => a + x.monto, 0) : 0;
   const ventasP = rp?.netas ?? 0;
   const rentas = pagosP.filter((x) => x.tipo === "renta").reduce((a, x) => a + x.monto, 0);
   const pagadoEquipo = pagosP.filter((x) => x.tipo === "pago").reduce((a, x) => a + x.monto, 0);
@@ -150,6 +166,8 @@ export default async function Finanzas({ searchParams }: { searchParams: Promise
   const comisionesMes = generadas.filter((g) => !esSueldo(g.id));
   const falt = await faltantesDe(bId, p.desde, p.hasta);
   const porPagar = comisionesMes.reduce((a, g) => a + Math.max(g.comision - pagosP.filter((x) => x.id === g.id && x.tipo === "pago").reduce((b, x) => b + x.monto, 0) - (falt.find((x) => x.usuarioId === g.id)?.monto ?? 0), 0), 0);
+  // Resultado: lo vendido menos lo gastado y menos lo que le corresponde al equipo, ya pagado o todavía por pagar.
+  const resultado = quedo - porPagar;
   const nombreP = p.tipo === "mes" ? p.etiqueta.split(" ")[0].toLowerCase() : p.etiqueta.toLowerCase();
   const maxB = Math.max(entro, salio, 1);
   const firma = (c: number) => (c < 0 ? `−${$(-c)}` : $(c));
@@ -161,11 +179,12 @@ export default async function Finanzas({ searchParams }: { searchParams: Promise
       {rentas > 0 && <div className="paso-c"><span><b>Rentas de silla</b><small>lo que pagaron los barberos</small></span><b className="num">+{$(rentas)}</b></div>}
       <div className="paso-c resta"><span><b>Pagos al equipo</b><small>lo que ya se registró como pagado</small></span><b className="num">{pagadoEquipo ? `−${$(pagadoEquipo)}` : $(0)}</b></div>
       {comisionesMes.length > 0 && <div className="sub-c"><span>Comisiones generadas en el periodo</span><span className="num">{$(comisionesMes.reduce((a, g) => a + g.comision, 0))}</span></div>}
-      {porPagar > 0 && <div className="sub-c"><span>Falta por pagar</span><span className="num">{$(porPagar)}</span></div>}
+      {porPagar > 0 && <div className="paso-c resta"><span><b>Falta por pagar al equipo</b><small>ya lo ganaron y todavía no se les paga</small></span><b className="num">−{$(porPagar)}</b></div>}
       <div className="paso-c resta"><span><b>Gastos del negocio</b><small>egresos registrados</small></span><b className="num">{egresos ? `−${$(egresos)}` : $(0)}</b></div>
       {[...gastosP].sort((a, b) => b.monto - a.monto).map((g) => <div key={g.categoria} className="sub-c"><span>{g.categoria}</span><span className="num">{$(g.monto)}</span></div>)}
-      <div className="paso-c total"><span><b>Lo que quedó</b></span><b className="num">{firma(quedo)}</b></div>
-      <p className="ayuda-txt">Los pagos al equipo se suman cuando alguien los registra en Equipo, con Pagar al equipo.</p>
+      <div className="paso-c total"><span><b>Resultado</b></span><b className="num">{firma(resultado)}</b></div>
+      <p className="ayuda-txt">El resultado es lo que ganó el negocio en estas fechas: lo que se vendió, menos lo que se gastó y menos lo que le toca al equipo. No es el dinero que hay en la caja ni en el banco.</p>
+      {retirado > 0 && <p className="ayuda-txt">En estas fechas se sacaron {$(retirado)} de la caja para guardarlos. No es un gasto, por eso no se resta aquí.</p>}
     </div>
   );
 
@@ -175,8 +194,8 @@ export default async function Finanzas({ searchParams }: { searchParams: Promise
         <>
           <section className="cab-v cab-fin glass subir">
             <div className="cv-num">
-              <span className="lab">Lo que quedó en {nombreP}</span>
-              <b className="num">{firma(quedo)}</b>
+              <span className="lab lab-ay">Resultado de {nombreP}<Ayuda titulo="Resultado">Lo que ganó el negocio: lo vendido, menos los gastos y menos lo que le toca al equipo, aunque todavía no se le pague. No es el dinero que hay en la caja.</Ayuda></span>
+              <b className="num">{firma(resultado)}</b>
               <BotonCajon texto={<>Cómo se llega<Icono n="derecha" /></>} titulo="Cómo se llega al resultado">{cuenta}</BotonCajon>
             </div>
             <div className="es-c">
@@ -184,6 +203,12 @@ export default async function Finanzas({ searchParams }: { searchParams: Promise
               <div><span className="muted">Salió</span><span className="barra-m sal"><i style={{ width: `${(salio / maxB) * 100}%` }} /></span><b className="num">{$(salio)}</b></div>
             </div>
           </section>
+          {(porPagar > 0 || retirado > 0) && (
+            <div className="res-notas">
+              {porPagar > 0 && <span><b className="num">{$(porPagar)}</b> falta por pagar al equipo. Ya está restado del resultado.</span>}
+              {retirado > 0 && <span><b className="num">{$(retirado)}</b> se sacaron de la caja para guardarlos. No es gasto y no se resta.</span>}
+            </div>
+          )}
           {anterior && <p className="aviso-sutil">Mostrando {nombreP} hasta que empiece el mes.</p>}
         </>
       )}

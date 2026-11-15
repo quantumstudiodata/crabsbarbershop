@@ -23,7 +23,7 @@ export function VerificadoStripe({ ventaId, confirmado, reembolsado, tarjeta, re
   const tj = r?.tarjeta || tarjeta;
   return (
     <span className={`vs-caja ${clave === "reembolsado" ? "dev" : ""}`}>
-      <span className="vs-tit"><Icono n={clave === "reembolsado" ? "historial" : "candado"} /><b>{clave === "reembolsado" ? "Pago devuelto al cliente" : "Verificado por Stripe"}</b>{!r && <i className="vs-viva" aria-label="Comprobando con Stripe" />}</span>
+      <span className="vs-tit"><Icono n={clave === "reembolsado" ? "historial" : "candado"} /><b>{clave === "reembolsado" ? "Pago devuelto al cliente" : "Pago confirmado"}</b>{!r && <i className="vs-viva" aria-label="Comprobando con Stripe" />}</span>
       <span className="vs-chips">
         <i className={`vs-est ${clave}`}>{CHIP[clave] ?? "Cobrado"}</i>
         <i className="vs-est">Pago en línea</i>

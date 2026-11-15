@@ -77,8 +77,8 @@ export default async function Ficha({ params, searchParams }: { params: Promise<
   const enMes = m.mes === m.hoy.slice(0, 7) ? "en el mes" : `en ${m.nombre.toLowerCase().split(" ")[0]}`;
   const periodoActual = enCurso && !enCurso.sinRegla ? <>Periodo en curso: {enCurso.fila.monto}</> : undefined;
   const cifras: [string, string, React.ReactNode?, boolean?][] = renta
-    ? [["Ventas atribuidas", formatoDinero(r.vendido)], ["Renta del mes", formatoDinero(cuenta.renta)], ["Recibido", formatoDinero(cuenta.rentaPagada)], [`Por cobrar ${enMes}`, formatoDinero(cuenta.rentaPendiente), periodoActual, cuenta.rentaPendiente > 0]]
-    : [["Ventas atribuidas", formatoDinero(r.vendido)], [cuenta.sueldo ? "Le corresponde" : "Comisión generada", formatoDinero(cuenta.corresponde)], [se.barberia.pagosEquipoAuto ? "Liquidado" : "Pagado", formatoDinero(cuenta.pagado)], [se.barberia.pagosEquipoAuto ? `Por liquidar ${enMes}` : `Por pagar ${enMes}`, formatoDinero(cuenta.saldo), periodoActual, cuenta.saldo > 0]];
+    ? [["Ventas atendidas", formatoDinero(r.vendido)], ["Renta del mes", formatoDinero(cuenta.renta)], ["Recibido", formatoDinero(cuenta.rentaPagada)], [`Por cobrar ${enMes}`, formatoDinero(cuenta.rentaPendiente), periodoActual, cuenta.rentaPendiente > 0]]
+    : [["Ventas atendidas", formatoDinero(r.vendido)], [cuenta.sueldo ? "Le corresponde" : "Comisión generada", formatoDinero(cuenta.corresponde)], [se.barberia.pagosEquipoAuto ? "Liquidado" : "Pagado", formatoDinero(cuenta.pagado)], [se.barberia.pagosEquipoAuto ? `Por liquidar ${enMes}` : `Por pagar ${enMes}`, formatoDinero(cuenta.saldo), periodoActual, cuenta.saldo > 0]];
   cifras[0][2] = <>{r.servicios} {r.servicios === 1 ? "servicio" : "servicios"}{res.n ? <><br />★ {res.prom.toFixed(1)} en {res.n} {res.n === 1 ? "reseña" : "reseñas"}</> : null}</>;
 
   const sinActividad = r.servicios === 0 && cuenta.corresponde === 0 && cuenta.pagado === 0 && cuenta.renta === 0;
@@ -87,8 +87,8 @@ export default async function Ficha({ params, searchParams }: { params: Promise<
   const dato = (k: string) => detalle.find(([a]) => a === k)?.[1] ?? "";
   const vistas: VistaCuenta[] = [
     { clave: "mes", titulo: m.nombre.split(" ")[0].replace(/^./, (x) => x.toUpperCase()), pendiente: formatoDinero(renta ? cuenta.rentaPendiente : cuenta.saldo), nota: `Lo acumulado ${enMes}`,
-      renglones: renta ? [["Renta del mes", formatoDinero(cuenta.renta)], ["Recibido", formatoDinero(cuenta.rentaPagada)], ["Ventas atribuidas", formatoDinero(r.vendido)]]
-        : [["Ventas atribuidas", formatoDinero(r.vendido)], [cuenta.sueldo ? "Le corresponde" : "Comisión generada", formatoDinero(cuenta.corresponde)], ["Pagado", formatoDinero(cuenta.pagado)]] },
+      renglones: renta ? [["Renta del mes", formatoDinero(cuenta.renta)], ["Recibido", formatoDinero(cuenta.rentaPagada)], ["Ventas atendidas", formatoDinero(r.vendido)]]
+        : [["Ventas atendidas", formatoDinero(r.vendido)], [cuenta.sueldo ? "Le corresponde" : "Comisión generada", formatoDinero(cuenta.corresponde)], ["Pagado", formatoDinero(cuenta.pagado)]] },
     ...(enCurso && !enCurso.sinRegla ? [{ clave: "periodo", titulo: "Periodo en curso", pendiente: enCurso.fila.monto, nota: `${dato("Periodo")}${dato(renta ? "Fecha límite" : "Fecha de pago") ? `, ${renta ? "vence" : "se paga"} el ${dato(renta ? "Fecha límite" : "Fecha de pago").toLowerCase()}` : ""}`,
       renglones: detalle.filter(([a]) => !["Periodo", "Fecha de pago", "Fecha límite", "Saldo pendiente", "Pendiente", "Forma de pago"].includes(a)) }] : []),
   ];
@@ -99,7 +99,7 @@ export default async function Ficha({ params, searchParams }: { params: Promise<
       <dt>Horario</dt><dd>{h.horas || "Sin horario"}</dd>
       <dt>Días</dt><dd>{h.dias}</dd>
       <dt>Modalidad</dt><dd>{modalidadCorta(regla)}{regla && (regla.tipo === "porcentaje" || regla.tipo === "mixto") && !modalidadCorta(regla).includes("%") ? `, ${regla.porcentaje / 100}%` : ""}</dd>
-      {cal && <><dt>Periodicidad</dt><dd>{NOMBRE_FRECUENCIA[frecuenciaDe(cal)] ?? "Semanal"}{frecuenciaDe(cal) === "semana" ? `, corte el ${DIAS_C[cal.diaCorte ?? 0]}` : ""}</dd></>}
+      {cal && <><dt>Cada cuándo se le paga</dt><dd>{NOMBRE_FRECUENCIA[frecuenciaDe(cal)] ?? "Semanal"}{frecuenciaDe(cal) === "semana" ? `, corte el ${DIAS_C[cal.diaCorte ?? 0]}` : ""}</dd></>}
       {cal && <><dt>Forma de pago</dt><dd>{NOMBRE_FORMA_PAGO[cal.formaPago ?? "efectivo"]}</dd></>}
       {per && !renta && <><dt>Próximo pago</dt><dd>{fechaLarga(per.pago)}</dd></>}
       <dt>Mes anterior</dt><dd>{formatoDinero(anterior.r.vendido)} en {mesAnt}</dd>
@@ -125,11 +125,11 @@ export default async function Ficha({ params, searchParams }: { params: Promise<
           ) : (
             <>
               <section className="glass fa-cifras solo-escritorio">
-                {cifras.map(([t, v, sub, pend]) => <span key={t}><small className={`${pend ? "pend" : ""} lab-ay`}>{t}{t === "Ventas atribuidas" && <Ayuda titulo="Ventas atribuidas">Total cobrado por los servicios que realizó, con cualquier forma de pago. Sobre esto se calcula su comisión.</Ayuda>}</small><b>{v}</b>{sub && <em>{sub}</em>}</span>)}
+                {cifras.map(([t, v, sub, pend]) => <span key={t}><small className={`${pend ? "pend" : ""} lab-ay`}>{t}{t === "Ventas atendidas" && <Ayuda titulo="Ventas atendidas">Total cobrado por los servicios que realizó, con cualquier forma de pago. Sobre esto se calcula su comisión.</Ayuda>}</small><b>{v}</b>{sub && <em>{sub}</em>}</span>)}
               </section>
               {vistas.length > 1 && <div className="solo-escritorio fa-per"><CuentaFicha vistas={vistas.filter((x) => x.clave === "periodo")} etiqueta={`${pendLabel} en el periodo en curso`} /></div>}
               <div className="solo-movil fa-mov"><CuentaFicha vistas={vistas} etiqueta={pendLabel}>{pagar}</CuentaFicha>
-                <small className="fa-ayuda">Ventas atribuidas: total cobrado por sus servicios con cualquier forma de pago. Sobre esto se calcula su comisión.{res.n ? ` Calificación de clientes: ★ ${res.prom.toFixed(1)} en ${res.n} ${res.n === 1 ? "reseña" : "reseñas"}.` : ""}</small></div>
+                <small className="fa-ayuda">Ventas atendidas: total cobrado por sus servicios con cualquier forma de pago. Sobre esto se calcula su comisión.{res.n ? ` Calificación de clientes: ★ ${res.prom.toFixed(1)} en ${res.n} ${res.n === 1 ? "reseña" : "reseñas"}.` : ""}</small></div>
             </>
           )}
           <div className="fa-dos">

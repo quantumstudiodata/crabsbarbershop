@@ -1,4 +1,5 @@
-import { and, eq, gt, inArray, isNull, sql } from "drizzle-orm";
+import { and, eq, gt, inArray, isNull, ne, sql } from "drizzle-orm";
+import { esPagoAnulado, esPagoEquipo } from "@/lib/caja";
 import { asentarCitasPagadas, esCategoriaComisiones } from "@/lib/pagos";
 import { cobraEnLinea } from "@/lib/stripe";
 import { requerirSesion } from "@/lib/auth";
@@ -60,6 +61,11 @@ export default async function Cobrar({ searchParams }: { searchParams: Promise<{
       deOtroDia: t.fechaOperativa < fechaLocal(new Date(), zona), folioCorte: folio, m: datos.m, esperado: datos.esperado,
       ventas: datos.ventas, ventasEfectivo: datos.ventasEfectivo, propinas: datos.propinasTotal, otros: datos.otrosPorMetodo.map((x) => ({ metodo: x.metodo, total: x.total, ventas: x.ventas })),
       comisiones: mio(comisiones), entregas: mio(entregas), verTodo, sinCobrar: sinCobrar?.n ?? 0,
+      pagosEquipo: datos.movimientos.filter((x) => x.tipo === "retiro" && esPagoEquipo(x.concepto)).reduce((a, x) => a + x.monto, 0),
+      pagosAnulados: datos.movimientos.filter((x) => x.tipo === "entrada" && esPagoAnulado(x.concepto)).reduce((a, x) => a + x.monto, 0),
+      otrosEgresos: s.puede("gastos.ver") ? (await db.select({ concepto: schema.gastos.concepto, metodo: schema.gastos.metodo, monto: schema.gastos.monto }).from(schema.gastos)
+        .where(and(eq(schema.gastos.barberiaId, s.barberia.id), eq(schema.gastos.fecha, t.fechaOperativa), isNull(schema.gastos.turnoId), ne(schema.gastos.metodo, "efectivo"), isNull(schema.gastos.canceladoEn))))
+        .map((g) => ({ concepto: g.concepto, metodo: g.metodo === "tarjeta" ? "Tarjeta" : "Transferencia", monto: g.monto })) : [],
     };
   }
   const folioVenta = `${s.barberia.folioPrefijo}-${String(s.barberia.siguienteFolio).padStart(6, "0")}`;
@@ -89,7 +95,7 @@ export default async function Cobrar({ searchParams }: { searchParams: Promise<{
             )}
           </>
         )}
-      {opera && <CajaModal inicial={q.caja === "cerrar" ? "corte" : q.caja === "retiro" ? "retiro" : null} turno={turno} limiteDiferencia={s.barberia.limiteDiferenciaCaja} categorias={cats.filter((c) => !esCategoriaComisiones(c.nombre)).map((c) => c.nombre)} evidencias={s.barberia.usaEvidenciaCorte} egresos={s.puede("gastos.registrar")} />}
+      {opera && <CajaModal inicial={q.caja === "cerrar" ? "corte" : q.caja === "retiro" || q.caja === "movimiento" ? "movimiento" : null} turno={turno} limiteDiferencia={s.barberia.limiteDiferenciaCaja} categorias={cats.filter((c) => !esCategoriaComisiones(c.nombre)).map((c) => c.nombre)} evidencias={s.barberia.usaEvidenciaCorte} egresos={s.puede("gastos.registrar")} />}
     </>
   );
 }

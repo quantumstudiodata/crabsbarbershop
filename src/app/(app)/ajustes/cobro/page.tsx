@@ -91,7 +91,7 @@ export default async function ConfigurarNegocio({ searchParams }: { searchParams
           ["Modelo de caja", b.modeloCaja === "individual" ? "Individual por trabajador" : "Compartida"],
           ["Apertura", b.aperturaManual ? "Manual, contando el fondo" : "Automática al primer cobro"],
           ["Corte de caja", b.corteObligatorio ? "Obligatorio cada día" : "No obligatorio"],
-          ["Evidencias del corte", b.usaEvidenciaCorte ? "Se pueden adjuntar al cerrar" : "No se piden"],
+          ["Fotos de comprobantes en el corte", b.usaEvidenciaCorte ? "Se pueden adjuntar al cerrar" : "No se piden"],
           ...(b.aperturaManual ? [] : [["Fondo inicial sugerido", $(b.fondoPredeterminado)] as [string, string]]),
           ["Diferencia permitida", b.limiteDiferenciaCaja ? $(b.limiteDiferenciaCaja) : "Ninguna, toda diferencia se explica"],
         ]} />}>

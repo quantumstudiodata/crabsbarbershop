@@ -169,7 +169,7 @@ export function Nuevo({ hoy, cajaAbierta, categorias, cerrar, otro, opciones }: 
           ) : (
             <p className="ayuda-txt" style={{ margin: 0 }}>{metodo !== "efectivo" ? `Pagado con ${metodo}: no afecta el efectivo de la caja.` : fecha !== hoy ? "Es de otro día: no afecta el corte de hoy." : "La caja está cerrada: este gasto no afecta ningún corte."}</p>
           )}
-          {opciones.periodicidad && <div className="campo"><span>Periodicidad del gasto</span><Selector etiqueta="Periodicidad del gasto" valor={periodo} onChange={setPeriodo} opciones={PERIODOS.map(([k, t]) => ({ valor: k, texto: t }))} /></div>}
+          {opciones.periodicidad && <div className="campo"><span>Cada cuánto se repite</span><Selector etiqueta="Periodicidad del gasto" valor={periodo} onChange={setPeriodo} opciones={PERIODOS.map(([k, t]) => ({ valor: k, texto: t }))} /></div>}
         </div>
 
         <div className="pila" hidden={paso !== 3}>
