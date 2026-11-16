@@ -16,6 +16,8 @@ export type FilaVenta = {
   stripe?: { confirmado: string; reembolsado: boolean; tarjeta: string; referencia: string };
   /** Si quien ve puede modificar la venta. */
   edicion?: DatosEdicion;
+  /** Esta fila no es una venta: marca el momento en que se hizo un corte de caja. */
+  corte?: { vendido?: number; enlace?: string };
 };
 export type DiaVentas = { fecha: string; titulo: string; total: number; filas: FilaVenta[] };
 
@@ -29,7 +31,15 @@ export function HistorialVentas({ dias, regreso, opciones, sinMarco }: { dias: D
         {dias.map((d) => (
           <div key={d.fecha}>
             <div className="hist-dia"><span>{d.titulo}</span><b className="num">{formatoDinero(d.total)}</b></div>
-            {d.filas.map((f) => (
+            {d.filas.map((f) => f.corte ? (
+              <div key={f.id} className="hist-corte">
+                <span className="t">{f.hora}</span>
+                <span className="hc-t">Corte de caja</span>
+                <span className="folio">{f.folio}</span>
+                {f.corte.vendido !== undefined && <span className="hc-v">Vendido <b className="num">{formatoDinero(f.corte.vendido)}</b></span>}
+                {f.corte.enlace && <a className="hc-l" href={f.corte.enlace}>Ver corte</a>}
+              </div>
+            ) : (
               <div key={f.id} className={`hist-fila ${f.cancelada ? "cancelada" : ""} ${abierta === f.id ? "abierta" : ""}`}>
                 <button type="button" className="hist-linea" aria-expanded={abierta === f.id} onClick={() => setAbierta(abierta === f.id ? null : f.id)}>
                   <span className="t">{f.hora}</span>

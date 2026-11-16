@@ -5606,3 +5606,13 @@ html:has(.fx-raiz .mc) body::before, html:has(.fx-raiz .mc) body::after { displa
 .acc-c em { font-style: normal; font-size: 11px; color: var(--muted); }
 .acc-c:hover { background: #fff; }
 @media (max-width: 520px) { .acc-f { grid-template-columns: 1fr 1fr; } .acc-pu { grid-column: 1 / -1; } }
+
+/* Ventas: separador donde se hizo un corte de caja. */
+.hist-corte { display: flex; align-items: center; flex-wrap: wrap; gap: 6px 14px; padding: 9px 14px; margin: 4px 0; border-top: 1px solid #13171c; border-bottom: 1px solid #13171c; background: rgba(19,23,28,.04); font-size: 12.5px; }
+.hist-corte .t { font: 500 11px var(--f-mono); color: var(--faint); width: 52px; }
+.hist-corte .hc-t { font: 600 10.5px var(--f-mono); letter-spacing: .22em; text-transform: uppercase; }
+.hist-corte .folio { font: 500 11px var(--f-mono); color: var(--muted); }
+.hist-corte .hc-v { margin-left: auto; color: var(--muted); }
+.hist-corte .hc-v b { color: var(--fg); margin-left: 4px; }
+.hist-corte .hc-l { color: var(--fg); font-weight: 600; text-decoration: underline; text-underline-offset: 2px; }
+@media (max-width: 520px) { .hist-corte .t { width: auto; } .hist-corte .hc-v { margin-left: 0; } }

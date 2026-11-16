@@ -5,7 +5,8 @@ import { and, eq, like, sql } from "drizzle-orm";
 import { POR_ENTREGAR, liquidarAutomaticos } from "@/lib/pagosAuto";
 import { revalidatePath } from "next/cache";
 import { requerirSesion } from "@/lib/auth";
-import { compararConteo, requiereExplicacion } from "@/lib/caja";
+import { CONCEPTO_PROPINA, compararConteo, requiereExplicacion } from "@/lib/caja";
+import { propinasDeTurno } from "@/lib/comisionesCorte";
 import { cajaDe, categoriasGasto, folioCorte, movimientosDeTurno } from "@/lib/datos";
 import { db, schema } from "@/lib/db";
 import { fechaLarga, fechaLocal } from "@/lib/fechas";
@@ -128,7 +129,12 @@ export async function cerrarCaja(_: EstadoCaja, form: FormData): Promise<EstadoC
       .map((x) => ({ ...x, decision: texto(form, `entrega:${x.barberoId}`) })).filter((x) => ["caja", "transferencia"].includes(x.decision));
   }
   const deCaja = entregas.filter((x) => x.decision === "caja").reduce((a, x) => a + x.monto, 0);
-  datos.esperado -= deCaja;
+  // Propinas del turno: se calculan aquí con lo guardado, no con lo que mande la pantalla. Del formulario solo se lee cómo se entrega lo de tarjeta.
+  const propinas = (await propinasDeTurno(s.barberia.id, turno.id)).map((p) => {
+    const transferencia = p.otro > 0 && texto(form, `propina:${p.id}`) === "transferencia";
+    return { ...p, transferencia, deCaja: p.efectivo + (transferencia ? 0 : p.otro) };
+  });
+  datos.esperado -= deCaja + propinas.reduce((a, p) => a + p.deCaja, 0);
   // Con la función activa, cada forma de pago (que no sea efectivo) con cobros necesita su evidencia.
   if (s.barberia.usaEvidenciaCorte) {
     // Los cobros con QR y los anticipos en línea ya están verificados por Stripe: no piden comprobante.
@@ -155,10 +161,14 @@ export async function cerrarCaja(_: EstadoCaja, form: FormData): Promise<EstadoC
         await tx.update(schema.pagosComision).set({ nota: `Transferencia: ${resto}`.slice(0, 200) }).where(eq(schema.pagosComision.id, e.id));
       }
     }
+    for (const p of propinas) {
+      if (p.deCaja > 0) await tx.insert(schema.movimientosCaja).values({ barberiaId: s.barberia.id, turnoId: turno.id, tipo: "retiro", monto: p.deCaja, concepto: `${CONCEPTO_PROPINA} ${p.nombre.split(" ")[0]}`, usuarioId: s.usuario.id });
+    }
     if (evidencias.length) await tx.insert(schema.evidenciasCorte).values(evidencias.map((e) => ({ ...e, barberiaId: s.barberia.id, turnoId: turno.id, subidoPor: s.usuario.id })));
     await registrar(tx, {
       barberiaId: s.barberia.id, usuarioId: s.usuario.id, tipo: "caja",
       accion: `${s.usuario.nombre} hizo el corte de caja. ${r.texto}`, detalle: { esperado: datos.esperado, contado, diferencia: r.diferencia, notas, verificacion, evidencias: evidencias.length || undefined,
+        propinas: propinas.length ? propinas.map((p) => `${p.nombre.split(" ")[0]} ${formatoDinero(p.efectivo + p.otro)}${p.transferencia ? ` (${formatoDinero(p.otro)} por transferencia)` : " de la caja"}`).join(", ") : undefined,
         comisiones: entregas.length ? entregas.map((e) => `${e.nombre.split(" ")[0]} ${formatoDinero(e.monto)} ${e.decision === "caja" ? "de la caja" : "por transferencia"}`).join(", ") : undefined },
     });
   });

@@ -5,7 +5,7 @@ import { Paginacion } from "@/components/Paginacion";
 import { requerirSesion } from "@/lib/auth";
 import { cobradoresDe } from "@/lib/faltantes";
 import { and, eq, inArray, isNull, ne } from "drizzle-orm";
-import { esPagoAnulado, esPagoEquipo } from "@/lib/caja";
+import { esPagoAnulado, esPagoEquipo, esPropinaEntregada } from "@/lib/caja";
 import { ajustesDeTurnos, detalleCortes, foliosCorte, metodosActivos, turnosCerrados } from "@/lib/datos";
 import { db, schema } from "@/lib/db";
 import { NecesitaRevision, TablaCortes, type Corte } from "./HistorialCortes";
@@ -64,6 +64,7 @@ export default async function Cortes({ searchParams }: { searchParams: Promise<C
     const gastos = det.gastos.filter((x) => x.turnoId === c.id);
     const suma = (t: string) => movs.filter((x) => x.tipo === t).reduce((a, x) => a + x.monto, 0);
     const anulados = movs.filter((x) => x.tipo === "entrada" && esPagoAnulado(x.concepto)).reduce((a, x) => a + x.monto, 0);
+    const propinasEnt = movs.filter((x) => x.tipo === "retiro" && esPropinaEntregada(x.concepto)).reduce((a, x) => a + x.monto, 0);
     const pagosEquipo = movs.filter((x) => x.tipo === "retiro" && esPagoEquipo(x.concepto)).reduce((a, x) => a + x.monto, 0) - anulados;
     return {
       id: c.id, folio: folios.get(c.id) ?? "", dia: fechaLarga(c.fechaOperativa), fechaCorta: c.fechaOperativa === hoy ? "Hoy" : fechaCorta(c.fechaOperativa),
@@ -71,11 +72,11 @@ export default async function Cortes({ searchParams }: { searchParams: Promise<C
       abrio: persona(c.abiertoPor), cerro: (() => { const x = persona(c.cerradoPorId); return x.nombre ? x : { nombre: c.cerradoPor ?? "", avatar: "iniciales" }; })(),
       metodos, total: metodos.reduce((a, x) => a + x.total, 0), ventas: cobros.reduce((a, x) => Math.max(a, x.ventas), 0),
       fondo: c.fondoInicial, ventasEfectivo: efectivo, propinasEfectivo: det.propinas.find((x) => x.turnoId === c.id)?.efectivo ?? 0,
-      entradas: suma("entrada") - anulados, retiros: suma("retiro") + suma("devolucion") - pagosEquipo - anulados, pagosEquipo, gastos: gastos.reduce((a, x) => a + x.monto, 0),
+      entradas: suma("entrada") - anulados, retiros: suma("retiro") + suma("devolucion") - pagosEquipo - anulados - propinasEnt, pagosEquipo, propinasEnt, gastos: gastos.reduce((a, x) => a + x.monto, 0),
       otrosEgresos: otrosEgresos.filter((x) => x.fecha === c.fechaOperativa).map((x) => ({ concepto: x.concepto, metodo: x.metodo === "tarjeta" ? "Tarjeta" : "Transferencia", monto: x.monto })),
       esperado: c.efectivoEsperado ?? 0, contado: c.efectivoContado ?? 0, diferencia: c.diferencia ?? 0, ajustado: ajustes.filter((x) => x.turnoId === c.id).reduce((a, x) => a + x.monto, 0), notas: c.notasCierre,
       movimientos: [
-        ...movs.map((m) => ({ t: m.creadoEn.getTime(), hora: horaCorta(m.creadoEn, zona), titulo: m.tipo === "retiro" ? (esPagoEquipo(m.concepto) ? "Pago al equipo" : "Dinero que se sacó") : m.tipo === "entrada" ? (esPagoAnulado(m.concepto) ? "Pago anulado, el dinero regresó" : "Dinero que se puso") : "Devolución", detalle: `${m.concepto}, ${m.usuario.split(" ")[0]}`, monto: m.tipo === "entrada" ? m.monto : -m.monto })),
+        ...movs.map((m) => ({ t: m.creadoEn.getTime(), hora: horaCorta(m.creadoEn, zona), titulo: m.tipo === "retiro" ? (esPropinaEntregada(m.concepto) ? "Propinas entregadas" : esPagoEquipo(m.concepto) ? "Pago al equipo" : "Dinero que se sacó") : m.tipo === "entrada" ? (esPagoAnulado(m.concepto) ? "Pago anulado, el dinero regresó" : "Dinero que se puso") : "Devolución", detalle: `${m.concepto}, ${m.usuario.split(" ")[0]}`, monto: m.tipo === "entrada" ? m.monto : -m.monto })),
         ...gastos.map((g) => ({ t: g.creadoEn.getTime(), hora: horaCorta(g.creadoEn, zona), titulo: "Gasto pagado con la caja", detalle: `${g.concepto}, ${g.usuario.split(" ")[0]}`, monto: -g.monto })),
       ].sort((a, b) => a.t - b.t),
       evidencias: evid.filter((x) => x.turnoId === c.id).map((x) => ({ id: x.id, etiqueta: x.etiqueta, nombre: x.nombre, tipo: x.tipo })),

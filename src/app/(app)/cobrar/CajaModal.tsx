@@ -17,6 +17,8 @@ export type Turno = {
   /** Comisiones por entregar en efectivo: se deciden en el corte. */
   entregas?: { id: string; nombre: string; avatar: string; monto: number; detalle: string }[];
   verTodo?: boolean;
+  /** Propinas del turno por persona, para entregarlas en el corte. */
+  propinasEquipo?: { id: string; nombre: string; avatar: string; efectivo: number; otro: number }[];
   /** De los retiros del turno, lo que fueron pagos al equipo. */
   pagosEquipo?: number;
   /** Pagos al equipo anulados con la caja abierta: el dinero regresó. */
@@ -273,7 +275,8 @@ function CortePasos({ turno, accion, cerrando, error, contado, setContado, limit
   const conComprobantes = evidencias && grupos.length > 0;
   const comisiones = turno.comisiones ?? [];
   const entregas = turno.entregas ?? [];
-  const conComisiones = comisiones.length > 0 || entregas.length > 0;
+  const propinasEq = turno.propinasEquipo ?? [];
+  const conComisiones = comisiones.length > 0 || entregas.length > 0 || propinasEq.length > 0;
   const nombres = ["Resumen del turno", ...(conComisiones ? ["Comisiones"] : []), "Efectivo", ...(conComprobantes ? ["Comprobantes"] : []), "Cierre"];
   const pasos = nombres.length;
   const n = (x: string) => nombres.indexOf(x) + 1;
@@ -287,8 +290,10 @@ function CortePasos({ turno, accion, cerrando, error, contado, setContado, limit
     return Object.fromEntries(entregas.map((e) => { const alcanza = queda >= e.monto; if (alcanza) queda -= e.monto; return [e.id, alcanza ? "caja" : "manana"]; }));
   });
   const alcanzaCaja = turno.esperado - entregas.filter((e) => decision[e.id] === "caja").reduce((a, e) => a + e.monto, 0) >= 0;
+  const [propDec, setPropDec] = useState<Record<string, string>>({});
+  const propCaja = propinasEq.reduce((a, p) => a + p.efectivo + (propDec[p.id] === "transferencia" ? 0 : p.otro), 0);
   const deCaja = entregas.filter((e) => decision[e.id] === "caja").reduce((a, e) => a + e.monto, 0);
-  const esperado = turno.esperado - deCaja;
+  const esperado = turno.esperado - deCaja - propCaja;
   const anulados = turno.pagosAnulados ?? 0;
   const det = turno.detalle ?? { gastos: [], sacado: [], puesto: [] };
   const c = leerPesos(contado);
@@ -336,7 +341,7 @@ function CortePasos({ turno, accion, cerrando, error, contado, setContado, limit
             </div>
             {entregas.length > 0 && (
               <div className="ck-con">
-                <span className="ck-lab">Comisiones de días anteriores que toca pagar hoy</span>
+                <span className="ck-lab">Comisiones que toca pagar hoy</span>
                 {entregas.map((e) => (
                   <div key={e.id} className="ck-ent">
                     <input type="hidden" name={`entrega:${e.id}`} value={decision[e.id] ?? "caja"} />
@@ -348,8 +353,27 @@ function CortePasos({ turno, accion, cerrando, error, contado, setContado, limit
                     </div>
                   </div>
                 ))}
-                <small className="muted">No son de los servicios de hoy: es lo que ganaron en esas fechas y hoy es su día de pago. Lo que se paga de la caja se descuenta del efectivo que debe haber. Si no alcanza, elige Mañana o Transferencia.</small>
+                <small className="muted">{entregas.some((e) => e.detalle !== "de hoy") ? "Las de otras fechas no son de los servicios de hoy: es lo que ganaron en esas fechas y hoy es su día de pago. " : ""}Se pagan una sola vez: en el siguiente corte ya no aparecen. Lo que se paga de la caja se descuenta del efectivo que debe haber. Si no alcanza, elige Mañana o Transferencia.</small>
                 {!alcanzaCaja && <small className="aviso" style={{ margin: 0 }}>El efectivo de la caja no alcanza para pagar todo lo que marcaste De la caja.</small>}
+              </div>
+            )}
+            {propinasEq.length > 0 && (
+              <div className="ck-con">
+                <span className="ck-lab">Propinas por entregar</span>
+                {propinasEq.map((p) => (
+                  <div key={p.id} className="ck-ent">
+                    <input type="hidden" name={`propina:${p.id}`} value={propDec[p.id] ?? "caja"} />
+                    <div className="ck-per"><Avatar avatar={p.avatar} nombre={p.nombre} t={26} /><span>{p.nombre.split(" ")[0]}<small>{[p.efectivo ? `${formatoDinero(p.efectivo)} en efectivo` : "", p.otro ? `${formatoDinero(p.otro)} con tarjeta o transferencia` : ""].filter(Boolean).join(" y ")}</small></span><b className="num">{formatoDinero(p.efectivo + p.otro)}</b></div>
+                    {p.otro > 0 && (
+                      <div className="seg ck-seg" role="radiogroup" aria-label={`Cómo se entrega la propina con tarjeta de ${p.nombre.split(" ")[0]}`}>
+                        {([["caja", "Todo de la caja"], ["transferencia", `Lo de tarjeta por transferencia`]] as const).map(([k, t]) => (
+                          <button key={k} type="button" role="radio" aria-checked={(propDec[p.id] ?? "caja") === k} className={(propDec[p.id] ?? "caja") === k ? "on" : ""} onClick={() => setPropDec((d) => ({ ...d, [p.id]: k }))}>{t}</button>
+                        ))}
+                      </div>
+                    )}
+                  </div>
+                ))}
+                <small className="muted">Son de cada persona, no del negocio. Las de efectivo ya están en la caja y se entregan de ella. Las de tarjeta o transferencia llegaron al banco: se pueden dar en efectivo de la caja o mandarse por transferencia. Se entregan una sola vez, en este corte.</small>
               </div>
             )}
           </div>
@@ -375,6 +399,7 @@ function CortePasos({ turno, accion, cerrando, error, contado, setContado, limit
             {m.propinasEfectivo > 0 && <div><span>Propinas en efectivo</span><span className="num">+{formatoDinero(m.propinasEfectivo)}</span></div>}
             {m.gastosDeCaja > 0 && <div><span>Gastos pagados con la caja</span><span className="num">−{formatoDinero(m.gastosDeCaja)}</span></div>}
             {det.gastos.map((x, k) => <div key={`g${k}`} className="ck-sub"><span>{x.concepto}</span><span className="num">{formatoDinero(x.monto)}</span></div>)}
+            {propCaja > 0 && <div><span>Propinas entregadas</span><span className="num">−{formatoDinero(propCaja)}</span></div>}
             {(turno.pagosEquipo ?? 0) - anulados + deCaja > 0 && <div><span>Pagos al equipo</span><span className="num">−{formatoDinero((turno.pagosEquipo ?? 0) - anulados + deCaja)}</span></div>}
             {m.retiros - (turno.pagosEquipo ?? 0) > 0 && <div><span>Dinero que se sacó</span><span className="num">−{formatoDinero(m.retiros - (turno.pagosEquipo ?? 0))}</span></div>}
             {det.sacado.map((x, k) => <div key={`s${k}`} className="ck-sub"><span>{x.concepto}</span><span className="num">{formatoDinero(x.monto)}</span></div>)}
@@ -395,7 +420,8 @@ function CortePasos({ turno, accion, cerrando, error, contado, setContado, limit
           <div className="ck-con">
             <div><span>Total vendido</span><b className="num">{formatoDinero(total)}</b></div>
             {comisiones.length > 0 && <div><span>{turno.verTodo ? "Comisiones de este corte" : "Tu comisión de este corte"}</span><span className="num">{turno.verTodo ? comisiones.map((x) => `${x.nombre.split(" ")[0]} ${formatoDinero(x.monto)}`).join(", ") : formatoDinero(comisiones.reduce((a, x) => a + x.monto, 0))}</span></div>}
-            {entregas.length > 0 && <div><span>Comisiones de días anteriores</span><span className="num">{entregas.map((e) => `${e.nombre.split(" ")[0]} ${formatoDinero(e.monto)}, servicios ${e.detalle}, ${decision[e.id] === "caja" ? "de la caja" : decision[e.id] === "transferencia" ? "por transferencia" : "mañana"}`).join(", ")}</span></div>}
+            {propinasEq.length > 0 && <div><span>Propinas que se entregan</span><span className="num">{propinasEq.map((p) => `${p.nombre.split(" ")[0]} ${formatoDinero(p.efectivo + p.otro)}${propDec[p.id] === "transferencia" ? ` (${formatoDinero(p.otro)} por transferencia)` : ""}`).join(", ")}</span></div>}
+            {entregas.length > 0 && <div><span>Comisiones que se pagan hoy</span><span className="num">{entregas.map((e) => `${e.nombre.split(" ")[0]} ${formatoDinero(e.monto)}, servicios ${e.detalle}, ${decision[e.id] === "caja" ? "de la caja" : decision[e.id] === "transferencia" ? "por transferencia" : "mañana"}`).join(", ")}</span></div>}
             <div><span>Efectivo esperado</span><span className="num">{formatoDinero(esperado)}</span></div>
             <div><span>Efectivo contado</span><span>{c === null ? "Sin contar" : `${formatoDinero(c)}, ${dif === 0 ? "coincide" : dif! > 0 ? `sobran ${formatoDinero(dif!)}` : `faltan ${formatoDinero(-dif!)}`}`}</span></div>
             {conComprobantes && <div><span>Comprobantes</span><span>{faltan ? `Falta en ${faltan} ${faltan === 1 ? "forma de pago" : "formas de pago"}` : `${archivos} ${archivos === 1 ? "archivo" : "archivos"}, al menos uno por forma de pago`}</span></div>}
@@ -421,7 +447,7 @@ function CortePasos({ turno, accion, cerrando, error, contado, setContado, limit
           {paso > 1 ? <button type="button" className="ck-atras" aria-label="Anterior" onClick={() => setPaso(paso - 1)}><Icono n="izquierda" /></button> : <span />}
           {esCierre
             ? <button key="cerrar" type="submit" className="bt" disabled={cerrando || c === null || (conComprobantes && faltan > 0)}>{cerrando ? "Cerrando…" : "Cerrar caja"}<Fl /></button>
-            : <button key="seguir" type="button" className="bt" disabled={!puedeSeguir} onClick={() => setPaso(paso + 1)}>{nombres[paso] === "Comisiones" ? "Ver comisiones" : nombres[paso] === "Efectivo" ? "Contar efectivo" : nombres[paso] === "Comprobantes" ? "Comprobantes" : nombre === "Efectivo" ? "Comparar" : "Continuar"}<Fl /></button>}
+            : <button key="seguir" type="button" className="bt" disabled={!puedeSeguir} onClick={() => setPaso(paso + 1)}>{nombres[paso] === "Comisiones" ? "Comisiones y propinas" : nombres[paso] === "Efectivo" ? "Contar efectivo" : nombres[paso] === "Comprobantes" ? "Comprobantes" : nombre === "Efectivo" ? "Comparar" : "Continuar"}<Fl /></button>}
         </div>
       </form>
     </Modal>

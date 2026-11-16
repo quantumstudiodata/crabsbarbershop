@@ -23,6 +23,23 @@ export async function comisionesDeTurno(barberiaId: string, turnoId: string): Pr
   return filas.filter((x): x is ComisionCorte => !!x.id);
 }
 
+export type PropinaCorte = { id: string; nombre: string; avatar: string; efectivo: number; otro: number };
+
+/**
+ * Propinas de las ventas de un turno, por persona: las de efectivo ya están en la caja y se entregan de ella;
+ * las de tarjeta o transferencia llegaron al banco y se entregan de la caja o por transferencia. Se reparten una sola vez, al cerrar ese turno.
+ */
+export async function propinasDeTurno(barberiaId: string, turnoId: string): Promise<PropinaCorte[]> {
+  const filas = await db
+    .select({ id: s.propinas.barberoId, nombre: s.usuarios.nombre, avatar: s.usuarios.avatar,
+      efectivo: sql<number>`coalesce(sum(case when ${s.propinas.esEfectivo} then ${s.propinas.monto} else 0 end), 0)::int`,
+      otro: sql<number>`coalesce(sum(case when ${s.propinas.esEfectivo} then 0 else ${s.propinas.monto} end), 0)::int` })
+    .from(s.propinas).innerJoin(s.ventas, eq(s.ventas.id, s.propinas.ventaId)).innerJoin(s.usuarios, eq(s.usuarios.id, s.propinas.barberoId))
+    .where(and(eq(s.ventas.barberiaId, barberiaId), eq(s.ventas.turnoId, turnoId), eq(s.ventas.estado, "pagada")))
+    .groupBy(s.propinas.barberoId, s.usuarios.nombre, s.usuarios.avatar).orderBy(asc(s.usuarios.nombre));
+  return filas.filter((x) => x.efectivo + x.otro > 0);
+}
+
 /** "13 de noviembre" pasa a "del 13 de noviembre"; lo que ya empieza con "de" o "del" se deja igual. */
 const conFecha = (t: string) => (!t.trim() ? "de días anteriores" : /^(de|del)\s/i.test(t.trim()) ? t.trim() : `del ${t.trim()}`);
 

@@ -17,7 +17,7 @@ import { fechaLarga, fechaLocal, horaCorta } from "@/lib/fechas";
 import { type ConsultaFiltros, leerFiltros, paginaDeRegistros, rangoDePagina } from "@/lib/filtros";
 import { esMovil } from "@/lib/dispositivo";
 import { formatoDinero } from "@/lib/money";
-import { esPagoEquipo } from "@/lib/caja";
+import { esPagoEquipo, esPropinaEntregada } from "@/lib/caja";
 import { Ayuda } from "@/components/Ayuda";
 import { Movimientos, type DiaMovimientos, type Movimiento } from "./Movimientos";
 import { liquidarAutomaticos } from "@/lib/pagosAuto";
@@ -64,7 +64,7 @@ export default async function Finanzas({ searchParams }: { searchParams: Promise
   const movsCaja = verTodo && ver("caja") ? (await db.select({ id: t.movimientosCaja.id, tipo: t.movimientosCaja.tipo, monto: t.movimientosCaja.monto, concepto: t.movimientosCaja.concepto, creadoEn: t.movimientosCaja.creadoEn, quien: t.usuarios.nombre })
     .from(t.movimientosCaja).innerJoin(t.usuarios, eq(t.usuarios.id, t.movimientosCaja.usuarioId))
     .where(and(eq(t.movimientosCaja.barberiaId, bId), inArray(t.movimientosCaja.tipo, ["retiro", "entrada"]), ...enFechas(t.movimientosCaja.creadoEn), ...(texto ? [ilike(t.movimientosCaja.concepto, texto)] : [])))
-    .orderBy(desc(t.movimientosCaja.creadoEn)).limit(500)).filter((x) => !esPagoEquipo(x.concepto) && !x.concepto.startsWith("Pago anulado a ")) : [];
+    .orderBy(desc(t.movimientosCaja.creadoEn)).limit(500)).filter((x) => !esPagoEquipo(x.concepto) && !esPropinaEntregada(x.concepto) && !x.concepto.startsWith("Pago anulado a ")) : [];
   const todosDias = [...new Set([...diasV, ...diasG, ...diasP].map((x) => x.d).concat(movsCaja.map((x) => fechaLocal(x.creadoEn, zona))))].sort().reverse();
   // En el teléfono se pagina por movimientos (7 por página); en escritorio, siete días por página.
   const movil = await esMovil();
@@ -158,7 +158,7 @@ export default async function Finanzas({ searchParams }: { searchParams: Promise
     db.select().from(t.conceptosFrecuentes).where(eq(t.conceptosFrecuentes.barberiaId, bId)),
   ]);
   const retirado = verTodo ? (await db.select({ concepto: t.movimientosCaja.concepto, monto: t.movimientosCaja.monto }).from(t.movimientosCaja)
-    .where(and(eq(t.movimientosCaja.barberiaId, bId), eq(t.movimientosCaja.tipo, "retiro"), enP(t.movimientosCaja.creadoEn)))).filter((x) => !esPagoEquipo(x.concepto)).reduce((a, x) => a + x.monto, 0) : 0;
+    .where(and(eq(t.movimientosCaja.barberiaId, bId), eq(t.movimientosCaja.tipo, "retiro"), enP(t.movimientosCaja.creadoEn)))).filter((x) => !esPagoEquipo(x.concepto) && !esPropinaEntregada(x.concepto)).reduce((a, x) => a + x.monto, 0) : 0;
   const ventasP = rp?.netas ?? 0;
   const rentas = pagosP.filter((x) => x.tipo === "renta").reduce((a, x) => a + x.monto, 0);
   const pagadoEquipo = pagosP.filter((x) => x.tipo === "pago").reduce((a, x) => a + x.monto, 0);

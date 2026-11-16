@@ -1,5 +1,5 @@
 import { and, eq, gt, inArray, isNull, ne, sql } from "drizzle-orm";
-import { esPagoAnulado, esPagoEquipo } from "@/lib/caja";
+import { esPagoAnulado, esPagoEquipo, esPropinaEntregada } from "@/lib/caja";
 import { asentarCitasPagadas, esCategoriaComisiones } from "@/lib/pagos";
 import { cobraEnLinea } from "@/lib/stripe";
 import { requerirSesion } from "@/lib/auth";
@@ -10,7 +10,7 @@ import { BarraCaja, CajaCerrada, CajaModal, CajaPendiente, type Turno } from "./
 import { FormCobro } from "./FormCobro";
 import type { Promo } from "@/lib/promociones";
 import { ModoFoco } from "./ModoFoco";
-import { comisionesDeTurno, entregasDeCorte } from "@/lib/comisionesCorte";
+import { comisionesDeTurno, entregasDeCorte, propinasDeTurno } from "@/lib/comisionesCorte";
 
 export const metadata = { title: "Cobro" };
 
@@ -45,12 +45,13 @@ export default async function Cobrar({ searchParams }: { searchParams: Promise<{
     // Quien no ve al equipo completo solo ve su propia comisión en el corte.
     const verTodo = s.puede("ventas.ver_todas") || s.puede("equipo.pagar");
     const mio = <T extends { id: string }>(xs: T[]) => (verTodo ? xs : xs.filter((x) => x.id === s.usuario.id));
-    const [datos, [abrio], folio, comisiones, entregas] = await Promise.all([
+    const [datos, [abrio], folio, comisiones, entregas, propinasEq] = await Promise.all([
       movimientosDeTurno(s.barberia.id, t.id, t.fondoInicial),
       db.select({ nombre: schema.usuarios.nombre, avatar: schema.usuarios.avatar }).from(schema.usuarios).where(and(eq(schema.usuarios.id, t.abiertoPor), eq(schema.usuarios.barberiaId, s.barberia.id))),
       folioCorte(s.barberia.id, t.abiertoEn),
       comisionesDeTurno(s.barberia.id, t.id),
       s.barberia.pagosEquipoAuto ? entregasDeCorte(s.barberia.id, zona, s.barberia.pagosEquipoDesde) : Promise.resolve([]),
+      propinasDeTurno(s.barberia.id, t.id),
     ]);
     // Citas que ya se atendieron y no se han cobrado: el corte avisa antes de cerrar.
     const [sinCobrar] = s.barberia.usaCitas ? await db.select({ n: sql<number>`count(*)::int` }).from(schema.citas)
@@ -62,9 +63,11 @@ export default async function Cobrar({ searchParams }: { searchParams: Promise<{
       ventas: datos.ventas, ventasEfectivo: datos.ventasEfectivo, propinas: datos.propinasTotal, otros: datos.otrosPorMetodo.map((x) => ({ metodo: x.metodo, total: x.total, ventas: x.ventas })),
       comisiones: mio(comisiones), entregas: mio(entregas), verTodo, sinCobrar: sinCobrar?.n ?? 0,
       pagosEquipo: datos.movimientos.filter((x) => x.tipo === "retiro" && esPagoEquipo(x.concepto)).reduce((a, x) => a + x.monto, 0),
+      // Las propinas se ven con nombre: quien cierra la caja es quien las entrega.
+      propinasEquipo: propinasEq,
       detalle: {
         gastos: datos.gastos.map((g) => ({ concepto: g.concepto, monto: g.monto })),
-        sacado: datos.movimientos.filter((x) => x.tipo === "retiro" && !esPagoEquipo(x.concepto)).map((x) => ({ concepto: x.concepto, monto: x.monto })),
+        sacado: datos.movimientos.filter((x) => x.tipo === "retiro" && !esPagoEquipo(x.concepto) && !esPropinaEntregada(x.concepto)).map((x) => ({ concepto: x.concepto, monto: x.monto })),
         puesto: datos.movimientos.filter((x) => x.tipo === "entrada" && !esPagoAnulado(x.concepto)).map((x) => ({ concepto: x.concepto, monto: x.monto })),
       },
       pagosAnulados: datos.movimientos.filter((x) => x.tipo === "entrada" && esPagoAnulado(x.concepto)).reduce((a, x) => a + x.monto, 0),

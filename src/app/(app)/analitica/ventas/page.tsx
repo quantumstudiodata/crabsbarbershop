@@ -5,13 +5,13 @@ import { AvisoUrl } from "@/components/Encabezado";
 import { BarraFiltros } from "@/components/BarraFiltros";
 import { Paginacion } from "@/components/Paginacion";
 import { requerirSesion } from "@/lib/auth";
-import { inArray } from "drizzle-orm";
+import { and, eq, inArray, sql } from "drizzle-orm";
 import { verificadosDe } from "@/lib/pagos";
 import { MINUTOS_CORRECCION } from "@/lib/caja";
-import { cajaDe, diasYTotalVentas, idsVentas, equipoConVentas, metodosActivos, ventasEntre } from "@/lib/datos";
+import { cajaDe, diasYTotalVentas, foliosCorte, idsVentas, equipoConVentas, metodosActivos, ventasEntre } from "@/lib/datos";
 import { condicionVentas, type ConsultaFiltros, leerFiltros, paginaDeRegistros, rangoDePagina, urlDescarga } from "@/lib/filtros";
 import { esMovil } from "@/lib/dispositivo";
-import { schema } from "@/lib/db";
+import { db, schema } from "@/lib/db";
 import { fechaLarga, fechaLocal, horaCorta } from "@/lib/fechas";
 import { formatoDinero } from "@/lib/money";
 import { HistorialVentas, type DiaVentas } from "@/components/HistorialVentas";
@@ -63,6 +63,12 @@ export default async function Ventas({ searchParams }: { searchParams: Promise<Q
     equipo: equipo.map((e) => ({ id: e.id, nombre: e.nombre })),
     metodos: (await metodosActivos(s.barberia.id)).map((m) => ({ id: m.id, nombre: m.nombre })),
   } : undefined;
+  // Cortes de caja cerrados en estos días: aparecen en el historial en la hora en que se hicieron, como separador.
+  const cortesDias = dias.length ? await db.select({ id: schema.turnosCaja.id, cerradoEn: schema.turnosCaja.cerradoEn,
+      vendido: sql<number>`coalesce((select sum(v.total) from ventas v where v.turno_id = turnos_caja.id and v.estado = 'pagada'), 0)::int` })
+    .from(schema.turnosCaja).where(and(eq(schema.turnosCaja.barberiaId, s.barberia.id), eq(schema.turnosCaja.estado, "cerrado"),
+      sql`(${schema.turnosCaja.cerradoEn} at time zone ${zona})::date between ${r.desde}::date and ${r.hasta}::date`)) : [];
+  const folios = cortesDias.length ? await foliosCorte(s.barberia.id) : new Map<string, string>();
   const historial: DiaVentas[] = dias.map((d) => {
     const delDia = ventas.filter((v) => v.fecha === d);
     const monto = (v: (typeof ventas)[number]) => (persona ? v.conceptos.filter((c) => c.barberoId === persona).reduce((a, c) => a + c.precioCobrado, 0) : v.total);
@@ -70,7 +76,11 @@ export default async function Ventas({ searchParams }: { searchParams: Promise<Q
     const propios = (v: (typeof ventas)[number]) => (persona ? v.conceptos.filter((c) => c.barberoId === persona) : v.conceptos);
     return {
       fecha: d, titulo: d === hoy ? "Hoy" : fechaLarga(d), total: delDia.filter((v) => v.estado === "pagada").reduce((a, v) => a + monto(v), 0),
-      filas: delDia.map((v) => ({
+      filas: [...cortesDias.filter((c) => c.cerradoEn && fechaLocal(c.cerradoEn, zona) === d).map((c) => ({
+        id: `corte-${c.id}`, folio: folios.get(c.id) ?? "", hora: horaCorta(c.cerradoEn!, zona), servicios: "", monto: c.vendido, cancelada: false, detalle: [] as [string, string][],
+        t: c.cerradoEn!.getTime(), corte: { vendido: verTodas ? c.vendido : undefined, enlace: s.puede("cortes.ver") ? "/analitica/cortes" : undefined },
+      })), ...delDia.map((v) => ({
+        t: v.creadoEn.getTime(),
         id: v.id, folio: v.folio, hora: horaCorta(v.creadoEn, zona), monto: monto(v), cancelada: v.estado === "cancelada",
         servicios: propios(v).map((c) => c.nombre).join(", "),
         stripe: (() => {
@@ -92,7 +102,7 @@ export default async function Ventas({ searchParams }: { searchParams: Promise<Q
           conceptos: v.conceptos.map((c) => ({ id: c.id, nombre: c.nombre, barberoId: c.barberoId, precio: c.precioCobrado })),
           pagos: v.pagos.filter((pg) => pg.metodoId).map((pg) => ({ metodoId: pg.metodoId!, monto: pg.monto })),
         } : undefined,
-      })),
+      }))].sort((a, b) => b.t - a.t),
     };
   });
   const qs = new URLSearchParams(Object.entries(q).filter(([k, v]) => v && k !== "aviso" && k !== "error") as [string, string][]).toString();

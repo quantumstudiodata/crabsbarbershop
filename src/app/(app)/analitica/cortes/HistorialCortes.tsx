@@ -13,7 +13,7 @@ export type Corte = {
   id: string; folio: string; horario: string; dia: string; fechaCorta: string;
   abrio: { nombre: string; avatar: string }; cerro: { nombre: string; avatar: string };
   metodos: { metodo: string; total: number }[]; total: number; ventas: number;
-  fondo: number; ventasEfectivo: number; propinasEfectivo: number; entradas: number; retiros: number; gastos: number; pagosEquipo: number; otrosEgresos: { concepto: string; metodo: string; monto: number }[];
+  fondo: number; ventasEfectivo: number; propinasEfectivo: number; entradas: number; retiros: number; gastos: number; pagosEquipo: number; propinasEnt: number; otrosEgresos: { concepto: string; metodo: string; monto: number }[];
   esperado: number; contado: number; diferencia: number; ajustado?: number; notas: string | null;
   movimientos: { hora: string; titulo: string; detalle: string; monto: number }[];
   ajustes: string[];
@@ -138,6 +138,7 @@ function Detalle({ c, cerrar, ajustar }: { c: Corte | null; cerrar: () => void; 
             {c.propinasEfectivo > 0 && <div><span>Propinas en efectivo</span><span className="num">+{$(c.propinasEfectivo)}</span></div>}
             {c.entradas > 0 && <div><span>Dinero que se puso en la caja</span><span className="num">+{$(c.entradas)}</span></div>}
             {c.gastos > 0 && <div><span>Gastos pagados con la caja</span><span className="num">−{$(c.gastos)}</span></div>}
+            {c.propinasEnt > 0 && <div><span>Propinas entregadas</span><span className="num">−{$(c.propinasEnt)}</span></div>}
             {c.pagosEquipo > 0 && <div><span>Pagos al equipo</span><span className="num">−{$(c.pagosEquipo)}</span></div>}
             {c.retiros > 0 && <div><span>Dinero que se sacó</span><span className="num">−{$(c.retiros)}</span></div>}
             <div><span>Debía haber</span><span className="num">{$(c.esperado)}</span></div>
