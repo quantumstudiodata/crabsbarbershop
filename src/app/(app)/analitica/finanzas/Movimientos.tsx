@@ -39,7 +39,7 @@ export function Movimientos({ dias, registrar, hoy, cajaAbierta, categorias, opc
         <span className="lab">Historial de movimientos{conteo ? <span className="muted" style={{ textTransform: "none", letterSpacing: 0, marginLeft: 8 }}>{conteo}</span> : null}</span>
         <span className="fila" style={{ gap: 8 }}>
           {botonCaja}
-          {registrar && <button type="button" className="bt chico" onClick={() => setNuevo((n) => n + 1)}><Icono n="mas" />Registrar egreso</button>}
+          {registrar && <button type="button" className="bt chico" onClick={() => setNuevo((n) => n + 1)}><Icono n="mas" /><span className="solo-escritorio">Registrar egreso</span><span className="solo-movil-i">Egreso</span></button>}
         </span>
       </div>
       {nuevo > 0 && <Nuevo key={nuevo} hoy={hoy} categorias={categorias.filter((c) => c.activo)} cerrar={() => setNuevo(0)} otro={() => setNuevo((n) => n + 1)} opciones={opciones} />}

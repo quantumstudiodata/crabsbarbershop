@@ -57,14 +57,18 @@ export function Guia({ vistos, puntos, nombre, practica = false }: { vistos: str
   const [repaso, setRepaso] = useState(false);
   // "¿Cómo se hace?" en Ayuda: repasa un solo punto, sin tocar el avance guardado.
   const [solo, setSolo] = useState<string | null>(null);
+  // Al abrir un repaso, la página se recarga (se cierra la ayuda): eso no debe cerrar el repaso recién abierto.
+  const soloRef = useRef<string | null>(null);
+  useEffect(() => { soloRef.current = solo; }, [solo]);
   useEffect(() => {
     let pausa = false, activa = false;
     try { pausa = sessionStorage.getItem("crabs-guia-pausa") === "1"; activa = sessionStorage.getItem("crabs-guia-activa") === "1"; } catch { /* sin almacenamiento */ }
     // Una guía que quedó a medias no se reanuda sola en otra visita (movería a la persona de pantalla): se continúa desde el menú de la cuenta.
-    setCerrada(pausa || vistos.includes("guia-omitida") || (vistos.includes("guia-inicio") && !activa));
+    const cerradaGuardada = pausa || vistos.includes("guia-omitida") || (vistos.includes("guia-inicio") && !activa);
+    setCerrada((c) => (soloRef.current ? c : cerradaGuardada));
     const abrir = (e: Event) => {
       const punto = (e as CustomEvent).detail?.punto as string | undefined;
-      if (punto && PUNTOS[punto]) { setSolo(punto); setRepaso(true); setFase("guia"); setCerrada(false); return; }
+      if (punto && PUNTOS[punto]) { soloRef.current = punto; setSolo(punto); setRepaso(true); setFase("guia"); setCerrada(false); return; }
       try { sessionStorage.removeItem("crabs-guia-pausa"); sessionStorage.setItem("crabs-guia-activa", "1"); } catch { /* sin almacenamiento */ }
       setHechos((h) => { if (!h.has("fin")) return h; setRepaso(true); return new Set(["inicio"]); });
       setFase("guia"); setCerrada(false);

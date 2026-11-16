@@ -171,6 +171,9 @@ export default async function MovimientosPagina({ searchParams }: { searchParams
     cajaDe(s),
     s.puede("ventas.modificar") ? metodosActivos(bId) : Promise.resolve([]),
   ]);
+  // Lo que se decidió en cada cierre (quién recibió cuánto y cómo): sirve para poner cada pago debajo de su corte.
+  const cierres = diasP.length && pd && ph ? await db.select({ creadoEn: t.historial.creadoEn, detalle: t.historial.detalle }).from(t.historial)
+    .where(and(eq(t.historial.barberiaId, bId), eq(t.historial.tipo, "caja"), sql`${t.historial.detalle} ? 'comisiones'`, ...enPagina(t.historial.creadoEn))) : [];
   // Pagos que siguen pendientes de entregar: se muestran siempre en la primera página, sean del día que sean,
   // para que nadie pierda de vista de cuándo es ese dinero.
   const pendientesTodos = verTodo && ver("equipo") && pagina === 1 && !f.periodo
@@ -252,8 +255,19 @@ export default async function MovimientosPagina({ searchParams }: { searchParams
         .sort((a, b) => Math.abs(a.creadoEn.getTime() - p.creadoEn.getTime()) - Math.abs(b.creadoEn.getTime() - p.creadoEn.getTime()))[0];
       if (m) { usadas.add(m.id); return m.turnoId; }
     }
-    // Comisión automática entregada por transferencia (o en efectivo sin salida encontrada): se decidió en el corte siguiente.
-    if (/Pago automático/.test(p.nota) && !p.nota.startsWith("Por entregar de caja")) return corteDespuesDe(p.creadoEn)?.id;
+    // Comisión entregada en un corte (por transferencia o en efectivo): el cierre guardó "Ana $1,250 por transferencia".
+    if (!p.nota.startsWith("Por entregar de caja")) {
+      const primero = nombre.split(" ")[0];
+      for (const h of cierres) {
+        const txt = String((h.detalle as { comisiones?: string }).comisiones ?? "");
+        const hay = [...txt.matchAll(/([^,]+?) \$([\d,]+(?:\.\d{1,2})?) (de la caja|por transferencia)/g)]
+          .some((m) => m[1].trim() === primero && Math.round(Number(m[2].replace(/,/g, "")) * 100) === p.monto);
+        if (!hay) continue;
+        const c = cortesAsc.find((x) => Math.abs(x.cerradoEn!.getTime() - h.creadoEn.getTime()) < 5 * 60000);
+        if (c) return c.id;
+      }
+      if (/Pago automático/.test(p.nota)) return corteDespuesDe(p.creadoEn)?.id;
+    }
     return undefined;
   };
   const DE_QUE = (nota: string) => nota.slice(nota.indexOf(":") + 1).replace(/^\s*Pago automático\s*/, "").trim();
@@ -263,14 +277,17 @@ export default async function MovimientosPagina({ searchParams }: { searchParams
     // De dónde viene un pago pendiente: de qué días es la comisión y en qué corte se dejó para después.
     const origen = pendiente ? corteDespuesDe(p.creadoEn) : undefined;
     const deCuando = DE_QUE(p.nota);
-    const subPend = [`Comisión ${deCuando ? (/^(de|del)\s/.test(deCuando) ? deCuando : `del ${deCuando}`) : "de días anteriores"}`,
-      origen ? `quedó pendiente en el corte ${folios.get(origen.id) ?? ""} del ${fechaLarga(origen.fechaOperativa).replace(/^./, (x) => x.toLowerCase())}` : "se le da en el próximo corte de caja"].join(", ");
+    // Corto para que quepa en la fila: "10 al 15 nov", "13 nov".
+    const MES: Record<string, string> = { enero: "ene", febrero: "feb", marzo: "mar", abril: "abr", mayo: "may", junio: "jun", julio: "jul", agosto: "ago", septiembre: "sep", octubre: "oct", noviembre: "nov", diciembre: "dic" };
+    const corto = deCuando.replace(/^(de|del)\s+/, "").replace(/ de (\w+)/g, (_, m: string) => ` ${MES[m.toLowerCase()] ?? m}`).replace(/^(\d+) (\w+) al (\d+) \2\b/, "$1 al $3 $2");
+    const folioOrigen = origen ? folios.get(origen.id) ?? "" : "";
+    const subPend = `Comisión ${corto || "de días anteriores"}. ${origen ? `Quedó en el corte ${folioOrigen}` : "Va en el próximo corte"}`;
     return { k: "mov" as const, dia: fechaLocal(p.creadoEn, zona), t: p.creadoEn.getTime(), ...extra, m: {
       id: `p${p.id}`, tipo: (renta ? "renta" : "pago") as "renta" | "pago", titulo: renta ? `Renta de silla de ${nombre.split(" ")[0]}` : `Pago a ${nombre.split(" ")[0]}`,
       pendiente,
-      sub: pendiente ? subPend : (p.nota.split(":")[0] || (renta ? "Ingreso" : "Pago al equipo")).replace(/^Efectivo de caja$/, "En efectivo, de la caja"),
+      sub: pendiente ? subPend : (p.nota.split(":")[0] || (renta ? "Ingreso" : "Pago al equipo")).replace(/^Efectivo de caja$/, "En efectivo, de la caja").replace(/^Transferencia$/, "Por transferencia"),
       monto: renta ? p.monto : -p.monto, hora: horaCorta(p.creadoEn, zona), cancelado: p.monto === 0,
-      detalle: [["Hora", horaCorta(p.creadoEn, zona)] as [string, string], ...(pendiente ? [["Estado", "Pendiente de entregar"] as [string, string]] : []), ...(p.nota ? [["Nota", p.nota] as [string, string]] : [])],
+      detalle: [["Hora", horaCorta(p.creadoEn, zona)] as [string, string], ...(pendiente ? [["Estado", origen ? `Pendiente de entregar. Quedó así en el corte ${folioOrigen} del ${fechaLarga(origen.fechaOperativa).replace(/^./, (x) => x.toLowerCase())}` : "Pendiente de entregar en el próximo corte"] as [string, string]] : []), ...(p.nota ? [["Nota", p.nota] as [string, string]] : [])],
     } };
   };
   // Pendientes: si se dejaron en el último corte, van debajo de ese corte; si no, arriba de todo (o al inicio de hoy si hoy no hay corte).
@@ -292,23 +309,30 @@ export default async function MovimientosPagina({ searchParams }: { searchParams
     const sale = c.tipo === "retiro", propina = esPropinaEntregada(c.concepto);
     items.push({ k: "mov", dia: c.dia, t: c.creadoEn.getTime(), corte: propina ? c.turnoId : undefined, m: {
       id: `c${c.id}`, tipo: propina ? "propina" : "caja", titulo: c.concepto, hora: horaCorta(c.creadoEn, zona),
-      sub: propina ? "Propinas que se le entregaron en el corte" : sale ? "Se sacó de la caja. No es un gasto" : "Se puso en la caja. No es una venta", monto: sale ? -c.monto : c.monto,
+      sub: propina ? "Es de quien hizo el servicio" : sale ? "Se sacó de la caja. No es un gasto" : "Se puso en la caja. No es una venta", monto: sale ? -c.monto : c.monto,
       detalle: [["Registró", `${c.quien.split(" ")[0]}, ${horaCorta(c.creadoEn, zona)}`],
-        ["Cuenta en la ganancia", propina ? "No. La propina es de quien atendió y se le da de la caja de propinas" : "No. Solo cambia el efectivo de la caja"]],
+        ["Cuenta en la ganancia", propina ? "No. La propina es de quien hizo el servicio" : "No. Solo cambia el efectivo de la caja"]],
     } });
   }
   for (const h of propTrans) {
     const det = h.detalle as { propinaTransferencia?: number; turnoId?: string };
     items.push({ k: "mov", dia: fechaLocal(h.creadoEn, zona), t: h.creadoEn.getTime(), corte: det.turnoId, m: {
       id: `h${h.id}`, tipo: "propina", titulo: h.accion.split(":")[0], sub: "Por transferencia, no tocó la caja", monto: -Number(det.propinaTransferencia ?? 0), hora: horaCorta(h.creadoEn, zona),
-      detalle: [["Cuenta en la ganancia", "No. La propina es de quien atendió"]],
+      detalle: [["Cuenta en la ganancia", "No. La propina es de quien hizo el servicio"]],
     } });
   }
   // Lo que pertenece a un corte que está en la lista se acomoda justo debajo de él, en su mismo día.
   const filaCorte = new Map(items.filter((x) => x.k === "corte").map((x) => [(x as { c: { id: string } }).c.id, x]));
   for (const it of items) {
     const c = it.corte ? filaCorte.get(it.corte) : undefined;
-    if (it.k !== "corte" && c) { it.dia = c.dia; it.t = c.t; }
+    if (it.k !== "corte" && c) {
+      it.dia = c.dia; it.t = c.t;
+      // Un pago al equipo se decidió al cerrar: se muestra con la hora del corte, no con la de la liquidación.
+      if (it.k === "mov" && it.m.id.startsWith("p")) {
+        const hc = horaCorta(new Date(c.t), zona);
+        it.m.hora = hc; it.m.detalle = it.m.detalle?.map(([k, v]) => (k === "Hora" ? [k, hc] : [k, v]) as [string, string]);
+      }
+    }
   }
   // El corte de caja es lo último del día: va arriba de su día. Debajo, lo pendiente que se dejó en ese corte y después
   // lo que se entregó al cerrar; luego lo demás del día, del más reciente al más viejo.

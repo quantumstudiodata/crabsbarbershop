@@ -341,13 +341,13 @@ export function FormCobro(p: {
         )}
 
         <div className="extras">
-          {hayCodigos && <button type="button" data-paso="" className={`chipf ${panel === "codigo" || codigo ? "on" : ""}`} aria-expanded={panel === "codigo"} onClick={() => setPanel((x) => (x === "codigo" ? null : "codigo"))}>
+          {hayCodigos && <button type="button" data-paso="" className={`chipf ${panel === "codigo" || codigo ? "on" : ""}`} aria-expanded={panel === "codigo"} onClick={() => { if (codigo) { setCodigo(""); setCodigoTxt(""); setPanel(null); } else setPanel((x) => (x === "codigo" ? null : "codigo")); }}>
             <Icono n="etiqueta" />{codigo ? `Código ${codigo}` : "Código promocional"}
           </button>}
-          {p.usa.descuentos && <button type="button" data-paso="" className={`chipf ${panel === "descuento" || desc ? "on" : ""}`} aria-expanded={panel === "descuento"} onClick={() => setPanel((x) => (x === "descuento" ? null : "descuento"))}>
+          {p.usa.descuentos && <button type="button" data-paso="" className={`chipf ${panel === "descuento" || desc ? "on" : ""}`} aria-expanded={panel === "descuento"} onClick={() => { if (descuento) { setDescuento(null); setMotivo(""); setPanel(null); } else setPanel((x) => (x === "descuento" ? null : "descuento")); }}>
             <Icono n="etiqueta" />{desc ? `Descuento −${formatoDinero(desc)}` : "Descuento"}
           </button>}
-          {p.usa.propinas && <button type="button" data-paso="" className={`chipf ${panel === "propina" || prop ? "on" : ""}`} aria-expanded={panel === "propina"} onClick={() => setPanel((x) => (x === "propina" ? null : "propina"))}>
+          {p.usa.propinas && <button type="button" data-paso="" className={`chipf ${panel === "propina" || prop ? "on" : ""}`} aria-expanded={panel === "propina"} onClick={() => { if (propina) { setPropina(null); setPropForma(null); setPanel(null); } else setPanel((x) => (x === "propina" ? null : "propina")); }}>
             <Icono n="mas" />{prop ? `Propina ${formatoDinero(prop)}` : "Propina"}
           </button>}
           {p.usa.dividir && p.metodos.length > 1 && (
@@ -359,14 +359,13 @@ export function FormCobro(p: {
           <div className="panel-rapido subir">
             <div className="billetes">
               {[5, 10, 20].map((v) => (
-                <button type="button" data-paso="" key={v} className={descuento?.tipo === "pct" && descuento.valor === String(v) ? "on" : ""} onClick={() => setDescuento({ tipo: "pct", valor: String(v) })}>
+                <button type="button" data-paso="" key={v} className={descuento?.tipo === "pct" && descuento.valor === String(v) ? "on" : ""} onClick={() => setDescuento(descuento?.tipo === "pct" && descuento.valor === String(v) ? null : { tipo: "pct", valor: String(v) })}>
                   {v}% <small>{formatoDinero(Math.round((subtotal * v) / 100))}</small>
                 </button>
               ))}
               {descuento?.tipo === "fijo"
                 ? <span className="otra"><span>$</span><input data-paso="" inputMode="decimal" autoFocus value={descuento.valor} onChange={(e) => setDescuento({ tipo: "fijo", valor: e.target.value })} aria-label="Otro descuento" /></span>
                 : <button type="button" data-paso="" onClick={() => setDescuento({ tipo: "fijo", valor: "" })}>Otro</button>}
-              {descuento && <button type="button" data-paso="" className="quitar" onClick={() => { setDescuento(null); setMotivo(""); }}>Quitar</button>}
             </div>
             {desc > 0 && (
               <div className="billetes motivo-r">
@@ -383,7 +382,6 @@ export function FormCobro(p: {
             <div className="billetes">
               <span className="otra"><input data-paso="" autoFocus value={codigoTxt} onChange={(e) => setCodigoTxt(e.target.value.toUpperCase())} placeholder="Escribe el código" aria-label="Código promocional" style={{ width: 150 }} /></span>
               <button type="button" data-paso="" onClick={() => setCodigo(codigoTxt.trim())}>Aplicar</button>
-              {codigo && <button type="button" data-paso="" className="quitar" onClick={() => { setCodigo(""); setCodigoTxt(""); }}>Quitar</button>}
             </div>
             {codigo && !ap.codigoValido && <small className="muted">Ese código no es válido o no aplica en este horario.</small>}
             {codigo && ap.codigoValido && descPromo === 0 && <small className="muted">El código es válido, pero no aplica a los servicios elegidos.</small>}
@@ -393,18 +391,17 @@ export function FormCobro(p: {
           <div className="panel-rapido subir">
             <div className="billetes">
               {[5, 10, 15].map((v) => (
-                <button type="button" data-paso="" key={v} className={propina?.tipo === "pct" && propina.valor === String(v) ? "on" : ""} onClick={() => setPropina({ tipo: "pct", valor: String(v) })}>
+                <button type="button" data-paso="" key={v} className={propina?.tipo === "pct" && propina.valor === String(v) ? "on" : ""} onClick={() => setPropina(propina?.tipo === "pct" && propina.valor === String(v) ? null : { tipo: "pct", valor: String(v) })}>
                   {v}% <small>{formatoDinero(Math.round((total * v) / 100))}</small>
                 </button>
               ))}
               <span className="otra"><span>Otra</span><input data-paso="" inputMode="decimal" placeholder="$0" value={propina?.tipo === "fijo" ? propina.valor : ""} onChange={(e) => setPropina(e.target.value ? { tipo: "fijo", valor: e.target.value } : null)} aria-label="Otra cantidad de propina" /></span>
-              {propina && <button type="button" data-paso="" className="quitar" onClick={() => { setPropina(null); setPropForma(null); }}>Quitar</button>}
             </div>
             {prop > 0 && !conQr && hayEfectivo && p.metodos.some((m) => !m.esEfectivo) && (
-              <div className="billetes prop-forma" role="radiogroup" aria-label="Cómo paga la propina">
-                <span className="muted" style={{ fontSize: 12 }}>La propina se paga</span>
+              <div className="prop-forma" role="radiogroup" aria-label="Cómo paga la propina">
+                <span className="muted">La propina se paga</span>
                 <button type="button" data-paso="" role="radio" aria-checked={propinaEfectivo} className={propinaEfectivo ? "on" : ""} onClick={() => setPropForma("efectivo")}>En efectivo</button>
-                <button type="button" data-paso="" role="radio" aria-checked={!propinaEfectivo} className={!propinaEfectivo ? "on" : ""} onClick={() => setPropForma("otro")}>Con tarjeta o transferencia</button>
+                <button type="button" data-paso="" role="radio" aria-checked={!propinaEfectivo} className={!propinaEfectivo ? "on" : ""} onClick={() => setPropForma("otro")}>Tarjeta o transferencia</button>
               </div>
             )}
           </div>
