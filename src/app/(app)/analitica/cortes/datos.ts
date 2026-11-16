@@ -1,4 +1,4 @@
-import { and, eq, inArray, isNull, ne } from "drizzle-orm";
+import { and, eq, gte, inArray, isNull, lte, ne, sql } from "drizzle-orm";
 import { esPagoAnulado, esPagoEquipo, esPropinaEntregada } from "@/lib/caja";
 import { cobradoresDe } from "@/lib/faltantes";
 import { ajustesDeTurnos, detalleCortes, metodosActivos, turnosCerrados } from "@/lib/datos";
@@ -27,6 +27,18 @@ export async function armarCortes(barberiaId: string, turnos: Turno[], o: { zona
   const fechas = [...new Set(turnos.map((c) => c.fechaOperativa))];
   const otrosEgresos = o.verEgresos ? await db.select({ fecha: schema.gastos.fecha, concepto: schema.gastos.concepto, metodo: schema.gastos.metodo, monto: schema.gastos.monto }).from(schema.gastos)
     .where(and(eq(schema.gastos.barberiaId, barberiaId), inArray(schema.gastos.fecha, fechas), isNull(schema.gastos.turnoId), ne(schema.gastos.metodo, "efectivo"), isNull(schema.gastos.canceladoEn))) : [];
+  // Lo que se decidió en cada cierre y no salió de la caja (por transferencia o para el próximo corte): solo se informa en el detalle.
+  const cerrados = turnos.map((c) => c.cerradoEn).filter((x): x is Date => !!x).map((x) => x.getTime());
+  const cierres = cerrados.length ? await db.select({ creadoEn: schema.historial.creadoEn, detalle: schema.historial.detalle }).from(schema.historial)
+    .where(and(eq(schema.historial.barberiaId, barberiaId), eq(schema.historial.tipo, "caja"), sql`${schema.historial.detalle} ? 'comisiones'`,
+      gte(schema.historial.creadoEn, new Date(Math.min(...cerrados) - 5 * 60000)), lte(schema.historial.creadoEn, new Date(Math.max(...cerrados) + 5 * 60000)))) : [];
+  const fueraDe = (cerradoEn: Date | null) => {
+    if (!cerradoEn) return [];
+    const h = cierres.find((x) => Math.abs(x.creadoEn.getTime() - cerradoEn.getTime()) < 5 * 60000);
+    const txt = String((h?.detalle as { comisiones?: string } | undefined)?.comisiones ?? "");
+    return [...txt.matchAll(/([^,]+?) \$([\d,]+(?:\.\d{1,2})?) (por transferencia|para el próximo corte)/g)]
+      .map((m) => ({ nombre: m[1].trim(), monto: Math.round(Number(m[2].replace(/,/g, "")) * 100), como: m[3] }));
+  };
   const { zona, hoy, gente, folios } = o;
   const persona = (id: string | null) => gente.find((g) => g.id === id) ?? { nombre: "", avatar: "iniciales" };
   return turnos.map((c): Corte => {
@@ -51,9 +63,10 @@ export async function armarCortes(barberiaId: string, turnos: Turno[], o: { zona
       otrosEgresos: otrosEgresos.filter((x) => x.fecha === c.fechaOperativa).map((x) => ({ concepto: x.concepto, metodo: x.metodo === "tarjeta" ? "Tarjeta" : "Transferencia", monto: x.monto })),
       esperado: c.efectivoEsperado ?? 0, contado: c.efectivoContado ?? 0, diferencia: c.diferencia ?? 0, ajustado: ajustes.filter((x) => x.turnoId === c.id).reduce((a, x) => a + x.monto, 0), notas: c.notasCierre,
       movimientos: [
-        ...movs.map((m) => ({ t: m.creadoEn.getTime(), hora: horaCorta(m.creadoEn, zona), titulo: m.tipo === "retiro" ? (esPropinaEntregada(m.concepto) ? "Propinas entregadas" : esPagoEquipo(m.concepto) ? "Pago al equipo" : "Dinero que se sacó") : m.tipo === "entrada" ? (esPagoAnulado(m.concepto) ? "Pago anulado, el dinero regresó" : "Dinero que se puso") : "Devolución", detalle: esPagoEquipo(m.concepto) ? m.concepto.replace(/^Pago (de comisiones )?a /, "Comisión de ") : m.concepto, monto: m.tipo === "entrada" ? m.monto : -m.monto })),
-        ...gastos.map((g) => ({ t: g.creadoEn.getTime(), hora: horaCorta(g.creadoEn, zona), titulo: "Gasto pagado con la caja", detalle: g.concepto, monto: -g.monto })),
+        ...movs.map((m) => ({ t: m.creadoEn.getTime(), tipo: m.tipo, hora: horaCorta(m.creadoEn, zona), titulo: m.tipo === "retiro" ? (esPropinaEntregada(m.concepto) ? "Propinas entregadas" : esPagoEquipo(m.concepto) ? "Pago al equipo" : "Dinero que se sacó") : m.tipo === "entrada" ? (esPagoAnulado(m.concepto) ? "Pago anulado, el dinero regresó" : "Dinero que se puso") : "Devolución", detalle: esPagoEquipo(m.concepto) ? m.concepto.replace(/^Pago (de comisiones )?a /, "Comisión de ") : m.concepto, monto: m.tipo === "entrada" ? m.monto : -m.monto })),
+        ...gastos.map((g) => ({ t: g.creadoEn.getTime(), tipo: "gasto", hora: horaCorta(g.creadoEn, zona), titulo: "Gasto pagado con la caja", detalle: g.concepto, monto: -g.monto })),
       ].sort((a, b) => a.t - b.t),
+      fueraCaja: fueraDe(c.cerradoEn),
       evidencias: evid.filter((x) => x.turnoId === c.id).map((x) => ({ id: x.id, etiqueta: x.etiqueta, nombre: x.nombre, tipo: x.tipo })),
       ajustes: ajustes.filter((x) => x.turnoId === c.id).map((x) => `Ajuste de ${formatoDinero(x.monto)} por ${x.usuario.split(" ")[0]}: ${x.motivo}`),
     };

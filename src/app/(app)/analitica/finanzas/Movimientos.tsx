@@ -4,7 +4,7 @@ import { useState } from "react";
 import { Vacio } from "@/components/Vacio";
 import { Icono } from "@/components/Icono";
 import { FilaVentaVista, type FilaVenta } from "@/components/HistorialVentas";
-import { FilaCorte, type Corte } from "../cortes/HistorialCortes";
+import { FilaCorte, type Corte, type HijoCorte } from "../cortes/HistorialCortes";
 import type { Opciones } from "../ventas/ModificarVenta";
 import { formatoDinero } from "@/lib/money";
 import { Cancelar, type FilaEgreso, Nuevo, type OpcionesEgreso } from "../gastos/Egresos";
@@ -51,20 +51,37 @@ export function Movimientos({ dias, registrar, hoy, cajaAbierta, categorias, opc
           : (
             <div className="historial sin-marco">
               <div className="hist-scroll movs-f" data-lista-mov>
-                {dias.map((d) => (
+                {dias.map((d) => {
+                  // Lo que se entregó al cerrar un corte va en renglones cortos bajo su pastilla, no como filas sueltas.
+                  const cortes = new Set(d.items.flatMap((x) => (x.k === "corte" ? [x.c.id] : [])));
+                  const esHijo = (x: ItemHistorial) => x.k === "mov" && !!x.corte && !x.pend && cortes.has(x.corte) && (x.m.tipo === "pago" || x.m.tipo === "propina") && !x.m.cancelado;
+                  const hijosDe = (id: string) => d.items.filter((x) => esHijo(x) && x.corte === id).map((x) => hijo((x as { m: Movimiento }).m))
+                    .sort((a, b) => Number(/transferencia|aparte/.test(a.que)) - Number(/transferencia|aparte/.test(b.que)));
+                  return (
                   <div key={d.fecha}>
                     <div className={`hist-dia ${d.sinTotal ? "pend-dia" : ""}`}><span>{d.titulo}</span>{!d.sinTotal && <b className="num">{formatoDinero(d.total)}</b>}</div>
-                    {d.items.map((it) => it.k === "corte" ? <FilaCorte key={it.c.id} c={it.c} ver={it.ver} corregir={corregir} abrir={abrirCorte === it.c.id} />
+                    {d.items.filter((x) => !esHijo(x)).map((it) => it.k === "corte" ? <FilaCorte key={it.c.id} c={it.c} ver={it.ver} corregir={corregir} abrir={abrirCorte === it.c.id} hijos={hijosDe(it.c.id)} />
                       : it.k === "venta" ? <FilaVentaVista key={it.f.id} f={it.f} abierta={abierto === it.f.id} alternar={() => setAbierto(abierto === it.f.id ? null : it.f.id)} regreso={regreso} opciones={opcionesVenta} />
                       : <FilaMov key={it.m.id} m={it.m} abierto={abierto === it.m.id} alternar={() => setAbierto(abierto === it.m.id ? null : it.m.id)} cancelar={setCancelar} />)}
                   </div>
-                ))}
+                  );
+                })}
               </div>
             </div>
           )}
       </section>
     </>
   );
+}
+
+/** "Pago a Ana" pasa a "Ana, comisión, de la caja"; las propinas en efectivo van aparte de la caja. */
+function hijo(m: Movimiento): HijoCorte {
+  const nombre = m.titulo.replace(/^(Pago a|Propinas para|Propina por transferencia a)\s+/i, "").split(" ")[0];
+  if (m.tipo === "propina") {
+    const transf = /transferencia/i.test(m.titulo + m.sub);
+    return { id: m.id, nombre, que: transf ? "propinas, por transferencia" : "propinas, aparte de la caja", monto: formatoDinero(Math.abs(m.monto)), aparte: !transf };
+  }
+  return { id: m.id, nombre, que: /transferencia/i.test(m.sub) ? "comisión, por transferencia" : "comisión, de la caja", monto: firma(m.monto) };
 }
 
 /** Un movimiento de dinero con el mismo formato que una venta: hora, qué fue, de qué tipo y cuánto. */

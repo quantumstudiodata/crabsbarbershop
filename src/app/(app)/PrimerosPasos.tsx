@@ -1,15 +1,13 @@
-import Link from "next/link";
 import { and, eq, inArray, sql } from "drizzle-orm";
 import type { requerirSesion } from "@/lib/auth";
 import { db, schema as t } from "@/lib/db";
-import { Icono } from "@/components/Icono";
-import { OcultarPasos } from "./OcultarPasos";
+import { PasosLinea } from "./PasosLinea";
 
 type Sesion = Awaited<ReturnType<typeof requerirSesion>>;
-type Paso = { id: string; texto: string; detalle: string; href: string; hecho: boolean };
+export type Paso = { id: string; texto: string; detalle: string; href: string; hecho: boolean };
 
 /**
- * Primeros pasos en Inicio, según el puesto. Cada punto se marca solo cuando se hace la operación real.
+ * Primeros pasos en Inicio, según el puesto: una línea con el avance bajo el saludo. Cada punto se marca solo cuando se hace la operación real.
  * Para Titular es la puesta en marcha del negocio (servicios, equipo, cómo se paga, formas de pago, reservas);
  * para quien atiende, lo básico del día. Desaparece al completarse o al ocultarla.
  */
@@ -58,20 +56,6 @@ export async function PrimerosPasos({ s }: { s: Sesion }) {
   }
   const hechos = pasos.filter((p) => p.hecho).length;
   if (!pasos.length || hechos === pasos.length) return null;
-  const sig = pasos.find((p) => !p.hecho)!;
-  return (
-    <section className="glass pp-c subir">
-      <div className="entre"><span className="lab">Primeros pasos</span><span className="pp-n">{hechos} de {pasos.length}<OcultarPasos /></span></div>
-      <i className="pp-barra" aria-hidden="true"><i style={{ width: `${(hechos / pasos.length) * 100}%` }} /></i>
-      <ol className="pp-l">
-        {pasos.map((p) => (
-          <li key={p.id} className={p.hecho ? "hecho" : p === sig ? "sig" : ""}>
-            <span className="pp-i" aria-hidden="true">{p.hecho ? <Icono n="palomita" /> : null}</span>
-            <span className="pp-t"><b>{p.texto}</b>{!p.hecho && <small>{p.detalle}</small>}</span>
-            {!p.hecho && <Link className="pnd-b sec" href={p.href}>{p === sig ? "Empezar" : "Ir"}</Link>}
-          </li>
-        ))}
-      </ol>
-    </section>
-  );
+  // Una línea bajo el saludo con el avance; al tocarla se abre la lista en una ventana.
+  return <PasosLinea pasos={pasos} titular={configura} />;
 }

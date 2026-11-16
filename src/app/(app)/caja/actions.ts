@@ -114,30 +114,65 @@ export async function cerrarCaja(_: EstadoCaja, form: FormData): Promise<EstadoC
     }
   }
   const datos = await movimientosDeTurno(s.barberia.id, turno.id, turno.fondoInicial);
-  // Comisiones automáticas: lo que se paga hoy se liquida al cerrar; cada entrega en efectivo se decide aquí
-  // (de la caja, mañana o por transferencia). Lo que sale de la caja se descuenta del efectivo esperado.
-  type Entrega = { id: string; barberoId: string; monto: number; nota: string; nombre: string; decision: string };
-  let entregas: Entrega[] = [];
+  // Comisiones automáticas: lo que se paga hoy se liquida al cerrar. La pantalla dice cuánto efectivo se le dio a cada quien
+  // (lo que alcanzó en la caja); lo que falta queda para el próximo corte o se pasa a transferencia.
+  type Pend = { id: string; barberoId: string; monto: number; nota: string; nombre: string; semana: string; usuarioId: string; creadoEn: Date };
+  let pend: Pend[] = [];
+  // Caja compartida: el corte es uno para todo el equipo, así que se entrega lo de todos, cierre quien cierre.
+  const verTodo = s.puede("ventas.ver_todas") || s.puede("equipo.pagar") || s.barberia.modeloCaja !== "individual";
   if (s.barberia.pagosEquipoAuto) {
     await liquidarAutomaticos(s.barberia.id, true);
-    const pend = await db.select({ id: schema.pagosComision.id, barberoId: schema.pagosComision.barberoId, monto: schema.pagosComision.monto, nota: schema.pagosComision.nota, nombre: schema.usuarios.nombre })
+    pend = (await db.select({ id: schema.pagosComision.id, barberoId: schema.pagosComision.barberoId, monto: schema.pagosComision.monto, nota: schema.pagosComision.nota, nombre: schema.usuarios.nombre,
+      semana: schema.pagosComision.semana, usuarioId: schema.pagosComision.usuarioId, creadoEn: schema.pagosComision.creadoEn })
       .from(schema.pagosComision).innerJoin(schema.usuarios, eq(schema.usuarios.id, schema.pagosComision.barberoId))
-      .where(and(eq(schema.pagosComision.barberiaId, s.barberia.id), eq(schema.pagosComision.tipo, "pago"), like(schema.pagosComision.nota, `${POR_ENTREGAR}:%`), sql`${schema.pagosComision.monto} > 0`));
-    // Solo se tocan las que se mostraron en el corte; las demás siguen pendientes.
-    // Caja compartida: el corte es uno para todo el equipo, así que se entrega lo de todos, cierre quien cierre.
-    const verTodo = s.puede("ventas.ver_todas") || s.puede("equipo.pagar") || s.barberia.modeloCaja !== "individual";
-    entregas = pend.filter((x) => verTodo || x.barberoId === s.usuario.id)
-      .map((x) => ({ ...x, decision: texto(form, `entrega:${x.barberoId}`) })).filter((x) => ["caja", "transferencia"].includes(x.decision));
+      .where(and(eq(schema.pagosComision.barberiaId, s.barberia.id), eq(schema.pagosComision.tipo, "pago"), like(schema.pagosComision.nota, `${POR_ENTREGAR}:%`), sql`${schema.pagosComision.monto} > 0`))
+      .orderBy(schema.pagosComision.creadoEn))
+      // Solo se tocan las que se mostraron en el corte; las demás siguen pendientes.
+      .filter((x) => verTodo || x.barberoId === s.usuario.id);
   }
-  const deCaja = entregas.filter((x) => x.decision === "caja").reduce((a, x) => a + x.monto, 0);
-  // Propinas del turno: se calculan aquí con lo guardado, no con lo que mande la pantalla. Del formulario solo se lee cómo se entrega lo de tarjeta.
+  // Propinas del turno: se calculan aquí con lo guardado, no con lo que mande la pantalla.
   // Solo las propinas que se mostraron: quien no ve al equipo entrega solo las suyas; las demás siguen en la caja.
-  const verEquipo = s.puede("ventas.ver_todas") || s.puede("equipo.pagar") || s.barberia.modeloCaja !== "individual";
-  const propinas = (await propinasDeTurno(s.barberia.id, turno.id)).filter((p) => verEquipo || p.id === s.usuario.id).map((p) => {
-    const transferencia = p.otro > 0 && texto(form, `propina:${p.id}`) === "transferencia";
-    return { ...p, transferencia, deCaja: p.efectivo + (transferencia ? 0 : p.otro) };
-  });
-  datos.esperado -= deCaja + propinas.reduce((a, p) => a + p.deCaja, 0);
+  const propTurno = (await propinasDeTurno(s.barberia.id, turno.id)).filter((p) => verTodo || p.id === s.usuario.id);
+  // Lo que se decidió para cada persona. "efectivo" es lo que se le dio de la caja (en centavos); si falta (pantalla anterior), se usa la decisión vieja.
+  type Parte = { fila: Pend; deCaja: number; resto: number; transf: boolean };
+  const partes: Parte[] = [];
+  const resumenCom: string[] = [];
+  const porPersona = new Map<string, { nombre: string; comCaja: number; propCaja: number; propTransf: number; efectivo: number }>();
+  for (const id of new Set([...pend.map((x) => x.barberoId), ...propTurno.map((p) => p.id)])) {
+    const filas = pend.filter((x) => x.barberoId === id);
+    const prop = propTurno.find((p) => p.id === id);
+    const otro = prop?.otro ?? 0;
+    const totalCom = filas.reduce((a, x) => a + x.monto, 0);
+    const crudo = form.get(`efectivo:${id}`);
+    const decision = texto(form, `entrega:${id}`);
+    const restoTransf = decision === "transferencia";
+    let dar: number;
+    let propTransf = 0;
+    if (crudo === null) {
+      // Pantalla vieja: "caja" daba todo de la caja; lo demás no sacaba comisión. Las propinas con tarjeta, según su campo.
+      propTransf = texto(form, `propina:${id}`) === "transferencia" ? otro : 0;
+      dar = (decision === "caja" ? totalCom : 0) + (otro - propTransf);
+    } else {
+      dar = Math.max(0, Math.min(Math.round(Number(crudo) || 0), totalCom + otro));
+    }
+    // Primero las propinas con tarjeta (salen de la caja), después la comisión más vieja.
+    const propCaja = Math.min(otro - propTransf, dar);
+    propTransf = otro - propCaja;
+    let queda = dar - propCaja;
+    let comCaja = 0;
+    for (const f of filas) {
+      const deCaja = Math.min(f.monto, queda);
+      queda -= deCaja; comCaja += deCaja;
+      partes.push({ fila: f, deCaja, resto: f.monto - deCaja, transf: restoTransf });
+    }
+    const nombre = (filas[0]?.nombre ?? prop?.nombre ?? "").split(" ")[0];
+    if (comCaja) resumenCom.push(`${nombre} ${formatoDinero(comCaja)} de la caja`);
+    if (totalCom - comCaja) resumenCom.push(`${nombre} ${formatoDinero(totalCom - comCaja)} ${restoTransf ? "por transferencia" : "para el próximo corte"}`);
+    porPersona.set(id, { nombre, comCaja, propCaja, propTransf, efectivo: prop?.efectivo ?? 0 });
+  }
+  const deCaja = [...porPersona.values()].reduce((a, x) => a + x.comCaja, 0);
+  const propinasSalen = [...porPersona.values()].reduce((a, x) => a + x.efectivo + x.propCaja, 0);
+  datos.esperado -= deCaja + propinasSalen;
   // Con la función activa, cada forma de pago (que no sea efectivo) con cobros necesita su evidencia.
   if (s.barberia.usaEvidenciaCorte) {
     // Los cobros con QR y los anticipos en línea ya están verificados por Stripe: no piden comprobante.
@@ -155,27 +190,34 @@ export async function cerrarCaja(_: EstadoCaja, form: FormData): Promise<EstadoC
       .where(and(eq(schema.turnosCaja.id, turno.id), eq(schema.turnosCaja.estado, "abierto")))
       .returning({ id: schema.turnosCaja.id });
     if (filas.length === 0) return;
-    for (const e of entregas) {
-      const resto = e.nota.slice(POR_ENTREGAR.length + 2);
-      if (e.decision === "caja") {
-        await tx.insert(schema.movimientosCaja).values({ barberiaId: s.barberia.id, turnoId: turno.id, tipo: "retiro", monto: e.monto, concepto: `Pago de comisiones a ${e.nombre.split(" ")[0]}`, usuarioId: s.usuario.id });
-        await tx.update(schema.pagosComision).set({ nota: `Efectivo de caja: ${resto} (entregado en el corte)`.slice(0, 200) }).where(eq(schema.pagosComision.id, e.id));
-      } else {
-        await tx.update(schema.pagosComision).set({ nota: `Transferencia: ${resto}`.slice(0, 200) }).where(eq(schema.pagosComision.id, e.id));
+    for (const p of partes) {
+      const f = p.fila;
+      const de = f.nota.slice(POR_ENTREGAR.length + 2);
+      if (p.deCaja > 0) {
+        // Lo que se dio de la caja queda como entregado; si fue solo una parte, lo que falta sigue como pago aparte.
+        await tx.update(schema.pagosComision).set({ monto: p.deCaja, nota: `Efectivo de caja: ${de} (entregado en el corte)`.slice(0, 200) })
+          .where(and(eq(schema.pagosComision.id, f.id), like(schema.pagosComision.nota, `${POR_ENTREGAR}:%`)));
+        if (p.resto > 0) await tx.insert(schema.pagosComision).values({ barberiaId: s.barberia.id, barberoId: f.barberoId, tipo: "pago", monto: p.resto, semana: f.semana,
+          nota: `${p.transf ? "Transferencia" : POR_ENTREGAR}: ${de}`.slice(0, 200), usuarioId: f.usuarioId, creadoEn: f.creadoEn });
+      } else if (p.transf) {
+        await tx.update(schema.pagosComision).set({ nota: `Transferencia: ${de}`.slice(0, 200) })
+          .where(and(eq(schema.pagosComision.id, f.id), like(schema.pagosComision.nota, `${POR_ENTREGAR}:%`)));
       }
     }
-    for (const p of propinas) {
+    for (const [id, x] of porPersona) {
+      if (x.comCaja > 0) await tx.insert(schema.movimientosCaja).values({ barberiaId: s.barberia.id, turnoId: turno.id, tipo: "retiro", monto: x.comCaja, concepto: `Pago de comisiones a ${x.nombre}`, usuarioId: s.usuario.id });
       // La propina con tarjeta que se manda por transferencia no toca la caja, pero queda como movimiento.
-      if (p.transferencia && p.otro > 0) await registrar(tx, { barberiaId: s.barberia.id, usuarioId: s.usuario.id, tipo: "equipo",
-        accion: `Propina por transferencia a ${p.nombre.split(" ")[0]}: ${formatoDinero(p.otro)}`, detalle: { propinaTransferencia: p.otro, barberoId: p.id, turnoId: turno.id } });
-      if (p.deCaja > 0) await tx.insert(schema.movimientosCaja).values({ barberiaId: s.barberia.id, turnoId: turno.id, tipo: "retiro", monto: p.deCaja, concepto: `${CONCEPTO_PROPINA} ${p.nombre.split(" ")[0]}`, usuarioId: s.usuario.id });
+      if (x.propTransf > 0) await registrar(tx, { barberiaId: s.barberia.id, usuarioId: s.usuario.id, tipo: "equipo",
+        accion: `Propina por transferencia a ${x.nombre}: ${formatoDinero(x.propTransf)}`, detalle: { propinaTransferencia: x.propTransf, barberoId: id, turnoId: turno.id } });
+      if (x.efectivo + x.propCaja > 0) await tx.insert(schema.movimientosCaja).values({ barberiaId: s.barberia.id, turnoId: turno.id, tipo: "retiro", monto: x.efectivo + x.propCaja, concepto: `${CONCEPTO_PROPINA} ${x.nombre}`, usuarioId: s.usuario.id });
     }
     if (evidencias.length) await tx.insert(schema.evidenciasCorte).values(evidencias.map((e) => ({ ...e, barberiaId: s.barberia.id, turnoId: turno.id, subidoPor: s.usuario.id })));
     await registrar(tx, {
       barberiaId: s.barberia.id, usuarioId: s.usuario.id, tipo: "caja",
       accion: `${s.usuario.nombre} hizo el corte de caja. ${r.texto}`, detalle: { esperado: datos.esperado, contado, diferencia: r.diferencia, notas, verificacion, evidencias: evidencias.length || undefined,
-        propinas: propinas.length ? propinas.map((p) => `${p.nombre.split(" ")[0]} ${[p.efectivo ? `${formatoDinero(p.efectivo)} de la caja de propinas` : "", p.otro ? `${formatoDinero(p.otro)} con tarjeta ${p.transferencia ? "por transferencia" : "de la caja"}` : ""].filter(Boolean).join(" y ")}`).join(", ") : undefined,
-        comisiones: entregas.length ? entregas.map((e) => `${e.nombre.split(" ")[0]} ${formatoDinero(e.monto)} ${e.decision === "caja" ? "de la caja" : "por transferencia"}`).join(", ") : undefined },
+        propinas: [...porPersona.values()].some((x) => x.efectivo + x.propCaja + x.propTransf) ? [...porPersona.values()].filter((x) => x.efectivo + x.propCaja + x.propTransf)
+          .map((x) => `${x.nombre} ${[x.efectivo ? `${formatoDinero(x.efectivo)} en efectivo, aparte` : "", x.propCaja ? `${formatoDinero(x.propCaja)} con tarjeta de la caja` : "", x.propTransf ? `${formatoDinero(x.propTransf)} con tarjeta por transferencia` : ""].filter(Boolean).join(" y ")}`).join(", ") : undefined,
+        comisiones: resumenCom.length ? resumenCom.join(", ") : undefined },
     });
   });
   const zona = s.barberia.zonaHoraria;

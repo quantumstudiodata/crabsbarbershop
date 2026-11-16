@@ -23,6 +23,8 @@ import { RefrescarConVentas } from "./RefrescarConVentas";
 import { UltimosServicios, type FilaUltimo } from "./UltimosServicios";
 import { verificadosDe, type Verificado } from "@/lib/pagos";
 import { Pendientes } from "./Pendientes";
+import { PrimerosPasos } from "./PrimerosPasos";
+import { Suspense } from "react";
 import { resumenSemana, type ResumenSemana } from "@/lib/resumenSemana";
 import { registrarGastosAutomaticos } from "@/lib/gastosAuto";
 
@@ -231,6 +233,8 @@ function InicioVista(v: Vista) {
         </div>
         <AccionesEscritorio acciones={v.acciones.visibles} personalizar={v.acciones} />
       </div>
+      {/* Primeros pasos: una línea bajo el saludo (en el teléfono, arriba de todo). */}
+      <Suspense fallback={null}><div className="pl-fila"><PrimerosPasos s={s} /></div></Suspense>
 
       {/* Teléfono */}
       <section className="glass ini-hoy-m solo-movil subir d1">

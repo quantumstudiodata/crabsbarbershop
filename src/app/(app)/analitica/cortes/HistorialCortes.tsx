@@ -1,10 +1,9 @@
 "use client";
 
-import { Ayuda } from "@/components/Ayuda";
 import { zoomPagina } from "@/lib/zoom";
 import { useState } from "react";
 import { Avatar } from "@/components/Avatar";
-import { Cajon } from "@/components/Cajon";
+import { Modal } from "@/components/ui";
 import { Icono } from "@/components/Icono";
 import { formatoDinero } from "@/lib/money";
 import { DecidirFaltante } from "./DecidirFaltante";
@@ -16,7 +15,9 @@ export type Corte = {
   metodos: { metodo: string; total: number }[]; total: number; ventas: number;
   fondo: number; ventasEfectivo: number; propinasEfectivo: number; entradas: number; retiros: number; gastos: number; pagosEquipo: number; propinasEnt: number; otrosEgresos: { concepto: string; metodo: string; monto: number }[];
   esperado: number; contado: number; diferencia: number; ajustado?: number; notas: string | null;
-  movimientos: { hora: string; titulo: string; detalle: string; monto: number }[];
+  movimientos: { hora: string; tipo?: string; titulo: string; detalle: string; monto: number }[];
+  /** Pagos decididos en el cierre que no salieron de la caja. */
+  fueraCaja?: { nombre: string; monto: number; como: string }[];
   ajustes: string[];
   evidencias: { id: string; etiqueta: string; nombre: string; tipo: string }[];
   abrioId?: string;
@@ -59,29 +60,31 @@ export function NecesitaRevision({ cortes, puede }: { cortes: Corte[]; puede: bo
   );
 }
 
+/** Lo que se entregó al cerrar, en renglones bajo la pastilla del corte. */
+export type HijoCorte = { id: string; nombre: string; que: string; monto: string; aparte?: boolean };
+
 /**
- * Un corte dentro de Movimientos: folio, día, horario, quién cerró, cómo quedó y lo vendido.
- * Al tocarlo se abre su comprobante a un lado, sin salir de la página. Quien no puede ver cortes solo ve la fila.
+ * Un corte dentro de Movimientos: una pastilla sobre una línea con la hora, cómo quedó y lo vendido;
+ * debajo, lo que se le dio a cada quien. Al tocar la pastilla se abre su detalle. Quien no puede ver cortes solo ve la pastilla.
  */
-export function FilaCorte({ c, corregir, abrir, ver = true }: { c: Corte; corregir: boolean; abrir?: boolean; ver?: boolean }) {
+export function FilaCorte({ c, corregir, abrir, ver = true, hijos = [] }: { c: Corte; corregir: boolean; abrir?: boolean; ver?: boolean; hijos?: HijoCorte[] }) {
   const [abierto, setAbierto] = useState(!!abrir && ver);
   const [ajuste, setAjuste] = useState(false);
-  // Tarjeta blanca separada del resto: candado, folio, horario y quién cerró; a la derecha cómo quedó y lo vendido.
-  const contenido = (
-    <>
-      <span className="cf-ico"><Icono n="candado" /></span>
-      <span className="cf-tit"><b><span className="cf-largo">Corte de caja</span><span className="cf-corto">Corte</span> {c.folio}</b>
-        <small>{c.horario}{c.cerro.nombre ? <span className="cf-largo">, cerró {primer(c.cerro.nombre)}</span> : null}{ver ? <span className="cf-corto">, {c.diferencia === 0 ? "cuadró" : `${c.diferencia < 0 ? "faltaron" : "sobraron"} ${$(Math.abs(c.diferencia))}`}</span> : null}</small></span>
-      <span className="cf-est">{ver ? <Estado d={c.diferencia} /> : null}</span>
-      <span className="num">{ver ? <>{$(c.total)}<small>vendido</small></> : null}</span>
-      {ver ? <Icono n="derecha" /> : <span />}
-    </>
-  );
+  const hora = c.horario.split(" a ")[1] || c.horario;
+  const estado = c.diferencia === 0 ? "cuadró" : `${c.diferencia < 0 ? "faltaron" : "sobraron"} ${$(Math.abs(c.diferencia))}`;
+  const contenido = <><span className="cp-txt">Corte {hora}, <span className={c.diferencia < 0 ? "cp-falta" : ""}>{ver ? estado : "cerrado"}</span></span>{ver && <small>{$(c.total)} vendido</small>}</>;
   return (
     <div className={`hist-fila t-corte ${abierto ? "abierta" : ""}`}>
-      {ver
-        ? <button type="button" className="corte-tj" aria-label={`Ver corte ${c.folio}`} onClick={() => setAbierto(true)}>{contenido}</button>
-        : <div className="corte-tj">{contenido}</div>}
+      <div className="cp-div">
+        <span className="cp-ln" />
+        {ver ? <button type="button" className="cp-pill" aria-label={`Ver corte ${c.folio}`} onClick={() => setAbierto(true)}>{contenido}</button> : <span className="cp-pill">{contenido}</span>}
+        <span className="cp-ln" />
+      </div>
+      {hijos.length > 0 && (
+        <div className="cp-hijos">
+          {hijos.map((h) => <div key={h.id} className={h.aparte ? "ap" : ""}><span>{h.nombre} <small>{h.que}</small></span><span className="num">{h.monto}</span></div>)}
+        </div>
+      )}
       {ver && <Detalle c={abierto ? c : null} cerrar={() => setAbierto(false)} ajustar={corregir ? () => { setAbierto(false); setAjuste(true); } : undefined} />}
       {ajuste && <Corregir id={c.id} dia={c.dia} folio={c.folio} diferencia={c.diferencia + (c.ajustado ?? 0)} abierto cerrar={() => setAjuste(false)} />}
     </div>
@@ -124,58 +127,101 @@ function Visor({ e, cerrar }: { e: Ev; cerrar: () => void }) {
 
 function Detalle({ c, cerrar, ajustar }: { c: Corte | null; cerrar: () => void; ajustar?: (c: Corte) => void }) {
   const [foto, setFoto] = useState<Ev | null>(null);
+  if (!c) return null;
+  const estado = c.diferencia === 0 ? "cuadró" : `${c.diferencia < 0 ? "faltaron" : "sobraron"} ${$(Math.abs(c.diferencia))}`;
+  // Propinas con tarjeta que se pagaron con efectivo de la caja: lo que se entregó de más sobre las propinas en efectivo.
+  const propDeCaja = c.propinasEnt - c.propinasEfectivo;
+  const caja = c.movimientos.filter((m) => !/^Propinas entregadas/.test(m.titulo));
+  const nombreDe = (m: Corte["movimientos"][number]) => m.titulo === "Pago al equipo" ? `${m.detalle.replace(/^Comisión de /, "")}, comisión` : m.detalle;
+  const subDe = (m: Corte["movimientos"][number]) => m.titulo === "Pago al equipo" ? "De la caja" : m.titulo === "Gasto pagado con la caja" ? "Gasto de caja" : m.titulo;
   return (
-    <Cajon abierto={!!c} cerrar={cerrar} titulo={c ? `Corte ${c.folio}` : ""}
-      pie={c && <>{ajustar && <button type="button" className="enlace" onClick={() => ajustar(c)}>Registrar ajuste</button>}<button type="button" className="bt chico" onClick={() => imprimir(c.folio)}><Icono n="imprimir" />Imprimir</button></>}>
-      {c && (
-        <div className="rc-papel">
-        {/* eslint-disable-next-line @next/next/no-img-element */}
-        <img className="rc-logo" src="/logo-crabs.png" alt="Crabs" width={946} height={209} />
-        <div className="recibo-c">
-          <div className="rc-cab"><span className="rc-tit">Corte de caja {c.folio}</span><b>{c.dia}</b><small>{c.horario}</small><small>Abrió {primer(c.abrio.nombre) || "sin registro"}, cerró {primer(c.cerro.nombre) || "sin registro"}</small></div>
-          <div className="rc-sec"><span className="lab">Cobros</span>
-            {c.metodos.map((m) => <div key={m.metodo}><span>{m.metodo}</span><span className="num">{$(m.total)}</span></div>)}
-            <div className="rc-tot"><span>Total vendido, {c.ventas} {c.ventas === 1 ? "venta" : "ventas"}</span><b className="num">{$(c.total)}</b></div>
-          </div>
-          <div className="rc-sec"><span className="lab">Efectivo</span>
-            <div><span>Con lo que se abrió la caja</span><span className="num">{$(c.fondo)}</span></div>
-            <div><span>Ventas en efectivo</span><span className="num">+{$(c.ventasEfectivo)}</span></div>
-            {c.propinasEfectivo > 0 && <div><span>Propinas en efectivo</span><span className="num">+{$(c.propinasEfectivo)}</span></div>}
-            {c.entradas > 0 && <div><span>Dinero que se puso en la caja</span><span className="num">+{$(c.entradas)}</span></div>}
-            {c.gastos > 0 && <div><span>Gastos pagados con la caja</span><span className="num">−{$(c.gastos)}</span></div>}
-            {c.propinasEnt > 0 && <div><span>Propinas entregadas</span><span className="num">−{$(c.propinasEnt)}</span></div>}
-            {c.pagosEquipo > 0 && <div><span>Pagos al equipo</span><span className="num">−{$(c.pagosEquipo)}</span></div>}
-            {c.retiros > 0 && <div><span>Dinero que se sacó</span><span className="num">−{$(c.retiros)}</span></div>}
-            <div><span>Debía haber</span><span className="num">{$(c.esperado)}</span></div>
-            <div><span>Se contó</span><span className="num">{$(c.contado)}</span></div>
-            <div className="rc-tot"><span className="lab-ay">Diferencia<Ayuda titulo="Diferencia">Lo que se contó menos lo que debía haber. Si faltó, se revisa en Necesita revisión y se decide si se descuenta a alguien o lo absorbe el negocio.</Ayuda></span><Estado d={c.diferencia} /></div>
-          </div>
-          {c.movimientos.length > 0 && (
-            <div className="rc-sec"><span className="lab">Movimientos de caja</span>
-              {c.movimientos.map((m, i) => <div key={i}><span>{m.hora} {m.titulo}<small>{m.detalle}</small></span><span className="num">{m.monto < 0 ? `−${$(-m.monto)}` : $(m.monto)}</span></div>)}
-            </div>
-          )}
-          {c.otrosEgresos.length > 0 && (
-            <div className="rc-sec"><span className="lab">Otros egresos del día</span>
-              {c.otrosEgresos.map((g, i) => <div key={i}><span>{g.concepto}<small>{g.metodo}</small></span><span className="num">{$(g.monto)}</span></div>)}
-              <p className="muted" style={{ fontSize: 12, margin: 0 }}>Pagados con transferencia o tarjeta. No salieron de la caja.</p>
-            </div>
-          )}
-          {c.evidencias.length > 0 && (
-            <div className="rc-sec rc-evid"><span className="lab">Fotos de comprobantes</span>
-              {c.evidencias.map((e) => <div key={e.id}><span>{e.etiqueta || "General"}<small>{e.nombre}</small></span><button type="button" className="enlace" onClick={() => setFoto(e)}>Ver</button></div>)}
-            </div>
-          )}
-          {(c.notas || c.ajustes.length > 0) && (
-            <div className="rc-sec"><span className="lab">Observaciones</span>
-              {c.notas && <p>{c.notas}</p>}
-              {c.ajustes.map((a, i) => <p key={i}>{a}</p>)}
-            </div>
-          )}
+    <Modal abierto cerrar={cerrar} etiqueta={`Folio ${c.folio}`} titulo={`Corte de caja, ${estado}`}>
+      <div className="pila-chica cd">
+        <p className="ct-ins">{c.dia}, {c.horario}.{c.cerro.nombre ? ` Cerró ${primer(c.cerro.nombre)}.` : ""}</p>
+        <div className="ct-hoja">
+          <Rg t="Fondo con el que abrió" v={$(c.fondo)} />
+          <Rg s="+" t="Cobrado en efectivo" v={$(c.ventasEfectivo)} />
+          {caja.map((m, i) => <Rg key={i} s={m.monto < 0 ? "-" : "+"} t={nombreDe(m)} sub={`${subDe(m)}, ${m.hora}`} v={$(Math.abs(m.monto))} />)}
+          {propDeCaja > 0 && <Rg s="-" t="Propinas con tarjeta" sub="Se pagaron con la caja" v={$(propDeCaja)} />}
+          <Rg s="=" t="Debía quedar" v={$(c.esperado)} cls="tot" />
+          <Rg t="Se contó" sub={c.diferencia === 0 ? "Cuadró" : estado.replace(/^./, (x) => x.toUpperCase())} v={$(c.contado)} />
+          {(c.fueraCaja ?? []).map((x, i) => <Rg key={`f${i}`} t={`${x.nombre}, comisión`} sub={x.como === "por transferencia" ? "Por transferencia, no sale de la caja" : "Para el próximo corte"} v={$(x.monto)} cls="mu" />)}
+          {c.propinasEfectivo > 0 && <Rg t="Propinas en efectivo" sub="Aparte de la caja" v={$(c.propinasEfectivo)} cls="mu" />}
         </div>
+        {c.otrosEgresos.length > 0 && (
+          <>
+            <span className="cd-t">Egresos del turno</span>
+            <div className="ct-hoja">{c.otrosEgresos.map((g, i) => <Rg key={i} t={g.concepto} sub={`${g.metodo}, no sale de la caja`} v={$(g.monto)} />)}</div>
+          </>
+        )}
+        <span className="cd-t">Vendido {$(c.total)}</span>
+        <div className="ct-hoja">{c.metodos.map((m) => <Rg key={m.metodo} t={m.metodo} v={$(m.total)} />)}</div>
+        {c.evidencias.length > 0 && (
+          <>
+            <span className="cd-t">Fotos de comprobantes</span>
+            <div className="ct-hoja">{c.evidencias.map((e) => <Rg key={e.id} t={e.etiqueta || "General"} sub={e.nombre} v={<button type="button" className="enlace" onClick={() => setFoto(e)}>Ver</button>} />)}</div>
+          </>
+        )}
+        {(c.notas || c.ajustes.length > 0) && (
+          <>
+            <span className="cd-t">Observaciones</span>
+            <div className="ct-hoja cd-obs">{c.notas && <p>{c.notas}</p>}{c.ajustes.map((a, i) => <p key={i}>{a}</p>)}</div>
+          </>
+        )}
+        <div className="cd-acc">
+          <button type="button" className="bt sec chico" onClick={() => imprimir(c.folio)}><Icono n="imprimir" />Imprimir</button>
+          {ajustar && <button type="button" className="bt sec chico" onClick={() => ajustar(c)}>Registrar ajuste</button>}
         </div>
-      )}
+        <Ticket c={c} />
+      </div>
       {foto && <Visor e={foto} cerrar={() => setFoto(null)} />}
-    </Cajon>
+    </Modal>
+  );
+}
+
+/** Un renglón de la cuenta de corridito: signo, concepto (con nota abajo) y monto. */
+function Rg({ s, t, sub, v, cls = "" }: { s?: string; t: React.ReactNode; sub?: React.ReactNode; v: React.ReactNode; cls?: string }) {
+  return (
+    <div className={`ct-r ${cls}`}>
+      <span className="ct-s" aria-hidden="true">{s ?? ""}</span>
+      <span className="ct-t">{t}{sub ? <small>{sub}</small> : null}</span>
+      <span className="ct-v num">{v}</span>
+    </div>
+  );
+}
+
+/** El ticket de 80 mm: solo se ve al imprimir. */
+function Ticket({ c }: { c: Corte }) {
+  return (
+    <div className="rc-papel solo-imp">
+      {/* eslint-disable-next-line @next/next/no-img-element */}
+      <img className="rc-logo" src="/logo-crabs.png" alt="Crabs" width={946} height={209} />
+      <div className="recibo-c">
+        <div className="rc-cab"><span className="rc-tit">Corte de caja {c.folio}</span><b>{c.dia}</b><small>{c.horario}</small><small>Abrió {primer(c.abrio.nombre) || "sin registro"}, cerró {primer(c.cerro.nombre) || "sin registro"}</small></div>
+        <div className="rc-sec"><span className="lab">Cobros</span>
+          {c.metodos.map((m) => <div key={m.metodo}><span>{m.metodo}</span><span className="num">{$(m.total)}</span></div>)}
+          <div className="rc-tot"><span>Total vendido, {c.ventas} {c.ventas === 1 ? "venta" : "ventas"}</span><b className="num">{$(c.total)}</b></div>
+        </div>
+        <div className="rc-sec"><span className="lab">Efectivo</span>
+          <div><span>Con lo que se abrió la caja</span><span className="num">{$(c.fondo)}</span></div>
+          <div><span>Ventas en efectivo</span><span className="num">+{$(c.ventasEfectivo)}</span></div>
+          {c.entradas > 0 && <div><span>Dinero que se puso en la caja</span><span className="num">+{$(c.entradas)}</span></div>}
+          {c.gastos > 0 && <div><span>Gastos pagados con la caja</span><span className="num">−{$(c.gastos)}</span></div>}
+          {c.pagosEquipo > 0 && <div><span>Pagos al equipo</span><span className="num">−{$(c.pagosEquipo)}</span></div>}
+          {c.retiros > 0 && <div><span>Dinero que se sacó</span><span className="num">−{$(c.retiros)}</span></div>}
+          <div><span>Debía haber</span><span className="num">{$(c.esperado)}</span></div>
+          <div><span>Se contó</span><span className="num">{$(c.contado)}</span></div>
+          <div className="rc-tot"><span>Diferencia</span><Estado d={c.diferencia} /></div>
+        </div>
+        {c.otrosEgresos.length > 0 && (
+          <div className="rc-sec"><span className="lab">Egresos del turno</span>
+            {c.otrosEgresos.map((g, i) => <div key={i}><span>{g.concepto}<small>{g.metodo}</small></span><span className="num">{$(g.monto)}</span></div>)}
+          </div>
+        )}
+        {(c.notas || c.ajustes.length > 0) && (
+          <div className="rc-sec"><span className="lab">Observaciones</span>{c.notas && <p>{c.notas}</p>}{c.ajustes.map((a, i) => <p key={i}>{a}</p>)}</div>
+        )}
+      </div>
+    </div>
   );
 }
