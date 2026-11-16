@@ -259,7 +259,7 @@ export default async function MovimientosPagina({ searchParams }: { searchParams
     const sale = c.tipo === "retiro", propina = esPropinaEntregada(c.concepto);
     items.push({ k: "mov", dia: c.dia, t: c.creadoEn.getTime(), corte: propina ? c.turnoId : undefined, m: {
       id: `c${c.id}`, tipo: propina ? "propina" : "caja", titulo: c.concepto, hora: horaCorta(c.creadoEn, zona),
-      sub: propina ? "Se entregó de la caja en el corte" : sale ? "Se sacó de la caja. No es un gasto" : "Se puso en la caja. No es una venta", monto: sale ? -c.monto : c.monto,
+      sub: propina ? "Propinas que se le entregaron en el corte" : sale ? "Se sacó de la caja. No es un gasto" : "Se puso en la caja. No es una venta", monto: sale ? -c.monto : c.monto,
       detalle: [["Registró", `${c.quien.split(" ")[0]}, ${horaCorta(c.creadoEn, zona)}`], ["Cuenta en la ganancia", "No. Solo cambia el efectivo de la caja"]],
     } });
   }

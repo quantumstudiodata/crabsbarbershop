@@ -173,7 +173,7 @@ export async function cerrarCaja(_: EstadoCaja, form: FormData): Promise<EstadoC
     await registrar(tx, {
       barberiaId: s.barberia.id, usuarioId: s.usuario.id, tipo: "caja",
       accion: `${s.usuario.nombre} hizo el corte de caja. ${r.texto}`, detalle: { esperado: datos.esperado, contado, diferencia: r.diferencia, notas, verificacion, evidencias: evidencias.length || undefined,
-        propinas: propinas.length ? propinas.map((p) => `${p.nombre.split(" ")[0]} ${formatoDinero(p.efectivo + p.otro)}${p.transferencia ? ` (${formatoDinero(p.otro)} por transferencia)` : " de la caja"}`).join(", ") : undefined,
+        propinas: propinas.length ? propinas.map((p) => `${p.nombre.split(" ")[0]} ${[p.efectivo ? `${formatoDinero(p.efectivo)} de la caja de propinas` : "", p.otro ? `${formatoDinero(p.otro)} con tarjeta ${p.transferencia ? "por transferencia" : "de la caja"}` : ""].filter(Boolean).join(" y ")}`).join(", ") : undefined,
         comisiones: entregas.length ? entregas.map((e) => `${e.nombre.split(" ")[0]} ${formatoDinero(e.monto)} ${e.decision === "caja" ? "de la caja" : "por transferencia"}`).join(", ") : undefined },
     });
   });

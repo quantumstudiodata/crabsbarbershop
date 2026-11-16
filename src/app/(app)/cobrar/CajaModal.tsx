@@ -435,7 +435,17 @@ function CortePasos({ turno, accion, cerrando, error, contado, setContado, limit
         <div className="pila" hidden={!esCierre}>
           <div className="ck-con">
             <div><span>Total vendido</span><b className="num">{formatoDinero(total)}</b></div>
-            {sobres.length > 0 && <div><span>Entregas</span><span className="num">{sobres.map((x) => { const d = dec[x.id] ?? "caja"; return `${x.nombre.split(" ")[0]} ${formatoDinero(totalSobre(x))} ${d === "caja" ? "de la caja" : d === "manana" ? "(comisión mañana)" : "por transferencia"}`; }).join(", ")}</span></div>}
+            {sobres.length > 0 && <div><span>Entregas</span><span /></div>}
+            {/* Cada persona en su renglón: la comisión dice de dónde sale y las propinas van aparte, para no sumarlas a la caja. */}
+            {sobres.map((x) => {
+              const d = dec[x.id] ?? "caja";
+              const partes = [
+                x.comision ? `comisión ${formatoDinero(x.comision)} ${d === "caja" ? "de la caja" : d === "manana" ? "mañana" : "por transferencia"}` : "",
+                x.efectivo ? `propinas ${formatoDinero(x.efectivo)} de la caja de propinas` : "",
+                x.otro ? `propinas con tarjeta ${formatoDinero(x.otro)} ${d === "transferencia" ? "por transferencia" : "de la caja"}` : "",
+              ].filter(Boolean).join(" + ");
+              return <div key={`e${x.id}`} className="ck-sub"><span>{x.nombre.split(" ")[0]}: {partes}</span><span /></div>;
+            })}
             <div><span>Efectivo esperado</span><span className="num">{formatoDinero(esperado)}</span></div>
             <div><span>Efectivo contado</span><span>{c === null ? "Sin contar" : `${formatoDinero(c)}, ${dif === 0 ? "coincide" : dif! > 0 ? `sobran ${formatoDinero(dif!)}` : `faltan ${formatoDinero(-dif!)}`}`}</span></div>
             {conComprobantes && <div><span>Comprobantes</span><span>{faltan ? `Falta en ${faltan} ${faltan === 1 ? "forma de pago" : "formas de pago"}` : `${archivos} ${archivos === 1 ? "archivo" : "archivos"}, al menos uno por forma de pago`}</span></div>}

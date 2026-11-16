@@ -71,10 +71,10 @@ export function Movimientos({ dias, registrar, hoy, cajaAbierta, categorias, opc
 function FilaMov({ m, abierto, alternar, cancelar }: { m: Movimiento; abierto: boolean; alternar: () => void; cancelar: (f: FilaEgreso) => void }) {
   return (
     <div className={`hist-fila mov-h ${m.tipo} ${TONO[m.tipo]} ${m.pendiente ? "pendiente" : ""} ${m.cancelado ? "cancelada" : ""} ${abierto ? "abierta" : ""}`}>
-      <button type="button" className="hist-linea" aria-expanded={abierto} onClick={alternar}>
+      <button type="button" className="hist-linea mov-fila" aria-expanded={abierto} onClick={alternar}>
         <span className="t">{m.hora}</span>
+        <span className="mov-tp"><i />{m.pendiente ? "Pendiente" : ETIQUETA[m.tipo]}</span>
         <span className="srv"><span>{m.titulo}</span><small className="mov-sub">{m.sub}</small></span>
-        <span className={`folio mov-tipo ${m.pendiente ? "pend" : ""}`}>{m.pendiente ? "Pago pendiente" : ETIQUETA[m.tipo]}</span>
         <span className={`num ${m.pendiente ? "muted" : ""}`}>{m.cancelado || m.pendiente ? formatoDinero(Math.abs(m.monto)) : firma(m.monto)}</span>
         <Icono n="abajo" />
       </button>

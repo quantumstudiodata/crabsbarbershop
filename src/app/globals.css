@@ -5684,31 +5684,6 @@ html:has(.fx-raiz .mc) body::before, html:has(.fx-raiz .mc) body::after { displa
 .ini-rejilla.midiendo { align-items: start; }
 .ini-rejilla.midiendo .ini-izq > *, .ini-rejilla.midiendo .ini-der > *, .ini-rejilla.midiendo .ini-der > :last-child > section, .ini-rejilla.midiendo .ini-hoy-w > .ini-hoy { flex: 0 0 auto; }
 
-/* Movimientos: cada tipo con su tono de gris azulado, sutil. Las ventas quedan claras; el corte es el más marcado. */
-.movs-f .hist-fila.t-corte .hist-linea { background: rgba(31,45,58,.11); }
-.movs-f .hist-fila.t-egreso .hist-linea { background: rgba(58,88,118,.075); }
-.movs-f .hist-fila.t-equipo .hist-linea { background: rgba(104,128,150,.10); }
-.movs-f .hist-fila.t-caja .hist-linea { background: rgba(150,170,188,.16); }
-.movs-f .hist-fila[class*="t-"] .hist-linea:hover { filter: brightness(.98); }
-.movs-f .t-corte .chip-p, .movs-f .t-corte .folio { background: rgba(31,45,58,.12); }
-.movs-f .t-egreso .mov-tipo { background: rgba(58,88,118,.14); }
-.movs-f .t-equipo .mov-tipo { background: rgba(104,128,150,.18); }
-.movs-f .t-caja .mov-tipo { background: rgba(150,170,188,.3); }
-.movs-f .hist-fila + .hist-fila.t-corte { margin-top: 2px; }
-/* Fila del corte: folio, día, horario, quién cerró, cómo quedó y lo vendido. */
-.hist-linea.corte-mv { grid-template-columns: 96px 110px minmax(0, 1fr) auto auto 90px 18px; font-weight: 500; cursor: pointer; }
-div.hist-linea.corte-mv { cursor: default; }
-.hist-linea.corte-mv .cf-hor { font-weight: 400; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
-.hist-linea.corte-mv .quien { display: inline-flex; align-items: center; gap: 8px; font-weight: 500; }
-.hist-linea.corte-mv .ic { transition: transform .2s; }
-.hist-linea.corte-mv:hover .ic { transform: translateX(3px); color: var(--fg); }
-@media (max-width: 760px) {
-  .hist-linea.corte-mv { grid-template-columns: auto minmax(0, 1fr) auto auto 14px; gap: 8px; }
-  .hist-linea.corte-mv .cf-dia, .hist-linea.corte-mv .cf-quien { display: none; }
-  .hist-linea.corte-mv .cf-hor { font-size: 12px; }
-}
-@media (max-width: 370px) { .hist-linea.corte-mv .cf-hor { display: none; } .hist-linea.corte-mv { grid-template-columns: auto minmax(0, 1fr) auto 14px; } }
-@media (max-width: 760px) { .hist-linea.corte-mv .folio { display: inline-block; } }
 
 /* Ficha de la persona: lo que lleva en el mes dentro de su perfil, con íconos; a la derecha, lo que se le debe. */
 .fa-stats { list-style: none; margin: 0; padding: 14px 0 0; border-top: 1px solid rgba(30,45,60,.08); display: grid; gap: 12px; }
@@ -5727,4 +5702,43 @@ div.hist-linea.corte-mv { cursor: default; }
 .fa-desg > div:last-child { border-bottom: 0; }
 .fa-debe > .eq2-pri { justify-self: start; margin-top: 8px; }
 @media (max-width: 760px) { .fa-debe { padding: 18px; } .fa-debe > b { font-size: 42px; } .fa-stats { padding-top: 12px; } }
-.movs-f .mov-tipo.pend { background: rgba(197,138,62,.16); color: #8a5a1e; }
+
+/* Movimientos, opción C: la columna de tipo va a la izquierda con un cuadrito de su tono, siempre en el mismo lugar. */
+.hist-linea.mov-fila { grid-template-columns: 52px 128px minmax(0, 1fr) 96px 18px; }
+.mov-tp { display: inline-flex; align-items: center; gap: 8px; font-size: 12.5px; font-weight: 600; color: #2b3a47; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.mov-tp i { width: 9px; height: 9px; border-radius: 3px; flex: none; background: #8ea5b8; }
+.mov-h.egreso .mov-tp i { background: #2f4a63; }
+.mov-h.gasto .mov-tp i, .mov-h.caja .mov-tp i { background: #8ea5b8; }
+.mov-h.pago .mov-tp i, .mov-h.renta .mov-tp i { background: #5b6f8f; }
+.mov-h.propina .mov-tp i { background: #a3b3c3; }
+.mov-h.pendiente .mov-tp i { background: #c58a3e; }
+.mov-h.pendiente .mov-tp { color: #8a5a1e; }
+@media (max-width: 640px) {
+  .hist-linea.mov-fila { grid-template-columns: 106px minmax(0, 1fr) auto 14px; gap: 10px; }
+  .hist-linea.mov-fila .t { display: none; }
+  .mov-tp { font-size: 11.5px; gap: 6px; }
+}
+
+/* Corte de caja, opción B: tarjeta blanca separada, con sombra. */
+.movs-f .hist-fila.t-corte { padding: 6px 4px; background: none; }
+.corte-tj { width: 100%; display: grid; grid-template-columns: 34px minmax(0, 1fr) auto auto 18px; gap: 14px; align-items: center; padding: 12px 16px; border: 0; border-radius: 16px;
+  background: #fff; box-shadow: 0 6px 18px -10px rgba(20,35,50,.35), inset 0 0 0 1px rgba(43,58,71,.08); text-align: left; font: inherit; color: inherit; }
+button.corte-tj { cursor: pointer; transition: box-shadow .15s, transform .15s; }
+button.corte-tj:hover { box-shadow: 0 10px 24px -12px rgba(20,35,50,.4), inset 0 0 0 1px rgba(43,58,71,.12); }
+.corte-tj .cf-ico { width: 34px; height: 34px; border-radius: 10px; background: #dfe6ed; color: #2b3a47; display: grid; place-items: center; }
+.corte-tj .cf-ico .ic { width: 16px; height: 16px; }
+.corte-tj .cf-tit { display: grid; gap: 2px; min-width: 0; }
+.corte-tj .cf-tit b { font-size: 14px; font-weight: 600; }
+.corte-tj .cf-tit small { font-size: 12px; color: var(--muted); overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.corte-tj .cf-corto { display: none; }
+.corte-tj .num { text-align: right; font-weight: 600; }
+.corte-tj .num small { display: block; font-weight: 400; font-size: 11px; color: var(--faint); }
+.corte-tj > .ic { width: 14px; height: 14px; color: var(--faint); transition: transform .2s; }
+button.corte-tj:hover > .ic { transform: translateX(3px); color: var(--fg); }
+@media (max-width: 640px) {
+  .corte-tj { grid-template-columns: 34px minmax(0, 1fr) auto 14px; gap: 10px; padding: 11px 12px; }
+  .corte-tj .cf-est { display: none; }
+  .corte-tj .cf-largo { display: none; }
+  .corte-tj .cf-corto { display: inline; }
+}
+.hist-linea.mov-fila .srv { display: grid; grid-template-columns: minmax(0, 1fr); grid-auto-flow: row; gap: 1px; }

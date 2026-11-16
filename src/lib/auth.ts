@@ -67,7 +67,7 @@ export const obtenerSesion = cache(async (): Promise<Sesion | null> => {
   const jar = await cookies();
   const token = jar.get(COOKIE)?.value;
   if (!token) return null;
-  const [fila] = await db
+  const leer = () => db
     .select({ u: schema.usuarios, b: schema.barberias, p: schema.puestos })
     .from(schema.sesiones)
     .innerJoin(schema.usuarios, eq(schema.usuarios.id, schema.sesiones.usuarioId))
@@ -75,6 +75,12 @@ export const obtenerSesion = cache(async (): Promise<Sesion | null> => {
     .leftJoin(schema.puestos, eq(schema.puestos.id, schema.usuarios.puestoId))
     .where(and(eq(schema.sesiones.id, sha256(token)), gt(schema.sesiones.expiraEn, new Date())))
     .limit(1);
+  // Si la base tarda en aceptar la conexión (le pasa al pooler de vez en cuando), se intenta otra vez antes de mostrar el error.
+  const [fila] = await leer().catch(async (err) => {
+    if (!esErrorDeConexion(err)) throw err;
+    await new Promise((r) => setTimeout(r, 700));
+    return leer();
+  });
   // Un negocio suspendido (por ejemplo, sin suscripción) no puede entrar; sus datos se conservan.
   if (!fila || !fila.u.activo || fila.b.estadoCuenta !== "activa") return null;
   // Un puesto desactivado deja sin acceso a quienes lo tienen.
@@ -118,4 +124,12 @@ export async function requerirSesion(permiso?: Permiso): Promise<Sesion> {
   if (s.usuario.debeCambiar) redirect("/cambiar-contrasena");
   if (permiso && !s.puede(permiso)) redirect("/?aviso=sin-permiso");
   return s;
+}
+
+/** Error al conectar con la base (tiempo agotado o conexión caída), no un error de la consulta. */
+function esErrorDeConexion(err: unknown) {
+  const e = err as { code?: string; message?: string; cause?: { code?: string; message?: string } };
+  const codigo = e?.cause?.code ?? e?.code ?? "";
+  const texto = `${e?.message ?? ""} ${e?.cause?.message ?? ""}`;
+  return codigo.startsWith("08") || codigo === "ECONNRESET" || codigo === "CONNECT_TIMEOUT" || /Failed to connect|timeout|ECONNRESET/i.test(texto);
 }

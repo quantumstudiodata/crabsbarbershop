@@ -65,22 +65,22 @@ export function NecesitaRevision({ cortes, puede }: { cortes: Corte[]; puede: bo
 export function FilaCorte({ c, corregir, abrir, ver = true }: { c: Corte; corregir: boolean; abrir?: boolean; ver?: boolean }) {
   const [abierto, setAbierto] = useState(!!abrir && ver);
   const [ajuste, setAjuste] = useState(false);
+  // Tarjeta blanca separada del resto: candado, folio, horario y quién cerró; a la derecha cómo quedó y lo vendido.
   const contenido = (
     <>
-      <span className="folio">{c.folio}</span>
-      <span className="cf-dia">{c.fechaCorta}</span>
-      <span className="muted cf-hor">{c.horario}</span>
-      <span className="cf-quien">{c.cerro.nombre ? <span className="quien"><Avatar avatar={c.cerro.avatar} nombre={c.cerro.nombre} t={24} />{primer(c.cerro.nombre)}</span> : null}</span>
-      <span className="cf-est">{ver ? <Estado d={c.diferencia} /> : <span className="chip-p">Corte de caja</span>}</span>
-      <span className="num">{ver ? $(c.total) : ""}</span>
+      <span className="cf-ico"><Icono n="candado" /></span>
+      <span className="cf-tit"><b><span className="cf-largo">Corte de caja</span><span className="cf-corto">Corte</span> {c.folio}</b>
+        <small>{c.horario}{c.cerro.nombre ? <span className="cf-largo">, cerró {primer(c.cerro.nombre)}</span> : null}{ver ? <span className="cf-corto">, {c.diferencia === 0 ? "cuadró" : `${c.diferencia < 0 ? "faltaron" : "sobraron"} ${$(Math.abs(c.diferencia))}`}</span> : null}</small></span>
+      <span className="cf-est">{ver ? <Estado d={c.diferencia} /> : null}</span>
+      <span className="num">{ver ? <>{$(c.total)}<small>vendido</small></> : null}</span>
       {ver ? <Icono n="derecha" /> : <span />}
     </>
   );
   return (
     <div className={`hist-fila t-corte ${abierto ? "abierta" : ""}`}>
       {ver
-        ? <button type="button" className="hist-linea corte-mv" aria-label={`Ver corte ${c.folio}`} onClick={() => setAbierto(true)}>{contenido}</button>
-        : <div className="hist-linea corte-mv">{contenido}</div>}
+        ? <button type="button" className="corte-tj" aria-label={`Ver corte ${c.folio}`} onClick={() => setAbierto(true)}>{contenido}</button>
+        : <div className="corte-tj">{contenido}</div>}
       {ver && <Detalle c={abierto ? c : null} cerrar={() => setAbierto(false)} ajustar={corregir ? () => { setAbierto(false); setAjuste(true); } : undefined} />}
       {ajuste && <Corregir id={c.id} dia={c.dia} folio={c.folio} diferencia={c.diferencia + (c.ajustado ?? 0)} abierto cerrar={() => setAjuste(false)} />}
     </div>
