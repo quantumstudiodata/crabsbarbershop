@@ -9,6 +9,8 @@ import { VerificadoStripe } from "./VerificadoStripe";
 
 export type FilaVenta = {
   id: string; folio: string; hora: string; servicios: string; monto: number; cancelada: boolean;
+  /** Quién hizo los servicios. */
+  quien?: string;
   detalle: [string, string][];
   /** Cancelar (quien tiene permiso) o anular (el propio barbero en sus primeros minutos). */
   accion?: { tipo: "cancelar" | "anular"; hasta?: string };
@@ -58,7 +60,7 @@ export function FilaVentaVista({ f, abierta, alternar, regreso, opciones }: { f:
     <div className={`hist-fila ${f.cancelada ? "cancelada" : ""} ${abierta ? "abierta" : ""}`}>
       <button type="button" className="hist-linea" aria-expanded={abierta} onClick={alternar}>
         <span className="t">{f.hora}</span>
-        <span className="srv">{f.stripe && <i className={`vs-chip ${f.stripe.reembolsado ? "dev" : ""}`} title={f.stripe.reembolsado ? "Pago en línea devuelto" : "Pago verificado por Stripe"}><Icono n="palomita" />{f.stripe.reembolsado ? "Devuelto" : "Pago confirmado"}</i>}<span className="srv-t">{f.servicios}</span></span>
+        <span className="srv">{f.stripe && <i className={`vs-chip ${f.stripe.reembolsado ? "dev" : ""}`} title={f.stripe.reembolsado ? "Pago en línea devuelto" : "Pago verificado por Stripe"}><Icono n="palomita" />{f.stripe.reembolsado ? "Devuelto" : "Pago confirmado"}</i>}<span className="srv-t">{f.servicios}</span>{f.quien && <small className="srv-q">{f.quien}</small>}</span>
         <span className="folio">{f.folio}</span>
         <span className="num">{formatoDinero(f.monto)}</span>
         <Icono n="abajo" />

@@ -200,6 +200,7 @@ export default async function MovimientosPagina({ searchParams }: { searchParams
   const filaVenta = (v: (typeof ventas)[number]): FilaVenta => ({
     id: v.id, folio: v.folio, hora: horaCorta(v.creadoEn, zona), monto: monto(v), cancelada: v.estado === "cancelada",
     servicios: propios(v).map((c) => c.nombre).join(", "),
+    quien: [...new Set(propios(v).map((c) => c.barbero.split(" ")[0]))].join(", "),
     stripe: (() => {
       const st = stripeDe.get(v.id);
       return st ? { reembolsado: st.estado === "reembolsado", tarjeta: st.tarjeta, referencia: st.referencia, confirmado: st.pagadoEn ? `${fechaLarga(fechaLocal(st.pagadoEn, zona))}, ${horaCorta(st.pagadoEn, zona)}` : "Sí" } : undefined;
@@ -347,18 +348,10 @@ export default async function MovimientosPagina({ searchParams }: { searchParams
       }
     }
   }
-  // El corte de caja es lo último del día: va arriba de su día. Debajo, lo pendiente que se dejó en ese corte y después
-  // lo que se entregó al cerrar; luego lo demás del día, del más reciente al más viejo.
-  // Con varios cortes en un día, cada uno conserva su lugar en el tiempo y lo suyo debajo.
+  // Orden por hora, del más reciente al más viejo. El corte va a la hora en que se cerró la caja, con lo suyo debajo
+  // (lo pendiente que se dejó en ese corte y lo que se entregó al cerrar). Lo que pasó después del corte queda arriba de él.
   const nivel = (x: ItemHistorial) => (x.k === "corte" ? 0 : (x as { pend?: boolean }).pend ? 1 : x.corte ? 2 : 3);
-  const orden = (lista: (ItemHistorial & { dia: string })[]) => {
-    const cortesDia = lista.filter((x) => x.k === "corte").length;
-    return lista.sort((a, b) => {
-      const ga = a.k === "corte" || (a.corte && filaCorte.has(a.corte)), gb = b.k === "corte" || (b.corte && filaCorte.has(b.corte));
-      if (cortesDia === 1 && ga !== gb) return ga ? -1 : 1;
-      return b.t - a.t || nivel(a) - nivel(b);
-    });
-  };
+  const orden = (lista: (ItemHistorial & { dia: string })[]) => lista.sort((a, b) => b.t - a.t || nivel(a) - nivel(b));
   // Pendientes que vienen de antes: si hoy ya hubo corte, van en su propio bloque arriba; si no, al inicio de hoy.
   const hoyConCorte = items.some((x) => x.k === "corte" && x.dia === hoy);
   const enHoy = !hoyConCorte && dias.includes(hoy);
