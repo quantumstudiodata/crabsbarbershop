@@ -5595,3 +5595,14 @@ html:has(.fx-raiz .mc) body::before, html:has(.fx-raiz .mc) body::after { displa
 .ig-det { display: grid; gap: 1px; font-size: 13px; color: var(--muted); min-width: 0; }
 @media (max-width: 760px) { .ig-num { font-size: 26px; } }
 .ini-hoy-c .lab { white-space: nowrap; }
+
+/* Soporte: cuentas de un negocio de prueba, con botones para copiar. */
+.acc-p { display: grid; gap: 8px; }
+.acc-f { display: grid; grid-template-columns: minmax(90px, auto) minmax(0, 1fr) minmax(0, 1fr); gap: 8px; align-items: center; }
+.acc-pu { font-size: 13px; font-weight: 600; }
+.acc-c { display: grid; text-align: left; gap: 1px; padding: 8px 10px; border-radius: 12px; border: 1px solid var(--line); background: rgba(255,255,255,.7); color: var(--fg); cursor: pointer; font: inherit; min-width: 0; }
+.acc-c small { font-size: 10.5px; color: var(--muted); text-transform: uppercase; letter-spacing: .05em; }
+.acc-c b { font-size: 13px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.acc-c em { font-style: normal; font-size: 11px; color: var(--muted); }
+.acc-c:hover { background: #fff; }
+@media (max-width: 520px) { .acc-f { grid-template-columns: 1fr 1fr; } .acc-pu { grid-column: 1 / -1; } }

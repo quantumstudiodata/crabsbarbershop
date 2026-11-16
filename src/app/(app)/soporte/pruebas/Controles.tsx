@@ -6,6 +6,23 @@ import { MenuPuntos } from "@/components/MenuPuntos";
 import { Modal } from "@/components/ui";
 import { crearNegocioPrueba, type EstadoSoporte, limpiarRegistros, mantenimientoPrueba } from "../actions";
 
+/** Cuentas con su usuario y contraseña, cada una con botón para copiarla. */
+function Cuentas({ cuentas }: { cuentas: { puesto: string; usuario: string; clave: string }[] }) {
+  const [copiado, setCopiado] = useState<string | null>(null);
+  const copiar = async (k: string, v: string) => { try { await navigator.clipboard.writeText(v); setCopiado(k); setTimeout(() => setCopiado(null), 1500); } catch { /* sin portapapeles */ } };
+  return (
+    <div className="acc-p">
+      {cuentas.map((c) => (
+        <div key={c.usuario} className="acc-f">
+          <span className="acc-pu">{c.puesto}</span>
+          <button type="button" className="acc-c" onClick={() => copiar(`u${c.usuario}`, c.usuario)} title="Copiar usuario"><small>Usuario</small><b className="mono">{c.usuario}</b><em>{copiado === `u${c.usuario}` ? "Copiado" : "Copiar"}</em></button>
+          <button type="button" className="acc-c" onClick={() => copiar(`c${c.usuario}`, c.clave)} title="Copiar contraseña"><small>Contraseña</small><b className="mono">{c.clave}</b><em>{copiado === `c${c.usuario}` ? "Copiado" : "Copiar"}</em></button>
+        </div>
+      ))}
+    </div>
+  );
+}
+
 type Conteo = { ventas: number; egresos: number; cortes: number; usuarios: number; servicios: number; pagos: number; historial: number };
 
 export function CrearPrueba() {
@@ -18,7 +35,7 @@ export function CrearPrueba() {
         {e.ok ? (
           <div className="pila">
             <p className="muted">{e.mensaje}</p>
-            <div className="tabla-mini">{e.cuentas?.map((c) => <div key={c.usuario}><span>{c.puesto}</span><b className="mono">{c.usuario}</b><b className="mono">{c.clave}</b></div>)}</div>
+            <Cuentas cuentas={e.cuentas ?? []} />
           </div>
         ) : (
           <form action={accion} className="pila">
@@ -35,12 +52,13 @@ export function CrearPrueba() {
 
 /** Menú de cada negocio de prueba. Restablecer y eliminar muestran exactamente qué se borra y piden escribir el nombre. */
 export function Mantenimiento({ id, nombre, conteo }: { id: string; nombre: string; conteo: Conteo }) {
-  const [accion, setAccion] = useState<"restablecer" | "eliminar" | "demo" | null>(null);
+  const [accion, setAccion] = useState<Accion | null>(null);
   const [vez, setVez] = useState(0);
-  const abrir = (a: "restablecer" | "eliminar" | "demo") => { setAccion(a); setVez((n) => n + 1); };
+  const abrir = (a: Accion) => { setAccion(a); setVez((n) => n + 1); };
   return (
     <>
       <MenuPuntos etiqueta={`Opciones de ${nombre}`} items={[
+        { texto: "Ver cuentas y contraseñas", icono: "llave", hacer: () => abrir("accesos") },
         { texto: "Crear datos de demostración", icono: "mas", hacer: () => abrir("demo") },
         { texto: "Restablecer datos de prueba", icono: "historial", hacer: () => abrir("restablecer") },
         { texto: "Eliminar negocio de prueba", icono: "basura", hacer: () => abrir("eliminar"), peligro: true },
@@ -50,17 +68,20 @@ export function Mantenimiento({ id, nombre, conteo }: { id: string; nombre: stri
   );
 }
 
-function Operacion({ id, nombre, conteo, accion, cerrar }: { id: string; nombre: string; conteo: Conteo; accion: "restablecer" | "eliminar" | "demo"; cerrar: () => void }) {
+type Accion = "restablecer" | "eliminar" | "demo" | "accesos";
+
+function Operacion({ id, nombre, conteo, accion, cerrar }: { id: string; nombre: string; conteo: Conteo; accion: Accion; cerrar: () => void }) {
   const [e, enviar, trabajando] = useActionState<EstadoSoporte, FormData>(mantenimientoPrueba, {});
   return (
     <>
-      <Modal abierto cerrar={cerrar} etiqueta={nombre} titulo={accion === "demo" ? `Datos de demostración en ${nombre}` : accion === "restablecer" ? `Restablecer ${nombre}` : `Eliminar ${nombre}`}>
-        {e.ok ? <p className="aviso ok">{e.mensaje}</p> : (
+      <Modal abierto cerrar={cerrar} etiqueta={nombre} titulo={accion === "accesos" ? `Cuentas de ${nombre}` : accion === "demo" ? `Datos de demostración en ${nombre}` : accion === "restablecer" ? `Restablecer ${nombre}` : `Eliminar ${nombre}`}>
+        {e.ok ? <div className="pila"><p className="aviso ok">{e.mensaje}</p>{e.cuentas && <Cuentas cuentas={e.cuentas} />}</div> : (
           <form action={enviar} className="pila">
             <input type="hidden" name="negocioId" value={id} />
             <input type="hidden" name="accion" value={accion} />
+            {accion === "accesos" && <p className="muted">Por seguridad las contraseñas no se guardan a la vista. Al continuar se generan contraseñas nuevas para todas las cuentas de este negocio de prueba y las anteriores dejan de funcionar. Las sesiones abiertas siguen abiertas. Si falta la cuenta de algún puesto, se crea.</p>}
             {accion === "demo" && <p className="muted">Se agregan ventas de las últimas dos semanas, con sus cortes de caja cerrados. No se borra nada.</p>}
-            {accion !== "demo" && (
+            {(accion === "restablecer" || accion === "eliminar") && (
               <>
                 <div className="aviso-borrar">
                   <span className="icono-alerta grande"><Icono n="basura" /></span>
@@ -73,8 +94,8 @@ function Operacion({ id, nombre, conteo, accion, cerrar }: { id: string; nombre:
             )}
             {e.error && <p className="aviso error">{e.error}</p>}
             <div className="acciones">
-              <button className={`bt ${accion === "demo" ? "" : "peligro"}`} disabled={trabajando}>
-                {trabajando ? "Trabajando…" : accion === "demo" ? "Crear datos" : accion === "restablecer" ? "Restablecer" : "Eliminar negocio"}<Fl />
+              <button className={`bt ${accion === "demo" || accion === "accesos" ? "" : "peligro"}`} disabled={trabajando}>
+                {trabajando ? "Trabajando…" : accion === "accesos" ? "Generar contraseñas" : accion === "demo" ? "Crear datos" : accion === "restablecer" ? "Restablecer" : "Eliminar negocio"}<Fl />
               </button>
             </div>
           </form>

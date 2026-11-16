@@ -5,7 +5,7 @@ import { revalidatePath } from "next/cache";
 import { requerirSesion } from "@/lib/auth";
 import { MAX_ADJUNTO, TIPOS_ADJUNTO } from "@/lib/archivo";
 import { db, schema as t } from "@/lib/db";
-import { crearPrueba, datosDemostracion, eliminarPrueba, empezarDeCero, limpiarTemporales, negocioDePrueba, restablecerPrueba } from "@/lib/pruebas";
+import { accesosPrueba, crearPrueba, datosDemostracion, eliminarPrueba, empezarDeCero, limpiarTemporales, negocioDePrueba, restablecerPrueba } from "@/lib/pruebas";
 import { ESTADOS_SOLICITUD, type EstadoSolicitud, PRIORIDADES, type Prioridad } from "@/lib/soporte";
 import { texto } from "@/lib/volver";
 
@@ -75,7 +75,7 @@ export async function crearNegocioPrueba(_: EstadoSoporte, form: FormData): Prom
   if (nombre.length < 3) return { error: "Escribe el nombre del negocio de prueba." };
   const r = await crearPrueba(nombre);
   revalidatePath("/soporte/pruebas");
-  return { ok: true, mensaje: `Se creó ${nombre}. Guarda estas contraseñas: no se vuelven a mostrar.`, cuentas: r.cuentas };
+  return { ok: true, mensaje: `Se creó ${nombre}. Si las olvidas, en el menú del negocio usa Ver cuentas y contraseñas.`, cuentas: r.cuentas };
 }
 
 /** Restablecer, eliminar o cargar datos. Para borrar hay que escribir el nombre exacto del negocio. */
@@ -86,6 +86,10 @@ export async function mantenimientoPrueba(_: EstadoSoporte, form: FormData): Pro
   const b = await negocioDePrueba(id);
   if (!b) return { error: "Esta operación solo es para negocios de prueba. Los negocios reales están excluidos." };
   try {
+    if (accion === "accesos") {
+      const r = await accesosPrueba(id);
+      return { ok: true, mensaje: `Contraseñas nuevas de ${r.nombre}. Las anteriores ya no funcionan.`, cuentas: r.cuentas };
+    }
     if (accion === "demo") {
       const r = await datosDemostracion(id);
       revalidatePath("/soporte/pruebas");

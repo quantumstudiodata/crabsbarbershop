@@ -17,6 +17,40 @@ export async function negocioDePrueba(id: string) {
   return b ?? null;
 }
 
+/**
+ * Accesos de un negocio de prueba. Las contraseñas no se guardan legibles, así que cada consulta genera unas nuevas
+ * y las anteriores dejan de servir. Solo en negocios de prueba; las sesiones abiertas no se cierran.
+ */
+export async function accesosPrueba(id: string) {
+  const b = await negocioDePrueba(id);
+  if (!b) throw new Error("Solo para negocios de prueba.");
+  const gente = await db.select({ id: t.usuarios.id, nombre: t.usuarios.nombre, usuario: t.usuarios.usuario, rol: t.usuarios.rol, puesto: t.puestos.nombre })
+    .from(t.usuarios).leftJoin(t.puestos, eq(t.puestos.id, t.usuarios.puestoId))
+    .where(and(eq(t.usuarios.barberiaId, id), eq(t.usuarios.activo, true), sql`${t.usuarios.usuario} not like 'BORRADO-%'`));
+  const NOMBRE: Record<string, string> = { duena: "Titular", contador: "Administrador", encargada: "Encargado", barbera: "Barbero", admin: "Soporte técnico" };
+  const orden = ["duena", "contador", "encargada", "barbera", "admin"];
+  const cuentas: { puesto: string; usuario: string; clave: string }[] = [];
+  await db.transaction(async (tx) => {
+    // Negocios de prueba creados antes de que hubiera cuenta de cada puesto: se agrega la que falte.
+    const existentes = (await tx.select({ u: t.usuarios.usuario }).from(t.usuarios)).map((x) => x.u);
+    for (const [rol, puesto] of [["duena", "Titular"], ["contador", "Administrador"], ["encargada", "Encargado"], ["barbera", "Barbero"]] as const) {
+      if (gente.some((g) => g.rol === rol)) continue;
+      const persona = `${puesto} Prueba ${b.nombre.split(" ")[0]}`;
+      const usuario = sugerirUsuario(persona, existentes);
+      existentes.push(usuario);
+      const [u] = await tx.insert(t.usuarios).values({ barberiaId: id, nombre: persona, usuario, rol, hash: await hashContrasena(contrasenaTemporal(persona)), debeCambiar: false }).returning({ id: t.usuarios.id });
+      if (rol === "barbera" || rol === "encargada") await tx.insert(t.reglasComision).values({ barberiaId: id, barberoId: u.id, tipo: "porcentaje", porcentaje: 4000 });
+      gente.push({ id: u.id, nombre: persona, usuario, rol, puesto: null });
+    }
+    for (const u of gente.sort((a, z) => orden.indexOf(a.rol) - orden.indexOf(z.rol))) {
+      const clave = contrasenaTemporal(u.nombre);
+      await tx.update(t.usuarios).set({ hash: await hashContrasena(clave), debeCambiar: false, claveTemporal: null, claveTemporalExpira: null }).where(and(eq(t.usuarios.id, u.id), eq(t.usuarios.barberiaId, id)));
+      cuentas.push({ puesto: u.puesto ?? NOMBRE[u.rol] ?? u.rol, usuario: u.usuario, clave });
+    }
+  });
+  return { nombre: b.nombre, cuentas };
+}
+
 /** Qué hay en un negocio: se muestra antes de restablecer o eliminar. */
 export async function conteoNegocio(id: string) {
   const n = async (tabla: typeof t.ventas | typeof t.gastos | typeof t.turnosCaja | typeof t.usuarios | typeof t.servicios | typeof t.pagosComision | typeof t.historial) =>
