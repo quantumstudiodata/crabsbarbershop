@@ -56,16 +56,20 @@ export default async function MovimientosPagina({ searchParams }: { searchParams
   const verVentas = verTodas || atiende;
   const verCortes = verVentas || s.puede("cortes.ver");
   const verEgresos = verTodo || s.puede("gastos.ver");
+  // Entradas y salidas de caja: quien maneja la caja (cobra, saca o pone dinero) o ve los cortes.
+  const verCaja = verTodo || s.puede("caja.retiros") || s.puede("cortes.ver");
   if (!verVentas && !verEgresos && !verCortes) redirect("/?aviso=sin-permiso");
   const q = await searchParams;
   const zona = s.barberia.zonaHoraria;
   const hoy = fechaLocal(new Date(), zona);
   const bId = s.barberia.id;
   const cobra = s.puede("ventas.registrar") || s.puede("ventas.registrar_otros");
-  const movCaja = s.puede("caja.retiros") && !cobra && !s.vista;
+  // Como en Cobro, la vista previa por puesto también deja registrar movimientos de caja (en un negocio de prueba son reales).
+  const movCaja = s.puede("caja.retiros") && !cobra;
   const TIPOS: [string, string][] = [["", "Todos los movimientos"],
     ...(verVentas ? [["ventas", "Ventas"] as [string, string]] : []), ...(verCortes ? [["cortes", "Cortes de caja"] as [string, string]] : []),
-    ...(verEgresos ? [["egresos", "Egresos"] as [string, string]] : []), ...(verTodo ? [["equipo", "Pagos al equipo"], ["caja", "Entradas y salidas de caja"]] as [string, string][] : [])];
+    ...(verEgresos ? [["egresos", "Egresos"] as [string, string]] : []), ...(verTodo ? [["equipo", "Pagos al equipo"] as [string, string]] : []),
+    ...(verCaja ? [["caja", "Entradas y salidas de caja"] as [string, string]] : [])];
   const tipo = TIPOS.some(([k]) => k === q.tipo) ? q.tipo ?? "" : "";
   const equipo = verTodas || verTodo ? await equipoConVentas(bId) : [];
   const f = leerFiltros(q, hoy, equipo.map((e) => e.id));
@@ -82,8 +86,9 @@ export default async function MovimientosPagina({ searchParams }: { searchParams
   const porFila = (d: unknown) => ({ d: sql<string>`${d}`, n: sql<number>`count(*)::int` });
   const diaGasto = sql`to_char(${t.gastos.fecha}, 'YYYY-MM-DD')`;
   // Egresos: lo que se pagó fuera de la caja. Lo que se pagó con la caja es un gasto de caja y va con las entradas y salidas de caja.
-  const verGastos = verEgresos && (ver("egresos") || ver("caja"));
-  const condGasto: SQL[] = [eq(t.gastos.barberiaId, bId), ...(tipo === "egresos" ? [isNull(t.gastos.turnoId)] : tipo === "caja" ? [isNotNull(t.gastos.turnoId)] : []),
+  // Quien no ve egresos pero maneja la caja ve solo los gastos que se pagaron con la caja.
+  const verGastos = (verEgresos && (ver("egresos") || ver("caja"))) || (verCaja && ver("caja"));
+  const condGasto: SQL[] = [eq(t.gastos.barberiaId, bId), ...(tipo === "egresos" ? [isNull(t.gastos.turnoId)] : tipo === "caja" || !verEgresos ? [isNotNull(t.gastos.turnoId)] : []),
     ...(desde && hasta ? [gte(t.gastos.fecha, desde), lte(t.gastos.fecha, hasta)] : []), ...(texto ? [or(ilike(t.gastos.concepto, texto), ilike(t.gastos.categoria, texto))!] : [])];
   // Lo que pasó en la caja cuenta en el día de trabajo de esa caja, aunque el corte se haya hecho después de medianoche.
   const diaCaja = sql`to_char(${t.turnosCaja.fechaOperativa}, 'YYYY-MM-DD')`;
@@ -105,7 +110,7 @@ export default async function MovimientosPagina({ searchParams }: { searchParams
     verTodo && ver("equipo") ? db.select(porFila(local(t.pagosComision.creadoEn))).from(t.pagosComision).innerJoin(t.usuarios, eq(t.usuarios.id, t.pagosComision.barberoId))
       .where(and(eq(t.pagosComision.barberiaId, bId), ...enFechas(t.pagosComision.creadoEn), ...(persona ? [eq(t.pagosComision.barberoId, persona)] : []), ...(texto ? [ilike(t.usuarios.nombre, texto)] : []))).groupBy(sql`1`) : [],
     // Las salidas por pagos al equipo no se cuentan: ya aparecen como pago.
-    verTodo && ver("caja") ? db.select(porFila(diaCaja)).from(t.movimientosCaja).innerJoin(t.turnosCaja, eq(t.turnosCaja.id, t.movimientosCaja.turnoId))
+    verCaja && ver("caja") ? db.select(porFila(diaCaja)).from(t.movimientosCaja).innerJoin(t.turnosCaja, eq(t.turnosCaja.id, t.movimientosCaja.turnoId))
       .where(and(...condMov, sql`${t.movimientosCaja.concepto} !~ '^Pago (de comisiones |anulado )?a '`)).groupBy(sql`1`) : [],
     verTodo && ver("equipo") ? db.select(porFila(local(t.historial.creadoEn))).from(t.historial)
       .where(and(eq(t.historial.barberiaId, bId), sql`${t.historial.detalle} ? 'propinaTransferencia'`, ...enFechas(t.historial.creadoEn), ...(persona ? [sql`${t.historial.detalle}->>'barberoId' = ${persona}`] : []))).groupBy(sql`1`) : [],
@@ -117,9 +122,9 @@ export default async function MovimientosPagina({ searchParams }: { searchParams
   for (const x of [...diasG, ...diasP, ...diasM, ...diasT]) sumar(x.d, x.n);
   const todosDias = [...porDia.keys()].sort().reverse();
   const totalFilas = [...porDia.values()].reduce((a, n) => a + n, 0);
-  // Páginas por filas: se juntan días completos hasta llegar a unas 30 filas (15 en el teléfono). Un día muy lleno va solo en su página.
+  // Páginas por filas: se juntan días completos hasta llegar a 10 filas en escritorio (15 en el teléfono). Un día muy lleno va solo en su página.
   const movil = await esMovil();
-  const LIMITE = movil ? 15 : 30;
+  const LIMITE = movil ? 15 : 10;
   // Un día con más filas que el límite se reparte en varias páginas (parte: desde qué fila y hasta cuál de ese día).
   type Grupo = { dias: string[]; parte?: { desde: number; hasta: number } };
   const grupos: Grupo[] = [];
@@ -241,13 +246,16 @@ export default async function MovimientosPagina({ searchParams }: { searchParams
     const renta = p.tipo === "renta";
     items.push({ k: "mov", dia: fechaLocal(p.creadoEn, zona), t: p.creadoEn.getTime(), corte: turnoDePago(p, nombre), m: {
       id: `p${p.id}`, tipo: renta ? "renta" : "pago", titulo: renta ? `Renta de silla de ${nombre.split(" ")[0]}` : `Pago a ${nombre.split(" ")[0]}`,
-      sub: (p.nota.split(":")[0] || (renta ? "Ingreso" : "Pago al equipo")).replace("Por entregar de caja", "Se entrega en el corte de caja").replace(/^Efectivo de caja$/, "En efectivo, de la caja"),
+      // Comisión ya liquidada que todavía no se entrega: queda marcada como pendiente hasta el corte de caja.
+      pendiente: !renta && p.monto > 0 && p.nota.startsWith("Por entregar de caja"),
+      sub: !renta && p.monto > 0 && p.nota.startsWith("Por entregar de caja") ? "Todavía no se le entrega. Se le da en el próximo corte de caja"
+        : (p.nota.split(":")[0] || (renta ? "Ingreso" : "Pago al equipo")).replace(/^Efectivo de caja$/, "En efectivo, de la caja"),
       monto: renta ? p.monto : -p.monto, hora: horaCorta(p.creadoEn, zona), cancelado: p.monto === 0,
       detalle: [["Hora", horaCorta(p.creadoEn, zona)], ...(p.nota ? [["Nota", p.nota] as [string, string]] : [])],
     } });
   }
   // Lo que entró o salió de la caja sin ser venta ni gasto. Los pagos al equipo ya aparecen como pago; aquí no se repiten.
-  if (verTodo && ver("caja")) for (const c of movsCaja.filter((x) => !esPagoEquipo(x.concepto) && !esPagoAnulado(x.concepto) && (!f.buscar || x.concepto.toLowerCase().includes(f.buscar.toLowerCase())))) {
+  if (verCaja && ver("caja")) for (const c of movsCaja.filter((x) => !esPagoEquipo(x.concepto) && !esPagoAnulado(x.concepto) && (!f.buscar || x.concepto.toLowerCase().includes(f.buscar.toLowerCase())))) {
     const sale = c.tipo === "retiro", propina = esPropinaEntregada(c.concepto);
     items.push({ k: "mov", dia: c.dia, t: c.creadoEn.getTime(), corte: propina ? c.turnoId : undefined, m: {
       id: `c${c.id}`, tipo: propina ? "propina" : "caja", titulo: c.concepto, hora: horaCorta(c.creadoEn, zona),

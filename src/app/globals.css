@@ -5709,3 +5709,22 @@ div.hist-linea.corte-mv { cursor: default; }
 }
 @media (max-width: 370px) { .hist-linea.corte-mv .cf-hor { display: none; } .hist-linea.corte-mv { grid-template-columns: auto minmax(0, 1fr) auto 14px; } }
 @media (max-width: 760px) { .hist-linea.corte-mv .folio { display: inline-block; } }
+
+/* Ficha de la persona: lo que lleva en el mes dentro de su perfil, con íconos; a la derecha, lo que se le debe. */
+.fa-stats { list-style: none; margin: 0; padding: 14px 0 0; border-top: 1px solid rgba(30,45,60,.08); display: grid; gap: 12px; }
+.fa-stats li { display: grid; grid-template-columns: 34px minmax(0, 1fr); gap: 12px; align-items: center; }
+.fa-stats li > .ic { width: 34px; height: 34px; padding: 8px; border-radius: 11px; background: rgba(43,58,71,.08); color: #2b3a47; }
+.fa-stats li > span { display: grid; grid-template-columns: minmax(0, 1fr) auto; column-gap: 8px; align-items: baseline; min-width: 0; }
+.fa-stats small { grid-column: 1 / -1; font-size: 11.5px; color: var(--muted); }
+.fa-stats b { font-size: 16px; font-weight: 600; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.fa-stats b.num { font: 700 20px/1.1 var(--f-display); }
+.fa-stats em { font-style: normal; font-size: 12px; color: var(--faint); text-align: right; white-space: nowrap; }
+.fa-debe { display: grid; gap: 6px; padding: 24px 26px; border-radius: 22px; box-shadow: var(--sh1), var(--hi); }
+.fa-debe > b { font: 800 52px/1 var(--f-display); letter-spacing: -.01em; }
+.fa-debe > small { font-size: 13px; }
+.fa-desg { display: grid; margin-top: 10px; border-top: 1px solid var(--line); }
+.fa-desg > div { display: flex; justify-content: space-between; gap: 12px; padding: 10px 0; border-bottom: 1px solid var(--line); font-size: 13.5px; }
+.fa-desg > div:last-child { border-bottom: 0; }
+.fa-debe > .eq2-pri { justify-self: start; margin-top: 8px; }
+@media (max-width: 760px) { .fa-debe { padding: 18px; } .fa-debe > b { font-size: 42px; } .fa-stats { padding-top: 12px; } }
+.movs-f .mov-tipo.pend { background: rgba(197,138,62,.16); color: #8a5a1e; }

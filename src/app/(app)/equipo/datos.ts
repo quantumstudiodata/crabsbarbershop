@@ -1,4 +1,4 @@
-import { and, asc, eq, sql } from "drizzle-orm";
+import { and, asc, eq, like, sql } from "drizzle-orm";
 import { redirect } from "next/navigation";
 import { requerirSesion } from "@/lib/auth";
 import { db, schema as s } from "@/lib/db";
@@ -8,7 +8,7 @@ import { NOMBRE_FORMA_PAGO, NOMBRE_FRECUENCIA, cuentaDe, frecuenciaDe, modalidad
 import { fechaCorta, fechaLarga, fechaLocal } from "@/lib/fechas";
 import { formatoDinero } from "@/lib/money";
 import { periodoMes } from "@/lib/periodo";
-import { liquidarAutomaticos } from "@/lib/pagosAuto";
+import { POR_ENTREGAR, liquidarAutomaticos } from "@/lib/pagosAuto";
 
 /** Quién entra a Equipo: quien ve los movimientos del equipo o registra sus pagos. */
 export async function sesionEquipo() {
@@ -51,6 +51,10 @@ export async function cuentasEnCurso(barberiaId: string, zona: string, personas:
   const tope = fechaLocal(new Date(Date.now() - 365 * 86400000), zona);
   const desdeRegla = new Map((await db.select({ id: s.reglasComision.barberoId, desde: sql<Date>`min(${s.reglasComision.vigenteDesde})` }).from(s.reglasComision)
     .where(eq(s.reglasComision.barberiaId, barberiaId)).groupBy(s.reglasComision.barberoId)).map((x) => [x.id, fechaLocal(new Date(x.desde), zona)]));
+  // Comisiones ya liquidadas que todavía no se entregan (esperan el corte de caja): también son lo que se le debe.
+  const esperan = new Map((await db.select({ id: s.pagosComision.barberoId, monto: sql<number>`coalesce(sum(${s.pagosComision.monto}), 0)::int` }).from(s.pagosComision)
+    .where(and(eq(s.pagosComision.barberiaId, barberiaId), eq(s.pagosComision.tipo, "pago"), like(s.pagosComision.nota, `${POR_ENTREGAR}:%`), sql`${s.pagosComision.monto} > 0`))
+    .groupBy(s.pagosComision.barberoId)).map((x) => [x.id, x.monto]));
   return Promise.all(personas.map(async (p) => {
     const { r, per } = periodos.get(p.id)!;
     const hasta = per.hasta > hoy ? hoy : per.hasta;
@@ -82,7 +86,8 @@ export async function cuentasEnCurso(barberiaId: string, zona: string, personas:
           ["Pagos registrados", formatoDinero(c.pagado)], ...(c.faltantes ? [["Faltantes autorizados", `−${formatoDinero(c.faltantes)}`]] : []),
           ...(anteriores ? [["De periodos anteriores", formatoDinero(anteriores)]] : []), ["Saldo pendiente", formatoDinero(saldo)]]) as [string, string][],
     };
-    return { id: p.id, renta, saldo, anteriores, fila, sinRegla: !c.regla, pago: per.pago, frecuencia, modalidad: modalidadCorta(c.regla),
+    const porEntregar = renta ? 0 : esperan.get(p.id) ?? 0;
+    return { id: p.id, renta, saldo, anteriores, porEntregar, debe: renta ? saldo : Math.max(saldo, 0) + porEntregar, fila, sinRegla: !c.regla, pago: per.pago, frecuencia, modalidad: modalidadCorta(c.regla),
       cifras: { comision: c.comision, sueldo: c.sueldo, vendido: c.vendido, pagado, periodo, desde: per.desde, hasta: per.hasta } };
   }));
 }

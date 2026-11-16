@@ -41,7 +41,13 @@ export async function propinasDeTurno(barberiaId: string, turnoId: string): Prom
 }
 
 /** "13 de noviembre" pasa a "del 13 de noviembre"; lo que ya empieza con "de" o "del" se deja igual. */
-const conFecha = (t: string) => (!t.trim() ? "de días anteriores" : /^(de|del)\s/i.test(t.trim()) ? t.trim() : `del ${t.trim()}`);
+const conFecha = (t: string, hoy?: string) => {
+  const x = t.trim();
+  if (!x) return "de días anteriores";
+  // Lo liquidado hoy mismo se llama "de hoy", para no leer "del 16 de noviembre y de hoy" el mismo día.
+  if (hoy && (x === hoy || x === `del ${hoy}` || x === `de ${hoy}`)) return "de hoy";
+  return /^(de|del)\s/i.test(x) ? x : `del ${x}`;
+};
 
 /** Comisiones ya liquidadas que esperan entregarse en efectivo, más las que se liquidan hoy al hacer el corte. */
 export async function entregasDeCorte(barberiaId: string, zona: string, desdePago: string | null): Promise<EntregaCorte[]> {
@@ -53,10 +59,10 @@ export async function entregasDeCorte(barberiaId: string, zona: string, desdePag
   const mapa = new Map<string, EntregaCorte>();
   const sumar = (id: string, nombre: string, avatar: string, monto: number, detalle: string) => {
     const x = mapa.get(id) ?? { id, nombre, avatar, monto: 0, detalle: "" };
-    x.monto += monto; x.detalle = [x.detalle, detalle].filter(Boolean).join(" y ");
+    x.monto += monto; x.detalle = [...new Set([...x.detalle.split(" y "), detalle].filter(Boolean))].join(" y ");
     mapa.set(id, x);
   };
-  for (const p of pendientes) sumar(p.id, p.nombre, p.avatar, p.monto, conFecha(p.nota.slice(POR_ENTREGAR.length + 2).replace(/^Pago automático\s*/, "")));
+  for (const p of pendientes) sumar(p.id, p.nombre, p.avatar, p.monto, conFecha(p.nota.slice(POR_ENTREGAR.length + 2).replace(/^Pago automático\s*/, ""), fechaCorta(hoy)));
   // Periodos que se pagan hoy y terminan hoy: se liquidan al cerrar la caja con lo vendido en el día.
   if (desdePago) {
     const reglas = await reglasDe(barberiaId);

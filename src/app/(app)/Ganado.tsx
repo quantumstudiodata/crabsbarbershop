@@ -8,7 +8,7 @@ import { formatoDinero } from "@/lib/money";
 import { cuentasEnCurso } from "./equipo/datos";
 
 type Sesion = Awaited<ReturnType<typeof requerirSesion>>;
-export type Ganado = { renta: boolean; total: number; pagado: number; saldo: number; periodo: string; frecuencia: string; modalidad: string; pago: string; hoy: boolean; verEquipo: boolean };
+export type Ganado = { renta: boolean; total: number; pagado: number; saldo: number; debe: number; periodo: string; frecuencia: string; modalidad: string; pago: string; hoy: boolean; verEquipo: boolean };
 
 /**
  * Lo que la persona lleva ganado en su periodo de pago en curso (o lo que debe de renta de silla).
@@ -21,7 +21,7 @@ export async function ganadoDe(s: Sesion, zona: string, hoy: string): Promise<Ga
     const [c] = await cuentasEnCurso(s.barberia.id, zona, [yo], false);
     if (!c || c.sinRegla) return null;
     return {
-      renta: c.renta, total: c.cifras.comision + c.cifras.sueldo, pagado: c.cifras.pagado, saldo: c.saldo, periodo: c.cifras.periodo, frecuencia: c.frecuencia, modalidad: c.modalidad,
+      renta: c.renta, total: c.cifras.comision + c.cifras.sueldo, pagado: Math.max(c.cifras.pagado - c.porEntregar, 0), saldo: c.saldo, debe: c.debe, periodo: c.cifras.periodo, frecuencia: c.frecuencia, modalidad: c.modalidad,
       pago: c.pago, hoy: c.pago === hoy, verEquipo: s.puede("equipo.pagar") || s.puede("ventas.ver_todas"),
     };
   } catch (err) {
@@ -45,7 +45,8 @@ export function TarjetaGanado({ g, className = "", tarjeta = false }: { g: Ganad
         <span className="ig-det">
           <span>{g.periodo}</span>
           <span>{g.renta ? (g.saldo > 0 ? `Se paga ${cuando}` : "Estás al corriente") : `Se te paga ${cuando}`}</span>
-          {!g.renta && g.pagado > 0 && <span>Ya recibiste {formatoDinero(g.pagado)}{g.saldo > 0 ? `, faltan ${formatoDinero(g.saldo)}` : ""}</span>}
+          {!g.renta && g.pagado > 0 && <span>Ya recibiste {formatoDinero(g.pagado)}</span>}
+          {!g.renta && g.debe > 0 && g.debe !== g.total && <span>Por recibir {formatoDinero(g.debe)}</span>}
         </span>
       </div>
       {g.verEquipo && <Link className="ini-link" href="/equipo">Ver lo del equipo</Link>}

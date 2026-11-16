@@ -162,7 +162,15 @@ export function CajaModal({ inicial, turno, limiteDiferencia, categorias, eviden
   useEffect(() => {
     const f = (e: Event) => setVista((e as CustomEvent).detail as Vista);
     window.addEventListener("crabs:caja", f);
-    return () => window.removeEventListener("crabs:caja", f);
+    // Un enlace a "Movimiento de caja" hacia esta misma página no recarga nada: se abre la ventana aquí.
+    const clic = (e: MouseEvent) => {
+      const a = (e.target as HTMLElement | null)?.closest?.("a[href*='caja=movimiento'], a[href*='caja=retiro']") as HTMLAnchorElement | null;
+      if (!a || new URL(a.href, location.href).pathname !== location.pathname) return;
+      e.preventDefault();
+      setVista("movimiento");
+    };
+    document.addEventListener("click", clic);
+    return () => { window.removeEventListener("crabs:caja", f); document.removeEventListener("click", clic); };
   }, []);
   useEffect(() => { if (eMov.ok) { setVista(null); setConcepto(""); } }, [eMov.n, eMov.ok]);
   useEffect(() => { if (eGasto.ok) setVista(null); }, [eGasto.n, eGasto.ok]);
@@ -170,7 +178,17 @@ export function CajaModal({ inicial, turno, limiteDiferencia, categorias, eviden
 
   const cerrar = () => { setVista(null); setGasto(""); };
   if (resumen) return <Resumen r={resumen} cerrar={() => setResumen(null)} />;
-  if (!vista || (!turno && !(abierta && vista !== "corte"))) return null;
+  if (!vista) return null;
+  // Con la caja cerrada no hay dónde registrar el movimiento: se dice en lugar de no hacer nada.
+  if (!turno && !abierta && vista !== "corte") return (
+    <Modal abierto cerrar={cerrar} etiqueta="Caja" titulo="La caja está cerrada">
+      <div className="pila">
+        <p className="muted" style={{ margin: 0 }}>Para sacar o poner dinero, o pagar algo con la caja, primero hay que abrirla en Cobro. Lo que se paga por transferencia o tarjeta se registra como egreso.</p>
+        <div className="acciones"><button type="button" className="bt" onClick={cerrar}>Entendido</button></div>
+      </div>
+    </Modal>
+  );
+  if (!turno && !(abierta && vista !== "corte")) return null;
 
   // Una sola puerta: la persona dice qué pasó y la app sabe cómo guardarlo.
   const atras = <button type="button" className="mov-atras" onClick={() => setVista("movimiento")}><Icono n="izquierda" />Elegir otra cosa</button>;
@@ -298,6 +316,10 @@ function CortePasos({ turno, accion, cerrando, error, contado, setContado, limit
   const opcionesDe = (x: Sobre): [string, string][] => x.comision > 0 ? [["caja", "Efectivo de la caja"], ["transferencia", "Transferencia"], ["manana", "Se le paga mañana"]]
     : x.otro > 0 ? [["caja", "Efectivo de la caja"], ["transferencia", "Transferencia"]] : [];
   const entregado = sobres.reduce((a, x) => a + deLaCaja(x, dec[x.id] ?? "caja"), 0);
+  // Las propinas en efectivo no se cuentan con la caja: van aparte, en la caja de propinas. Entran y salen en la misma cuenta,
+  // así que aquí solo se muestra lo que de verdad sale del efectivo de la caja (comisión y propinas pagadas con tarjeta).
+  const propinasAparte = sobres.reduce((a, x) => a + x.efectivo, 0);
+  const saleDeCaja = entregado - propinasAparte;
   const alcanzaCaja = turno.esperado - entregado >= 0;
   const esperado = turno.esperado - entregado;
   const nombres = ["Resumen del turno", ...(sobres.length ? ["Entregas"] : []), "Efectivo", ...(conComprobantes ? ["Comprobantes"] : []), "Cierre"];
@@ -348,14 +370,14 @@ function CortePasos({ turno, accion, cerrando, error, contado, setContado, limit
             <div className="ck-sobres">
               {sobres.map((x) => {
                 const d = dec[x.id] ?? "caja";
-                const partes = [x.comision ? `Comisión ${x.detalle === "de hoy" ? "de hoy" : x.detalle} ${formatoDinero(x.comision)}` : "", x.efectivo + x.otro ? `propinas ${formatoDinero(x.efectivo + x.otro)}` : ""].filter(Boolean).join(" + ").replace(/^p/, "P");
-                const nota = d === "manana" && x.efectivo + x.otro > 0 ? `Sus propinas, ${formatoDinero(x.efectivo + x.otro)}, se apartan hoy de la caja. Si no está, guárdalas en un sobre con su nombre.`
-                  : d === "transferencia" && x.efectivo > 0 ? `Sus propinas en efectivo, ${formatoDinero(x.efectivo)}, se le dan de la caja.` : "";
+                const partes = [x.comision ? `Comisión ${x.detalle === "de hoy" ? "de hoy" : x.detalle} ${formatoDinero(x.comision)}` : "", x.efectivo ? `propinas ${formatoDinero(x.efectivo)}` : "", x.otro ? `propinas con tarjeta ${formatoDinero(x.otro)}` : ""].filter(Boolean).join(" + ").replace(/^p/, "P");
+                const nota = [x.efectivo > 0 && d === "manana" ? `Si no está, guarda sus propinas, ${formatoDinero(x.efectivo)}, en un sobre con su nombre en la caja de propinas.` : "",
+                  x.otro > 0 && d !== "transferencia" ? `Las propinas con tarjeta, ${formatoDinero(x.otro)}, salen del efectivo de la caja.` : ""].filter(Boolean).join(" ");
                 return (
                   <div key={x.id} className="ck-sobre">
                     <input type="hidden" name={`entrega:${x.id}`} value={x.comision ? d : ""} />
                     <input type="hidden" name={`propina:${x.id}`} value={d === "transferencia" ? "transferencia" : "caja"} />
-                    <div className="ck-per"><Avatar avatar={x.avatar} nombre={x.nombre} t={30} /><span>{x.nombre.split(" ")[0]}<small>{partes}</small></span><b className="num">{formatoDinero(totalSobre(x))}</b></div>
+                    <div className="ck-per"><Avatar avatar={x.avatar} nombre={x.nombre} t={30} /><span>{x.nombre.split(" ")[0]}<small>{partes}</small></span><b className="num">{formatoDinero(x.comision + x.otro)}</b></div>
                     {opcionesDe(x).length > 0 && (
                       <div className="ck-pago">
                         <span>Se le paga con</span>
@@ -368,7 +390,8 @@ function CortePasos({ turno, accion, cerrando, error, contado, setContado, limit
                 );
               })}
             </div>
-            <div className="ck-tot"><span>Sale de la caja</span><b className="num">{formatoDinero(entregado)}</b></div>
+            <div className="ck-tot"><span>Sale de la caja</span><b className="num">{formatoDinero(saleDeCaja)}</b></div>
+            {propinasAparte > 0 && <small className="muted">Propinas en efectivo, {formatoDinero(propinasAparte)}: se entregan de la caja de propinas, no de la caja.</small>}
             {!alcanzaCaja && <small className="aviso" style={{ margin: 0 }}>El efectivo de la caja no alcanza para todo lo marcado De la caja.</small>}
           </div>
         )}
@@ -390,10 +413,9 @@ function CortePasos({ turno, accion, cerrando, error, contado, setContado, limit
             {m.entradas - anulados > 0 && <div><span>Dinero que se agregó después</span><span className="num">+{formatoDinero(m.entradas - anulados)}</span></div>}
             {det.puesto.map((x, k) => <div key={`p${k}`} className="ck-sub"><span>{x.concepto}</span><span className="num">{formatoDinero(x.monto)}</span></div>)}
             <div><span>Ventas en efectivo</span><span className="num">+{formatoDinero(m.cobrosEfectivo)}</span></div>
-            {m.propinasEfectivo > 0 && <div><span>Propinas en efectivo</span><span className="num">+{formatoDinero(m.propinasEfectivo)}</span></div>}
             {m.gastosDeCaja > 0 && <div><span>Gastos pagados con la caja</span><span className="num">−{formatoDinero(m.gastosDeCaja)}</span></div>}
             {det.gastos.map((x, k) => <div key={`g${k}`} className="ck-sub"><span>{x.concepto}</span><span className="num">{formatoDinero(x.monto)}</span></div>)}
-            {entregado > 0 && <div><span>Entregas al equipo hoy</span><span className="num">−{formatoDinero(entregado)}</span></div>}
+            {saleDeCaja > 0 && <div><span>Entregas al equipo hoy</span><span className="num">−{formatoDinero(saleDeCaja)}</span></div>}
             {(turno.pagosEquipo ?? 0) - anulados > 0 && <div><span>Pagos al equipo</span><span className="num">−{formatoDinero((turno.pagosEquipo ?? 0) - anulados)}</span></div>}
             {m.retiros - (turno.pagosEquipo ?? 0) > 0 && <div><span>Dinero que se sacó</span><span className="num">−{formatoDinero(m.retiros - (turno.pagosEquipo ?? 0))}</span></div>}
             {det.sacado.map((x, k) => <div key={`s${k}`} className="ck-sub"><span>{x.concepto}</span><span className="num">{formatoDinero(x.monto)}</span></div>)}

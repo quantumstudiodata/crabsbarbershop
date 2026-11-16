@@ -47,7 +47,8 @@ export default async function Equipo({ searchParams }: { searchParams: Promise<{
   const cuentaDe = (id: string) => cuentas.find((c) => c.id === id);
   const filas = activas.map((p) => ({ ...p, r: rendimiento(ventas, p.id), c: cuentaDe(p.id) })).sort((a, b) => b.r.vendido - a.r.vendido);
   const archivadas = personas.filter((p) => !p.activo).map((p) => ({ ...p, r: rendimiento(ventas, p.id) }));
-  const porPagar = cuentas.filter((c) => !c.renta && c.saldo > 0).reduce((a, c) => a + c.saldo, 0);
+  // Lo que se le debe a cada quien: su periodo más lo ya liquidado que espera el corte de caja.
+  const porPagar = cuentas.filter((c) => !c.renta && c.debe > 0).reduce((a, c) => a + c.debe, 0);
   const porCobrar = cuentas.filter((c) => c.renta && c.saldo > 0).reduce((a, c) => a + c.saldo, 0);
   const q = m.mes === m.hoy.slice(0, 7) ? "" : `?mes=${m.mes}`;
   const verArch = q0.archivados === "1";
@@ -80,7 +81,7 @@ export default async function Equipo({ searchParams }: { searchParams: Promise<{
         <span className="eqa-total"><small className="lab-ay">Ventas atendidas<Ayuda titulo="Ventas atendidas">Total cobrado por los servicios que realizó el equipo, con cualquier forma de pago. No corresponde a lo que se le paga a cada persona.</Ayuda></small><b>{formatoDinero(total.vendido)}</b><em>{total.servicios} {total.servicios === 1 ? "servicio" : "servicios"}</em>{cal?.n ? <em>★ {cal.prom.toFixed(1)} de calificación en {cal.n} {cal.n === 1 ? "reseña" : "reseñas"}</em> : null}</span>
         {(hayEquipo || hayRentas) && (
           <div className="eqa-pend">
-            {hayEquipo && <span><small>{auto ? "Comisiones del periodo" : "Por pagar al equipo"}</small><b>{formatoDinero(porPagar)}</b></span>}
+            {hayEquipo && <span><small>Por pagar al equipo</small><b>{formatoDinero(porPagar)}</b></span>}
             {hayRentas && <span><small>Renta por cobrar</small><b>{formatoDinero(porCobrar)}</b></span>}
           </div>
         )}
@@ -102,7 +103,11 @@ export default async function Equipo({ searchParams }: { searchParams: Promise<{
           {filas.length ? filas.map((p) => {
             const c = p.c;
             const pend = !c || c.sinRegla ? null : c.renta ? (c.saldo > 0 ? `${formatoDinero(c.saldo)} por cobrar` : "Renta al corriente")
-              : c.saldo > 0 ? (auto ? `Lleva ${formatoDinero(c.saldo)}, ${c.pago === m.hoy ? "se paga hoy en el corte" : `se paga el ${fechaCorta(c.pago)}`}` : `${formatoDinero(c.saldo)} por pagar`) : null;
+              : c.debe > 0 ? (auto
+                ? (c.porEntregar > 0 && c.saldo > 0 && c.pago !== m.hoy
+                  ? `Por pagar ${formatoDinero(c.debe)}: ${formatoDinero(c.porEntregar)} en el corte de caja y ${formatoDinero(c.saldo)} el ${fechaCorta(c.pago)}`
+                  : `Por pagar ${formatoDinero(c.debe)}, ${c.porEntregar > 0 || c.pago === m.hoy ? "se entrega en el corte de caja" : `se paga el ${fechaCorta(c.pago)}`}`)
+                : `${formatoDinero(c.debe)} por pagar`) : null;
             return (
               <Link key={p.id} href={`/equipo/${p.id}${q}`} className="eq2-fila">
                 <Avatar avatar={p.avatar} nombre={p.nombre} t={38} />

@@ -10,7 +10,7 @@ import { formatoDinero } from "@/lib/money";
 import { Cancelar, type FilaEgreso, Nuevo, type OpcionesEgreso } from "../gastos/Egresos";
 
 export type Movimiento = {
-  id: string; tipo: "egreso" | "pago" | "renta" | "caja" | "propina" | "gasto"; titulo: string; sub: string; monto: number; hora: string; cancelado?: boolean;
+  id: string; tipo: "egreso" | "pago" | "renta" | "caja" | "propina" | "gasto"; titulo: string; sub: string; monto: number; hora: string; cancelado?: boolean; /** Liquidado pero sin entregar todavía. */ pendiente?: boolean;
   detalle: [string, string][]; comprobante?: { id: string; nombre: string }; egreso?: FilaEgreso;
 };
 /** Todo lo que pasó en el negocio, en un solo historial: ventas, cortes de caja y movimientos de dinero. */
@@ -70,12 +70,12 @@ export function Movimientos({ dias, registrar, hoy, cajaAbierta, categorias, opc
 /** Un movimiento de dinero con el mismo formato que una venta: hora, qué fue, de qué tipo y cuánto. */
 function FilaMov({ m, abierto, alternar, cancelar }: { m: Movimiento; abierto: boolean; alternar: () => void; cancelar: (f: FilaEgreso) => void }) {
   return (
-    <div className={`hist-fila mov-h ${m.tipo} ${TONO[m.tipo]} ${m.cancelado ? "cancelada" : ""} ${abierto ? "abierta" : ""}`}>
+    <div className={`hist-fila mov-h ${m.tipo} ${TONO[m.tipo]} ${m.pendiente ? "pendiente" : ""} ${m.cancelado ? "cancelada" : ""} ${abierto ? "abierta" : ""}`}>
       <button type="button" className="hist-linea" aria-expanded={abierto} onClick={alternar}>
         <span className="t">{m.hora}</span>
         <span className="srv"><span>{m.titulo}</span><small className="mov-sub">{m.sub}</small></span>
-        <span className="folio mov-tipo">{ETIQUETA[m.tipo]}</span>
-        <span className="num">{m.cancelado ? formatoDinero(Math.abs(m.monto)) : firma(m.monto)}</span>
+        <span className={`folio mov-tipo ${m.pendiente ? "pend" : ""}`}>{m.pendiente ? "Pago pendiente" : ETIQUETA[m.tipo]}</span>
+        <span className={`num ${m.pendiente ? "muted" : ""}`}>{m.cancelado || m.pendiente ? formatoDinero(Math.abs(m.monto)) : firma(m.monto)}</span>
         <Icono n="abajo" />
       </button>
       {abierto && (

@@ -11,13 +11,11 @@ import { elegirRegla } from "@/lib/comisiones";
 import { reglasDe } from "@/lib/datos";
 import { sql } from "drizzle-orm";
 import { formatoDinero } from "@/lib/money";
-import { fechaLarga, fechaLocal } from "@/lib/fechas";
+import { fechaCorta, fechaLarga, fechaLocal } from "@/lib/fechas";
 import { NOMBRE_ROL, type Rol } from "@/lib/permisos";
 import { MesEquipo } from "../Partes";
 import { cuentasEnCurso, mesElegido, sesionEquipo } from "../datos";
 import { RegistrarPago } from "../Pago";
-import { CuentaFicha, type VistaCuenta } from "../CuentaFicha";
-import { Ayuda } from "@/components/Ayuda";
 
 export const metadata = { title: "Equipo" };
 
@@ -75,23 +73,23 @@ export default async function Ficha({ params, searchParams }: { params: Promise<
   const sePaga = cal && !renta ? (frecuenciaDe(cal) === "semana" && per ? `se paga los ${DIAS_PAGO[new Date(`${per.pago}T12:00:00Z`).getUTCDay()]}` : `se paga ${(NOMBRE_FRECUENCIA[frecuenciaDe(cal)] ?? "").toLowerCase()}`) : "";
   const fecha = (d: Date) => fechaLarga(fechaLocal(d, se.barberia.zonaHoraria));
   const enMes = m.mes === m.hoy.slice(0, 7) ? "en el mes" : `en ${m.nombre.toLowerCase().split(" ")[0]}`;
-  const periodoActual = enCurso && !enCurso.sinRegla ? <>Periodo en curso: {enCurso.fila.monto}</> : undefined;
-  const cifras: [string, string, React.ReactNode?, boolean?][] = renta
-    ? [["Ventas atendidas", formatoDinero(r.vendido)], ["Renta del mes", formatoDinero(cuenta.renta)], ["Recibido", formatoDinero(cuenta.rentaPagada)], [`Por cobrar ${enMes}`, formatoDinero(cuenta.rentaPendiente), periodoActual, cuenta.rentaPendiente > 0]]
-    : [["Ventas atendidas", formatoDinero(r.vendido)], [cuenta.sueldo ? "Le corresponde" : "Comisión generada", formatoDinero(cuenta.corresponde)], [se.barberia.pagosEquipoAuto ? "Liquidado" : "Pagado", formatoDinero(cuenta.pagado)], [se.barberia.pagosEquipoAuto ? `Por liquidar ${enMes}` : `Por pagar ${enMes}`, formatoDinero(cuenta.saldo), periodoActual, cuenta.saldo > 0]];
-  cifras[0][2] = <>{r.servicios} {r.servicios === 1 ? "servicio" : "servicios"}{res.n ? <><br />★ {res.prom.toFixed(1)} en {res.n} {res.n === 1 ? "reseña" : "reseñas"}</> : null}</>;
-
   const sinActividad = r.servicios === 0 && cuenta.corresponde === 0 && cuenta.pagado === 0 && cuenta.renta === 0;
-  const pendLabel = renta ? "Por cobrar" : "Por pagar";
-  const detalle = enCurso?.fila.detalle ?? [];
-  const dato = (k: string) => detalle.find(([a]) => a === k)?.[1] ?? "";
-  const vistas: VistaCuenta[] = [
-    { clave: "mes", titulo: m.nombre.split(" ")[0].replace(/^./, (x) => x.toUpperCase()), pendiente: formatoDinero(renta ? cuenta.rentaPendiente : cuenta.saldo), nota: `Lo acumulado ${enMes}`,
-      renglones: renta ? [["Renta del mes", formatoDinero(cuenta.renta)], ["Recibido", formatoDinero(cuenta.rentaPagada)], ["Ventas atendidas", formatoDinero(r.vendido)]]
-        : [["Ventas atendidas", formatoDinero(r.vendido)], [cuenta.sueldo ? "Le corresponde" : "Comisión generada", formatoDinero(cuenta.corresponde)], ["Pagado", formatoDinero(cuenta.pagado)]] },
-    ...(enCurso && !enCurso.sinRegla ? [{ clave: "periodo", titulo: "Periodo en curso", pendiente: enCurso.fila.monto, nota: `${dato("Periodo")}${dato(renta ? "Fecha límite" : "Fecha de pago") ? `, ${renta ? "vence" : "se paga"} el ${dato(renta ? "Fecha límite" : "Fecha de pago").toLowerCase()}` : ""}`,
-      renglones: detalle.filter(([a]) => !["Periodo", "Fecha de pago", "Fecha límite", "Saldo pendiente", "Pendiente", "Forma de pago"].includes(a)) }] : []),
-  ];
+  const delMes = m.mes === m.hoy.slice(0, 7) ? "del mes" : `de ${m.nombre.toLowerCase().split(" ")[0]}`;
+  // Lo que se le debe hoy: lo que lleva su periodo de pago más lo ya liquidado que espera entregarse en el corte.
+  const debe = enCurso && !enCurso.sinRegla ? enCurso.debe : 0;
+  const nombrePeriodo = per ? (per.desde === per.hasta ? (per.desde === m.hoy ? "de hoy" : `del ${fechaCorta(per.desde)}`) : `del ${fechaCorta(per.desde)} al ${fechaCorta(per.hasta)}`) : "";
+  const dia = (d: string) => fechaLarga(d).replace(/^./, (x) => x.toLowerCase());
+  const esperaCorte = (enCurso?.porEntregar ?? 0) > 0;
+  const cuando = !per ? "" : renta ? `Vence el ${dia(per.pago)}`
+    : per.pago === m.hoy ? (se.barberia.pagosEquipoAuto ? "Se entrega hoy en el corte de caja" : "Se paga hoy")
+    : esperaCorte ? `Lo ya liquidado se entrega en el corte de caja; lo demás se paga el ${dia(per.pago)}` : `Se paga el ${dia(per.pago)}`;
+  const desglose: [string, string][] = !enCurso || enCurso.sinRegla ? [] : renta
+    ? enCurso.fila.detalle.filter(([a]) => !["Periodo", "Fecha límite", "Pendiente"].includes(a))
+    : [
+        [`${cuenta.sueldo ? "Le corresponde" : "Comisión"} ${nombrePeriodo}`, formatoDinero(Math.max(enCurso.saldo - enCurso.anteriores, 0))],
+        ...(enCurso.porEntregar > 0 ? [["Ya liquidado, espera el corte de caja", formatoDinero(enCurso.porEntregar)] as [string, string]] : []),
+        ...(enCurso.anteriores > 0 ? [["De periodos anteriores", formatoDinero(enCurso.anteriores)] as [string, string]] : []),
+      ];
   const auto = se.barberia.pagosEquipoAuto;
   const pagar = enCurso && enCurso.fila.puedePagar && !auto ? <RegistrarPago filas={[enCurso.fila]} regreso={`/equipo/${u.id}${q}`} texto={renta ? "Registrar cobro" : "Registrar pago"} clase="eq2-pri eqa-bt" /> : null;
   const info = (
@@ -115,7 +113,14 @@ export default async function Ficha({ params, searchParams }: { params: Promise<
             <Avatar avatar={u.avatar} nombre={u.nombre} t={72} />
             <span><span className="eq2-nom"><h1>{u.nombre}</h1></span><small>{puesto}{!u.activo && ", archivada"}</small><small className="fa-forma">{[cuenta.forma, sePaga].filter(Boolean).join(", ")}</small></span>
           </div>
-          <div className="solo-escritorio fa-acc">{pagar}</div>
+          <ul className="fa-stats" aria-label={`Lo que lleva ${delMes}`}>
+            <li><Icono n="efectivo" /><span><small>Ventas atendidas {delMes}</small><b className="num">{formatoDinero(r.vendido)}</b><em>{r.servicios} {r.servicios === 1 ? "servicio" : "servicios"}</em></span></li>
+            {renta
+              ? <li><Icono n="caja" /><span><small>Renta {delMes}</small><b className="num">{formatoDinero(cuenta.renta)}</b></span></li>
+              : <li><Icono n="chispa" /><span><small>{cuenta.sueldo ? `Le corresponde ${delMes}` : `Comisión generada ${delMes}`}</small><b className="num">{formatoDinero(cuenta.corresponde)}</b></span></li>}
+            {res.n > 0 && <li><Icono n="estrella" /><span><small>Calificación de clientes</small><b className="num">{res.prom.toFixed(1)}</b><em>{res.n} {res.n === 1 ? "reseña" : "reseñas"}</em></span></li>}
+            {r.top[0] && <li><Icono n="lista" /><span><small>Lo más pedido</small><b>{r.top[0].nombre}</b><em>{r.top[0].veces} {r.top[0].veces === 1 ? "vez" : "veces"}</em></span></li>}
+          </ul>
           <div className="fa-info solo-escritorio">{info}{se.puede("citas.horarios") && <Link href="/ajustes/citas?tab=horarios" className="eq2-link">Editar horario</Link>}</div>
         </aside>
         <div className="fa-main">
@@ -124,12 +129,15 @@ export default async function Ficha({ params, searchParams }: { params: Promise<
             <Vacio icono="calendario" titulo={`Sin actividad ${enMes}`} texto="No tiene servicios, pagos ni saldo pendiente en este mes. Elige otro mes para ver su historial." />
           ) : (
             <>
-              <section className="glass fa-cifras solo-escritorio">
-                {cifras.map(([t, v, sub, pend]) => <span key={t}><small className={`${pend ? "pend" : ""} lab-ay`}>{t}{t === "Ventas atendidas" && <Ayuda titulo="Ventas atendidas">Total cobrado por los servicios que realizó, con cualquier forma de pago. Sobre esto se calcula su comisión.</Ayuda>}</small><b>{v}</b>{sub && <em>{sub}</em>}</span>)}
-              </section>
-              {vistas.length > 1 && <div className="solo-escritorio fa-per"><CuentaFicha vistas={vistas.filter((x) => x.clave === "periodo")} etiqueta={`${pendLabel} en el periodo en curso`} /></div>}
-              <div className="solo-movil fa-mov"><CuentaFicha vistas={vistas} etiqueta={pendLabel}>{pagar}</CuentaFicha>
-                <small className="fa-ayuda">Ventas atendidas: total cobrado por sus servicios con cualquier forma de pago. Sobre esto se calcula su comisión.{res.n ? ` Calificación de clientes: ★ ${res.prom.toFixed(1)} en ${res.n} ${res.n === 1 ? "reseña" : "reseñas"}.` : ""}</small></div>
+              {enCurso && !enCurso.sinRegla && (
+                <section className="glass fa-debe">
+                  <span className="lab">{renta ? "Por cobrar" : "Por pagar"}, {(enCurso.frecuencia ?? "").toLowerCase()}</span>
+                  <b className="num">{formatoDinero(debe)}</b>
+                  <small className="muted">{debe > 0 ? cuando : renta ? "Renta al corriente" : "No se le debe nada por ahora"}</small>
+                  {desglose.length > 0 && debe > 0 && <div className="fa-desg">{desglose.map(([k, v]) => <div key={k}><span>{k}</span><b className="num">{v}</b></div>)}</div>}
+                  {pagar}
+                </section>
+              )}
             </>
           )}
           <div className="fa-dos">
