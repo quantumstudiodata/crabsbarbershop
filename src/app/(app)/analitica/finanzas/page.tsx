@@ -171,6 +171,13 @@ export default async function MovimientosPagina({ searchParams }: { searchParams
     cajaDe(s),
     s.puede("ventas.modificar") ? metodosActivos(bId) : Promise.resolve([]),
   ]);
+  // Pagos que siguen pendientes de entregar: se muestran siempre en la primera página, sean del día que sean,
+  // para que nadie pierda de vista de cuándo es ese dinero.
+  const pendientesTodos = verTodo && ver("equipo") && pagina === 1 && !f.periodo
+    ? await db.select({ p: t.pagosComision, nombre: t.usuarios.nombre }).from(t.pagosComision).innerJoin(t.usuarios, eq(t.usuarios.id, t.pagosComision.barberoId))
+      .where(and(eq(t.pagosComision.barberiaId, bId), eq(t.pagosComision.tipo, "pago"), sql`${t.pagosComision.nota} like 'Por entregar de caja:%'`, sql`${t.pagosComision.monto} > 0`,
+        ...(persona ? [eq(t.pagosComision.barberoId, persona)] : []), ...(texto ? [ilike(t.usuarios.nombre, texto)] : [])))
+    : [];
   const comps = gastos.length ? await db.select({ id: t.comprobantes.id, gastoId: t.comprobantes.gastoId, nombre: t.comprobantes.nombre }).from(t.comprobantes)
     .where(and(eq(t.comprobantes.barberiaId, bId), inArray(t.comprobantes.gastoId, gastos.map((x) => x.g.id)))) : [];
   const stripeDe = ventas.length ? await verificadosDe(ventas.map((v) => v.id)) : new Map();
@@ -233,26 +240,52 @@ export default async function MovimientosPagina({ searchParams }: { searchParams
   // Cada pago en efectivo dejó una salida en la caja ("Pago a Ana"): con ella se sabe en qué corte se entregó.
   const salidasPago = movsCaja.filter((m) => m.tipo === "retiro" && esPagoEquipo(m.concepto));
   const usadas = new Set<string>();
+  // Cortes del más viejo al más nuevo: la comisión automática se decide (caja, transferencia o mañana) en el primer corte después de liquidarse.
+  const cortesAsc = [...turnos].filter((c) => c.cerradoEn).sort((a, b) => a.cerradoEn!.getTime() - b.cerradoEn!.getTime());
+  const corteDespuesDe = (d: Date) => cortesAsc.find((c) => c.cerradoEn!.getTime() > d.getTime());
+  const ultimoCorte = cortesAsc[cortesAsc.length - 1];
   const turnoDePago = (p: (typeof pagos)[number]["p"], nombre: string) => {
-    if (p.tipo !== "pago" || !/^Efectivo de caja/.test(p.nota)) return undefined;
-    const primero = nombre.split(" ")[0];
-    const m = salidasPago.filter((x) => !usadas.has(x.id) && x.monto === p.monto && x.concepto.endsWith(` ${primero}`))
-      .sort((a, b) => Math.abs(a.creadoEn.getTime() - p.creadoEn.getTime()) - Math.abs(b.creadoEn.getTime() - p.creadoEn.getTime()))[0];
-    if (!m) return undefined;
-    usadas.add(m.id);
-    return m.turnoId;
+    if (p.tipo !== "pago") return undefined;
+    if (/^Efectivo de caja/.test(p.nota)) {
+      const primero = nombre.split(" ")[0];
+      const m = salidasPago.filter((x) => !usadas.has(x.id) && x.monto === p.monto && x.concepto.endsWith(` ${primero}`))
+        .sort((a, b) => Math.abs(a.creadoEn.getTime() - p.creadoEn.getTime()) - Math.abs(b.creadoEn.getTime() - p.creadoEn.getTime()))[0];
+      if (m) { usadas.add(m.id); return m.turnoId; }
+    }
+    // Comisión automática entregada por transferencia (o en efectivo sin salida encontrada): se decidió en el corte siguiente.
+    if (/Pago automático/.test(p.nota) && !p.nota.startsWith("Por entregar de caja")) return corteDespuesDe(p.creadoEn)?.id;
+    return undefined;
   };
-  for (const { p, nombre } of pagos) {
+  const DE_QUE = (nota: string) => nota.slice(nota.indexOf(":") + 1).replace(/^\s*Pago automático\s*/, "").trim();
+  const filaPago = (p: (typeof pagos)[number]["p"], nombre: string, extra: { corte?: string; pend?: boolean } = {}): ItemHistorial & { dia: string } => {
     const renta = p.tipo === "renta";
-    items.push({ k: "mov", dia: fechaLocal(p.creadoEn, zona), t: p.creadoEn.getTime(), corte: turnoDePago(p, nombre), m: {
-      id: `p${p.id}`, tipo: renta ? "renta" : "pago", titulo: renta ? `Renta de silla de ${nombre.split(" ")[0]}` : `Pago a ${nombre.split(" ")[0]}`,
-      // Comisión ya liquidada que todavía no se entrega: queda marcada como pendiente hasta el corte de caja.
-      pendiente: !renta && p.monto > 0 && p.nota.startsWith("Por entregar de caja"),
-      sub: !renta && p.monto > 0 && p.nota.startsWith("Por entregar de caja") ? "Todavía no se le entrega. Se le da en el próximo corte de caja"
-        : (p.nota.split(":")[0] || (renta ? "Ingreso" : "Pago al equipo")).replace(/^Efectivo de caja$/, "En efectivo, de la caja"),
+    const pendiente = !renta && p.monto > 0 && p.nota.startsWith("Por entregar de caja");
+    // De dónde viene un pago pendiente: de qué días es la comisión y en qué corte se dejó para después.
+    const origen = pendiente ? corteDespuesDe(p.creadoEn) : undefined;
+    const deCuando = DE_QUE(p.nota);
+    const subPend = [`Comisión ${deCuando ? (/^(de|del)\s/.test(deCuando) ? deCuando : `del ${deCuando}`) : "de días anteriores"}`,
+      origen ? `quedó pendiente en el corte ${folios.get(origen.id) ?? ""} del ${fechaLarga(origen.fechaOperativa).replace(/^./, (x) => x.toLowerCase())}` : "se le da en el próximo corte de caja"].join(", ");
+    return { k: "mov" as const, dia: fechaLocal(p.creadoEn, zona), t: p.creadoEn.getTime(), ...extra, m: {
+      id: `p${p.id}`, tipo: (renta ? "renta" : "pago") as "renta" | "pago", titulo: renta ? `Renta de silla de ${nombre.split(" ")[0]}` : `Pago a ${nombre.split(" ")[0]}`,
+      pendiente,
+      sub: pendiente ? subPend : (p.nota.split(":")[0] || (renta ? "Ingreso" : "Pago al equipo")).replace(/^Efectivo de caja$/, "En efectivo, de la caja"),
       monto: renta ? p.monto : -p.monto, hora: horaCorta(p.creadoEn, zona), cancelado: p.monto === 0,
-      detalle: [["Hora", horaCorta(p.creadoEn, zona)], ...(p.nota ? [["Nota", p.nota] as [string, string]] : [])],
-    } });
+      detalle: [["Hora", horaCorta(p.creadoEn, zona)] as [string, string], ...(pendiente ? [["Estado", "Pendiente de entregar"] as [string, string]] : []), ...(p.nota ? [["Nota", p.nota] as [string, string]] : [])],
+    } };
+  };
+  // Pendientes: si se dejaron en el último corte, van debajo de ese corte; si no, arriba de todo (o al inicio de hoy si hoy no hay corte).
+  const pendIds = new Set(pendientesTodos.map((x) => x.p.id));
+  const fijos: (ItemHistorial & { dia: string })[] = [];
+  for (const { p, nombre } of pendientesTodos) {
+    const origen = corteDespuesDe(p.creadoEn);
+    if (origen && origen.id === ultimoCorte?.id && turnosPagina.some((c) => c.id === origen.id)) items.push(filaPago(p, nombre, { corte: origen.id, pend: true }));
+    else fijos.push(filaPago(p, nombre));
+  }
+  for (const { p, nombre } of pagos) {
+    if (pendIds.has(p.id)) continue;
+    // Los pendientes no se repiten en su día: salen arriba, en la primera página.
+    if (p.tipo === "pago" && p.monto > 0 && p.nota.startsWith("Por entregar de caja") && !f.periodo && verTodo && ver("equipo")) continue;
+    items.push(filaPago(p, nombre, { corte: turnoDePago(p, nombre) }));
   }
   // Lo que entró o salió de la caja sin ser venta ni gasto. Los pagos al equipo ya aparecen como pago; aquí no se repiten.
   if (verCaja && ver("caja")) for (const c of movsCaja.filter((x) => !esPagoEquipo(x.concepto) && !esPagoAnulado(x.concepto) && (!f.buscar || x.concepto.toLowerCase().includes(f.buscar.toLowerCase())))) {
@@ -260,7 +293,8 @@ export default async function MovimientosPagina({ searchParams }: { searchParams
     items.push({ k: "mov", dia: c.dia, t: c.creadoEn.getTime(), corte: propina ? c.turnoId : undefined, m: {
       id: `c${c.id}`, tipo: propina ? "propina" : "caja", titulo: c.concepto, hora: horaCorta(c.creadoEn, zona),
       sub: propina ? "Propinas que se le entregaron en el corte" : sale ? "Se sacó de la caja. No es un gasto" : "Se puso en la caja. No es una venta", monto: sale ? -c.monto : c.monto,
-      detalle: [["Registró", `${c.quien.split(" ")[0]}, ${horaCorta(c.creadoEn, zona)}`], ["Cuenta en la ganancia", "No. Solo cambia el efectivo de la caja"]],
+      detalle: [["Registró", `${c.quien.split(" ")[0]}, ${horaCorta(c.creadoEn, zona)}`],
+        ["Cuenta en la ganancia", propina ? "No. La propina es de quien atendió y se le da de la caja de propinas" : "No. Solo cambia el efectivo de la caja"]],
     } });
   }
   for (const h of propTrans) {
@@ -274,10 +308,29 @@ export default async function MovimientosPagina({ searchParams }: { searchParams
   const filaCorte = new Map(items.filter((x) => x.k === "corte").map((x) => [(x as { c: { id: string } }).c.id, x]));
   for (const it of items) {
     const c = it.corte ? filaCorte.get(it.corte) : undefined;
-    if (it.k !== "corte" && c) { it.dia = c.dia; it.t = c.t - 1; }
+    if (it.k !== "corte" && c) { it.dia = c.dia; it.t = c.t; }
   }
-  const historial: DiaHistorial[] = dias.map((d) => {
-    const ordenados = items.filter((x) => x.dia === d).sort((a, b) => b.t - a.t || (a.k === "corte" ? -1 : b.k === "corte" ? 1 : 0));
+  // El corte de caja es lo último del día: va arriba de su día. Debajo, lo pendiente que se dejó en ese corte y después
+  // lo que se entregó al cerrar; luego lo demás del día, del más reciente al más viejo.
+  // Con varios cortes en un día, cada uno conserva su lugar en el tiempo y lo suyo debajo.
+  const nivel = (x: ItemHistorial) => (x.k === "corte" ? 0 : (x as { pend?: boolean }).pend ? 1 : x.corte ? 2 : 3);
+  const orden = (lista: (ItemHistorial & { dia: string })[]) => {
+    const cortesDia = lista.filter((x) => x.k === "corte").length;
+    return lista.sort((a, b) => {
+      const ga = a.k === "corte" || (a.corte && filaCorte.has(a.corte)), gb = b.k === "corte" || (b.corte && filaCorte.has(b.corte));
+      if (cortesDia === 1 && ga !== gb) return ga ? -1 : 1;
+      return b.t - a.t || nivel(a) - nivel(b);
+    });
+  };
+  // Pendientes que vienen de antes: si hoy ya hubo corte, van en su propio bloque arriba; si no, al inicio de hoy.
+  const hoyConCorte = items.some((x) => x.k === "corte" && x.dia === hoy);
+  const enHoy = !hoyConCorte && dias.includes(hoy);
+  for (const it of fijos) { it.dia = enHoy ? hoy : "pendientes"; it.t = Number.MAX_SAFE_INTEGER; }
+  items.push(...fijos);
+  const diasConPend = fijos.length && !enHoy ? ["pendientes", ...dias] : dias;
+  const historial: DiaHistorial[] = diasConPend.map((d) => {
+    if (d === "pendientes") return { fecha: d, titulo: "Pendientes por entregar", total: 0, sinTotal: true, items: items.filter((x) => x.dia === d) };
+    const ordenados = orden(items.filter((x) => x.dia === d));
     const delDia = grupo?.parte ? ordenados.slice(grupo.parte.desde, grupo.parte.hasta) : ordenados;
     const total = ventas.filter((v) => v.fecha === d && v.estado === "pagada").reduce((a, v) => a + monto(v), 0);
     const nombre = d === hoy ? "Hoy" : fechaLarga(d);

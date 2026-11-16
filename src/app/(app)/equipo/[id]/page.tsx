@@ -83,12 +83,12 @@ export default async function Ficha({ params, searchParams }: { params: Promise<
   const esperaCorte = (enCurso?.porEntregar ?? 0) > 0;
   const cuando = !per ? "" : renta ? `Vence el ${dia(per.pago)}`
     : per.pago === m.hoy ? (se.barberia.pagosEquipoAuto ? "Se entrega hoy en el corte de caja" : "Se paga hoy")
-    : esperaCorte ? `Lo ya liquidado se entrega en el corte de caja; lo demás se paga el ${dia(per.pago)}` : `Se paga el ${dia(per.pago)}`;
+    : esperaCorte ? `Lo pendiente se entrega en el corte de caja; lo demás se paga el ${dia(per.pago)}` : `Se paga el ${dia(per.pago)}`;
   const desglose: [string, string][] = !enCurso || enCurso.sinRegla ? [] : renta
     ? enCurso.fila.detalle.filter(([a]) => !["Periodo", "Fecha límite", "Pendiente"].includes(a))
     : [
         [`${cuenta.sueldo ? "Le corresponde" : "Comisión"} ${nombrePeriodo}`, formatoDinero(Math.max(enCurso.saldo - enCurso.anteriores, 0))],
-        ...(enCurso.porEntregar > 0 ? [["Ya liquidado, espera el corte de caja", formatoDinero(enCurso.porEntregar)] as [string, string]] : []),
+        ...(enCurso.porEntregar > 0 ? [["Pendiente de entregar", formatoDinero(enCurso.porEntregar)] as [string, string]] : []),
         ...(enCurso.anteriores > 0 ? [["De periodos anteriores", formatoDinero(enCurso.anteriores)] as [string, string]] : []),
       ];
   const auto = se.barberia.pagosEquipoAuto;

@@ -15,8 +15,8 @@ export type Movimiento = {
 };
 /** Todo lo que pasó en el negocio, en un solo historial: ventas, cortes de caja y movimientos de dinero. */
 /** `corte`: el corte de caja al que pertenece (propinas y pagos que se entregaron al cerrar); se muestra justo debajo de ese corte. */
-export type ItemHistorial = { t: number; corte?: string } & ({ k: "venta"; f: FilaVenta } | { k: "corte"; c: Corte; ver: boolean } | { k: "mov"; m: Movimiento });
-export type DiaHistorial = { fecha: string; titulo: string; total: number; items: ItemHistorial[] };
+export type ItemHistorial = { t: number; corte?: string; /** Pago pendiente que se dejó en ese corte. */ pend?: boolean } & ({ k: "venta"; f: FilaVenta } | { k: "corte"; c: Corte; ver: boolean } | { k: "mov"; m: Movimiento });
+export type DiaHistorial = { fecha: string; titulo: string; total: number; sinTotal?: boolean; items: ItemHistorial[] };
 type Categoria = { id: string; nombre: string; activo: boolean };
 
 const firma = (c: number) => `${c < 0 ? "−" : "+"}${formatoDinero(Math.abs(c))}`;
@@ -53,7 +53,7 @@ export function Movimientos({ dias, registrar, hoy, cajaAbierta, categorias, opc
               <div className="hist-scroll movs-f" data-lista-mov>
                 {dias.map((d) => (
                   <div key={d.fecha}>
-                    <div className="hist-dia"><span>{d.titulo}</span><b className="num">{formatoDinero(d.total)}</b></div>
+                    <div className={`hist-dia ${d.sinTotal ? "pend-dia" : ""}`}><span>{d.titulo}</span>{!d.sinTotal && <b className="num">{formatoDinero(d.total)}</b>}</div>
                     {d.items.map((it) => it.k === "corte" ? <FilaCorte key={it.c.id} c={it.c} ver={it.ver} corregir={corregir} abrir={abrirCorte === it.c.id} />
                       : it.k === "venta" ? <FilaVentaVista key={it.f.id} f={it.f} abierta={abierto === it.f.id} alternar={() => setAbierto(abierto === it.f.id ? null : it.f.id)} regreso={regreso} opciones={opcionesVenta} />
                       : <FilaMov key={it.m.id} m={it.m} abierto={abierto === it.m.id} alternar={() => setAbierto(abierto === it.m.id ? null : it.m.id)} cancelar={setCancelar} />)}
