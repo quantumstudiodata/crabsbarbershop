@@ -6,7 +6,7 @@ import { prepararArchivo } from "@/lib/archivo";
 import { useActionState, useEffect, useState, useTransition } from "react";
 import { Calendario } from "@/components/Calendario";
 import { Fl, Icono } from "@/components/Icono";
-import { Interruptor, Modal, Selector, sinReinicio } from "@/components/ui";
+import { Modal, Selector, sinReinicio } from "@/components/ui";
 import { formatoDinero, leerPesos } from "@/lib/money";
 import { cancelarEgreso, type EstadoGasto, registrarEgreso } from "./actions";
 
@@ -100,7 +100,7 @@ export type Frecuente = { id: string; concepto: string; categoria: string; monto
 export type OpcionesEgreso = { periodicidad: boolean; comprobantes: boolean; obligatorio?: boolean; frecuentes: Frecuente[]; metodos: string[] };
 const PERIODOS: [string, string][] = [["unica", "Una vez"], ["diaria", "Diaria"], ["semanal", "Semanal"], ["quincenal", "Quincenal"], ["mensual", "Mensual"]];
 
-export function Nuevo({ hoy, cajaAbierta, categorias, cerrar, otro, opciones }: { hoy: string; cajaAbierta: boolean; categorias: Categoria[]; cerrar: () => void; otro: () => void; opciones: OpcionesEgreso }) {
+export function Nuevo({ hoy, categorias, cerrar, otro, opciones }: { hoy: string; cajaAbierta: boolean; categorias: Categoria[]; cerrar: () => void; otro: () => void; opciones: OpcionesEgreso }) {
   const [e, accion, guardando] = useActionState<EstadoGasto, FormData>(registrarEgreso, {});
   const [metodo, setMetodo] = useState<"efectivo" | "transferencia" | "tarjeta">((["transferencia", "tarjeta", "efectivo"].find((x) => opciones.metodos.includes(x)) ?? "efectivo") as "efectivo");
   const [concepto, setConcepto] = useState("");
@@ -115,10 +115,8 @@ export function Nuevo({ hoy, cajaAbierta, categorias, cerrar, otro, opciones }: 
   };
   const [fecha, setFecha] = useState(hoy);
   const [categoria, setCategoria] = useState(categorias[0]?.nombre ?? "");
-  const [deCaja, setDeCaja] = useState(cajaAbierta);
   const [seguir, setSeguir] = useState(false);
   useEffect(() => { if (e.ok) { if (seguir) otro(); else cerrar(); } }, [e.ok, e.n, seguir, otro, cerrar]);
-  const puedeCaja = metodo === "efectivo" && fecha === hoy && cajaAbierta;
   // En efectivo no se adjunta comprobante: la evidencia es el efectivo.
   const conComprobante = opciones.comprobantes && metodo !== "efectivo";
   const faltaComprobante = conComprobante && !!opciones.obligatorio && !archivo;
@@ -132,7 +130,8 @@ export function Nuevo({ hoy, cajaAbierta, categorias, cerrar, otro, opciones }: 
         <input type="hidden" name="metodo" value={metodo} />
         <input type="hidden" name="fecha" value={fecha} />
         <input type="hidden" name="categoria" value={categoria} />
-        <input type="hidden" name="deCaja" value={puedeCaja && deCaja ? "si" : "no"} />
+        {/* Lo que sale de la caja se registra solo en Movimiento de caja: aquí nunca, para no tener dos caminos para lo mismo. */}
+        <input type="hidden" name="deCaja" value="no" />
         <input type="hidden" name="periodicidad" value={periodo} />
         {archivo && conComprobante && <><input type="hidden" name="comprobante" value={archivo.datos} /><input type="hidden" name="comprobanteNombre" value={archivo.nombre} /></>}
         <div className="ck-pasos" aria-hidden="true">{Array.from({ length: total }, (_, i) => <i key={i} className={i < paso ? "on" : ""} />)}</div>
@@ -161,14 +160,9 @@ export function Nuevo({ hoy, cajaAbierta, categorias, cerrar, otro, opciones }: 
               {opciones.metodos.includes("efectivo") && <button type="button" className={metodo === "efectivo" ? "on" : ""} onClick={() => setMetodo("efectivo")}><Icono n="efectivo" />Efectivo</button>}
             </div>
           </div>
-          {puedeCaja ? (
-            <label className="entre opcion-caja">
-              <span><b>Lo pagué con el efectivo de la caja</b><small>Se resta del efectivo que debe haber al hacer el corte de hoy.</small></span>
-              <Interruptor etiqueta="Lo pagué con el efectivo de la caja" checked={deCaja} onChange={setDeCaja} />
-            </label>
-          ) : (
-            <p className="ayuda-txt" style={{ margin: 0 }}>{metodo !== "efectivo" ? `Pagado con ${metodo}: no afecta el efectivo de la caja.` : fecha !== hoy ? "Es de otro día: no afecta el corte de hoy." : "La caja está cerrada: este gasto no afecta ningún corte."}</p>
-          )}
+          <p className="ayuda-txt" style={{ margin: 0 }}>{metodo !== "efectivo"
+            ? `Pagado con ${metodo}: no toca la caja.`
+            : <>Efectivo que no salió de la caja, por ejemplo de tu bolsillo o de la cuenta del negocio. Si salió de la caja, regístralo en Cobro, en <a className="enlace" href="/cobrar?caja=movimiento">Movimiento de caja</a>, para que el corte cuadre.</>}</p>
           {opciones.periodicidad && <div className="campo"><span>Cada cuánto se repite</span><Selector etiqueta="Periodicidad del gasto" valor={periodo} onChange={setPeriodo} opciones={PERIODOS.map(([k, t]) => ({ valor: k, texto: t }))} /></div>}
         </div>
 
