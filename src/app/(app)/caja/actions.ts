@@ -164,6 +164,9 @@ export async function cerrarCaja(_: EstadoCaja, form: FormData): Promise<EstadoC
       }
     }
     for (const p of propinas) {
+      // La propina con tarjeta que se manda por transferencia no toca la caja, pero queda como movimiento.
+      if (p.transferencia && p.otro > 0) await registrar(tx, { barberiaId: s.barberia.id, usuarioId: s.usuario.id, tipo: "equipo",
+        accion: `Propina por transferencia a ${p.nombre.split(" ")[0]}: ${formatoDinero(p.otro)}`, detalle: { propinaTransferencia: p.otro, barberoId: p.id, turnoId: turno.id } });
       if (p.deCaja > 0) await tx.insert(schema.movimientosCaja).values({ barberiaId: s.barberia.id, turnoId: turno.id, tipo: "retiro", monto: p.deCaja, concepto: `${CONCEPTO_PROPINA} ${p.nombre.split(" ")[0]}`, usuarioId: s.usuario.id });
     }
     if (evidencias.length) await tx.insert(schema.evidenciasCorte).values(evidencias.map((e) => ({ ...e, barberiaId: s.barberia.id, turnoId: turno.id, subidoPor: s.usuario.id })));

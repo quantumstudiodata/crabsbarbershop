@@ -23,10 +23,8 @@ export default async function Simulacion() {
   const secciones: [string, (i: number) => boolean][] = [
     ["Inicio", (i) => menus[i].items.some((x) => x.href === "/")],
     ["Cobro", (i) => menus[i].items.some((x) => x.href === "/cobrar")],
-    ["Ventas del barbero", (i) => menus[i].items.some((x) => x.href === "/analitica/ventas")],
+    ["Movimientos del barbero", (i) => menus[i].items.some((x) => x.href === "/analitica/finanzas")],
     ["Reportes, resumen", (i) => menus[i].sub.some(([h]) => h === "/analitica")],
-    ["Reportes, ventas", (i) => menus[i].sub.some(([h]) => h === "/analitica/ventas")],
-    ["Reportes, cortes de caja", (i) => menus[i].sub.some(([h]) => h === "/analitica/cortes")],
     ["Reportes, movimientos", (i) => menus[i].sub.some(([h]) => h === "/analitica/finanzas")],
     ["Datos", (i) => menus[i].items.some((x) => x.href === "/libreta")],
     ["Ajustes", (i) => ajustes[i]],

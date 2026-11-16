@@ -59,8 +59,8 @@ export function NecesitaRevision({ cortes, puede }: { cortes: Corte[]; puede: bo
 }
 
 /** Todos los cortes en una tabla. Al tocar uno se abre su comprobante a un lado. */
-export function TablaCortes({ cortes, corregir }: { cortes: Corte[]; corregir: boolean }) {
-  const [ver, setVer] = useState<Corte | null>(null);
+export function TablaCortes({ cortes, corregir, abrir }: { cortes: Corte[]; corregir: boolean; /** Corte que se abre al llegar desde Movimientos. */ abrir?: string }) {
+  const [ver, setVer] = useState<Corte | null>(() => cortes.find((c) => c.id === abrir) ?? null);
   const [ajuste, setAjuste] = useState<Corte | null>(null);
   if (!cortes.length) return <Vacio icono="candado" titulo="No hay cortes con esos filtros" texto="Cada vez que alguien cierre la caja, el corte aparecerá aquí con lo vendido y si sobró o faltó dinero." />;
   return (

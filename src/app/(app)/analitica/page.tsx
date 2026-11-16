@@ -32,7 +32,7 @@ export default async function Resumen({ searchParams }: { searchParams: Promise<
   await registrarGastosAutomaticos(s.barberia.id);
   await liquidarAutomaticos(s.barberia.id);
   await asentarCitasPagadas(s.barberia.id);
-  if (!s.puede("reportes.ver")) redirect(s.puede("ventas.ver_todas") ? "/analitica/ventas" : s.puede("cortes.ver") ? "/analitica/cortes" : s.puede("gastos.ver") ? "/analitica/finanzas" : "/?aviso=sin-permiso");
+  if (!s.puede("reportes.ver")) redirect(s.puede("ventas.ver_todas") ? "/analitica/finanzas" : s.puede("cortes.ver") ? "/analitica/cortes" : s.puede("gastos.ver") ? "/analitica/finanzas" : "/?aviso=sin-permiso");
   const q = await searchParams;
   const zona = s.barberia.zonaHoraria;
   const hoy = fechaLocal(new Date(), zona);
@@ -211,7 +211,7 @@ export default async function Resumen({ searchParams }: { searchParams: Promise<
                   etiquetas={dias.map((d) => (largo <= 7 ? DIA[new Date(`${d}T12:00:00Z`).getUTCDay()] : String(Number(d.slice(8)))))} cadaEtiqueta={largo <= 7 ? 1 : 7} alto={130} descripcion={`Ventas por día de ${nombreP} y ${nombrePrev}`} vacio="Sin ventas en estas fechas" />
               : <p className="muted">Elige un mes o una semana para ver la gráfica.</p>}
             <div className="rs-pie">{mejor && mejor[1] > 0 && <span>Mejor día <b>{$(mejor[1])}</b></span>}{p.tipo === "mes" && <span>{nombrePrev} a esta fecha <b>{$(prev.netas)}</b></span>}</div>
-            {s.puede("ventas.ver_todas") && <Link className="eq2-link" href="/analitica/ventas">Ver ventas</Link>}
+            {s.puede("ventas.ver_todas") && <Link className="eq2-link" href="/analitica/finanzas?tipo=ventas">Ver ventas</Link>}
           </div>
         </details>
         <details className="glass rs-acc">

@@ -14,10 +14,9 @@ export function menuDe(rol: Rol, puede: (p: Permiso) => boolean, citas = false) 
   const equipo = puede("ventas.ver_todas") || puede("equipo.pagar");
   const sub: [string, string][] = [];
   if (puede("reportes.ver")) sub.push(["/analitica", "Resumen"]);
-  if (puede("ventas.ver_todas")) sub.push(["/analitica/ventas", "Ventas"]);
+  // Movimientos reúne ventas, cortes de caja y entradas y salidas de dinero en un solo historial.
+  if (puede("reportes.ver") || puede("gastos.ver") || puede("ventas.ver_todas") || puede("cortes.ver")) sub.push(["/analitica/finanzas", "Movimientos"]);
   if (equipo) sub.push(["/equipo", "Equipo"]);
-  if (puede("cortes.ver")) sub.push(["/analitica/cortes", "Corte de caja"]);
-  if (puede("reportes.ver") || puede("gastos.ver")) sub.push(["/analitica/finanzas", "Movimientos"]);
   const clientes: [string, string][] = [];
   if (citas && puede("citas.ver")) clientes.push(["/citas", "Citas y agenda"]);
   if (equipo) clientes.push(["/clientes/resenas", "Reseñas"]);
@@ -25,7 +24,7 @@ export function menuDe(rol: Rol, puede: (p: Permiso) => boolean, citas = false) 
   const items: ItemMenuApp[] = [];
   items.push({ href: "/", texto: "Inicio", icono: "inicio" });
   if (cobra) items.push({ href: "/cobrar", texto: "Cobro", icono: "cobro" });
-  if (atiende && !puede("ventas.ver_todas")) items.push({ href: "/analitica/ventas", texto: "Ventas", icono: "lista" });
+  if (atiende && !puede("ventas.ver_todas")) items.push({ href: "/analitica/finanzas", texto: "Movimientos", icono: "lista", tambien: VISTAS_MOVIMIENTOS });
   if (analitica) items.push({ href: "/analitica", texto: "Reportes", icono: "grafica", tambien: equipo ? ["/equipo"] : undefined });
   else if (equipo) items.push({ href: "/equipo", texto: "Equipo", icono: "persona" });
   if (clientes.length > 1) items.push({ href: "/clientes", texto: "Clientes", icono: "clientes", tambien: ["/citas"] });
@@ -37,8 +36,13 @@ export function menuDe(rol: Rol, puede: (p: Permiso) => boolean, citas = false) 
   return { items, sub, grupos, atiende };
 }
 
+/** Pantallas que viven dentro de Movimientos: el detalle de los cortes y la dirección vieja de Ventas. */
+export const VISTAS_MOVIMIENTOS = ["/analitica/cortes", "/analitica/ventas"];
+const comoMovimientos = (ruta: string) => (VISTAS_MOVIMIENTOS.some((v) => ruta === v || ruta.startsWith(v + "/")) ? "/analitica/finanzas" : ruta);
+
 /** Si la ruta está dentro de la pestaña: la que es prefijo de otra solo cuenta exacta (Resumen en /analitica). */
-export function pestanaActiva(ruta: string, href: string, items: [string, string][]) {
+export function pestanaActiva(rutaReal: string, href: string, items: [string, string][]) {
+  const ruta = comoMovimientos(rutaReal);
   const exacta = items.some(([o]) => o !== href && o.startsWith(href + "/"));
   return exacta ? ruta === href : ruta === href || ruta.startsWith(href + "/");
 }

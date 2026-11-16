@@ -3,7 +3,6 @@
 import { and, eq, isNull, sql } from "drizzle-orm";
 import { revalidatePath } from "next/cache";
 import { requerirSesion } from "@/lib/auth";
-import { cajaDe } from "@/lib/datos";
 import { db, schema } from "@/lib/db";
 import { diasEntre, esFechaValida, fechaLocal } from "@/lib/fechas";
 import { registrar } from "@/lib/historial";
@@ -34,7 +33,6 @@ export async function registrarEgreso(_: EstadoGasto, form: FormData): Promise<E
   const monto = leerPesos(texto(form, "monto"));
   const fecha = texto(form, "fecha", 10);
   const metodo = METODOS[texto(form, "metodo") as keyof typeof METODOS];
-  const deCaja = texto(form, "deCaja") === "si";
   const hoy = fechaLocal(new Date(), s.barberia.zonaHoraria);
   const periodicidad = s.barberia.usaPeriodicidad && PERIODOS.includes(texto(form, "periodicidad")) ? texto(form, "periodicidad") : "unica";
   // En efectivo no se adjunta comprobante: la evidencia es el efectivo.
@@ -46,19 +44,17 @@ export async function registrarEgreso(_: EstadoGasto, form: FormData): Promise<E
   if (!concepto) return { error: "Escribe el concepto del egreso." };
   if (!monto || monto <= 0) return { error: "Escribe una cantidad mayor a cero." };
   if (monto > 100_000_000) return { error: "La cantidad es demasiado grande. Revísala." };
-  if (!metodo || !s.barberia.metodosEgreso.includes(metodo)) return { error: "Elige cómo se pagó." };
+  // El efectivo con dinero de la caja se registra en Movimiento de caja; aquí solo transferencia o tarjeta.
+  if (metodo === METODOS.efectivo) return { error: "Los pagos en efectivo se registran en Movimiento de caja." };
+  const permitidos = s.barberia.metodosEgreso.filter((m) => m !== "efectivo");
+  if (!metodo || !(permitidos.length ? permitidos : ["transferencia", "tarjeta"]).includes(metodo)) return { error: "Elige cómo se pagó." };
   if (!esFechaValida(fecha) || fecha > hoy || diasEntre(fecha, hoy) > 400) return { error: "Elige una fecha válida, que no sea futura." };
   const [cat] = await db.select({ nombre: schema.categoriasGasto.nombre }).from(schema.categoriasGasto)
     .where(and(eq(schema.categoriasGasto.barberiaId, s.barberia.id), eq(schema.categoriasGasto.nombre, categoria), eq(schema.categoriasGasto.activo, true)));
   if (!cat) return { error: "Elige una categoría de la lista." };
 
-  let turnoId: string | null = null;
-  if (metodo === "efectivo" && deCaja) {
-    if (fecha !== hoy) return { error: "Solo los gastos de hoy pueden salir de la caja." };
-    const turno = await cajaDe(s);
-    if (!turno) return { error: "La caja está cerrada. Marca que no salió de la caja, o ábrela primero." };
-    turnoId = turno.id;
-  }
+  // Un egreso nunca sale de la caja: eso se registra en Movimiento de caja.
+  const turnoId: string | null = null;
 
   // Evita guardar el mismo egreso dos veces si se presiona el botón dos veces.
   const [repetido] = await db.select({ id: schema.gastos.id }).from(schema.gastos).where(and(

@@ -27,7 +27,7 @@ export async function registrarPago(form: FormData) {
   // La fecha con la que se agrupa el pago: el lunes de la semana (Ventas) o el cierre del periodo (Equipo).
   const semana = esFechaValida(semanaTxt) ? semanaTxt : null;
   const reg = texto(form, "regreso", 200);
-  const ruta = reg.startsWith("/analitica/ventas") || reg.startsWith("/equipo") ? reg : "/analitica/ventas";
+  const ruta = reg.startsWith("/analitica/finanzas") || reg.startsWith("/equipo") ? reg : "/equipo";
   if (!semana || !monto) volver(ruta, { error: "Escribe el monto." });
   const [u] = await db.select().from(schema.usuarios)
     .where(and(eq(schema.usuarios.id, barberoId), eq(schema.usuarios.barberiaId, s.barberia.id))).limit(1);
@@ -53,7 +53,7 @@ export async function registrarPago(form: FormData) {
       detalle: { semana, nota, caja: turno ? "El efectivo salió de la caja abierta" : undefined, formas: partes.map((x) => `${x.forma || "Sin forma"} ${formatoDinero(x.monto)}`).join(" y ") },
     });
   });
-  revalidatePath("/analitica/ventas");
+  revalidatePath("/analitica/finanzas");
   revalidatePath("/equipo", "layout");
   volver(ruta, { aviso: "guardado" });
 }

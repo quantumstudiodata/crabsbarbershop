@@ -88,7 +88,7 @@ export function Egresos({ dias, hoy, cajaAbierta, puede, categorias, resumen, et
         </div>
       </section>
 
-      {nuevo > 0 && <Nuevo key={nuevo} hoy={hoy} cajaAbierta={cajaAbierta} categorias={categorias.filter((c) => c.activo)} cerrar={() => setNuevo(0)} otro={() => setNuevo((n) => n + 1)} opciones={opciones} />}
+      {nuevo > 0 && <Nuevo key={nuevo} hoy={hoy} categorias={categorias.filter((c) => c.activo)} cerrar={() => setNuevo(0)} otro={() => setNuevo((n) => n + 1)} opciones={opciones} />}
       {cancelar && <Cancelar f={cancelar} cerrar={() => setCancelar(null)} />}
     </>
   );
@@ -100,9 +100,9 @@ export type Frecuente = { id: string; concepto: string; categoria: string; monto
 export type OpcionesEgreso = { /** Dónde se registra lo que sale de la caja; null si la persona no puede. */ cajaHref?: string | null; periodicidad: boolean; comprobantes: boolean; obligatorio?: boolean; frecuentes: Frecuente[]; metodos: string[] };
 const PERIODOS: [string, string][] = [["unica", "Una vez"], ["diaria", "Diaria"], ["semanal", "Semanal"], ["quincenal", "Quincenal"], ["mensual", "Mensual"]];
 
-export function Nuevo({ hoy, categorias, cerrar, otro, opciones }: { hoy: string; cajaAbierta: boolean; categorias: Categoria[]; cerrar: () => void; otro: () => void; opciones: OpcionesEgreso }) {
+export function Nuevo({ hoy, categorias, cerrar, otro, opciones }: { hoy: string; categorias: Categoria[]; cerrar: () => void; otro: () => void; opciones: OpcionesEgreso }) {
   const [e, accion, guardando] = useActionState<EstadoGasto, FormData>(registrarEgreso, {});
-  const [metodo, setMetodo] = useState<"efectivo" | "transferencia" | "tarjeta">((["transferencia", "tarjeta", "efectivo"].find((x) => opciones.metodos.includes(x)) ?? "efectivo") as "efectivo");
+  const [metodo, setMetodo] = useState<"efectivo" | "transferencia" | "tarjeta">((["transferencia", "tarjeta"].find((x) => opciones.metodos.includes(x)) ?? "transferencia") as "transferencia");
   const [concepto, setConcepto] = useState("");
   const [monto, setMonto] = useState("");
   const [periodo, setPeriodo] = useState("unica");
@@ -121,10 +121,25 @@ export function Nuevo({ hoy, categorias, cerrar, otro, opciones }: { hoy: string
   const conComprobante = opciones.comprobantes && metodo !== "efectivo";
   const faltaComprobante = conComprobante && !!opciones.obligatorio && !archivo;
   const [paso, setPaso] = useState(1);
+  // Antes del formulario se explica qué es un egreso; quien ya lo leyó puede pedir que no vuelva a salir.
+  const [intro, setIntro] = useState(() => { try { return localStorage.getItem("crabs-egreso-intro") !== "visto"; } catch { return true; } });
+  const [noMostrar, setNoMostrar] = useState(false);
   const total = 3;
   const valido = paso === 1 ? concepto.trim().length > 0 : paso === 2 ? (leerPesos(monto) ?? 0) > 0 : !faltaComprobante;
   const nombres = ["Qué se pagó", "Monto y forma de pago", conComprobante ? "Comprobante y detalle" : "Detalle"];
   return (
+    intro ? (
+      <Modal abierto cerrar={cerrar} etiqueta="Egresos" titulo="Registrar egreso">
+        <div className="pila eg-intro">
+          <p style={{ margin: 0 }}>Aquí se registran los pagos del negocio hechos <b>con transferencia o con tarjeta</b>: renta, luz, internet, productos.</p>
+          <p style={{ margin: 0 }}>Si pagaste <b>en efectivo con dinero de la caja</b>, no es aquí: regístralo en {opciones.cajaHref
+            ? <a className="enlace" href={opciones.cajaHref}>Movimiento de caja</a>
+            : <u>Movimiento de caja</u>}{opciones.cajaHref === null ? ", o pide a quien opera la caja que lo registre" : ""}.</p>
+          <label className="eg-nomas"><input type="checkbox" checked={noMostrar} onChange={(x) => setNoMostrar(x.target.checked)} />No volver a mostrar</label>
+          <div className="acciones"><button type="button" className="bt" onClick={() => { if (noMostrar) { try { localStorage.setItem("crabs-egreso-intro", "visto"); } catch { /* sin almacenamiento */ } } setIntro(false); }}>Continuar<Fl /></button></div>
+        </div>
+      </Modal>
+    ) :
     <Modal abierto cerrar={cerrar} etiqueta={`Paso ${paso} de ${total}`} titulo="Registrar egreso">
       <form onSubmit={(x) => { if (paso < total) { x.preventDefault(); if (valido) setPaso(paso + 1); return; } sinReinicio(accion)(x); }} className="pila ck">
         <input type="hidden" name="metodo" value={metodo} />
@@ -155,14 +170,11 @@ export function Nuevo({ hoy, categorias, cerrar, otro, opciones }: { hoy: string
           </div>
           <div className="campo"><span>Forma de pago</span>
             <div className="seg metodos-eg" role="radiogroup" aria-label="Forma de pago">
-              {opciones.metodos.includes("transferencia") && <button type="button" className={metodo === "transferencia" ? "on" : ""} onClick={() => setMetodo("transferencia")}><Icono n="enviar" />Transferencia</button>}
-              {opciones.metodos.includes("tarjeta") && <button type="button" className={metodo === "tarjeta" ? "on" : ""} onClick={() => setMetodo("tarjeta")}><Icono n="tarjeta" />Tarjeta</button>}
-              {opciones.metodos.includes("efectivo") && <button type="button" className={metodo === "efectivo" ? "on" : ""} onClick={() => setMetodo("efectivo")}><Icono n="efectivo" />Efectivo</button>}
+              {(opciones.metodos.includes("transferencia") || !opciones.metodos.some((m) => m !== "efectivo")) && <button type="button" className={metodo === "transferencia" ? "on" : ""} onClick={() => setMetodo("transferencia")}><Icono n="enviar" />Transferencia</button>}
+              {(opciones.metodos.includes("tarjeta") || !opciones.metodos.some((m) => m !== "efectivo")) && <button type="button" className={metodo === "tarjeta" ? "on" : ""} onClick={() => setMetodo("tarjeta")}><Icono n="tarjeta" />Tarjeta</button>}
             </div>
           </div>
-          <p className="ayuda-txt" style={{ margin: 0 }}>{metodo !== "efectivo"
-            ? `Pagado con ${metodo}: no toca la caja.`
-            : <>Efectivo que no salió de la caja, por ejemplo de tu bolsillo o de la cuenta del negocio. {opciones.cajaHref === null ? "Si salió de la caja, pide a quien opera la caja que lo registre como movimiento de caja, para que el corte cuadre." : <>Si salió de la caja, regístralo en <a className="enlace" href={opciones.cajaHref ?? "/cobrar?caja=movimiento"}>Movimiento de caja</a>, para que el corte cuadre.</>}</>}</p>
+          <p className="ayuda-txt" style={{ margin: 0 }}>Pagado con {metodo}: no toca la caja.</p>
           {opciones.periodicidad && <div className="campo"><span>Cada cuánto se repite</span><Selector etiqueta="Periodicidad del gasto" valor={periodo} onChange={setPeriodo} opciones={PERIODOS.map(([k, t]) => ({ valor: k, texto: t }))} /></div>}
         </div>
 

@@ -16,7 +16,7 @@ import { esMovil } from "@/lib/dispositivo";
 
 export const metadata = { title: "Cortes de caja" };
 
-export default async function Cortes({ searchParams }: { searchParams: Promise<ConsultaFiltros & { aviso?: string; error?: string }> }) {
+export default async function Cortes({ searchParams }: { searchParams: Promise<ConsultaFiltros & { aviso?: string; error?: string; corte?: string }> }) {
   const s = await requerirSesion();
   if (!s.puede("cortes.ver")) redirect("/?aviso=sin-permiso");
   const q = await searchParams;
@@ -43,7 +43,8 @@ export default async function Cortes({ searchParams }: { searchParams: Promise<C
   // Faltantes de los últimos 30 días que nadie ha revisado.
   const hace30 = fechaLocal(new Date(Date.now() - 30 * 864e5), zona);
   const revisar = todos.filter((c) => (c.diferencia ?? 0) < 0 && !c.revisadoEn && c.fechaOperativa >= hace30);
-  const ids = [...new Set([...cortes, ...revisar].map((c) => c.id))];
+  const pedido = q.corte ? todos.find((c) => c.id === q.corte) : undefined;
+  const ids = [...new Set([...cortes, ...revisar, ...(pedido ? [pedido] : [])].map((c) => c.id))];
   const [ajustes, det, evid] = await Promise.all([
     ajustesDeTurnos(s.barberia.id, ids), detalleCortes(s.barberia.id, ids),
     ids.length ? db.select({ id: schema.evidenciasCorte.id, turnoId: schema.evidenciasCorte.turnoId, etiqueta: schema.evidenciasCorte.etiqueta, nombre: schema.evidenciasCorte.nombre, tipo: schema.evidenciasCorte.tipo })
@@ -83,7 +84,8 @@ export default async function Cortes({ searchParams }: { searchParams: Promise<C
       ajustes: ajustes.filter((x) => x.turnoId === c.id).map((x) => `Ajuste de ${formatoDinero(x.monto)} por ${x.usuario.split(" ")[0]}: ${x.motivo}`),
     };
   };
-  const lista = cortes.map(aCorte);
+  // Desde Movimientos llega con ?corte=<id>: ese corte se abre aunque no esté en esta página.
+  const lista = [...(pedido && !cortes.some((c) => c.id === pedido.id) ? [pedido] : []), ...cortes].map(aCorte);
   return (
     <>
       <AvisoUrl aviso={q.aviso} error={q.error} />
@@ -96,7 +98,7 @@ export default async function Cortes({ searchParams }: { searchParams: Promise<C
       <section className="glass panel-hist subir d1">
         <BarraFiltros p={p} hoy={hoy} personas={personas} persona={f.persona} buscar={f.buscar} sinPeriodo="Todas las fechas"
           textoBuscar="Buscar folio o persona" descarga={s.puede("reportes.exportar") ? urlDescarga("cortes", f) : undefined} />
-        <TablaCortes cortes={lista} corregir={s.puede("caja.corregir")} />
+        <TablaCortes cortes={lista} corregir={s.puede("caja.corregir")} abrir={pedido?.id} />
       </section>
       <Paginacion ruta="/analitica/cortes" params={q as Record<string, string | undefined>} pagina={r.pagina} paginas={r.paginas}
         texto={filtrados.length ? `${filtrados.length} ${filtrados.length === 1 ? "corte" : "cortes"}${r.paginas > 1 ? `, página ${r.pagina} de ${r.paginas}` : ""}` : ""} />

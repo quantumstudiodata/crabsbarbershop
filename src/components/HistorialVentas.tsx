@@ -31,44 +31,54 @@ export function HistorialVentas({ dias, regreso, opciones, sinMarco }: { dias: D
         {dias.map((d) => (
           <div key={d.fecha}>
             <div className="hist-dia"><span>{d.titulo}</span><b className="num">{formatoDinero(d.total)}</b></div>
-            {d.filas.map((f) => f.corte ? (
-              <div key={f.id} className="hist-corte">
-                <span className="t">{f.hora}</span>
-                <span className="hc-t">Corte de caja</span>
-                <span className="folio">{f.folio}</span>
-                {f.corte.vendido !== undefined && <span className="hc-v">Vendido <b className="num">{formatoDinero(f.corte.vendido)}</b></span>}
-                {f.corte.enlace && <a className="hc-l" href={f.corte.enlace}>Ver corte</a>}
-              </div>
-            ) : (
-              <div key={f.id} className={`hist-fila ${f.cancelada ? "cancelada" : ""} ${abierta === f.id ? "abierta" : ""}`}>
-                <button type="button" className="hist-linea" aria-expanded={abierta === f.id} onClick={() => setAbierta(abierta === f.id ? null : f.id)}>
-                  <span className="t">{f.hora}</span>
-                  <span className="srv">{f.stripe && <i className={`vs-chip ${f.stripe.reembolsado ? "dev" : ""}`} title={f.stripe.reembolsado ? "Pago en línea devuelto" : "Pago verificado por Stripe"}><Icono n="palomita" />{f.stripe.reembolsado ? "Devuelto" : "Pago confirmado"}</i>}<span className="srv-t">{f.servicios}</span></span>
-                  <span className="folio">{f.folio}</span>
-                  <span className="num">{formatoDinero(f.monto)}</span>
-                  <Icono n="abajo" />
-                </button>
-                {abierta === f.id && (
-                  <div className="hist-det">
-                    {f.detalle.map(([k, v]) => <span key={k}><small>{k}</small>{v}</span>)}
-                    {f.stripe && <VerificadoStripe ventaId={f.id} {...f.stripe} />}
-                    {(f.accion || (f.edicion && opciones)) && (
-                      <span className="anular">
-                        <small>{f.accion?.tipo === "anular" ? "¿Te equivocaste?" : "Corregir la venta"}</small>
-                        <span className="fila" style={{ gap: 8 }}>
-                          {f.accion?.tipo === "anular" ? `Puedes anularla hasta las ${f.accion.hasta}` : f.edicion ? "Modifícala o cancélala. Todo queda en el historial." : "Queda tachada con su motivo; no se borra."}
-                          {f.edicion && opciones && <ModificarVenta id={f.id} folio={f.folio} datos={f.edicion} opciones={opciones} />}
-                          {f.accion && <CancelarVenta id={f.id} folio={f.folio} total={formatoDinero(f.monto)} regreso={regreso} texto={f.accion.tipo === "anular" ? "Anular" : "Cancelar"} />}
-                        </span>
-                      </span>
-                    )}
-                  </div>
-                )}
-              </div>
-            ))}
+            {d.filas.map((f) => f.corte ? <SeparadorCorte key={f.id} f={f} /> : <FilaVentaVista key={f.id} f={f} abierta={abierta === f.id} alternar={() => setAbierta(abierta === f.id ? null : f.id)} regreso={regreso} opciones={opciones} />)}
           </div>
         ))}
       </div>
+    </div>
+  );
+}
+
+/** El momento en que se hizo un corte de caja, como separador en un historial. */
+export function SeparadorCorte({ f }: { f: FilaVenta }) {
+  return (
+    <div className="hist-corte">
+      <span className="t">{f.hora}</span>
+      <span className="hc-t">Corte de caja</span>
+      <span className="folio">{f.folio}</span>
+      {f.corte?.vendido !== undefined && <span className="hc-v">Vendido <b className="num">{formatoDinero(f.corte.vendido!)}</b></span>}
+      {f.corte?.enlace && <a className="hc-l" href={f.corte.enlace}>Ver corte</a>}
+    </div>
+  );
+}
+
+/** Una venta en un historial: se abre para ver su detalle, cancelarla o modificarla. */
+export function FilaVentaVista({ f, abierta, alternar, regreso, opciones }: { f: FilaVenta; abierta: boolean; alternar: () => void; regreso: string; opciones?: Opciones }) {
+  return (
+    <div className={`hist-fila ${f.cancelada ? "cancelada" : ""} ${abierta ? "abierta" : ""}`}>
+      <button type="button" className="hist-linea" aria-expanded={abierta} onClick={alternar}>
+        <span className="t">{f.hora}</span>
+        <span className="srv">{f.stripe && <i className={`vs-chip ${f.stripe.reembolsado ? "dev" : ""}`} title={f.stripe.reembolsado ? "Pago en línea devuelto" : "Pago verificado por Stripe"}><Icono n="palomita" />{f.stripe.reembolsado ? "Devuelto" : "Pago confirmado"}</i>}<span className="srv-t">{f.servicios}</span></span>
+        <span className="folio">{f.folio}</span>
+        <span className="num">{formatoDinero(f.monto)}</span>
+        <Icono n="abajo" />
+      </button>
+      {abierta && (
+        <div className="hist-det">
+          {f.detalle.map(([k, v]) => <span key={k}><small>{k}</small>{v}</span>)}
+          {f.stripe && <VerificadoStripe ventaId={f.id} {...f.stripe} />}
+          {(f.accion || (f.edicion && opciones)) && (
+            <span className="anular">
+              <small>{f.accion?.tipo === "anular" ? "¿Te equivocaste?" : "Corregir la venta"}</small>
+              <span className="fila" style={{ gap: 8 }}>
+                {f.accion?.tipo === "anular" ? `Puedes anularla hasta las ${f.accion.hasta}` : f.edicion ? "Modifícala o cancélala. Todo queda en el historial." : "Queda tachada con su motivo; no se borra."}
+                {f.edicion && opciones && <ModificarVenta id={f.id} folio={f.folio} datos={f.edicion} opciones={opciones} />}
+                {f.accion && <CancelarVenta id={f.id} folio={f.folio} total={formatoDinero(f.monto)} regreso={regreso} texto={f.accion.tipo === "anular" ? "Anular" : "Cancelar"} />}
+              </span>
+            </span>
+          )}
+        </div>
+      )}
     </div>
   );
 }

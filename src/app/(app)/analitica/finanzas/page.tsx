@@ -4,107 +4,162 @@ import { registrarGastosAutomaticos } from "@/lib/gastosAuto";
 import { alias } from "drizzle-orm/pg-core";
 import { redirect } from "next/navigation";
 import { BarraFiltros } from "@/components/BarraFiltros";
-
 import { BotonCajon } from "@/components/Cajon";
 import { Icono } from "@/components/Icono";
 import { Paginacion } from "@/components/Paginacion";
 import { SelectorUrl } from "@/components/SelectorUrl";
+import { AvisoUrl, } from "@/components/Encabezado";
 import { requerirSesion } from "@/lib/auth";
 import { faltantesDe } from "@/lib/faltantes";
-import { cajaDe, categoriasGasto, resumenPeriodo } from "@/lib/datos";
+import { cajaDe, categoriasGasto, diasYTotalVentas, equipoConVentas, foliosCorte, metodosActivos, resumenPeriodo, ventasEntre } from "@/lib/datos";
 import { db, schema as t } from "@/lib/db";
 import { fechaLarga, fechaLocal, horaCorta } from "@/lib/fechas";
-import { type ConsultaFiltros, leerFiltros, paginaDeRegistros, rangoDePagina } from "@/lib/filtros";
+import { condicionVentas, type ConsultaFiltros, leerFiltros, urlDescarga } from "@/lib/filtros";
 import { esMovil } from "@/lib/dispositivo";
 import { formatoDinero } from "@/lib/money";
-import { esPagoEquipo, esPropinaEntregada } from "@/lib/caja";
+import { esPagoAnulado, esPagoEquipo, esPropinaEntregada, MINUTOS_CORRECCION } from "@/lib/caja";
 import { Ayuda } from "@/components/Ayuda";
 import { CajaModal } from "../../cobrar/CajaModal";
 import { BotonCaja } from "./BotonCaja";
-import { esCategoriaComisiones } from "@/lib/pagos";
-import { Movimientos, type DiaMovimientos, type Movimiento } from "./Movimientos";
+import { esCategoriaComisiones, verificadosDe } from "@/lib/pagos";
+import { Movimientos, type DiaHistorial, type ItemHistorial } from "./Movimientos";
 import { liquidarAutomaticos } from "@/lib/pagosAuto";
 import { asentarCitasPagadas } from "@/lib/pagos";
+import { periodoEncabezado } from "@/components/CabeceraPeriodo";
+import type { FilaVenta } from "@/components/HistorialVentas";
 
 export const metadata = { title: "Movimientos" };
 
 const $ = formatoDinero;
 const SUELDO = new Set(["sueldo", "mixto"]);
-const TIPOS = [["", "Todos los movimientos"], ["ingresos", "Ingresos"], ["egresos", "Egresos"], ["equipo", "Pagos al equipo"], ["caja", "Dinero que entró o salió de la caja"]] as const;
 const METODO: Record<string, string> = { efectivo: "efectivo", transferencia: "transferencia", tarjeta: "tarjeta" };
 
-type Q = ConsultaFiltros & { tipo?: string; egreso?: string; caja?: string };
+type Q = ConsultaFiltros & { tipo?: string; egreso?: string; caja?: string; aviso?: string; error?: string };
 
-/** Finanzas y egresos en una sola pantalla: lo que quedó del periodo y todos los movimientos del negocio. */
-export default async function Finanzas({ searchParams }: { searchParams: Promise<Q> }) {
+/**
+ * Movimientos: todo lo que pasa con el dinero en un solo lugar. Arriba, el resultado y las ventas en corto;
+ * abajo, el historial con ventas, cortes de caja, egresos, pagos al equipo y lo que entró o salió de la caja.
+ * Cada quien ve solo lo que su puesto permite.
+ */
+export default async function MovimientosPagina({ searchParams }: { searchParams: Promise<Q> }) {
   const s = await requerirSesion();
   await registrarGastosAutomaticos(s.barberia.id);
   await liquidarAutomaticos(s.barberia.id);
   await asentarCitasPagadas(s.barberia.id);
   const verTodo = s.puede("reportes.ver");
-  if (!verTodo && !s.puede("gastos.ver")) redirect("/?aviso=sin-permiso");
+  const verTodas = s.puede("ventas.ver_todas");
+  const atiende = s.usuario.rol === "barbera" || s.usuario.rol === "encargada";
+  const verVentas = verTodas || atiende;
+  const verCortes = verVentas || s.puede("cortes.ver");
+  const verEgresos = verTodo || s.puede("gastos.ver");
+  if (!verVentas && !verEgresos && !verCortes) redirect("/?aviso=sin-permiso");
   const q = await searchParams;
-  // Quien registra movimientos de caja pero no usa Cobro (Administrador) los registra aquí; quien usa Cobro, allá, para no tener dos botones para lo mismo.
-  const cobra = s.puede("ventas.registrar") || s.puede("ventas.registrar_otros");
-  const movCaja = s.puede("caja.retiros") && !cobra && !s.vista;
   const zona = s.barberia.zonaHoraria;
   const hoy = fechaLocal(new Date(), zona);
   const bId = s.barberia.id;
-  const f = leerFiltros(q, hoy, []);
-  // Quien solo ve egresos, solo ve egresos.
-  const tipo = verTodo ? (TIPOS.some(([k]) => k === q.tipo) ? q.tipo ?? "" : "") : "egresos";
-  const ver = (x: string) => !tipo || tipo === x;
+  const cobra = s.puede("ventas.registrar") || s.puede("ventas.registrar_otros");
+  const movCaja = s.puede("caja.retiros") && !cobra && !s.vista;
+  const TIPOS: [string, string][] = [["", "Todos los movimientos"],
+    ...(verVentas ? [["ventas", "Ventas"] as [string, string]] : []), ...(verCortes ? [["cortes", "Cortes de caja"] as [string, string]] : []),
+    ...(verEgresos ? [["egresos", "Egresos"] as [string, string]] : []), ...(verTodo ? [["equipo", "Pagos al equipo"], ["caja", "Entradas y salidas de caja"]] as [string, string][] : [])];
+  const tipo = TIPOS.some(([k]) => k === q.tipo) ? q.tipo ?? "" : "";
+  const equipo = verTodas || verTodo ? await equipoConVentas(bId) : [];
+  const f = leerFiltros(q, hoy, equipo.map((e) => e.id));
+  const persona = f.persona;
+  // Con una persona elegida solo se ve lo suyo: sus ventas y lo que se le pagó. Lo demás no es de nadie en particular.
+  const ver = (x: string) => (!tipo || tipo === x) && (!persona || x === "ventas" || x === "equipo");
   const desde = f.periodo?.desde, hasta = f.periodo?.hasta;
   const local = (col: unknown) => sql<string>`to_char((${col} at time zone ${zona})::date, 'YYYY-MM-DD')`;
   const enFechas = (col: unknown): SQL[] => (desde && hasta ? [sql`(${col} at time zone ${zona})::date between ${desde}::date and ${hasta}::date`] : []);
   const texto = f.buscar ? `%${f.buscar}%` : null;
+  const condV = condicionVentas(f);
 
-  // Días que tienen algún movimiento, para paginar por días.
-  const [diasV, diasG, diasP] = await Promise.all([
-    ver("ingresos") && !texto ? db.selectDistinct({ d: local(t.ventas.creadoEn) }).from(t.ventas).where(and(eq(t.ventas.barberiaId, bId), eq(t.ventas.estado, "pagada"), ...enFechas(t.ventas.creadoEn))) : [],
-    ver("egresos") ? db.selectDistinct({ d: sql<string>`to_char(${t.gastos.fecha}, 'YYYY-MM-DD')` }).from(t.gastos).where(and(eq(t.gastos.barberiaId, bId), ...(desde && hasta ? [gte(t.gastos.fecha, desde), lte(t.gastos.fecha, hasta)] : []), ...(texto ? [or(ilike(t.gastos.concepto, texto), ilike(t.gastos.categoria, texto))!] : []))) : [],
-    ver("equipo") || ver("ingresos") ? db.selectDistinct({ d: local(t.pagosComision.creadoEn) }).from(t.pagosComision).innerJoin(t.usuarios, eq(t.usuarios.id, t.pagosComision.barberoId))
-      .where(and(eq(t.pagosComision.barberiaId, bId), ...(tipo === "equipo" ? [eq(t.pagosComision.tipo, "pago")] : tipo === "ingresos" ? [eq(t.pagosComision.tipo, "renta")] : []), ...enFechas(t.pagosComision.creadoEn), ...(texto ? [ilike(t.usuarios.nombre, texto)] : []))) : [],
+  // Días con algo que mostrar, para paginar por días.
+  const [diasV, diasC, diasG, diasP, diasM, diasT] = await Promise.all([
+    verVentas && ver("ventas") ? diasYTotalVentas(bId, zona, { desde, hasta, persona, condiciones: condV }).then((r) => r.dias) : [],
+    verCortes && ver("cortes") && !texto ? db.selectDistinct({ d: local(t.turnosCaja.cerradoEn) }).from(t.turnosCaja).where(and(eq(t.turnosCaja.barberiaId, bId), eq(t.turnosCaja.estado, "cerrado"), ...enFechas(t.turnosCaja.cerradoEn))).then((x) => x.map((y) => y.d)) : [],
+    verEgresos && ver("egresos") ? db.selectDistinct({ d: sql<string>`to_char(${t.gastos.fecha}, 'YYYY-MM-DD')` }).from(t.gastos).where(and(eq(t.gastos.barberiaId, bId), ...(desde && hasta ? [gte(t.gastos.fecha, desde), lte(t.gastos.fecha, hasta)] : []), ...(texto ? [or(ilike(t.gastos.concepto, texto), ilike(t.gastos.categoria, texto))!] : []))).then((x) => x.map((y) => y.d)) : [],
+    verTodo && ver("equipo") ? db.selectDistinct({ d: local(t.pagosComision.creadoEn) }).from(t.pagosComision).innerJoin(t.usuarios, eq(t.usuarios.id, t.pagosComision.barberoId))
+      .where(and(eq(t.pagosComision.barberiaId, bId), ...enFechas(t.pagosComision.creadoEn), ...(persona ? [eq(t.pagosComision.barberoId, persona)] : []), ...(texto ? [ilike(t.usuarios.nombre, texto)] : []))).then((x) => x.map((y) => y.d)) : [],
+    verTodo && ver("caja") ? db.selectDistinct({ d: local(t.movimientosCaja.creadoEn) }).from(t.movimientosCaja)
+      .where(and(eq(t.movimientosCaja.barberiaId, bId), inArray(t.movimientosCaja.tipo, ["retiro", "entrada"]), ...enFechas(t.movimientosCaja.creadoEn), ...(texto ? [ilike(t.movimientosCaja.concepto, texto)] : []))).then((x) => x.map((y) => y.d)) : [],
+    verTodo && ver("equipo") ? db.selectDistinct({ d: local(t.historial.creadoEn) }).from(t.historial)
+      .where(and(eq(t.historial.barberiaId, bId), sql`${t.historial.detalle} ? 'propinaTransferencia'`, ...enFechas(t.historial.creadoEn), ...(persona ? [sql`${t.historial.detalle}->>'barberoId' = ${persona}`] : []))).then((x) => x.map((y) => y.d)) : [],
   ]);
-  // Dinero que se sacó o se puso en la caja sin ser gasto ni venta: se informa, pero no cuenta en los totales.
-  const movsCaja = verTodo && ver("caja") ? (await db.select({ id: t.movimientosCaja.id, tipo: t.movimientosCaja.tipo, monto: t.movimientosCaja.monto, concepto: t.movimientosCaja.concepto, creadoEn: t.movimientosCaja.creadoEn, quien: t.usuarios.nombre })
-    .from(t.movimientosCaja).innerJoin(t.usuarios, eq(t.usuarios.id, t.movimientosCaja.usuarioId))
-    .where(and(eq(t.movimientosCaja.barberiaId, bId), inArray(t.movimientosCaja.tipo, ["retiro", "entrada"]), ...enFechas(t.movimientosCaja.creadoEn), ...(texto ? [ilike(t.movimientosCaja.concepto, texto)] : [])))
-    .orderBy(desc(t.movimientosCaja.creadoEn)).limit(500)).filter((x) => !esPagoEquipo(x.concepto) && !esPropinaEntregada(x.concepto) && !x.concepto.startsWith("Pago anulado a ")) : [];
-  const todosDias = [...new Set([...diasV, ...diasG, ...diasP].map((x) => x.d).concat(movsCaja.map((x) => fechaLocal(x.creadoEn, zona))))].sort().reverse();
-  // En el teléfono se pagina por movimientos (7 por página); en escritorio, siete días por página.
+  const todosDias = [...new Set([...diasV, ...diasC, ...diasG, ...diasP, ...diasM, ...diasT])].filter(Boolean).sort().reverse();
+  // Escritorio: siete días por página. Teléfono: dos, para que la página no sea interminable.
   const movil = await esMovil();
-  const r = movil ? { pagina: 1, paginas: 1, dias: todosDias, desde: todosDias[todosDias.length - 1] ?? hoy, hasta: todosDias[0] ?? hoy } : rangoDePagina(todosDias, f.pagina);
-  const pd = r.dias.length ? r.desde : null, ph = r.dias.length ? r.hasta : null;
+  const porPagina = movil ? 2 : 7;
+  const paginas = Math.max(1, Math.ceil(todosDias.length / porPagina));
+  const pagina = Math.min(f.pagina, paginas);
+  const dias = todosDias.slice((pagina - 1) * porPagina, pagina * porPagina);
+  const pd = dias.length ? dias[dias.length - 1] : null, ph = dias.length ? dias[0] : null;
   const enPagina = (col: unknown): SQL[] => (pd && ph ? [sql`(${col} at time zone ${zona})::date between ${pd}::date and ${ph}::date`] : [sql`false`]);
 
   const quien = alias(t.usuarios, "quien");
   const cancelo = alias(t.usuarios, "cancelo");
-  const [ventasDia, metodosDia, gastos, pagos, turno] = await Promise.all([
-    ver("ingresos") && !texto ? db.select({ d: local(t.ventas.creadoEn), n: sql<number>`count(*)::int`, total: sql<number>`sum(${t.ventas.total})::int`, ultima: sql<Date>`max(${t.ventas.creadoEn})` })
-      .from(t.ventas).where(and(eq(t.ventas.barberiaId, bId), eq(t.ventas.estado, "pagada"), ...enPagina(t.ventas.creadoEn))).groupBy(sql`1`) : [],
-    ver("ingresos") && !texto ? db.select({ d: local(t.ventas.creadoEn), metodo: t.pagos.nombreMetodo, total: sql<number>`sum(${t.pagos.monto})::int` })
-      .from(t.pagos).innerJoin(t.ventas, eq(t.ventas.id, t.pagos.ventaId)).where(and(eq(t.ventas.barberiaId, bId), eq(t.ventas.estado, "pagada"), ...enPagina(t.ventas.creadoEn))).groupBy(sql`1`, t.pagos.nombreMetodo) : [],
-    ver("egresos") && pd && ph ? db.select({ g: t.gastos, quien: quien.nombre, cancelo: cancelo.nombre }).from(t.gastos)
+  const [ventas, cortes, gastos, pagos, movsCaja, propTrans, turno, metodos] = await Promise.all([
+    diasV.length && pd && ph ? ventasEntre(bId, pd, ph, { zona, condiciones: condV }).then((r) => r.ventas) : [],
+    diasC.length ? db.select({ id: t.turnosCaja.id, cerradoEn: t.turnosCaja.cerradoEn, diferencia: t.turnosCaja.diferencia,
+        vendido: sql<number>`coalesce((select sum(v.total) from ventas v where v.turno_id = turnos_caja.id and v.estado = 'pagada'), 0)::int` })
+      .from(t.turnosCaja).where(and(eq(t.turnosCaja.barberiaId, bId), eq(t.turnosCaja.estado, "cerrado"), ...enPagina(t.turnosCaja.cerradoEn))) : [],
+    diasG.length && pd && ph ? db.select({ g: t.gastos, quien: quien.nombre, cancelo: cancelo.nombre }).from(t.gastos)
       .innerJoin(quien, eq(quien.id, t.gastos.usuarioId)).leftJoin(cancelo, eq(cancelo.id, t.gastos.canceladoPor))
       .where(and(eq(t.gastos.barberiaId, bId), gte(t.gastos.fecha, pd), lte(t.gastos.fecha, ph), ...(texto ? [or(ilike(t.gastos.concepto, texto), ilike(t.gastos.categoria, texto))!] : [])))
       .orderBy(desc(t.gastos.creadoEn)) : [],
-    (ver("equipo") || ver("ingresos")) ? db.select({ p: t.pagosComision, nombre: t.usuarios.nombre }).from(t.pagosComision).innerJoin(t.usuarios, eq(t.usuarios.id, t.pagosComision.barberoId))
-      .where(and(eq(t.pagosComision.barberiaId, bId), ...(tipo === "equipo" ? [eq(t.pagosComision.tipo, "pago")] : tipo === "ingresos" ? [eq(t.pagosComision.tipo, "renta")] : []), ...enPagina(t.pagosComision.creadoEn), ...(texto ? [ilike(t.usuarios.nombre, texto)] : [])))
-      .orderBy(desc(t.pagosComision.creadoEn)) : [],
+    diasP.length ? db.select({ p: t.pagosComision, nombre: t.usuarios.nombre }).from(t.pagosComision).innerJoin(t.usuarios, eq(t.usuarios.id, t.pagosComision.barberoId))
+      .where(and(eq(t.pagosComision.barberiaId, bId), ...enPagina(t.pagosComision.creadoEn), ...(persona ? [eq(t.pagosComision.barberoId, persona)] : []), ...(texto ? [ilike(t.usuarios.nombre, texto)] : []))) : [],
+    diasM.length ? db.select({ id: t.movimientosCaja.id, tipo: t.movimientosCaja.tipo, monto: t.movimientosCaja.monto, concepto: t.movimientosCaja.concepto, creadoEn: t.movimientosCaja.creadoEn, quien: t.usuarios.nombre })
+      .from(t.movimientosCaja).innerJoin(t.usuarios, eq(t.usuarios.id, t.movimientosCaja.usuarioId))
+      .where(and(eq(t.movimientosCaja.barberiaId, bId), inArray(t.movimientosCaja.tipo, ["retiro", "entrada"]), ...enPagina(t.movimientosCaja.creadoEn), ...(texto ? [ilike(t.movimientosCaja.concepto, texto)] : []))) : [],
+    diasT.length ? db.select({ id: t.historial.id, creadoEn: t.historial.creadoEn, accion: t.historial.accion, detalle: t.historial.detalle }).from(t.historial)
+      .where(and(eq(t.historial.barberiaId, bId), sql`${t.historial.detalle} ? 'propinaTransferencia'`, ...enPagina(t.historial.creadoEn), ...(persona ? [sql`${t.historial.detalle}->>'barberoId' = ${persona}`] : []))) : [],
     cajaDe(s),
+    s.puede("ventas.modificar") ? metodosActivos(bId) : Promise.resolve([]),
   ]);
   const comps = gastos.length ? await db.select({ id: t.comprobantes.id, gastoId: t.comprobantes.gastoId, nombre: t.comprobantes.nombre }).from(t.comprobantes)
     .where(and(eq(t.comprobantes.barberiaId, bId), inArray(t.comprobantes.gastoId, gastos.map((x) => x.g.id)))) : [];
+  const folios = cortes.length ? await foliosCorte(bId) : new Map<string, string>();
+  const stripeDe = ventas.length ? await verificadosDe(ventas.map((v) => v.id)) : new Map();
 
-  const PER: Record<string, string> = { diaria: "diaria", semanal: "semanal", quincenal: "quincenal", mensual: "mensual" };
-  const todosLosDias: DiaMovimientos[] = r.dias.map((d) => {
-    const movs: (Movimiento & { t: number })[] = [];
-    const v = ventasDia.find((x) => x.d === d);
-    if (v) movs.push({
-      id: `v${d}`, tipo: "venta", titulo: "Ventas del día", sub: `${v.n} ${v.n === 1 ? "cobro" : "cobros"}`, monto: v.total, t: new Date(v.ultima).getTime(),
-      detalle: metodosDia.filter((m) => m.d === d).map((m) => [m.metodo, $(m.total)] as [string, string]),
-    });
+  // Ventas, con lo mismo que tenía la pantalla de Ventas: detalle, pago confirmado, cancelar, anular o modificar.
+  const puedeCancelar = s.puede("ventas.cancelar");
+  const puedeModificar = s.puede("ventas.modificar");
+  const ahora = Date.now();
+  const opcionesVenta = puedeModificar ? { equipo: equipo.map((e) => ({ id: e.id, nombre: e.nombre })), metodos: metodos.map((m) => ({ id: m.id, nombre: m.nombre })) } : undefined;
+  const monto = (v: (typeof ventas)[number]) => (persona ? v.conceptos.filter((c) => c.barberoId === persona).reduce((a, c) => a + c.precioCobrado, 0) : v.total);
+  const propios = (v: (typeof ventas)[number]) => (persona ? v.conceptos.filter((c) => c.barberoId === persona) : v.conceptos);
+  const filaVenta = (v: (typeof ventas)[number]): FilaVenta => ({
+    id: v.id, folio: v.folio, hora: horaCorta(v.creadoEn, zona), monto: monto(v), cancelada: v.estado === "cancelada",
+    servicios: propios(v).map((c) => c.nombre).join(", "),
+    stripe: (() => {
+      const st = stripeDe.get(v.id);
+      return st ? { reembolsado: st.estado === "reembolsado", tarjeta: st.tarjeta, referencia: st.referencia, confirmado: st.pagadoEn ? `${fechaLarga(fechaLocal(st.pagadoEn, zona))}, ${horaCorta(st.pagadoEn, zona)}` : "Sí" } : undefined;
+    })(),
+    detalle: [
+      ["Servicios", propios(v).map((c) => `${c.nombre} con ${c.barbero.split(" ")[0]}, ${$(c.precioCobrado)}`).join("; ")],
+      ...(v.conceptos.some((c) => c.descuento) ? [["Descuento", v.conceptos.filter((c) => c.descuento).map((c) => `${$(c.descuento)} en ${c.nombre}`).join("; ")] as [string, string]] : []),
+      ...(v.propinas.length ? [["Propina", v.propinas.map((x) => `${$(x.monto)}${x.esEfectivo ? " en efectivo" : " con tarjeta o transferencia"}`).join(" y ")] as [string, string]] : []),
+      ["Pago", v.pagos.map((pg) => `${pg.metodo} ${$(pg.monto)}`).join(" y ") || "Sin pago"],
+      ["Registró", v.registradaPor.split(" ")[0]],
+      ...(v.estado === "cancelada" ? [["Cancelada", v.motivoCancelacion ?? ""] as [string, string]] : []),
+    ],
+    accion: puedeCancelar && v.estado === "pagada" ? { tipo: "cancelar" }
+      : !verTodas && v.estado === "pagada" && v.registradaPorId === s.usuario.id && turno?.id === v.turnoId && ahora < v.creadoEn.getTime() + MINUTOS_CORRECCION * 60000
+        ? { tipo: "anular", hasta: horaCorta(new Date(v.creadoEn.getTime() + MINUTOS_CORRECCION * 60000), zona) } : undefined,
+    edicion: puedeModificar && v.estado === "pagada" ? {
+      conceptos: v.conceptos.map((c) => ({ id: c.id, nombre: c.nombre, barberoId: c.barberoId, precio: c.precioCobrado })),
+      pagos: v.pagos.filter((pg) => pg.metodoId).map((pg) => ({ metodoId: pg.metodoId!, monto: pg.monto })),
+    } : undefined,
+  });
+
+  const historial: DiaHistorial[] = dias.map((d) => {
+    const items: ItemHistorial[] = [];
+    const delDia = ventas.filter((v) => v.fecha === d);
+    for (const v of delDia) items.push({ k: "venta", t: v.creadoEn.getTime(), f: filaVenta(v) });
+    for (const c of cortes.filter((x) => x.cerradoEn && fechaLocal(x.cerradoEn, zona) === d)) items.push({ k: "corte", t: c.cerradoEn!.getTime(), f: {
+      id: `corte-${c.id}`, folio: folios.get(c.id) ?? "", hora: horaCorta(c.cerradoEn!, zona), servicios: "", monto: c.vendido, cancelada: false, detalle: [],
+      corte: { vendido: verTodas ? c.vendido : undefined, enlace: s.puede("cortes.ver") ? `/analitica/cortes?corte=${c.id}` : undefined } } });
     for (const { g, quien: qn, cancelo: cn } of gastos.filter((x) => x.g.fecha === d)) {
       const comp = comps.find((c) => c.gastoId === g.id);
       const det: [string, string][] = [
@@ -114,36 +169,39 @@ export default async function Finanzas({ searchParams }: { searchParams: Promise
         ...(g.canceladoEn ? [["Cancelado", `${cn?.split(" ")[0] ?? ""}: ${g.motivoCancelacion ?? ""}`] as [string, string]] : []),
       ];
       const cerrado = !!g.turnoId && g.turnoId !== turno?.id;
-      movs.push({
-        id: `g${g.id}`, tipo: "egreso", titulo: g.concepto, sub: [g.categoria, PER[g.periodicidad], METODO[g.metodo]].filter(Boolean).join(", "), monto: -g.monto,
-        cancelado: !!g.canceladoEn, t: g.creadoEn.getTime(), detalle: det, comprobante: comp ? { id: comp.id, nombre: comp.nombre } : undefined,
+      items.push({ k: "mov", t: g.creadoEn.getTime(), m: {
+        id: `g${g.id}`, tipo: "egreso", titulo: g.concepto, sub: [g.categoria, g.turnoId ? "de la caja" : METODO[g.metodo]].filter(Boolean).join(", "), monto: -g.monto, hora: horaCorta(g.creadoEn, zona),
+        cancelado: !!g.canceladoEn, detalle: det, comprobante: comp ? { id: comp.id, nombre: comp.nombre } : undefined,
         egreso: { id: g.id, concepto: g.concepto, categoria: g.categoria, metodo: g.metodo, monto: g.monto, cancelado: !!g.canceladoEn, puedeCancelar: s.puede("gastos.cancelar") && !g.canceladoEn && !cerrado, detalle: det },
-      });
+      } });
     }
     for (const { p, nombre } of pagos.filter((x) => fechaLocal(x.p.creadoEn, zona) === d)) {
       const renta = p.tipo === "renta";
-      movs.push({
+      items.push({ k: "mov", t: p.creadoEn.getTime(), m: {
         id: `p${p.id}`, tipo: renta ? "renta" : "pago", titulo: renta ? `Renta de silla de ${nombre.split(" ")[0]}` : `Pago a ${nombre.split(" ")[0]}`,
-        sub: renta ? "Ingreso" : "Pago al equipo", monto: renta ? p.monto : -p.monto, t: p.creadoEn.getTime(),
+        sub: (p.nota.split(":")[0] || (renta ? "Ingreso" : "Pago al equipo")).replace("Por entregar de caja", "Se entrega en el corte de caja"), monto: renta ? p.monto : -p.monto, hora: horaCorta(p.creadoEn, zona), cancelado: p.monto === 0,
         detalle: [["Hora", horaCorta(p.creadoEn, zona)], ...(p.nota ? [["Nota", p.nota] as [string, string]] : [])],
-      });
+      } });
     }
-    for (const c of movsCaja.filter((x) => fechaLocal(x.creadoEn, zona) === d)) {
-      const sale = c.tipo === "retiro";
-      movs.push({
-        id: `c${c.id}`, tipo: "caja", titulo: c.concepto, sub: sale ? "Se sacó de la caja. No es un gasto" : "Se puso en la caja. No es una venta", monto: sale ? -c.monto : c.monto, t: c.creadoEn.getTime(),
+    // Lo que entró o salió de la caja sin ser venta ni gasto. Los pagos al equipo ya aparecen como pago; aquí no se repiten.
+    for (const c of movsCaja.filter((x) => fechaLocal(x.creadoEn, zona) === d && !esPagoEquipo(x.concepto) && !esPagoAnulado(x.concepto))) {
+      const sale = c.tipo === "retiro", propina = esPropinaEntregada(c.concepto);
+      items.push({ k: "mov", t: c.creadoEn.getTime(), m: {
+        id: `c${c.id}`, tipo: propina ? "propina" : "caja", titulo: c.concepto, hora: horaCorta(c.creadoEn, zona),
+        sub: propina ? "Se entregó de la caja en el corte" : sale ? "Se sacó de la caja. No es un gasto" : "Se puso en la caja. No es una venta", monto: sale ? -c.monto : c.monto,
         detalle: [["Registró", `${c.quien.split(" ")[0]}, ${horaCorta(c.creadoEn, zona)}`], ["Cuenta en el resultado", "No. Solo cambia el efectivo de la caja"]],
-      });
+      } });
     }
-    movs.sort((a, b) => b.t - a.t);
-    return { fecha: d, titulo: d === hoy ? "Hoy" : fechaLarga(d), neto: movs.filter((m) => !m.cancelado && m.tipo !== "caja").reduce((a, m) => a + m.monto, 0), movs };
+    for (const h of propTrans.filter((x) => fechaLocal(x.creadoEn, zona) === d)) {
+      const m = Number((h.detalle as { propinaTransferencia?: number }).propinaTransferencia ?? 0);
+      items.push({ k: "mov", t: h.creadoEn.getTime(), m: {
+        id: `h${h.id}`, tipo: "propina", titulo: h.accion.split(":")[0], sub: "Por transferencia, no tocó la caja", monto: -m, hora: horaCorta(h.creadoEn, zona),
+        detalle: [["Cuenta en el resultado", "No. La propina es de quien atendió"]],
+      } });
+    }
+    items.sort((a, b) => b.t - a.t);
+    return { fecha: d, titulo: d === hoy ? "Hoy" : fechaLarga(d), total: delDia.filter((v) => v.estado === "pagada").reduce((a, v) => a + monto(v), 0), items };
   });
-  let paginaMov = r.pagina, paginasMov = r.paginas, dias = todosLosDias;
-  if (movil) {
-    const pg = paginaDeRegistros(todosLosDias.flatMap((d) => d.movs.map((m) => ({ d, m }))), f.pagina, 7);
-    paginaMov = pg.pagina; paginasMov = pg.paginas;
-    dias = [...new Set(pg.items.map((x) => x.d))].map((d) => ({ ...d, movs: pg.items.filter((x) => x.d === d).map((x) => x.m) }));
-  }
 
   // Encabezado: el periodo elegido o el mes en curso (el día 1, el mes anterior).
   // Sin filtro, el encabezado muestra el resultado de hoy; la lista de abajo sigue siendo el historial completo.
@@ -196,33 +254,44 @@ export default async function Finanzas({ searchParams }: { searchParams: Promise
     </div>
   );
 
+  // Ventas del mes (o del periodo elegido), en corto. Quien atiende y no ve al equipo ve las suyas.
+  const pv = periodoEncabezado(f.periodo, hoy).p;
+  const rv = verVentas ? await resumenPeriodo(bId, pv.desde, pv.hasta, zona, verTodas ? persona || undefined : s.usuario.id) : null;
+  const nombreV = pv.tipo === "mes" ? `de ${pv.etiqueta.split(" ")[0].toLowerCase()}` : pv.tipo === "dia" ? (pv.desde === hoy ? "de hoy" : `del ${pv.etiqueta}`) : pv.etiqueta.toLowerCase();
+  const descarga = s.puede("reportes.exportar") ? (tipo === "egresos" ? urlDescarga("gastos", f) : urlDescarga("ventas", f)) : undefined;
+
   return (
     <>
-      {verTodo && (
-        <>
-          <section className="cab-v cab-fin glass subir">
-            <div className="cv-num">
-              <span className="lab lab-ay">Resultado de {nombreP}<Ayuda titulo="Resultado">Lo que ganó el negocio: lo vendido, menos los gastos y menos lo que le toca al equipo, aunque todavía no se le pague. No es el dinero que hay en la caja.</Ayuda></span>
-              <b className="num">{firma(resultado)}</b>
-              <BotonCajon texto={<>Cómo se llega<Icono n="derecha" /></>} titulo="Cómo se llega al resultado">{cuenta}</BotonCajon>
-            </div>
-            <div className="es-c">
-              <div><span className="muted">Entró</span><span className="barra-m"><i style={{ width: `${(entro / maxB) * 100}%` }} /></span><b className="num">{$(entro)}</b></div>
-              <div><span className="muted">Salió</span><span className="barra-m sal"><i style={{ width: `${(salio / maxB) * 100}%` }} /></span><b className="num">{$(salio)}</b></div>
-            </div>
+      <AvisoUrl aviso={q.aviso} error={q.error} />
+      <div className={`cab-dos ${verTodo && rv ? "" : "una"}`}>
+        {verTodo && (
+          <section className="cab-mini glass subir">
+            <span className="lab lab-ay">Resultado de {nombreP}<Ayuda titulo="Resultado">Lo que ganó el negocio: lo vendido, menos los gastos y menos lo que le toca al equipo, aunque todavía no se le pague. No es el dinero que hay en la caja.</Ayuda></span>
+            <b className="num">{firma(resultado)}</b>
+            <span className="cm-l"><span>Entró {$(entro)}</span><span>Salió {$(salio)}</span>
+              <BotonCajon texto={<>Cómo se llega<Icono n="derecha" /></>} titulo="Cómo se llega al resultado">{cuenta}</BotonCajon></span>
           </section>
-          {anterior && <p className="aviso-sutil">Mostrando {nombreP} hasta que empiece el mes.</p>}
-        </>
-      )}
+        )}
+        {rv && (
+          <section className="cab-mini glass subir">
+            <span className="lab">{verTodas ? "Ventas" : "Tus ventas"} {nombreV}</span>
+            <b className="num">{$(rv.netas)}</b>
+            <span className="cm-l"><span>{rv.servicios} {rv.servicios === 1 ? "servicio" : "servicios"}</span>{rv.servicios > 0 && <span>{$(Math.round(rv.netas / rv.servicios / 100) * 100)} en promedio</span>}</span>
+          </section>
+        )}
+      </div>
+      {anterior && <p className="aviso-sutil">Mostrando {nombreP} hasta que empiece el mes.</p>}
       {movCaja && <CajaModal inicial={q.caja === "movimiento" ? "movimiento" : null} turno={null} abierta={!!turno} limiteDiferencia={0}
         categorias={cats.filter((c) => c.activo && !esCategoriaComisiones(c.nombre)).map((c) => c.nombre)} configurar={s.puede("configuracion.egresos") && !s.vista} />}
-      <Movimientos botonCaja={movCaja ? <BotonCaja abierta={!!turno} /> : undefined} abrirEgreso={q.egreso === "1"} dias={dias} registrar={s.puede("gastos.registrar")} hoy={hoy} cajaAbierta={!!turno} categorias={cats}
+      <Movimientos botonCaja={movCaja ? <BotonCaja abierta={!!turno} /> : undefined} abrirEgreso={q.egreso === "1"} dias={historial} registrar={s.puede("gastos.registrar")} hoy={hoy} cajaAbierta={!!turno} categorias={cats}
+        regreso={`/analitica/finanzas${new URLSearchParams(Object.entries(q).filter(([k, v]) => v && !["aviso", "error", "egreso", "caja"].includes(k)) as [string, string][]).toString() ? `?${new URLSearchParams(Object.entries(q).filter(([k, v]) => v && !["aviso", "error", "egreso", "caja"].includes(k)) as [string, string][])}` : ""}`}
+        opcionesVenta={opcionesVenta}
         opciones={{ cajaHref: cobra && s.puede("caja.retiros") ? "/cobrar?caja=movimiento" : movCaja ? "/analitica/finanzas?caja=movimiento" : null, metodos: s.barberia.metodosEgreso, periodicidad: false, comprobantes: s.barberia.usaComprobantes, obligatorio: s.barberia.comprobanteObligatorio, frecuentes: frecuentes.map(({ id, concepto, categoria, monto, metodo, periodicidad }) => ({ id, concepto, categoria, monto, metodo, periodicidad })) }}
-        filtros={<BarraFiltros p={f.periodo} hoy={hoy} personas={[]} persona="" buscar={f.buscar} sinPeriodo="Todas las fechas" textoBuscar="Buscar"
-          descarga={s.puede("reportes.exportar") ? `/api/exportar?tipo=gastos${f.periodo ? `&desde=${f.periodo.desde}&hasta=${f.periodo.hasta}` : ""}` : undefined}
-          extra={verTodo ? <SelectorUrl nombre="tipo" valor={tipo} opciones={TIPOS.map(([valor, texto]) => ({ valor, texto }))} etiqueta="Tipo de movimiento" /> : undefined} />} />
-      <Paginacion ruta="/analitica/finanzas" params={q as Record<string, string | undefined>} pagina={paginaMov} paginas={paginasMov}
-        texto={todosDias.length ? (movil ? `Página ${paginaMov} de ${paginasMov}` : `${todosDias.length} ${todosDias.length === 1 ? "día" : "días"} con movimientos${r.paginas > 1 ? `, página ${r.pagina} de ${r.paginas}` : ""}`) : ""} />
+        filtros={<BarraFiltros p={f.periodo} hoy={hoy} personas={equipo} persona={persona} buscar={f.buscar} sinPeriodo="Todas las fechas" textoBuscar="Buscar folio, servicio, persona o concepto"
+          descarga={descarga}
+          extra={TIPOS.length > 2 ? <SelectorUrl nombre="tipo" valor={tipo} opciones={TIPOS.map(([valor, texto]) => ({ valor, texto }))} etiqueta="Tipo de movimiento" /> : undefined} />} />
+      <Paginacion ruta="/analitica/finanzas" params={q as Record<string, string | undefined>} pagina={pagina} paginas={paginas}
+        texto={todosDias.length ? `${todosDias.length} ${todosDias.length === 1 ? "día" : "días"} con movimientos${paginas > 1 ? `, página ${pagina} de ${paginas}` : ""}` : ""} />
     </>
   );
 }

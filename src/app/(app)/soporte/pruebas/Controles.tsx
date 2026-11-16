@@ -15,8 +15,8 @@ function Cuentas({ cuentas }: { cuentas: { puesto: string; usuario: string; clav
       {cuentas.map((c) => (
         <div key={c.usuario} className="acc-f">
           <span className="acc-pu">{c.puesto}</span>
-          <button type="button" className="acc-c" onClick={() => copiar(`u${c.usuario}`, c.usuario)} title="Copiar usuario"><small>Usuario</small><b className="mono">{c.usuario}</b><em>{copiado === `u${c.usuario}` ? "Copiado" : "Copiar"}</em></button>
-          <button type="button" className="acc-c" onClick={() => copiar(`c${c.usuario}`, c.clave)} title="Copiar contraseña"><small>Contraseña</small><b className="mono">{c.clave}</b><em>{copiado === `c${c.usuario}` ? "Copiado" : "Copiar"}</em></button>
+          <button type="button" className="accp-c" onClick={() => copiar(`u${c.usuario}`, c.usuario)} title="Copiar usuario"><small>Usuario</small><b className="mono">{c.usuario}</b><em>{copiado === `u${c.usuario}` ? "Copiado" : "Copiar"}</em></button>
+          <button type="button" className="accp-c" onClick={() => copiar(`c${c.usuario}`, c.clave)} title="Copiar contraseña"><small>Contraseña</small><b className="mono">{c.clave}</b><em>{copiado === `c${c.usuario}` ? "Copiado" : "Copiar"}</em></button>
         </div>
       ))}
     </div>

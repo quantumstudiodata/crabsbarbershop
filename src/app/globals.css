@@ -3062,7 +3062,10 @@ html:has(.capa) body, html:has(.velo-c) body, html:has(.velo-hoja) body, html:ha
 .ini-link:hover { color: var(--fg); }
 .ini-hoy > .ini-link { align-self: flex-start; }
 .ini-izq, .ini-der { display: flex; flex-direction: column; gap: 20px; min-width: 0; }
-.ini-izq > :last-child, .ini-der > :last-child { flex: 1 0 auto; }
+/* Las dos columnas terminan parejas sin estirar tarjetas: el espacio que sobre se reparte entre ellas, nunca dentro.
+   Una columna con una sola tarjeta sí la estira (la de Hoy pone su gráfica abajo). */
+.ini-izq, .ini-der { justify-content: space-between; }
+.ini-izq > :only-child, .ini-der > :only-child { flex: 1 0 auto; }
 /* Equipo hoy va en la columna que quede más corta: a la izquierda si hay pendientes, a la derecha si no. */
 .ini-card { display: grid; gap: 4px; align-content: start; padding: 18px 22px; border-radius: 20px; }
 .ini-card > .entre, .ini-card > .lab { margin-bottom: 4px; }
@@ -5600,11 +5603,11 @@ html:has(.fx-raiz .mc) body::before, html:has(.fx-raiz .mc) body::after { displa
 .acc-p { display: grid; gap: 8px; }
 .acc-f { display: grid; grid-template-columns: minmax(90px, auto) minmax(0, 1fr) minmax(0, 1fr); gap: 8px; align-items: center; }
 .acc-pu { font-size: 13px; font-weight: 600; }
-.acc-c { display: grid; text-align: left; gap: 1px; padding: 8px 10px; border-radius: 12px; border: 1px solid var(--line); background: rgba(255,255,255,.7); color: var(--fg); cursor: pointer; font: inherit; min-width: 0; }
-.acc-c small { font-size: 10.5px; color: var(--muted); text-transform: uppercase; letter-spacing: .05em; }
-.acc-c b { font-size: 13px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
-.acc-c em { font-style: normal; font-size: 11px; color: var(--muted); }
-.acc-c:hover { background: #fff; }
+.accp-c { display: grid; text-align: left; gap: 1px; padding: 8px 10px; border-radius: 12px; border: 1px solid var(--line); background: rgba(255,255,255,.7); color: var(--fg); cursor: pointer; font: inherit; min-width: 0; }
+.accp-c small { font-size: 10.5px; color: var(--muted); text-transform: uppercase; letter-spacing: .05em; }
+.accp-c b { font-size: 13px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.accp-c em { font-style: normal; font-size: 11px; color: var(--muted); }
+.accp-c:hover { background: #fff; }
 @media (max-width: 520px) { .acc-f { grid-template-columns: 1fr 1fr; } .acc-pu { grid-column: 1 / -1; } }
 
 /* Ventas: separador donde se hizo un corte de caja. */
@@ -5624,3 +5627,35 @@ html:has(.fx-raiz .mc) body::before, html:has(.fx-raiz .mc) body::after { displa
 .ck-sobre .ck-per small { white-space: normal; }
 .ck-seg.n2 { grid-template-columns: repeat(2, 1fr); }
 .ck-tot { display: flex; justify-content: space-between; align-items: baseline; padding-top: 10px; border-top: 1px solid var(--fg); font-weight: 600; }
+
+/* Inicio: citas de otros días llevan su fecha arriba de la hora. */
+.ini-cita { grid-template-columns: minmax(52px, auto) minmax(0, 1fr) auto; }
+.ini-cita b small { display: block; font-weight: 500; font-size: 11.5px; color: var(--muted); }
+/* Barra de la meta: se ve como barra aunque esté llena. */
+.ini-meta { height: 10px; border-radius: 99px; background: rgba(30,45,60,.12); padding: 2px; box-shadow: inset 0 1px 2px rgba(20,30,40,.08); }
+.ini-meta i { border-radius: 99px; background: linear-gradient(90deg, #4b6274, #13171c); }
+.ini-hoy-m .ini-meta { height: 9px; }
+
+.eg-intro p { font-size: 14.5px; line-height: 1.5; }
+.eg-intro .enlace, .eg-intro u { font-weight: 600; text-decoration: underline; text-underline-offset: 3px; }
+.eg-nomas { display: flex; align-items: center; gap: 8px; font-size: 13px; color: var(--muted); cursor: pointer; }
+
+/* Corte: cómo se le paga a cada quien, como un campo que se ve cambiable. */
+.ck-pago { display: grid; grid-template-columns: auto minmax(0, 1fr); align-items: center; gap: 10px; padding-left: 40px; font-size: 12.5px; color: var(--muted); }
+.ck-pago .ck-sel { width: 100%; }
+@media (max-width: 400px) { .ck-pago { grid-template-columns: 1fr; gap: 4px; padding-left: 0; } }
+
+/* Movimientos: dos encabezados cortos lado a lado. */
+.cab-dos { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 14px; }
+.cab-dos.una { grid-template-columns: minmax(0, 1fr); }
+.cab-mini { display: grid; gap: 4px; padding: 16px 20px; border-radius: 20px; align-content: start; }
+.cab-mini > b { font: 600 30px/1.05 var(--f-display); letter-spacing: -.01em; }
+.cab-mini .cm-l { display: flex; flex-wrap: wrap; align-items: center; gap: 4px 14px; font-size: 12.5px; color: var(--muted); }
+.cab-mini .cm-l .link-c { font-size: 12.5px; }
+@media (max-width: 640px) { .cab-dos { grid-template-columns: minmax(0, 1fr); gap: 10px; } .cab-mini > b { font-size: 26px; } }
+/* Movimientos de dinero con el mismo formato que una venta. */
+.mov-h .srv { display: grid; min-width: 0; }
+.mov-h .srv > span { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.mov-h .mov-sub { font-size: 11.5px; color: var(--muted); overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.mov-h .mov-tipo { background: rgba(60,81,99,.08); }
+.mov-h.cancelada .num, .mov-h.cancelada .srv > span { text-decoration: line-through; color: var(--muted); }

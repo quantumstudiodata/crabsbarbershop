@@ -22,7 +22,7 @@ export function useAbrirPanel(cual: "ayuda" | "ideas", abrir: () => void) {
 
 /** Parte izquierda de la barra superior en el teléfono: saludo en Inicio, nombre de la sección en lo demás. */
 // Secciones que no están en la barra de abajo pero necesitan su nombre arriba.
-const OTRAS: [string, string][] = [["/historial", "Actividad"], ["/ajustes", "Ajustes"], ["/soporte", "Soporte"], ["/libreta", "Datos"], ["/equipo", "Equipo"], ["/analitica", "Reportes"], ["/citas", "Citas"], ["/clientes", "Clientes"], ["/cambiar-contrasena", "Contraseña"]];
+const OTRAS: [string, string][] = [["/historial", "Actividad"], ["/ajustes", "Ajustes"], ["/soporte", "Soporte"], ["/libreta", "Datos"], ["/equipo", "Equipo"], ["/analitica/cortes", "Cortes de caja"], ["/analitica", "Reportes"], ["/citas", "Citas"], ["/clientes", "Clientes"], ["/cambiar-contrasena", "Contraseña"]];
 
 export function TituloMovil({ negocio, nombre, fecha, items, grupos }: { negocio: string; nombre: string; fecha: string; items: ItemNav[]; grupos: SubNav[] }) {
   const ruta = usePathname();

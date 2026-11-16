@@ -205,7 +205,7 @@ export function OpcionesRegistro({ metodos, comprobantes, obligatorio = false, p
       <div className="eg-formas">
         <span className="sub-a">Formas de pago permitidas</span>
         <div className="eg-chips" role="group" aria-label="Formas de pago para egresos">
-          {METODOS.map(([k, t]) => (
+          {METODOS.filter(([k]) => k !== "efectivo").map(([k, t]) => (
             <button key={k} type="button" aria-pressed={mets.includes(k)} disabled={!puede || pendiente} className={`chipf ${mets.includes(k) ? "on-suave" : ""}`}
               onClick={() => {
                 // Cambia al momento; si el servidor no lo acepta, regresa a como estaba.
@@ -215,7 +215,7 @@ export function OpcionesRegistro({ metodos, comprobantes, obligatorio = false, p
               }}>{mets.includes(k) && <Icono n="palomita" />}{t}</button>
           ))}
         </div>
-        <small className="muted">Solo el efectivo que sale de la caja afecta el corte.</small>
+        <small className="muted">Los pagos en efectivo con dinero de la caja se registran en Movimiento de caja, no como egreso.</small>
       </div>
       <div className="lista-cfg sin-chip">
         {opciones.map(([k, t, d]) => (

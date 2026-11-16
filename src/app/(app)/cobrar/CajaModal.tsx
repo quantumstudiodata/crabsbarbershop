@@ -4,7 +4,7 @@ import { startTransition, useActionState, useEffect, useState } from "react";
 import { Avatar } from "@/components/Avatar";
 import { EvidenciasCorte } from "./EvidenciasCorte";
 import { Fl, Icono } from "@/components/Icono";
-import { Modal } from "@/components/ui";
+import { Modal, Selector } from "@/components/ui";
 import type { MovimientosTurno } from "@/lib/caja";
 import { formatoDinero, leerPesos } from "@/lib/money";
 import { abrirCaja, cerrarCaja, registrarGasto, registrarMovimiento, type EstadoCaja, type ResumenCorte } from "../caja/actions";
@@ -295,8 +295,8 @@ function CortePasos({ turno, accion, cerrando, error, contado, setContado, limit
       const d = x.comision > 0 ? "manana" : "transferencia"; queda -= deLaCaja(x, d); return [x.id, d];
     }));
   });
-  const opcionesDe = (x: Sobre): [string, string][] => x.comision > 0 ? [["caja", "De la caja"], ["transferencia", "Transferencia"], ["manana", "Mañana"]]
-    : x.otro > 0 ? [["caja", "De la caja"], ["transferencia", "Transferencia"]] : [];
+  const opcionesDe = (x: Sobre): [string, string][] => x.comision > 0 ? [["caja", "Efectivo de la caja"], ["transferencia", "Transferencia"], ["manana", "Se le paga mañana"]]
+    : x.otro > 0 ? [["caja", "Efectivo de la caja"], ["transferencia", "Transferencia"]] : [];
   const entregado = sobres.reduce((a, x) => a + deLaCaja(x, dec[x.id] ?? "caja"), 0);
   const alcanzaCaja = turno.esperado - entregado >= 0;
   const esperado = turno.esperado - entregado;
@@ -349,7 +349,7 @@ function CortePasos({ turno, accion, cerrando, error, contado, setContado, limit
               {sobres.map((x) => {
                 const d = dec[x.id] ?? "caja";
                 const partes = [x.comision ? `Comisión ${x.detalle === "de hoy" ? "de hoy" : x.detalle} ${formatoDinero(x.comision)}` : "", x.efectivo + x.otro ? `propinas ${formatoDinero(x.efectivo + x.otro)}` : ""].filter(Boolean).join(" + ").replace(/^p/, "P");
-                const nota = d === "manana" && x.efectivo + x.otro > 0 ? `Hoy solo sus propinas, ${formatoDinero(x.efectivo + x.otro)}, de la caja.`
+                const nota = d === "manana" && x.efectivo + x.otro > 0 ? `Sus propinas, ${formatoDinero(x.efectivo + x.otro)}, se apartan hoy de la caja. Si no está, guárdalas en un sobre con su nombre.`
                   : d === "transferencia" && x.efectivo > 0 ? `Sus propinas en efectivo, ${formatoDinero(x.efectivo)}, se le dan de la caja.` : "";
                 return (
                   <div key={x.id} className="ck-sobre">
@@ -357,8 +357,10 @@ function CortePasos({ turno, accion, cerrando, error, contado, setContado, limit
                     <input type="hidden" name={`propina:${x.id}`} value={d === "transferencia" ? "transferencia" : "caja"} />
                     <div className="ck-per"><Avatar avatar={x.avatar} nombre={x.nombre} t={30} /><span>{x.nombre.split(" ")[0]}<small>{partes}</small></span><b className="num">{formatoDinero(totalSobre(x))}</b></div>
                     {opcionesDe(x).length > 0 && (
-                      <div className={`seg ck-seg n${opcionesDe(x).length}`} role="radiogroup" aria-label={`Cómo se le da a ${x.nombre.split(" ")[0]}`}>
-                        {opcionesDe(x).map(([k, t]) => <button key={k} type="button" role="radio" aria-checked={d === k} className={d === k ? "on" : ""} onClick={() => setDec((v) => ({ ...v, [x.id]: k }))}>{t}</button>)}
+                      <div className="ck-pago">
+                        <span>Se le paga con</span>
+                        <Selector className="ck-sel" etiqueta={`Cómo se le paga a ${x.nombre.split(" ")[0]}`} valor={d} onChange={(k) => setDec((v) => ({ ...v, [x.id]: k }))}
+                          opciones={opcionesDe(x).map(([k, t]) => ({ valor: k, texto: t }))} />
                       </div>
                     )}
                     {nota && <small className="muted">{nota}</small>}

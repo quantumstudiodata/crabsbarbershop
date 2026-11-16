@@ -113,16 +113,16 @@ export const PUNTOS: Record<string, Punto> = {
     ],
   },
   cortesver: {
-    id: "cortesver", nombre: "Cortes de caja", ejemplo: "Consulta cada corte y si tuvo diferencia.", ruta: "/analitica/cortes", ir: ['a[href="/analitica/cortes"]', 'a[href="/analitica"]'],
+    id: "cortesver", nombre: "Cortes de caja", ejemplo: "Cada corte aparece en Movimientos, en la hora en que se hizo.", ruta: "/analitica/finanzas", ir: ['a[href="/analitica/finanzas"]', 'a[href="/analitica"]'],
     pasos: [
-      { sel: ".rev-l, .tabla-c tbody tr", modo: "leer", alt: { sel: ".vacio-g", t: "Aquí verás cada corte", x: "Todavía no hay cortes. Cada vez que alguien cierre la caja, aparecerá aquí con lo vendido y si sobró o faltó dinero." }, t: "Cada corte del equipo", x: "Aquí está cada cierre de caja: quién lo hizo, cuánto se vendió y si sobró o faltó dinero. Tócalo para ver el detalle y sus comprobantes.", h: "Toca Siguiente" },
+      { sel: ".hist-corte", modo: "leer", alt: { sel: ".vacio-g, .panel-hist", t: "Aquí verás cada corte", x: "Cada vez que alguien cierre la caja, el corte aparece en el historial con su folio y lo vendido." }, t: "Cada corte del equipo", x: "Los cortes aparecen en el historial como separadores. Toca Ver corte para ver si sobró o faltó dinero y sus comprobantes.", h: "Toca Siguiente" },
     ],
   },
   ventas: {
-    id: "ventas", nombre: "Ventas", ejemplo: "Todo lo cobrado: quién lo hizo y cómo pagaron.", ruta: "/analitica/ventas", ir: ['a[href="/analitica/ventas"]', 'a[href="/analitica"]'],
+    id: "ventas", nombre: "Movimientos", ejemplo: "Ventas, cortes y todo el dinero que entra o sale.", ruta: "/analitica/finanzas", ir: ['a[href="/analitica/finanzas"]', 'a[href="/analitica"]'],
     pasos: [
-      { sel: ".hist-linea", modo: "leer", alt: { sel: ".vacio-g, main p.muted", t: "Aquí verás cada venta", x: "Todavía no hay ventas. En cuanto cobres la primera, aparecerá aquí con su hora, servicios, folio y total." }, t: "Cada renglón es una venta", x: "Ves la hora, los servicios, el folio y el total. Tócala para ver el detalle o el ticket.", h: "Toca Siguiente" },
-      { sel: "button.campo-f, button.input", modo: "leer", opcional: true, t: "Busca lo que necesites", x: "Filtra por fechas o por persona para encontrar una venta en segundos.", h: "Toca Siguiente" },
+      { sel: ".hist-linea", modo: "leer", alt: { sel: ".vacio-g, .panel-hist", t: "Aquí verás cada movimiento", x: "Todavía no hay movimientos. En cuanto cobres la primera venta, aparecerá aquí con su hora, folio y total." }, t: "Cada renglón es un movimiento", x: "Ventas, cortes de caja, egresos y pagos al equipo, el más reciente arriba. Tócalo para ver su detalle.", h: "Toca Siguiente" },
+      { sel: "button.campo-f, button.input", modo: "leer", opcional: true, t: "Busca lo que necesites", x: "Filtra por fechas, por persona o por tipo de movimiento.", h: "Toca Siguiente" },
     ],
   },
   citas: {

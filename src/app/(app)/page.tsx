@@ -83,15 +83,24 @@ function filasUltimos(ventas: Venta[], gente: Gente, hoy: string, zona: string, 
 }
 
 /** Citas de hoy que todavía no llegan (de todo el negocio o de una persona). */
+/**
+ * Citas por atender: primero las que faltan de hoy. Si hoy ya no queda ninguna, las siguientes de otros días,
+ * para que nunca se quede vacío teniendo citas agendadas.
+ */
 async function porLlegar(s: Sesion, hoy: string, zona: string, persona?: string) {
   if (!s.barberia.usaCitas || !s.puede("citas.ver")) return null;
-  const filas = await db.select({ id: schema.citas.id, inicio: schema.citas.inicio, cliente: schema.citas.clienteNombre, servicios: schema.citas.servicios, barbero: schema.usuarios.nombre, indiferente: schema.citas.indiferente })
+  const consulta = (soloHoy: boolean) => db.select({ id: schema.citas.id, inicio: schema.citas.inicio, cliente: schema.citas.clienteNombre, servicios: schema.citas.servicios, barbero: schema.usuarios.nombre })
     .from(schema.citas).innerJoin(schema.usuarios, eq(schema.usuarios.id, schema.citas.barberoId))
-    .where(and(eq(schema.citas.barberiaId, s.barberia.id), sql`(${schema.citas.inicio} at time zone ${zona})::date = ${hoy}::date`, gt(schema.citas.inicio, new Date()),
+    .where(and(eq(schema.citas.barberiaId, s.barberia.id), gt(schema.citas.inicio, new Date()),
+      ...(soloHoy ? [sql`(${schema.citas.inicio} at time zone ${zona})::date = ${hoy}::date`] : [sql`${schema.citas.inicio} < now() + interval '60 days'`]),
       or(eq(schema.citas.estado, "en_espera"), and(eq(schema.citas.estado, "apartada"), gt(schema.citas.expiraEn, new Date()))),
       ...(persona ? [eq(schema.citas.barberoId, persona)] : [])))
-    .orderBy(asc(schema.citas.inicio));
-  return filas.map((c) => ({ id: c.id, hora: horaCorta(c.inicio, zona), cliente: c.cliente, con: c.barbero.split(" ")[0], servicio: c.servicios.map((x) => x.nombre).join(" y ") }));
+    .orderBy(asc(schema.citas.inicio)).limit(soloHoy ? 50 : 4);
+  let filas = await consulta(true);
+  const deHoy = filas.length > 0;
+  if (!deHoy) filas = await consulta(false);
+  const dia = (d: Date) => new Intl.DateTimeFormat("es-MX", { timeZone: zona, weekday: "short", day: "numeric", month: "short" }).format(d).replace(/\./g, "");
+  return filas.map((c) => ({ id: c.id, hora: horaCorta(c.inicio, zona), dia: deHoy ? "" : dia(c.inicio), cliente: c.cliente, con: c.barbero.split(" ")[0], servicio: c.servicios.map((x) => x.nombre).join(" y ") }));
 }
 
 /**
@@ -110,7 +119,7 @@ async function accionesDe(s: Sesion, turno: Turno | null | undefined, hoy: strin
     { k: "compartir", href: "/citas?compartir=1", texto: "Compartir enlace para reservar", corto: "Compartir enlace", icono: "enviar", ok: s.barberia.usaCitas && !!s.barberia.slug && leerConfig(s.barberia.citasConfig).enLinea && s.puede("citas.ver") },
     { k: "egreso", href: "/analitica/finanzas?egreso=1", texto: "Registrar un egreso", corto: "Egreso", icono: "archivo", ok: s.puede("gastos.registrar") },
     { k: "pago", href: "/equipo?pagar=1", texto: "Registrar pago o comisión", corto: "Pago al equipo", icono: "efectivo", ok: s.puede("equipo.pagar") && !s.barberia.pagosEquipoAuto },
-    { k: "ventas", href: "/analitica/ventas", texto: barbero ? "Ver mis ventas" : "Ver ventas", corto: barbero ? "Mis ventas" : "Ventas", icono: "lista", ok: true },
+    { k: "ventas", href: "/analitica/finanzas?tipo=ventas", texto: barbero ? "Ver mis ventas" : "Ver ventas", corto: barbero ? "Mis ventas" : "Ventas", icono: "lista", ok: true },
     { k: "historial", href: "/equipo/pagos", texto: s.barberia.pagosEquipoAuto ? "Ver historial de comisiones" : "Ver historial de pagos", corto: s.barberia.pagosEquipoAuto ? "Comisiones" : "Historial de pagos", icono: "historial", ok: s.puede("equipo.pagar") || s.puede("equipo.autorizar") },
     { k: "correccion", href: "/analitica/cortes", texto: "Corregir un corte de caja", corto: "Corregir corte", icono: "editar", ok: s.puede("caja.corregir") && s.puede("cortes.ver") },
     { k: "resenas", href: "/clientes/resenas", texto: "Ver reseñas", corto: "Reseñas", icono: "estrella", ok: s.barberia.usaCitas || s.puede("resenas.responder") },
@@ -170,6 +179,10 @@ function InicioVista(v: Vista) {
   const reparto = [[true, true], [true, false], [false, true], [false, false]].map(([eq, gan]) => ({ eq, gan, d: Math.abs(base + (eq ? altoEq : 0) + (gan ? altoGan : 0) - (altoDer + (eq ? 0 : altoEq) + (gan || !altoGan ? 0 : altoGan + 40))) }))
     .sort((a, b) => a.d - b.d)[0];
   const equipoIzq = reparto.eq, ganadoIzq = reparto.gan;
+  // Lo que no se pudo emparejar lo absorbe la gráfica de hoy: crece o se encoge para que ninguna tarjeta quede con espacio vacío.
+  const izqFinal = base + (equipoIzq ? altoEq + 20 : 0) + (ganadoIzq ? altoGan : 0);
+  const derFinal = altoDer + (equipoIzq ? 0 : altoEq + 20) + (ganadoIzq || !altoGan ? 0 : altoGan + 40);
+  const altoGraf = v.servicios > 0 ? Math.round(Math.min(Math.max(150 + (derFinal - izqFinal), 100), 300)) : 150;
   const serie = serieHoy(v.movs, hoy, zona);
   const pct = v.meta ? porcentaje(v.total, v.meta.monto) : 0;
   const barra = v.meta ? <div className="ini-meta" role="progressbar" aria-valuemin={0} aria-valuemax={100} aria-valuenow={Math.min(pct, 100)} aria-label="Avance de la meta"><i style={{ width: `${Math.max(Math.min(pct, 100), 2)}%` }} /></div> : null;
@@ -208,11 +221,11 @@ function InicioVista(v: Vista) {
       {siguiente && (
         <section className="glass ini-sig solo-movil subir d2">
           <span className="lab">{v.barbero ? "Tu siguiente cita" : "Próxima cita"}</span>
-          <div className="entre"><span><b>{siguiente.hora}</b> {siguiente.cliente}</span><span className="muted">{v.barbero ? siguiente.servicio : `con ${siguiente.con}`}</span></div>
+          <div className="entre"><span><b>{siguiente.dia ? `${siguiente.dia}, ${siguiente.hora}` : siguiente.hora}</b> {siguiente.cliente}</span><span className="muted">{v.barbero ? siguiente.servicio : `con ${siguiente.con}`}</span></div>
         </section>
       )}
       <section className="glass ini-card ini-eq-m-card solo-movil subir d2">
-        <div className="entre"><span className="lab">Equipo hoy</span>{v.verVentas && <Link className="ini-link" href="/analitica/ventas">Ver ventas</Link>}</div>
+        <div className="entre"><span className="lab">Equipo hoy</span>{v.verVentas && <Link className="ini-link" href="/analitica/finanzas?tipo=ventas">Ver ventas</Link>}</div>
         {listaEquipo}
       </section>
 
@@ -229,14 +242,14 @@ function InicioVista(v: Vista) {
           </div>
           {v.meta && (
             <div className="ini-meta-f">
-              <div className="entre"><span>{v.barbero ? "Tu meta de hoy" : "Meta de hoy"} {formatoDinero(v.meta.monto)}{v.meta.ayuda && <Ayuda titulo="Meta de hoy">{v.meta.ayuda}</Ayuda>}</span><b>{pct}%</b></div>
+              <div className="entre"><span>{v.barbero ? "Tu meta de hoy" : "Meta de hoy"} {formatoDinero(v.meta.monto)}{v.meta.ayuda && <Ayuda titulo="Meta de hoy">{v.meta.ayuda}</Ayuda>}</span><b>{pct >= 100 ? `Cumplida, ${pct}%` : `${pct}%`}</b></div>
               {barra}
               {v.meta.nota && <small className="muted">{v.meta.nota}</small>}
             </div>
           )}
           {v.ganado && ganadoIzq && <TarjetaGanado g={v.ganado} />}
           {v.servicios === 0 ? <p className="muted ini-sin-graf">La gráfica del día aparece con la primera venta.</p> : <div className="ini-graf">
-            <Grafica id="inicio-hoy" actual={serie.actual} previo={serie.previo} etiquetas={serie.etiquetas} cadaEtiqueta={serie.cada} alto={150} enCurso={serie.enCurso}
+            <Grafica id="inicio-hoy" actual={serie.actual} previo={serie.previo} etiquetas={serie.etiquetas} cadaEtiqueta={serie.cada} alto={altoGraf} enCurso={serie.enCurso}
               globos={serie.actual.map((x, i) => (x === null ? null : [`A las ${serie.etiquetas[i]}`, formatoDinero(x), "acumulado"] as [string, string, string]))}
               descripcion={`${v.barbero ? "Tus ventas" : "Ventas"} de hoy por hora contra el ${dia} pasado`} vacio="Se dibuja con la primera venta del día" />
           </div>}
@@ -252,10 +265,10 @@ function InicioVista(v: Vista) {
           {v.ganado && !ganadoIzq && <TarjetaGanado g={v.ganado} tarjeta className="subir d2" />}
           {v.citas && (
             <section className="glass ini-card subir d2">
-              <div className="entre"><span className="lab">{v.barbero ? "Tus próximas citas" : "Próximas citas"}</span><Link className="ini-link" href={v.barbero ? `/citas?persona=${s.usuario.id}` : "/citas"}>Agenda</Link></div>
+              <div className="entre"><span className="lab">{v.citas.some((c) => c.dia) ? (v.barbero ? "Tus siguientes citas" : "Siguientes citas") : v.barbero ? "Tus citas de hoy" : "Citas de hoy"}</span><Link className="ini-link" href={v.barbero ? `/citas?persona=${s.usuario.id}` : "/citas"}>Agenda</Link></div>
               {v.citas.length ? v.citas.slice(0, 3).map((c) => (
-                <div key={c.id} className="ini-cita"><b>{c.hora}</b><span>{c.cliente}</span><span className="muted">{v.barbero ? c.servicio : c.con}</span></div>
-              )) : <p className="muted ini-vacio">No hay más citas hoy.</p>}
+                <div key={c.id} className="ini-cita"><b>{c.dia ? <>{c.dia}<small>{c.hora}</small></> : c.hora}</b><span>{c.cliente}</span><span className="muted">{v.barbero ? c.servicio : c.con}</span></div>
+              )) : <p className="muted ini-vacio">No hay citas agendadas.</p>}
               {v.citas.length > 3 && <small className="muted">y {v.citas.length - 3} más</small>}
             </section>
           )}
@@ -271,7 +284,7 @@ function InicioVista(v: Vista) {
       <section className="ultimos-s subir d3">
         <div className="entre">
           <h2 className="sub-t">Últimos servicios</h2>
-          {v.verVentas && <Link className="bt-ver" href="/analitica/ventas">Ver todas las ventas<span><Icono n="derecha" /></span></Link>}
+          {v.verVentas && <Link className="bt-ver" href="/analitica/finanzas?tipo=ventas">Ver todas las ventas<span><Icono n="derecha" /></span></Link>}
         </div>
         <UltimosServicios filas={v.ultimos} />
       </section>
@@ -323,7 +336,7 @@ export default async function Inicio({ searchParams }: { searchParams: Promise<Q
     const m = delMes?.porBarbero.find((b) => b.id === e.id && b.aplica);
     return { id: e.id, nombre: e.nombre, avatar: e.avatar, servicios: cs.length, monto: cs.reduce((x, c) => x + c.precioCobrado, 0), meta: m?.diaria };
   }).sort((a, b) => b.monto - a.monto);
-  const acciones = await accionesDe(s, turno, hoy, zona, citas?.length ?? null, false);
+  const acciones = await accionesDe(s, turno, hoy, zona, citas ? citas.filter((c) => !c.dia).length : null, false);
   return (
     <InicioVista s={s} hoy={hoy} zona={zona} avisos={avisos} acciones={acciones} barbero={false} ganado={await ganadoDe(s, zona, hoy)}
       total={total} servicios={conceptos.length} clientes={deHoy.length} previo={previo}
@@ -365,7 +378,7 @@ async function InicioBarbero({ s, hoy, zona, turno, avisos }: { s: Sesion; hoy: 
     const cs = conceptosHoy.filter((c) => c.barberoId === g.id);
     return { id: g.id, nombre: g.nombre, avatar: g.avatar, servicios: cs.length, monto: cs.reduce((a, c) => a + c.precioCobrado, 0) };
   }).sort((a, b) => b.monto - a.monto);
-  const acciones = await accionesDe(s, turno, hoy, zona, citas?.length ?? null, true);
+  const acciones = await accionesDe(s, turno, hoy, zona, citas ? citas.filter((c) => !c.dia).length : null, true);
   return (
     <InicioVista s={s} hoy={hoy} zona={zona} avisos={avisos} acciones={acciones} barbero ganado={await ganadoDe(s, zona, hoy)}
       total={total} servicios={deHoy.length} clientes={clientesHoy} previo={previo}
@@ -373,6 +386,6 @@ async function InicioBarbero({ s, hoy, zona, turno, avisos }: { s: Sesion; hoy: 
       meta={s.barberia.usaMetas ? { monto: Math.max(metaHoy, 1), ayuda: mia?.aplica ? "Sale de la meta mensual del negocio y de tu forma de pago." : "Refleja tu meta de ventas y cuánto llevas de ella." } : null}
       citas={citas} equipo={filasEq} pendientes={pendientes}
       ultimos={filasUltimos(todas.slice(0, 5), gente, hoy, zona, await verificadosDe(todas.slice(0, 5).map((v) => v.id)))}
-      verMas={{ href: "/analitica/ventas", texto: "Ver tu semana y mes en Ventas" }} verVentas />
+      verMas={{ href: "/analitica/finanzas?tipo=ventas", texto: "Ver tus ventas en Movimientos" }} verVentas />
   );
 }

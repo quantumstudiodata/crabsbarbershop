@@ -23,7 +23,7 @@ export async function cancelarVenta(form: FormData) {
   const ventaId = texto(form, "ventaId", 40);
   const motivo = texto(form, "motivo", 300);
   const r = texto(form, "regreso", 200);
-  const regreso = r.startsWith("/analitica/ventas") || r.startsWith("/mis-ventas") ? r : "/analitica/ventas";
+  const regreso = r.startsWith("/analitica/finanzas") || r.startsWith("/analitica/ventas") ? r : "/analitica/finanzas";
   if (!motivo) volver(regreso, { error: "Escribe el motivo de la cancelación." });
   const [v] = await db.select({ venta: schema.ventas, turno: schema.turnosCaja }).from(schema.ventas)
     .innerJoin(schema.turnosCaja, eq(schema.turnosCaja.id, schema.ventas.turnoId))
