@@ -1,4 +1,5 @@
 import { ganadoDe, TarjetaGanado, type Ganado } from "./Ganado";
+import { GraficaAjustable, RejillaInicio } from "./RejillaInicio";
 import { and, asc, eq, gt, or, sql } from "drizzle-orm";
 import { asentarCitasPagadas } from "@/lib/pagos";
 import Link from "next/link";
@@ -194,6 +195,31 @@ function InicioVista(v: Vista) {
       <span className="ini-eq-m"><b>{formatoDinero(e.monto)}</b>{e.meta ? <small className="muted">meta del día {formatoDinero(e.meta)}</small> : e.servicios ? <small className="muted">{e.servicios} {e.servicios === 1 ? "servicio" : "servicios"}</small> : null}</span>
     </div>
   )) : <p className="muted ini-vacio">Todavía no hay personas que atiendan.</p>;
+  const tarjetaHoy = (conGanado: boolean) => (
+        <section className="glass ini-hoy subir d1">
+          <div className="ini-hoy-c">
+            <div><span className="lab">{v.barbero ? "Hoy llevas" : "Hoy llevan"}</span><b className="ini-big"><Cuenta valor={v.total} /></b></div>
+            <div className="ini-dato">
+              <span><b>{v.servicios}</b> {v.servicios === 1 ? "servicio" : "servicios"}{v.clientes > 0 && <>, <b>{formatoDinero(Math.round(v.total / v.clientes))}</b> por cliente</>}</span>
+              <span>{comparacion(v.total, v.previo, dia)}</span>
+            </div>
+          </div>
+          {v.meta && (
+            <div className="ini-meta-f">
+              <div className="entre"><span>{v.barbero ? "Tu meta de hoy" : "Meta de hoy"} {formatoDinero(v.meta.monto)}{v.meta.ayuda && <Ayuda titulo="Meta de hoy">{v.meta.ayuda}</Ayuda>}</span><b>{pct >= 100 ? `Cumplida, ${pct}%` : `${pct}%`}</b></div>
+              {barra}
+              {v.meta.nota && <small className="muted">{v.meta.nota}</small>}
+            </div>
+          )}
+          {conGanado && v.ganado && <TarjetaGanado g={v.ganado} />}
+          {/* Sin ventas todavía, la gráfica se ve vacía con su aviso: el espacio no queda en blanco. */}<div className="ini-graf">
+            <GraficaAjustable id="inicio-hoy" actual={serie.actual} previo={serie.previo} etiquetas={serie.etiquetas} cadaEtiqueta={serie.cada} alto={altoGraf} enCurso={serie.enCurso}
+              globos={serie.actual.map((x, i) => (x === null ? null : [`A las ${serie.etiquetas[i]}`, formatoDinero(x), "acumulado"] as [string, string, string]))}
+              descripcion={`${v.barbero ? "Tus ventas" : "Ventas"} de hoy por hora contra el ${dia} pasado`} vacio="La gráfica del día aparece con la primera venta" />
+          </div>
+          {v.verMas && <Link className="ini-link" href={v.verMas.href}>{v.verMas.texto}</Link>}
+        </section>
+  );
   return (
     <>
       {v.avisos}
@@ -230,41 +256,14 @@ function InicioVista(v: Vista) {
       </section>
 
       {/* Escritorio */}
-      <div className="ini-rejilla solo-escritorio">{/* Equipo hoy va en la columna más corta; la última tarjeta de cada columna se estira para que las dos terminen parejas. */}
-        <div className="ini-izq">
-        <section className="glass ini-hoy subir d1">
-          <div className="ini-hoy-c">
-            <div><span className="lab">{v.barbero ? "Hoy llevas" : "Hoy llevan"}</span><b className="ini-big"><Cuenta valor={v.total} /></b></div>
-            <div className="ini-dato">
-              <span><b>{v.servicios}</b> {v.servicios === 1 ? "servicio" : "servicios"}{v.clientes > 0 && <>, <b>{formatoDinero(Math.round(v.total / v.clientes))}</b> por cliente</>}</span>
-              <span>{comparacion(v.total, v.previo, dia)}</span>
-            </div>
-          </div>
-          {v.meta && (
-            <div className="ini-meta-f">
-              <div className="entre"><span>{v.barbero ? "Tu meta de hoy" : "Meta de hoy"} {formatoDinero(v.meta.monto)}{v.meta.ayuda && <Ayuda titulo="Meta de hoy">{v.meta.ayuda}</Ayuda>}</span><b>{pct >= 100 ? `Cumplida, ${pct}%` : `${pct}%`}</b></div>
-              {barra}
-              {v.meta.nota && <small className="muted">{v.meta.nota}</small>}
-            </div>
-          )}
-          {v.ganado && ganadoIzq && <TarjetaGanado g={v.ganado} />}
-          {v.servicios === 0 ? <p className="muted ini-sin-graf">La gráfica del día aparece con la primera venta.</p> : <div className="ini-graf">
-            <Grafica id="inicio-hoy" actual={serie.actual} previo={serie.previo} etiquetas={serie.etiquetas} cadaEtiqueta={serie.cada} alto={altoGraf} enCurso={serie.enCurso}
-              globos={serie.actual.map((x, i) => (x === null ? null : [`A las ${serie.etiquetas[i]}`, formatoDinero(x), "acumulado"] as [string, string, string]))}
-              descripcion={`${v.barbero ? "Tus ventas" : "Ventas"} de hoy por hora contra el ${dia} pasado`} vacio="Se dibuja con la primera venta del día" />
-          </div>}
-          {v.verMas && <Link className="ini-link" href={v.verMas.href}>{v.verMas.texto}</Link>}
-        </section>
-          {equipoIzq && <section className="glass ini-card subir d2">
-            <span className="lab">Equipo hoy</span>
-            {listaEquipo}
-          </section>}
-        </div>
-        <div className={`ini-der ${v.citas ? "con-citas" : ""}`}>
-          <Pendientes items={v.pendientes} className="subir d2" />
-          {v.ganado && !ganadoIzq && <TarjetaGanado g={v.ganado} tarjeta className="subir d2" />}
+      <RejillaInicio inicial={{ eq: equipoIzq, gan: ganadoIzq }}
+        hoyCon={tarjetaHoy(true)} hoySin={tarjetaHoy(false)}
+        ganado={v.ganado ? <TarjetaGanado g={v.ganado} tarjeta className="subir d2" /> : null}
+        equipo={<section className="glass ini-card subir d2"><span className="lab">Equipo hoy</span>{listaEquipo}</section>}
+        der={<>
+          {v.pendientes.length > 0 && <div data-fijo><Pendientes items={v.pendientes} className="subir d2" /></div>}
           {v.citas && (
-            <section className="glass ini-card subir d2">
+            <section data-fijo className="glass ini-card subir d2">
               <div className="entre"><span className="lab">{v.citas.some((c) => c.dia) ? (v.barbero ? "Tus siguientes citas" : "Siguientes citas") : v.barbero ? "Tus citas de hoy" : "Citas de hoy"}</span><Link className="ini-link" href={v.barbero ? `/citas?persona=${s.usuario.id}` : "/citas"}>Agenda</Link></div>
               {v.citas.length ? v.citas.slice(0, 3).map((c) => (
                 <div key={c.id} className="ini-cita"><b>{c.dia ? <>{c.dia}<small>{c.hora}</small></> : c.hora}</b><span>{c.cliente}</span><span className="muted">{v.barbero ? c.servicio : c.con}</span></div>
@@ -272,12 +271,7 @@ function InicioVista(v: Vista) {
               {v.citas.length > 3 && <small className="muted">y {v.citas.length - 3} más</small>}
             </section>
           )}
-          {!equipoIzq && <section className="glass ini-card subir d2">
-            <span className="lab">Equipo hoy</span>
-            {listaEquipo}
-          </section>}
-        </div>
-      </div>
+        </>} />
 
       {v.semana && <TarjetaSemana r={v.semana} />}
 

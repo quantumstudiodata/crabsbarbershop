@@ -5659,3 +5659,28 @@ html:has(.fx-raiz .mc) body::before, html:has(.fx-raiz .mc) body::after { displa
 .mov-h .mov-sub { font-size: 11.5px; color: var(--muted); overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
 .mov-h .mov-tipo { background: rgba(60,81,99,.08); }
 .mov-h.cancelada .num, .mov-h.cancelada .srv > span { text-decoration: line-through; color: var(--muted); }
+
+/* Inicio: la columna izquierda crece con la tarjeta de hoy; su gráfica llena el espacio sobrante sin deformarse. */
+.ini-izq { justify-content: flex-start; }
+.ini-der { justify-content: flex-start; }
+.ini-izq > *, .ini-der > * { flex: 0 0 auto; }
+.ini-izq > .ini-hoy-w { flex: 1 0 auto; display: flex; flex-direction: column; }
+.ini-hoy-w > .ini-hoy { flex: 1 0 auto; }
+.ini-hoy-w .ini-graf { flex: 1 1 0; min-height: 84px; margin-top: 0; display: flex; }
+.graf-ajustable { position: relative; flex: 1 1 auto; min-height: 84px; overflow: hidden; }
+.graf-ajustable > div { position: absolute; inset: 0; }
+.ini-hoy-w .ini-sin-graf { flex: 1 1 0; min-height: 60px; display: grid; place-items: center; text-align: center; margin: 0; border-radius: 14px; background: rgba(30,45,60,.035); }
+
+/* G5: los historiales (Movimientos, Cortes, Actividad) muestran su lista completa con paginación, sin recuadro con desplazamiento propio. */
+.hist-scroll, .tabla-c-scroll { max-height: none !important; overflow: visible; padding-right: 0; }
+.tabla-c-scroll { overflow-x: auto; }
+
+/* Si la columna derecha queda unos píxeles más corta, su última tarjeta se alarga repartiendo sus renglones, sin dejar un bloque vacío. */
+.ini-der > :last-child { flex: 1 0 auto; display: flex; flex-direction: column; }
+.ini-der > :last-child > section { flex: 1 0 auto; align-content: space-between; }
+.ini-der > section:last-child { display: grid; align-content: space-between; }
+/* Si la última tarjeta solo dice que no hay nada, el texto queda en medio del espacio y no pegado abajo. */
+.ini-der > section:last-child:has(> .ini-vacio) { grid-template-rows: auto 1fr; align-content: stretch; }
+.ini-der > section:last-child > .ini-vacio { align-self: center; }
+.ini-rejilla.midiendo { align-items: start; }
+.ini-rejilla.midiendo .ini-izq > *, .ini-rejilla.midiendo .ini-der > *, .ini-rejilla.midiendo .ini-der > :last-child > section, .ini-rejilla.midiendo .ini-hoy-w > .ini-hoy { flex: 0 0 auto; }
