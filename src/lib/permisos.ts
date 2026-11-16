@@ -75,7 +75,8 @@ export const PERMISOS_POR_ROL: Record<Rol, Permiso[]> = {
   duena: TODOS,
   admin: TODOS,
   contador: [
-    "ventas.ver_todas", "cortes.ver", "gastos.ver", "gastos.registrar", "gastos.cancelar", "equipo.pagar",
+    // Registra movimientos de caja desde Movimientos (no usa la pantalla de Cobro).
+    "ventas.ver_todas", "cortes.ver", "caja.retiros", "gastos.ver", "gastos.registrar", "gastos.cancelar", "equipo.pagar",
     "usuarios.ver", "servicios.ver", "configuracion.ver", "reportes.ver", "reportes.exportar",
     "citas.ver", "citas.pagos",
   ],

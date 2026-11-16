@@ -39,6 +39,8 @@ const duracion = (iso: string) => {
 };
 
 const abrir = (v: Vista) => window.dispatchEvent(new CustomEvent("crabs:caja", { detail: v }));
+/** Abre "¿Qué pasó con el dinero?" desde otra pantalla (Movimientos, para quien no usa Cobro). */
+export const abrirMovimientoCaja = () => abrir("movimiento");
 
 /** Línea discreta arriba de Cobro mientras la caja está abierta. */
 export function BarraCaja({ turno, folioVenta }: { turno: Turno; folioVenta: string }) {
@@ -143,7 +145,7 @@ function Resumen({ r, cerrar }: { r: ResumenCorte; cerrar: () => void }) {
   );
 }
 
-export function CajaModal({ inicial, turno, limiteDiferencia, categorias, evidencias = false, egresos = false, configurar = false }: { inicial: Vista | null; turno: Turno | null; limiteDiferencia: number; categorias: string[]; evidencias?: boolean; /** Puede registrar egresos en Movimientos. */ egresos?: boolean; /** Puede editar las categorías de gasto. */ configurar?: boolean }) {
+export function CajaModal({ inicial, turno, limiteDiferencia, categorias, evidencias = false, egresos = false, configurar = false, abierta = false }: { inicial: Vista | null; turno: Turno | null; limiteDiferencia: number; categorias: string[]; evidencias?: boolean; /** Puede registrar egresos en Movimientos. */ egresos?: boolean; /** Puede editar las categorías de gasto. */ configurar?: boolean; /** Fuera de Cobro: hay caja abierta aunque no se tengan sus datos (solo para movimientos, no para el corte). */ abierta?: boolean }) {
   const [vista, setVista] = useState<Vista | null>(inicial);
   const [eMov, accMov, guardandoMov] = useActionState<EstadoCaja, FormData>(registrarMovimiento, {});
   const [eGasto, accGasto, guardandoGasto] = useActionState<EstadoCaja, FormData>(registrarGasto, {});
@@ -168,7 +170,7 @@ export function CajaModal({ inicial, turno, limiteDiferencia, categorias, eviden
 
   const cerrar = () => { setVista(null); setGasto(""); };
   if (resumen) return <Resumen r={resumen} cerrar={() => setResumen(null)} />;
-  if (!vista || !turno) return null;
+  if (!vista || (!turno && !(abierta && vista !== "corte"))) return null;
 
   // Una sola puerta: la persona dice qué pasó y la app sabe cómo guardarlo.
   const atras = <button type="button" className="mov-atras" onClick={() => setVista("movimiento")}><Icono n="izquierda" />Elegir otra cosa</button>;
@@ -231,6 +233,7 @@ export function CajaModal({ inicial, turno, limiteDiferencia, categorias, eviden
     );
   }
 
+  if (!turno) return null;
   return <CortePasos turno={turno} accion={accCerrar} cerrando={cerrando} error={eCerrar.error} contado={contado} setContado={setContado} limiteDiferencia={limiteDiferencia} evidencias={evidencias} cerrar={cerrar} />;
 }
 

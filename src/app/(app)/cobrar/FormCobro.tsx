@@ -49,6 +49,8 @@ export function FormCobro(p: {
   const [descuento, setDescuento] = useState<{ tipo: "pct" | "fijo"; valor: string } | null>(null);
   const [motivo, setMotivo] = useState("");
   const [propina, setPropina] = useState<{ tipo: "pct" | "fijo"; valor: string } | null>(null);
+  // Cómo se paga la propina: por defecto igual que el servicio; se puede cambiar (servicio con tarjeta y propina en efectivo, o al revés).
+  const [propForma, setPropForma] = useState<"efectivo" | "otro" | null>(null);
   const [ultima, setUltima] = useState<{ folio: string; total: number; encuesta?: string | null } | null>(null);
   const [cobroQr, setCobroQr] = useState<CobroQrAbierto | null>(null);
   // Cobro con QR que se dejó en espera al cerrar su ventana: pasa a la lista de cobros en espera.
@@ -69,7 +71,7 @@ export function FormCobro(p: {
 
   const limpiar = () => {
     setClave(nuevaClave()); setLineas([]); setDividir(false); setMonto1(""); setRecibido(""); setBuscar("");
-    setPanel(null); setDescuento(null); setMotivo(""); setPropina(null); setCodigo(""); setCodigoTxt(""); setCita(null);
+    setPanel(null); setDescuento(null); setMotivo(""); setPropina(null); setPropForma(null); setCodigo(""); setCodigoTxt(""); setCita(null);
   };
 
   // Después de cobrar: limpiar todo y preparar una venta nueva (una sola vez por folio).
@@ -167,10 +169,11 @@ export function FormCobro(p: {
   const pasaLimite = desc > Math.floor((subtotal * p.limiteDescuento) / 100);
   const efectivoSolo = !dividir && metodoActual?.esEfectivo;
   const pagaCon = leerPesos(recibido);
-  // La propina se paga igual que la venta.
-  const propinaEfectivo = !!metodoActual?.esEfectivo;
+  // La propina se paga igual que la venta, salvo que se elija otra forma. Con QR va siempre en el cobro con tarjeta.
+  const hayEfectivo = p.metodos.some((m) => m.esEfectivo);
+  const propinaEfectivo = conQr ? false : propForma ? propForma === "efectivo" && hayEfectivo : !!metodoActual?.esEfectivo;
   const aCobrarEfectivo = total + (propinaEfectivo ? prop : 0);
-  const aCobrarTransferencia = total + prop;
+  const aCobrarTransferencia = total + (propinaEfectivo ? 0 : prop);
   const cambioC = pagaCon !== null ? pagaCon - aCobrarEfectivo : null;
 
   const datos = useMemo(() => JSON.stringify({
@@ -395,8 +398,15 @@ export function FormCobro(p: {
                 </button>
               ))}
               <span className="otra"><span>Otra</span><input data-paso="" inputMode="decimal" placeholder="$0" value={propina?.tipo === "fijo" ? propina.valor : ""} onChange={(e) => setPropina(e.target.value ? { tipo: "fijo", valor: e.target.value } : null)} aria-label="Otra cantidad de propina" /></span>
-              {propina && <button type="button" data-paso="" className="quitar" onClick={() => setPropina(null)}>Quitar</button>}
+              {propina && <button type="button" data-paso="" className="quitar" onClick={() => { setPropina(null); setPropForma(null); }}>Quitar</button>}
             </div>
+            {prop > 0 && !conQr && hayEfectivo && p.metodos.some((m) => !m.esEfectivo) && (
+              <div className="billetes prop-forma" role="radiogroup" aria-label="Cómo paga la propina">
+                <span className="muted" style={{ fontSize: 12 }}>La propina se paga</span>
+                <button type="button" data-paso="" role="radio" aria-checked={propinaEfectivo} className={propinaEfectivo ? "on" : ""} onClick={() => setPropForma("efectivo")}>En efectivo</button>
+                <button type="button" data-paso="" role="radio" aria-checked={!propinaEfectivo} className={!propinaEfectivo ? "on" : ""} onClick={() => setPropForma("otro")}>Con tarjeta o transferencia</button>
+              </div>
+            )}
           </div>
         )}
 
@@ -445,7 +455,7 @@ export function FormCobro(p: {
           <span className="lab">{anticipo > 0 ? "Por cobrar" : "Total"}</span>
           <span className="big">{formatoDinero(total + prop)}</span>
         </div>
-        {prop > 0 && <div className="renglon desglose-p"><span className="muted">{formatoDinero(total)} de servicios + {formatoDinero(prop)} de propina</span></div>}
+        {prop > 0 && <div className="renglon desglose-p"><span className="muted">{formatoDinero(total)} de servicios + {formatoDinero(prop)} de propina{propinaEfectivo !== !!metodoActual?.esEfectivo || dividir ? (propinaEfectivo ? " en efectivo" : " con tarjeta o transferencia") : ""}</span></div>}
         {estado.error && <p className="aviso error" role="alert">{estado.error}</p>}
         <button className="bt grande" data-paso="cobrar" disabled={enviando || lineas.length === 0}>{enviando ? (conQr ? "Preparando el QR…" : "Guardando…") : conQr ? `Mostrar QR para cobrar ${formatoDinero(total + prop)}` : `Cobrar ${formatoDinero(total + prop)}`}<Fl /></button>
         <div className="atajos" aria-label="Atajos de teclado">

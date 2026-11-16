@@ -19,6 +19,9 @@ import { esMovil } from "@/lib/dispositivo";
 import { formatoDinero } from "@/lib/money";
 import { esPagoEquipo, esPropinaEntregada } from "@/lib/caja";
 import { Ayuda } from "@/components/Ayuda";
+import { CajaModal } from "../../cobrar/CajaModal";
+import { BotonCaja } from "./BotonCaja";
+import { esCategoriaComisiones } from "@/lib/pagos";
 import { Movimientos, type DiaMovimientos, type Movimiento } from "./Movimientos";
 import { liquidarAutomaticos } from "@/lib/pagosAuto";
 import { asentarCitasPagadas } from "@/lib/pagos";
@@ -30,7 +33,7 @@ const SUELDO = new Set(["sueldo", "mixto"]);
 const TIPOS = [["", "Todos los movimientos"], ["ingresos", "Ingresos"], ["egresos", "Egresos"], ["equipo", "Pagos al equipo"], ["caja", "Dinero que entró o salió de la caja"]] as const;
 const METODO: Record<string, string> = { efectivo: "efectivo", transferencia: "transferencia", tarjeta: "tarjeta" };
 
-type Q = ConsultaFiltros & { tipo?: string; egreso?: string };
+type Q = ConsultaFiltros & { tipo?: string; egreso?: string; caja?: string };
 
 /** Finanzas y egresos en una sola pantalla: lo que quedó del periodo y todos los movimientos del negocio. */
 export default async function Finanzas({ searchParams }: { searchParams: Promise<Q> }) {
@@ -41,6 +44,9 @@ export default async function Finanzas({ searchParams }: { searchParams: Promise
   const verTodo = s.puede("reportes.ver");
   if (!verTodo && !s.puede("gastos.ver")) redirect("/?aviso=sin-permiso");
   const q = await searchParams;
+  // Quien registra movimientos de caja pero no usa Cobro (Administrador) los registra aquí; quien usa Cobro, allá, para no tener dos botones para lo mismo.
+  const cobra = s.puede("ventas.registrar") || s.puede("ventas.registrar_otros");
+  const movCaja = s.puede("caja.retiros") && !cobra && !s.vista;
   const zona = s.barberia.zonaHoraria;
   const hoy = fechaLocal(new Date(), zona);
   const bId = s.barberia.id;
@@ -208,8 +214,10 @@ export default async function Finanzas({ searchParams }: { searchParams: Promise
           {anterior && <p className="aviso-sutil">Mostrando {nombreP} hasta que empiece el mes.</p>}
         </>
       )}
-      <Movimientos abrirEgreso={q.egreso === "1"} dias={dias} registrar={s.puede("gastos.registrar")} hoy={hoy} cajaAbierta={!!turno} categorias={cats}
-        opciones={{ metodos: s.barberia.metodosEgreso, periodicidad: false, comprobantes: s.barberia.usaComprobantes, obligatorio: s.barberia.comprobanteObligatorio, frecuentes: frecuentes.map(({ id, concepto, categoria, monto, metodo, periodicidad }) => ({ id, concepto, categoria, monto, metodo, periodicidad })) }}
+      {movCaja && <CajaModal inicial={q.caja === "movimiento" ? "movimiento" : null} turno={null} abierta={!!turno} limiteDiferencia={0}
+        categorias={cats.filter((c) => c.activo && !esCategoriaComisiones(c.nombre)).map((c) => c.nombre)} configurar={s.puede("configuracion.egresos") && !s.vista} />}
+      <Movimientos botonCaja={movCaja ? <BotonCaja abierta={!!turno} /> : undefined} abrirEgreso={q.egreso === "1"} dias={dias} registrar={s.puede("gastos.registrar")} hoy={hoy} cajaAbierta={!!turno} categorias={cats}
+        opciones={{ cajaHref: cobra && s.puede("caja.retiros") ? "/cobrar?caja=movimiento" : movCaja ? "/analitica/finanzas?caja=movimiento" : null, metodos: s.barberia.metodosEgreso, periodicidad: false, comprobantes: s.barberia.usaComprobantes, obligatorio: s.barberia.comprobanteObligatorio, frecuentes: frecuentes.map(({ id, concepto, categoria, monto, metodo, periodicidad }) => ({ id, concepto, categoria, monto, metodo, periodicidad })) }}
         filtros={<BarraFiltros p={f.periodo} hoy={hoy} personas={[]} persona="" buscar={f.buscar} sinPeriodo="Todas las fechas" textoBuscar="Buscar"
           descarga={s.puede("reportes.exportar") ? `/api/exportar?tipo=gastos${f.periodo ? `&desde=${f.periodo.desde}&hasta=${f.periodo.hasta}` : ""}` : undefined}
           extra={verTodo ? <SelectorUrl nombre="tipo" valor={tipo} opciones={TIPOS.map(([valor, texto]) => ({ valor, texto }))} etiqueta="Tipo de movimiento" /> : undefined} />} />

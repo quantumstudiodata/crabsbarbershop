@@ -95,7 +95,7 @@ function puntosGuia(s: Awaited<ReturnType<typeof requerirSesion>>, atiende: bool
   return [
     "acc",
     ...(cobra ? ["cobro", "atajos", "qr"] : []),
-    ...(s.puede("caja.retiros") ? ["retiro", "gasto"] : s.puede("gastos.registrar") ? ["egreso"] : []),
+    ...(cobra && s.puede("caja.retiros") ? ["retiro", "gasto"] : s.puede("gastos.registrar") ? ["egreso"] : []),
     ...(s.puede("caja.operar") ? ["corte"] : s.puede("cortes.ver") ? ["cortesver"] : []),
     ...(cobra || s.puede("ventas.ver_todas") ? ["ventas"] : []),
     ...(citas && s.puede("citas.modificar") ? ["citas"] : []),

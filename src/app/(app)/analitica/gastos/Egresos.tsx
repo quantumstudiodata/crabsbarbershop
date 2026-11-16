@@ -97,7 +97,7 @@ export function Egresos({ dias, hoy, cajaAbierta, puede, categorias, resumen, et
 const pct = (a: number, b: number) => (b ? `${Math.round((a / b) * 100)}%` : "0%");
 
 export type Frecuente = { id: string; concepto: string; categoria: string; monto: number; metodo: string; periodicidad: string };
-export type OpcionesEgreso = { periodicidad: boolean; comprobantes: boolean; obligatorio?: boolean; frecuentes: Frecuente[]; metodos: string[] };
+export type OpcionesEgreso = { /** Dónde se registra lo que sale de la caja; null si la persona no puede. */ cajaHref?: string | null; periodicidad: boolean; comprobantes: boolean; obligatorio?: boolean; frecuentes: Frecuente[]; metodos: string[] };
 const PERIODOS: [string, string][] = [["unica", "Una vez"], ["diaria", "Diaria"], ["semanal", "Semanal"], ["quincenal", "Quincenal"], ["mensual", "Mensual"]];
 
 export function Nuevo({ hoy, categorias, cerrar, otro, opciones }: { hoy: string; cajaAbierta: boolean; categorias: Categoria[]; cerrar: () => void; otro: () => void; opciones: OpcionesEgreso }) {
@@ -162,7 +162,7 @@ export function Nuevo({ hoy, categorias, cerrar, otro, opciones }: { hoy: string
           </div>
           <p className="ayuda-txt" style={{ margin: 0 }}>{metodo !== "efectivo"
             ? `Pagado con ${metodo}: no toca la caja.`
-            : <>Efectivo que no salió de la caja, por ejemplo de tu bolsillo o de la cuenta del negocio. Si salió de la caja, regístralo en Cobro, en <a className="enlace" href="/cobrar?caja=movimiento">Movimiento de caja</a>, para que el corte cuadre.</>}</p>
+            : <>Efectivo que no salió de la caja, por ejemplo de tu bolsillo o de la cuenta del negocio. {opciones.cajaHref === null ? "Si salió de la caja, pide a quien opera la caja que lo registre como movimiento de caja, para que el corte cuadre." : <>Si salió de la caja, regístralo en <a className="enlace" href={opciones.cajaHref ?? "/cobrar?caja=movimiento"}>Movimiento de caja</a>, para que el corte cuadre.</>}</>}</p>
           {opciones.periodicidad && <div className="campo"><span>Cada cuánto se repite</span><Selector etiqueta="Periodicidad del gasto" valor={periodo} onChange={setPeriodo} opciones={PERIODOS.map(([k, t]) => ({ valor: k, texto: t }))} /></div>}
         </div>
 

@@ -16,8 +16,8 @@ type Categoria = { id: string; nombre: string; activo: boolean };
 const firma = (c: number) => `${c < 0 ? "−" : "+"}${formatoDinero(Math.abs(c))}`;
 
 /** Lista de movimientos del negocio: ventas del día, egresos y pagos al equipo. Cada uno se abre para ver su detalle. */
-export function Movimientos({ dias, registrar, hoy, cajaAbierta, categorias, opciones, filtros, abrirEgreso }: {
-  abrirEgreso?: boolean; dias: DiaMovimientos[]; registrar: boolean; hoy: string; cajaAbierta: boolean; categorias: Categoria[]; opciones: OpcionesEgreso; filtros: React.ReactNode;
+export function Movimientos({ dias, registrar, hoy, cajaAbierta, categorias, opciones, filtros, abrirEgreso, botonCaja }: {
+  abrirEgreso?: boolean; botonCaja?: React.ReactNode; dias: DiaMovimientos[]; registrar: boolean; hoy: string; cajaAbierta: boolean; categorias: Categoria[]; opciones: OpcionesEgreso; filtros: React.ReactNode;
 }) {
   const [abierto, setAbierto] = useState<string | null>(null);
   const [nuevo, setNuevo] = useState(abrirEgreso && registrar ? 1 : 0);
@@ -26,7 +26,10 @@ export function Movimientos({ dias, registrar, hoy, cajaAbierta, categorias, opc
     <>
       <div className="tit-fuera">
         <span className="lab">Movimientos</span>
-        {registrar && <button type="button" className="bt chico" onClick={() => setNuevo((n) => n + 1)}><Icono n="mas" />Registrar egreso</button>}
+        <span className="fila" style={{ gap: 8 }}>
+          {botonCaja}
+          {registrar && <button type="button" className="bt chico" onClick={() => setNuevo((n) => n + 1)}><Icono n="mas" />Registrar egreso</button>}
+        </span>
       </div>
       {nuevo > 0 && <Nuevo key={nuevo} hoy={hoy} cajaAbierta={cajaAbierta} categorias={categorias.filter((c) => c.activo)} cerrar={() => setNuevo(0)} otro={() => setNuevo((n) => n + 1)} opciones={opciones} />}
       {cancelar && <Cancelar f={cancelar} cerrar={() => setCancelar(null)} />}
