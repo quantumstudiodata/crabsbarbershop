@@ -402,10 +402,10 @@ export async function diasYTotalVentas(barberiaId: string, zona: string, f: { de
     ? sql<number>`coalesce(sum(case when ${s.ventas.estado} = 'pagada' then (select coalesce(sum(c.precio_cobrado),0) from ${s.conceptos} c where c.venta_id = ${sql.raw('"ventas"."id"')} and c.barbero_id = ${f.persona}) else 0 end),0)::int`
     : sql<number>`coalesce(sum(case when ${s.ventas.estado} = 'pagada' then ${s.ventas.total} else 0 end),0)::int`;
   const [dias, [t]] = await Promise.all([
-    db.select({ d: dia }).from(s.ventas).where(cond).groupBy(sql`1`).orderBy(sql`1 desc`),
+    db.select({ d: dia, n: sql<number>`count(*)::int` }).from(s.ventas).where(cond).groupBy(sql`1`).orderBy(sql`1 desc`),
     db.select({ n: sql<number>`count(*) filter (where ${s.ventas.estado} = 'pagada')::int`, monto }).from(s.ventas).where(cond),
   ]);
-  return { dias: dias.map((x) => x.d), ventas: t.n, monto: t.monto };
+  return { dias: dias.map((x) => x.d), porDia: dias.map((x) => [x.d, x.n] as [string, number]), ventas: t.n, monto: t.monto };
 }
 
 /** Ventas que cumplen los filtros, de la más reciente a la más vieja: sirve para paginar por registros en el teléfono. */

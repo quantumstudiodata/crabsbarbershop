@@ -193,7 +193,7 @@ export async function cerrarCaja(_: EstadoCaja, form: FormData): Promise<EstadoC
 /** Corrección de un cierre ya hecho: no se edita el cierre, se agrega un ajuste con motivo. */
 export async function corregirCierre(form: FormData) {
   const s = await requerirSesion("caja.corregir");
-  const R = "/analitica/cortes";
+  const R = "/analitica/finanzas?tipo=cortes";
   const turnoId = texto(form, "turnoId", 40);
   const signo = texto(form, "signo") === "menos" ? -1 : 1;
   const monto = leerPesos(texto(form, "monto"));
@@ -209,19 +209,19 @@ export async function corregirCierre(form: FormData) {
       accion: `${s.usuario.nombre} corrigió el cierre del ${t.fechaOperativa} en ${signo < 0 ? "−" : ""}${formatoDinero(monto)}`, detalle: { motivo },
     });
   });
-  revalidatePath(R);
+  revalidatePath("/analitica/finanzas");
   volver(R, { aviso: "guardado" });
 }
 
 /** Marca como revisado un corte en el que faltó dinero. */
 export async function marcarRevisado(form: FormData) {
   const s = await requerirSesion("caja.corregir");
-  const R = "/analitica/cortes";
+  const R = "/analitica/finanzas?tipo=cortes";
   const turnoId = texto(form, "turnoId", 40);
   const [t] = await db.update(schema.turnosCaja).set({ revisadoPor: s.usuario.id, revisadoEn: new Date() })
     .where(and(eq(schema.turnosCaja.id, turnoId), eq(schema.turnosCaja.barberiaId, s.barberia.id), eq(schema.turnosCaja.estado, "cerrado")))
     .returning({ fecha: schema.turnosCaja.fechaOperativa });
   if (!t) volver(R, { error: "No se encontró ese corte." });
   await registrar(db, { barberiaId: s.barberia.id, usuarioId: s.usuario.id, tipo: "caja", accion: `${s.usuario.nombre} marcó como revisado el corte del ${fechaLarga(t.fecha).toLowerCase()}` });
-  revalidatePath(R);
+  revalidatePath("/analitica/finanzas");
 }

@@ -10,7 +10,7 @@ export const dynamic = "force-dynamic";
 
 const s = schema;
 const RUTA: Record<string, string> = {
-  venta: "/analitica/finanzas?tipo=ventas", caja: "/analitica/cortes", usuario: "/ajustes", precio: "/ajustes/servicios",
+  venta: "/analitica/finanzas?tipo=ventas", caja: "/analitica/finanzas?tipo=cortes", usuario: "/ajustes", precio: "/ajustes/servicios",
   ajuste: "/ajustes/cobro", equipo: "/equipo",
 };
 
@@ -185,7 +185,7 @@ async function avisosPara(se: Sesion): Promise<AvisoVivo[]> {
     ]);
     for (const c of cortes) if (c.t) avisos.push({
       id: `k${c.id}`, t: c.t.toISOString(), titulo: `${(c.dif ?? 0) < 0 ? "Faltaron" : "Sobraron"} ${formatoDinero(Math.abs(c.dif ?? 0))} en un corte`,
-      detalle: `Lo cerró ${primer(c.nombre)}`, href: "/analitica/cortes", nombre: c.nombre ?? "", avatar: c.avatar ?? "cangrejo", icono: "caja",
+      detalle: `Lo cerró ${primer(c.nombre)}`, href: `/analitica/finanzas?tipo=cortes&corte=${c.id}`, nombre: c.nombre ?? "", avatar: c.avatar ?? "cangrejo", icono: "caja",
     });
     for (const v of canceladas) if (v.t && v.por !== yo) avisos.push({ id: `x${v.id}`, t: v.t.toISOString(), titulo: `${primer(v.nombre)} canceló la venta ${v.folio}`, detalle: `${formatoDinero(v.total)}${v.motivo ? `, ${v.motivo}` : ""}`, href: `/analitica/ventas?q=${v.folio}`, nombre: v.nombre ?? "", avatar: v.avatar ?? "cangrejo" });
     for (const g of egresos) if (g.por !== yo) avisos.push({ id: `g${g.id}`, t: g.t.toISOString(), titulo: `${primer(g.nombre)} registró un egreso de ${formatoDinero(g.monto)}`, detalle: g.concepto, href: "/analitica/finanzas?tipo=egresos", nombre: g.nombre, avatar: g.avatar });

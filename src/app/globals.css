@@ -5672,10 +5672,40 @@ html:has(.fx-raiz .mc) body::before, html:has(.fx-raiz .mc) body::after { displa
 
 /* Si la columna derecha queda unos píxeles más corta, su última tarjeta se alarga repartiendo sus renglones, sin dejar un bloque vacío. */
 .ini-der > :last-child { flex: 1 0 auto; display: flex; flex-direction: column; }
-.ini-der > :last-child > section { flex: 1 0 auto; align-content: space-between; }
-.ini-der > section:last-child { display: grid; align-content: space-between; }
+/* La última tarjeta de la derecha se alarga hasta empatar con la izquierda: su contenido queda junto arriba (no se reparte con huecos)
+   y, si tiene pie (un total o un enlace), el pie baja al fondo. */
+.ini-der > :last-child > section { flex: 1 0 auto; }
+.ini-der > :last-child > section, .ini-der > section:last-child { display: flex; flex-direction: column; gap: 4px; justify-content: flex-start; }
+.ini-der > :last-child > section > .ini-pie, .ini-der > section:last-child > .ini-pie { margin-top: auto; }
+.ini-pie { display: flex; justify-content: space-between; align-items: baseline; gap: 10px; padding-top: 12px; margin-top: 6px; border-top: 1px solid var(--line); font-size: 13px; }
+.ini-pie b { font-size: 14px; }
 /* Si la última tarjeta solo dice que no hay nada, el texto queda en medio del espacio y no pegado abajo. */
-.ini-der > section:last-child:has(> .ini-vacio) { grid-template-rows: auto 1fr; align-content: stretch; }
-.ini-der > section:last-child > .ini-vacio { align-self: center; }
+.ini-der > section:last-child > .ini-vacio, .ini-der > :last-child > section > .ini-vacio { margin: 4px 0 0; }
 .ini-rejilla.midiendo { align-items: start; }
 .ini-rejilla.midiendo .ini-izq > *, .ini-rejilla.midiendo .ini-der > *, .ini-rejilla.midiendo .ini-der > :last-child > section, .ini-rejilla.midiendo .ini-hoy-w > .ini-hoy { flex: 0 0 auto; }
+
+/* Movimientos: cada tipo con su tono de gris azulado, sutil. Las ventas quedan claras; el corte es el más marcado. */
+.movs-f .hist-fila.t-corte .hist-linea { background: rgba(31,45,58,.11); }
+.movs-f .hist-fila.t-egreso .hist-linea { background: rgba(58,88,118,.075); }
+.movs-f .hist-fila.t-equipo .hist-linea { background: rgba(104,128,150,.10); }
+.movs-f .hist-fila.t-caja .hist-linea { background: rgba(150,170,188,.16); }
+.movs-f .hist-fila[class*="t-"] .hist-linea:hover { filter: brightness(.98); }
+.movs-f .t-corte .chip-p, .movs-f .t-corte .folio { background: rgba(31,45,58,.12); }
+.movs-f .t-egreso .mov-tipo { background: rgba(58,88,118,.14); }
+.movs-f .t-equipo .mov-tipo { background: rgba(104,128,150,.18); }
+.movs-f .t-caja .mov-tipo { background: rgba(150,170,188,.3); }
+.movs-f .hist-fila + .hist-fila.t-corte { margin-top: 2px; }
+/* Fila del corte: folio, día, horario, quién cerró, cómo quedó y lo vendido. */
+.hist-linea.corte-mv { grid-template-columns: 96px 110px minmax(0, 1fr) auto auto 90px 18px; font-weight: 500; cursor: pointer; }
+div.hist-linea.corte-mv { cursor: default; }
+.hist-linea.corte-mv .cf-hor { font-weight: 400; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.hist-linea.corte-mv .quien { display: inline-flex; align-items: center; gap: 8px; font-weight: 500; }
+.hist-linea.corte-mv .ic { transition: transform .2s; }
+.hist-linea.corte-mv:hover .ic { transform: translateX(3px); color: var(--fg); }
+@media (max-width: 760px) {
+  .hist-linea.corte-mv { grid-template-columns: auto minmax(0, 1fr) auto auto 14px; gap: 8px; }
+  .hist-linea.corte-mv .cf-dia, .hist-linea.corte-mv .cf-quien { display: none; }
+  .hist-linea.corte-mv .cf-hor { font-size: 12px; }
+}
+@media (max-width: 370px) { .hist-linea.corte-mv .cf-hor { display: none; } .hist-linea.corte-mv { grid-template-columns: auto minmax(0, 1fr) auto 14px; } }
+@media (max-width: 760px) { .hist-linea.corte-mv .folio { display: inline-block; } }

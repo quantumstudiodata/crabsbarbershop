@@ -32,7 +32,7 @@ export default async function Resumen({ searchParams }: { searchParams: Promise<
   await registrarGastosAutomaticos(s.barberia.id);
   await liquidarAutomaticos(s.barberia.id);
   await asentarCitasPagadas(s.barberia.id);
-  if (!s.puede("reportes.ver")) redirect(s.puede("ventas.ver_todas") ? "/analitica/finanzas" : s.puede("cortes.ver") ? "/analitica/cortes" : s.puede("gastos.ver") ? "/analitica/finanzas" : "/?aviso=sin-permiso");
+  if (!s.puede("reportes.ver")) redirect(s.puede("ventas.ver_todas") ? "/analitica/finanzas" : s.puede("cortes.ver") ? "/analitica/finanzas?tipo=cortes" : s.puede("gastos.ver") ? "/analitica/finanzas" : "/?aviso=sin-permiso");
   const q = await searchParams;
   const zona = s.barberia.zonaHoraria;
   const hoy = fechaLocal(new Date(), zona);
@@ -93,7 +93,7 @@ export default async function Resumen({ searchParams }: { searchParams: Promise<
   const lista = (xs: string[]) => (xs.length < 2 ? xs.join("") : `${xs.slice(0, -1).join(", ")} y ${xs[xs.length - 1]}`);
   const pendientes = [
     ...(!auto && pendEquipo > 0 && s.puede("equipo.pagar") ? [{ titulo: "Pagos pendientes al equipo", detalle: `${lista(conPend.map((g) => nombreDe(g.id)))}, ${$(pendEquipo)}`, href: "/equipo" }] : []),
-    ...(conDif.length ? [{ titulo: conDif.length === 1 ? "Un corte con diferencia" : `${conDif.length} cortes con diferencia`, detalle: conDif.length === 1 ? `${(conDif[0].diferencia ?? 0) < 0 ? "Faltaron" : "Sobraron"} ${$(Math.abs(conDif[0].diferencia ?? 0))} el ${fechaCorta(conDif[0].fechaOperativa)}` : "Revisa qué pasó en cada uno", href: "/analitica/cortes" }] : []),
+    ...(conDif.length ? [{ titulo: conDif.length === 1 ? "Un corte con diferencia" : `${conDif.length} cortes con diferencia`, detalle: conDif.length === 1 ? `${(conDif[0].diferencia ?? 0) < 0 ? "Faltaron" : "Sobraron"} ${$(Math.abs(conDif[0].diferencia ?? 0))} el ${fechaCorta(conDif[0].fechaOperativa)}` : "Revisa qué pasó en cada uno", href: "/analitica/finanzas?tipo=cortes" }] : []),
   ];
   const totalVentas = Math.max(1, ...r.porBarbero.map((x) => x.monto));
   const calDe = (id: string) => cal.find((x) => x.id === id);

@@ -47,7 +47,7 @@ export async function resumenSemana(barberiaId: string, zona: string): Promise<R
     if (max.n >= 3 && max.n >= Math.max(prom * 2, 2)) alertas.push({ texto: `${max.nombre.split(" ")[0]} tuvo ${max.n} citas marcadas como No vino, más que el resto del equipo`, href: `/citas?vista=lista&persona=${max.id}` });
   }
   if (sinCobro[0]?.n) alertas.push({ texto: sinCobro[0].n === 1 ? "Una cita se cerró como atendida sin cobrarse" : `${sinCobro[0].n} citas se cerraron como atendidas sin cobrarse`, href: "/citas?vista=lista" });
-  if (faltantes[0]?.n) alertas.push({ texto: `${faltantes[0].n === 1 ? "Un corte" : `${faltantes[0].n} cortes`} con faltante, ${formatoDinero(faltantes[0].total)} en total`, href: "/analitica/cortes" });
+  if (faltantes[0]?.n) alertas.push({ texto: `${faltantes[0].n === 1 ? "Un corte" : `${faltantes[0].n} cortes`} con faltante, ${formatoDinero(faltantes[0].total)} en total`, href: "/analitica/finanzas?tipo=cortes" });
   if ((canceladas[0]?.n ?? 0) >= 3) alertas.push({ texto: `${canceladas[0].n} ventas canceladas en la semana`, href: "/analitica/finanzas?tipo=ventas" });
   return {
     periodo: `Del ${fechaCorta(desde)} al ${fechaCorta(hasta)}`,

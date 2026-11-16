@@ -2,7 +2,6 @@
 
 import { zoomPagina } from "@/lib/zoom";
 import { useState } from "react";
-import { Vacio } from "@/components/Vacio";
 import { Avatar } from "@/components/Avatar";
 import { Cajon } from "@/components/Cajon";
 import { Icono } from "@/components/Icono";
@@ -59,34 +58,32 @@ export function NecesitaRevision({ cortes, puede }: { cortes: Corte[]; puede: bo
   );
 }
 
-/** Todos los cortes en una tabla. Al tocar uno se abre su comprobante a un lado. */
-export function TablaCortes({ cortes, corregir, abrir }: { cortes: Corte[]; corregir: boolean; /** Corte que se abre al llegar desde Movimientos. */ abrir?: string }) {
-  const [ver, setVer] = useState<Corte | null>(() => cortes.find((c) => c.id === abrir) ?? null);
-  const [ajuste, setAjuste] = useState<Corte | null>(null);
-  if (!cortes.length) return <Vacio icono="candado" titulo="No hay cortes con esos filtros" texto="Cada vez que alguien cierre la caja, el corte aparecerá aquí con lo vendido y si sobró o faltó dinero." />;
-  return (
+/**
+ * Un corte dentro de Movimientos: folio, día, horario, quién cerró, cómo quedó y lo vendido.
+ * Al tocarlo se abre su comprobante a un lado, sin salir de la página. Quien no puede ver cortes solo ve la fila.
+ */
+export function FilaCorte({ c, corregir, abrir, ver = true }: { c: Corte; corregir: boolean; abrir?: boolean; ver?: boolean }) {
+  const [abierto, setAbierto] = useState(!!abrir && ver);
+  const [ajuste, setAjuste] = useState(false);
+  const contenido = (
     <>
-      <div className="hist-scroll tabla-c-scroll">
-        <table className="tabla-c">
-          <thead><tr><th>Folio</th><th>Día</th><th>Horario</th><th>Cerró</th><th>Estado</th><th className="der">Vendido</th></tr></thead>
-          <tbody>
-            {cortes.map((c) => (
-              <tr key={c.id} className={ver?.id === c.id ? "activa" : ""} onClick={() => setVer(c)} tabIndex={0} onKeyDown={(e) => { if (e.key === "Enter") setVer(c); }}>
-                <td><span className="folio">{c.folio}</span></td>
-                <td>{c.fechaCorta}</td>
-                <td className="muted">{c.horario}</td>
-                <td>{c.cerro.nombre ? <span className="quien"><Avatar avatar={c.cerro.avatar} nombre={c.cerro.nombre} t={24} />{primer(c.cerro.nombre)}</span> : <span className="muted">Sin registro</span>}</td>
-                <td><Estado d={c.diferencia} /></td>
-                <td className="der num">{$(c.total)}</td>
-              </tr>
-            ))}
-          </tbody>
-        </table>
-      </div>
-      {/* Registrar ajuste cierra el comprobante y abre su ventana, para no encimar dos capas. */}
-      <Detalle c={ver} cerrar={() => setVer(null)} ajustar={corregir ? (c) => { setVer(null); setAjuste(c); } : undefined} />
-      {ajuste && <Corregir id={ajuste.id} dia={ajuste.dia} folio={ajuste.folio} diferencia={ajuste.diferencia + (ajuste.ajustado ?? 0)} abierto cerrar={() => setAjuste(null)} />}
+      <span className="folio">{c.folio}</span>
+      <span className="cf-dia">{c.fechaCorta}</span>
+      <span className="muted cf-hor">{c.horario}</span>
+      <span className="cf-quien">{c.cerro.nombre ? <span className="quien"><Avatar avatar={c.cerro.avatar} nombre={c.cerro.nombre} t={24} />{primer(c.cerro.nombre)}</span> : null}</span>
+      <span className="cf-est">{ver ? <Estado d={c.diferencia} /> : <span className="chip-p">Corte de caja</span>}</span>
+      <span className="num">{ver ? $(c.total) : ""}</span>
+      {ver ? <Icono n="derecha" /> : <span />}
     </>
+  );
+  return (
+    <div className={`hist-fila t-corte ${abierto ? "abierta" : ""}`}>
+      {ver
+        ? <button type="button" className="hist-linea corte-mv" aria-label={`Ver corte ${c.folio}`} onClick={() => setAbierto(true)}>{contenido}</button>
+        : <div className="hist-linea corte-mv">{contenido}</div>}
+      {ver && <Detalle c={abierto ? c : null} cerrar={() => setAbierto(false)} ajustar={corregir ? () => { setAbierto(false); setAjuste(true); } : undefined} />}
+      {ajuste && <Corregir id={c.id} dia={c.dia} folio={c.folio} diferencia={c.diferencia + (c.ajustado ?? 0)} abierto cerrar={() => setAjuste(false)} />}
+    </div>
   );
 }
 

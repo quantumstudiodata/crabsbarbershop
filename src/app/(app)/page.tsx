@@ -122,7 +122,7 @@ async function accionesDe(s: Sesion, turno: Turno | null | undefined, hoy: strin
     { k: "pago", href: "/equipo?pagar=1", texto: "Registrar pago o comisión", corto: "Pago al equipo", icono: "efectivo", ok: s.puede("equipo.pagar") && !s.barberia.pagosEquipoAuto },
     { k: "ventas", href: "/analitica/finanzas?tipo=ventas", texto: barbero ? "Ver mis ventas" : "Ver ventas", corto: barbero ? "Mis ventas" : "Ventas", icono: "lista", ok: true },
     { k: "historial", href: "/equipo/pagos", texto: s.barberia.pagosEquipoAuto ? "Ver historial de comisiones" : "Ver historial de pagos", corto: s.barberia.pagosEquipoAuto ? "Comisiones" : "Historial de pagos", icono: "historial", ok: s.puede("equipo.pagar") || s.puede("equipo.autorizar") },
-    { k: "correccion", href: "/analitica/cortes", texto: "Corregir un corte de caja", corto: "Corregir corte", icono: "editar", ok: s.puede("caja.corregir") && s.puede("cortes.ver") },
+    { k: "correccion", href: "/analitica/finanzas?tipo=cortes", texto: "Corregir un corte de caja", corto: "Corregir corte", icono: "editar", ok: s.puede("caja.corregir") && s.puede("cortes.ver") },
     { k: "resenas", href: "/clientes/resenas", texto: "Ver reseñas", corto: "Reseñas", icono: "estrella", ok: s.barberia.usaCitas || s.puede("resenas.responder") },
   ];
   // Orden sugerido por rol: lo del día a día primero.
@@ -161,7 +161,7 @@ type Vista = {
   citas: Awaited<ReturnType<typeof porLlegar>>;
   pendientes: Pendiente[];
   equipo: { id: string; nombre: string; avatar: string; monto: number; servicios: number; meta?: number }[];
-  ultimos: FilaUltimo[]; verMas: { href: string; texto: string } | null; verVentas: boolean;
+  ultimos: FilaUltimo[]; verMas: { href: string; texto: string } | null; verVentas: boolean; agendar?: boolean;
   semana?: ResumenSemana | null;
   ganado?: Ganado | null;
 };
@@ -259,7 +259,11 @@ function InicioVista(v: Vista) {
       <RejillaInicio inicial={{ eq: equipoIzq, gan: ganadoIzq }}
         hoyCon={tarjetaHoy(true)} hoySin={tarjetaHoy(false)}
         ganado={v.ganado ? <TarjetaGanado g={v.ganado} tarjeta className="subir d2" /> : null}
-        equipo={<section className="glass ini-card subir d2"><span className="lab">Equipo hoy</span>{listaEquipo}</section>}
+        equipo={<section className="glass ini-card subir d2">
+          <div className="entre"><span className="lab">Equipo hoy</span>{v.verVentas && <Link className="ini-link" href="/analitica/finanzas?tipo=ventas">Ver ventas</Link>}</div>
+          {listaEquipo}
+          {v.equipo.length > 1 && <div className="ini-pie"><span className="muted">Entre todos hoy</span><span><b className="num">{formatoDinero(v.equipo.reduce((a, e) => a + e.monto, 0))}</b>{v.equipo.some((e) => e.meta) && <small className="muted"> de {formatoDinero(v.equipo.reduce((a, e) => a + (e.meta ?? 0), 0))}</small>}</span></div>}
+        </section>}
         der={<>
           {v.pendientes.length > 0 && <div data-fijo><Pendientes items={v.pendientes} className="subir d2" /></div>}
           {v.citas && (
@@ -268,6 +272,7 @@ function InicioVista(v: Vista) {
               {v.citas.length ? v.citas.slice(0, 3).map((c) => (
                 <div key={c.id} className="ini-cita"><b>{c.dia ? <>{c.dia}<small>{c.hora}</small></> : c.hora}</b><span>{c.cliente}</span><span className="muted">{v.barbero ? c.servicio : c.con}</span></div>
               )) : <p className="muted ini-vacio">No hay citas agendadas.</p>}
+              {!v.citas.length && v.agendar && <div className="ini-pie"><span className="muted">Agendar una cita</span><Link className="ini-link" href="/citas?nueva=1">Nueva cita</Link></div>}
               {v.citas.length > 3 && <small className="muted">y {v.citas.length - 3} más</small>}
             </section>
           )}
@@ -337,7 +342,7 @@ export default async function Inicio({ searchParams }: { searchParams: Promise<Q
       movs={pagadas.map((v) => ({ creadoEn: v.creadoEn, fecha: v.fecha, monto: v.total }))}
       meta={meta} citas={citas} equipo={filasEq} pendientes={pendientes}
       ultimos={filasUltimos(ventas.slice(0, 5), equipo, hoy, zona, await verificadosDe(ventas.slice(0, 5).map((v) => v.id)))}
-      verMas={{ href: "/analitica", texto: "Ver semana y mes en Reportes" }} verVentas={s.puede("ventas.ver_todas")}
+      verMas={{ href: "/analitica", texto: "Ver semana y mes en Reportes" }} verVentas={s.puede("ventas.ver_todas")} agendar={s.barberia.usaCitas && s.puede("citas.modificar")}
       semana={s.puede("reportes.ver") && ["duena", "admin", "contador"].includes(s.usuario.rol) ? await registrarGastosAutomaticos(s.barberia.id).then(() => resumenSemana(s.barberia.id, zona)).catch(() => null) : null} />
   );
 }
@@ -380,6 +385,6 @@ async function InicioBarbero({ s, hoy, zona, turno, avisos }: { s: Sesion; hoy: 
       meta={s.barberia.usaMetas ? { monto: Math.max(metaHoy, 1), ayuda: mia?.aplica ? "Sale de la meta mensual del negocio y de tu forma de pago." : "Refleja tu meta de ventas y cuánto llevas de ella." } : null}
       citas={citas} equipo={filasEq} pendientes={pendientes}
       ultimos={filasUltimos(todas.slice(0, 5), gente, hoy, zona, await verificadosDe(todas.slice(0, 5).map((v) => v.id)))}
-      verMas={{ href: "/analitica/finanzas?tipo=ventas", texto: "Ver tus ventas en Movimientos" }} verVentas />
+      verMas={{ href: "/analitica/finanzas?tipo=ventas", texto: "Ver tus ventas en Movimientos" }} verVentas agendar={s.barberia.usaCitas && s.puede("citas.modificar")} />
   );
 }

@@ -3,25 +3,30 @@
 import { useState } from "react";
 import { Vacio } from "@/components/Vacio";
 import { Icono } from "@/components/Icono";
-import { FilaVentaVista, type FilaVenta, SeparadorCorte } from "@/components/HistorialVentas";
+import { FilaVentaVista, type FilaVenta } from "@/components/HistorialVentas";
+import { FilaCorte, type Corte } from "../cortes/HistorialCortes";
 import type { Opciones } from "../ventas/ModificarVenta";
 import { formatoDinero } from "@/lib/money";
 import { Cancelar, type FilaEgreso, Nuevo, type OpcionesEgreso } from "../gastos/Egresos";
 
 export type Movimiento = {
-  id: string; tipo: "egreso" | "pago" | "renta" | "caja" | "propina"; titulo: string; sub: string; monto: number; hora: string; cancelado?: boolean;
+  id: string; tipo: "egreso" | "pago" | "renta" | "caja" | "propina" | "gasto"; titulo: string; sub: string; monto: number; hora: string; cancelado?: boolean;
   detalle: [string, string][]; comprobante?: { id: string; nombre: string }; egreso?: FilaEgreso;
 };
 /** Todo lo que pasó en el negocio, en un solo historial: ventas, cortes de caja y movimientos de dinero. */
-export type ItemHistorial = { t: number } & ({ k: "venta"; f: FilaVenta } | { k: "corte"; f: FilaVenta } | { k: "mov"; m: Movimiento });
+/** `corte`: el corte de caja al que pertenece (propinas y pagos que se entregaron al cerrar); se muestra justo debajo de ese corte. */
+export type ItemHistorial = { t: number; corte?: string } & ({ k: "venta"; f: FilaVenta } | { k: "corte"; c: Corte; ver: boolean } | { k: "mov"; m: Movimiento });
 export type DiaHistorial = { fecha: string; titulo: string; total: number; items: ItemHistorial[] };
 type Categoria = { id: string; nombre: string; activo: boolean };
 
 const firma = (c: number) => `${c < 0 ? "−" : "+"}${formatoDinero(Math.abs(c))}`;
-const ETIQUETA: Record<Movimiento["tipo"], string> = { egreso: "Egreso", pago: "Pago al equipo", renta: "Renta", caja: "Caja", propina: "Propina" };
+const ETIQUETA: Record<Movimiento["tipo"], string> = { egreso: "Egreso", pago: "Pago al equipo", renta: "Renta", caja: "Caja", propina: "Propina", gasto: "Gasto de caja" };
+/** Cada tipo lleva un tono de gris azulado distinto, sutil, para distinguirlos de un vistazo. */
+const TONO: Record<Movimiento["tipo"], string> = { egreso: "t-egreso", pago: "t-equipo", renta: "t-equipo", propina: "t-equipo", caja: "t-caja", gasto: "t-caja" };
 
 /** Historial de movimientos: ventas, cortes de caja, egresos, pagos al equipo y dinero que entró o salió de la caja, el más reciente arriba. */
-export function Movimientos({ dias, registrar, hoy, cajaAbierta, categorias, opciones, filtros, abrirEgreso, botonCaja, regreso, opcionesVenta, conteo }: {
+export function Movimientos({ dias, registrar, hoy, cajaAbierta, categorias, opciones, filtros, abrirEgreso, botonCaja, regreso, opcionesVenta, conteo, corregir, abrirCorte }: {
+  corregir: boolean; abrirCorte?: string;
   abrirEgreso?: boolean; botonCaja?: React.ReactNode; dias: DiaHistorial[]; registrar: boolean; hoy: string; cajaAbierta: boolean; categorias: Categoria[];
   opciones: OpcionesEgreso; filtros: React.ReactNode; regreso: string; opcionesVenta?: Opciones; conteo?: string;
 }) {
@@ -49,7 +54,7 @@ export function Movimientos({ dias, registrar, hoy, cajaAbierta, categorias, opc
                 {dias.map((d) => (
                   <div key={d.fecha}>
                     <div className="hist-dia"><span>{d.titulo}</span><b className="num">{formatoDinero(d.total)}</b></div>
-                    {d.items.map((it) => it.k === "corte" ? <SeparadorCorte key={it.f.id} f={it.f} />
+                    {d.items.map((it) => it.k === "corte" ? <FilaCorte key={it.c.id} c={it.c} ver={it.ver} corregir={corregir} abrir={abrirCorte === it.c.id} />
                       : it.k === "venta" ? <FilaVentaVista key={it.f.id} f={it.f} abierta={abierto === it.f.id} alternar={() => setAbierto(abierto === it.f.id ? null : it.f.id)} regreso={regreso} opciones={opcionesVenta} />
                       : <FilaMov key={it.m.id} m={it.m} abierto={abierto === it.m.id} alternar={() => setAbierto(abierto === it.m.id ? null : it.m.id)} cancelar={setCancelar} />)}
                   </div>
@@ -65,7 +70,7 @@ export function Movimientos({ dias, registrar, hoy, cajaAbierta, categorias, opc
 /** Un movimiento de dinero con el mismo formato que una venta: hora, qué fue, de qué tipo y cuánto. */
 function FilaMov({ m, abierto, alternar, cancelar }: { m: Movimiento; abierto: boolean; alternar: () => void; cancelar: (f: FilaEgreso) => void }) {
   return (
-    <div className={`hist-fila mov-h ${m.tipo} ${m.cancelado ? "cancelada" : ""} ${abierto ? "abierta" : ""}`}>
+    <div className={`hist-fila mov-h ${m.tipo} ${TONO[m.tipo]} ${m.cancelado ? "cancelada" : ""} ${abierto ? "abierta" : ""}`}>
       <button type="button" className="hist-linea" aria-expanded={abierto} onClick={alternar}>
         <span className="t">{m.hora}</span>
         <span className="srv"><span>{m.titulo}</span><small className="mov-sub">{m.sub}</small></span>
