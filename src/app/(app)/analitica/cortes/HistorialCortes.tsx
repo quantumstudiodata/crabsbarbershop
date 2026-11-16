@@ -1,5 +1,6 @@
 "use client";
 
+import { Ayuda } from "@/components/Ayuda";
 import { zoomPagina } from "@/lib/zoom";
 import { useState } from "react";
 import { Avatar } from "@/components/Avatar";
@@ -147,7 +148,7 @@ function Detalle({ c, cerrar, ajustar }: { c: Corte | null; cerrar: () => void; 
             {c.retiros > 0 && <div><span>Dinero que se sacó</span><span className="num">−{$(c.retiros)}</span></div>}
             <div><span>Debía haber</span><span className="num">{$(c.esperado)}</span></div>
             <div><span>Se contó</span><span className="num">{$(c.contado)}</span></div>
-            <div className="rc-tot"><span>Diferencia</span><Estado d={c.diferencia} /></div>
+            <div className="rc-tot"><span className="lab-ay">Diferencia<Ayuda titulo="Diferencia">Lo que se contó menos lo que debía haber. Si faltó, se revisa en Necesita revisión y se decide si se descuenta a alguien o lo absorbe el negocio.</Ayuda></span><Estado d={c.diferencia} /></div>
           </div>
           {c.movimientos.length > 0 && (
             <div className="rc-sec"><span className="lab">Movimientos de caja</span>

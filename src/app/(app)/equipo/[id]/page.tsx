@@ -1,4 +1,5 @@
 import Link from "next/link";
+import { Ayuda } from "@/components/Ayuda";
 import { Vacio } from "../Vacio";
 import { notFound } from "next/navigation";
 import { and, desc, eq } from "drizzle-orm";
@@ -116,8 +117,8 @@ export default async function Ficha({ params, searchParams }: { params: Promise<
           <ul className="fa-stats" aria-label={`Lo que lleva ${delMes}`}>
             <li><Icono n="efectivo" /><span><small>Ventas atendidas {delMes}</small><b className="num">{formatoDinero(r.vendido)}</b><em>{r.servicios} {r.servicios === 1 ? "servicio" : "servicios"}</em></span></li>
             {renta
-              ? <li><Icono n="caja" /><span><small>Renta {delMes}</small><b className="num">{formatoDinero(cuenta.renta)}</b></span></li>
-              : <li><Icono n="chispa" /><span><small>{cuenta.sueldo ? `Le corresponde ${delMes}` : `Comisión generada ${delMes}`}</small><b className="num">{formatoDinero(cuenta.corresponde)}</b></span></li>}
+              ? <li><Icono n="caja" /><span><small className="lab-ay">Renta {delMes}<Ayuda titulo="Renta de silla">Lo que esta persona paga al negocio por usar la silla. Lo que cobra por sus servicios es suyo.</Ayuda></small><b className="num">{formatoDinero(cuenta.renta)}</b></span></li>
+              : <li><Icono n="chispa" /><span><small className="lab-ay">{cuenta.sueldo ? `Le corresponde ${delMes}` : `Comisión generada ${delMes}`}<Ayuda titulo="Comisión">Lo que le toca por los servicios que atendió, según cómo se le paga (porcentaje, sueldo o mixto). Las propinas no se incluyen: son suyas aparte.</Ayuda></small><b className="num">{formatoDinero(cuenta.corresponde)}</b></span></li>}
             {res.n > 0 && <li><Icono n="estrella" /><span><small>Calificación de clientes</small><b className="num">{res.prom.toFixed(1)}</b><em>{res.n} {res.n === 1 ? "reseña" : "reseñas"}</em></span></li>}
             {r.top[0] && <li><Icono n="lista" /><span><small>Lo más pedido</small><b>{r.top[0].nombre}</b><em>{r.top[0].veces} {r.top[0].veces === 1 ? "vez" : "veces"}</em></span></li>}
           </ul>

@@ -9,7 +9,7 @@ import { Modal } from "@/components/ui";
 import { marcarConsejos } from "./acciones-usuario";
 import type { Pendiente } from "./pendientes";
 
-const ICONO = { llegar: "reloj", cobrar: "efectivo", pago: "palomita", transferencia: "cobro", recordar: "enviar" } as const;
+const ICONO = { llegar: "reloj", cobrar: "efectivo", pago: "palomita", transferencia: "cobro", recordar: "enviar", config: "ajustes" } as const;
 
 /** Pendientes por registrar en Inicio: máximo tres a la vista, el resto en la agenda. Solo aparece si hay algo. */
 export function Pendientes({ items, className = "" }: { items: Pendiente[]; className?: string }) {
@@ -43,9 +43,9 @@ export function Pendientes({ items, className = "" }: { items: Pendiente[]; clas
   });
   return (
     <section className={`glass pnd ${className}`}>
-      <div className="entre"><span className="lab">Pendientes por registrar</span><span className="pnd-n">{xs.length}</span></div>
+      <div className="entre"><span className="lab">{xs.every((x) => x.tipo === "config") ? "Falta configurar" : xs.some((x) => x.tipo === "config") ? "Pendientes" : "Pendientes por registrar"}</span><span className="pnd-n">{xs.length}</span></div>
       <div className="pnd-l">
-        {[...xs.filter((x) => x.tipo !== "recordar").slice(0, 3), ...xs.filter((x) => x.tipo === "recordar")].map((x) => (
+        {[...xs.filter((x) => x.tipo === "config"), ...xs.filter((x) => x.tipo !== "recordar" && x.tipo !== "config").slice(0, 3), ...xs.filter((x) => x.tipo === "recordar")].map((x) => (
           <div key={x.id} className="pnd-f">
             <span className={`pnd-i ${x.tipo === "cobrar" ? "osc" : ""}`} aria-hidden="true"><Icono n={ICONO[x.tipo]} /></span>
             <span className="pnd-t"><b>{x.titulo}</b><small>{x.detalle}</small></span>
@@ -54,12 +54,13 @@ export function Pendientes({ items, className = "" }: { items: Pendiente[]; clas
               : <span className="pnd-dos"><button type="button" className="pnd-b sec" disabled={pend} onClick={() => porWhats(x)} title="El cliente mandó su comprobante por WhatsApp">Por WhatsApp</button><button type="button" className="pnd-b" disabled={pend} onClick={() => recibida(x)}>Recibida</button></span>)
               : x.tipo === "llegar" ? <span className="pnd-dos"><button type="button" className="pnd-b sec" disabled={pend} onClick={() => noVino(x)}>No vino</button><button type="button" className="pnd-b" disabled={pend} onClick={() => llego(x)}>Llegó</button></span>
               : x.tipo === "cobrar" ? <Link className="pnd-b" href={`/cobrar?cita=${x.citaId}`}>Cobrar</Link>
+              : x.tipo === "config" ? <Link className="pnd-b" href={x.enlace ?? "/ajustes"}>Configurar</Link>
               : <Link className="pnd-b sec" href={`/citas?vista=lista&dia=${x.dia}`}>Ver</Link>}
           </div>
         ))}
       </div>
       {error && <small className="aviso error" role="alert">{error}</small>}
-      {xs.filter((x) => x.tipo !== "recordar").length > 3 && <Link className="ini-link" href="/citas?vista=lista">Ver todos ({xs.length})</Link>}
+      {xs.filter((x) => x.tipo !== "recordar" && x.tipo !== "config").length > 3 && <Link className="ini-link" href="/citas?vista=lista">Ver todos ({xs.filter((x) => x.tipo !== "config").length})</Link>}
       {recordar && (
         <Modal abierto cerrar={() => setRecordar(null)} etiqueta="WhatsApp" titulo="Citas de mañana">
           <div className="pila">

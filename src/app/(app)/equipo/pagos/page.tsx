@@ -1,4 +1,5 @@
 import Link from "next/link";
+import { Ayuda } from "@/components/Ayuda";
 import { Vacio } from "../Vacio";
 import { and, desc, eq, sql } from "drizzle-orm";
 import { alias } from "drizzle-orm/pg-core";
@@ -91,7 +92,7 @@ export default async function Pagos({ searchParams }: { searchParams: Promise<{ 
       {/* Solo los faltantes que se van a descontar del pago de alguien: eso sí es parte de sus comisiones. */}
       {revision.length > 0 && (
         <section id="faltantes" className="eq2-sec">
-          <span className="lab">Descuentos por faltante de caja</span>
+          <span className="lab lab-ay">Descuentos por faltante de caja<Ayuda titulo="Faltante">Cuando en un corte faltó dinero, quien administra decide si se le descuenta a alguien. Aquí se ve cada descuento y en qué pago se aplica.</Ayuda></span>
             <div className="glass eq2-lista">
               {revision.map((f) => (
                 <div key={f.id} className="eq2-fila sin">

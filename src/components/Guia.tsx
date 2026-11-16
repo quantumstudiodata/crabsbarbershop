@@ -41,7 +41,7 @@ const esEscritorio = () => typeof window !== "undefined" && window.matchMedia("(
  * Guía de primer uso. Aparece hasta que la persona termina su lista (se guarda en su usuario).
  * Recorre la app real señalando dónde tocar. Lo que se envía durante la guía se detiene: nada se registra.
  */
-export function Guia({ vistos, puntos, nombre }: { vistos: string[]; puntos: string[]; nombre: string }) {
+export function Guia({ vistos, puntos, nombre, practica = false }: { vistos: string[]; puntos: string[]; nombre: string; /** Negocio de prueba: el último paso sí se completa, para ver el resultado. */ practica?: boolean }) {
   const ruta = usePathname();
   const router = useRouter();
   const [hechos, setHechos] = useState(() => new Set(vistos.filter((v) => v.startsWith("guia-")).map((v) => v.slice(5))));
@@ -55,12 +55,16 @@ export function Guia({ vistos, puntos, nombre }: { vistos: string[]; puntos: str
   // El avance se conserva: al volver, sigue donde se quedó. Si ya se terminó, se puede repasar sin tocar lo guardado.
   const [cerrada, setCerrada] = useState(true);
   const [repaso, setRepaso] = useState(false);
+  // "¿Cómo se hace?" en Ayuda: repasa un solo punto, sin tocar el avance guardado.
+  const [solo, setSolo] = useState<string | null>(null);
   useEffect(() => {
     let pausa = false, activa = false;
     try { pausa = sessionStorage.getItem("crabs-guia-pausa") === "1"; activa = sessionStorage.getItem("crabs-guia-activa") === "1"; } catch { /* sin almacenamiento */ }
     // Una guía que quedó a medias no se reanuda sola en otra visita (movería a la persona de pantalla): se continúa desde el menú de la cuenta.
     setCerrada(pausa || vistos.includes("guia-omitida") || (vistos.includes("guia-inicio") && !activa));
-    const abrir = () => {
+    const abrir = (e: Event) => {
+      const punto = (e as CustomEvent).detail?.punto as string | undefined;
+      if (punto && PUNTOS[punto]) { setSolo(punto); setRepaso(true); setFase("guia"); setCerrada(false); return; }
       try { sessionStorage.removeItem("crabs-guia-pausa"); sessionStorage.setItem("crabs-guia-activa", "1"); } catch { /* sin almacenamiento */ }
       setHechos((h) => { if (!h.has("fin")) return h; setRepaso(true); return new Set(["inicio"]); });
       setFase("guia"); setCerrada(false);
@@ -72,27 +76,32 @@ export function Guia({ vistos, puntos, nombre }: { vistos: string[]; puntos: str
   useEffect(() => { if (esc === null || fin) return; setFase((f) => f ?? (hechos.has("inicio") ? "guia" : "bienvenida")); }, [esc, fin, hechos]);
 
   // Mientras dura la guía, ningún formulario se envía: se aprende sin registrar nada.
-  const activa = !!fase && !fin && !cerrada;
+  const activa = (!!fase && !fin && !cerrada) || (!!solo && !cerrada);
   useEffect(() => {
-    if (!activa) return;
+    if (!activa || practica) return;
     // Abrir la caja sí se permite: es la operación normal del inicio del día y sin ella no se puede seguir.
     const alto = (e: Event) => { if ((e.target as HTMLElement)?.querySelector?.('input[name="fondo"]')) return; e.preventDefault(); e.stopPropagation(); };
     document.addEventListener("submit", alto, true);
     document.body.classList.add("con-guia");
     return () => { document.removeEventListener("submit", alto, true); document.body.classList.remove("con-guia"); };
-  }, [activa]);
+  }, [activa, practica]);
 
   const guardar = useCallback((ids: string[]) => {
     setHechos((h) => { const n = new Set(h); ids.forEach((i) => n.add(i)); return n; });
     if (!repaso) marcarConsejos(ids.map((i) => `guia-${i}`)).catch(() => {});
   }, [repaso]);
 
+  if (solo && esc !== null && !cerrada) return (
+    <Recorrido practica={practica} key={`solo-${solo}`} punto={solo} lista={[solo]} hechos={new Set()} esc={esc} ruta={ruta} pausar={() => { setSolo(null); setRepaso(false); setCerrada(true); }}
+      ir={(r) => router.push(r)} listo={() => { setSolo(null); setRepaso(false); setCerrada(true); }} />
+  );
   if (!fase || fin || esc === null || cerrada) return null;
   if (fase === "bienvenida") return <Bienvenida nombre={nombre} empezar={() => { try { sessionStorage.setItem("crabs-guia-activa", "1"); } catch { /* sin almacenamiento */ } guardar(["inicio"]); setFase("guia"); }} despues={pausar}
     omitir={() => { marcarConsejos(["guia-omitida"]).catch(() => {}); setCerrada(true); }} />;
   if (fase === "cierre" || !actual) return <Cierre nombre={nombre} terminar={() => { guardar(["fin"]); router.push("/"); }} />;
   return (
     <Recorrido
+      practica={practica}
       key={actual}
       punto={actual}
       lista={lista}
@@ -110,7 +119,8 @@ export function Guia({ vistos, puntos, nombre }: { vistos: string[]; puntos: str
   );
 }
 
-function Recorrido({ punto, lista, hechos, esc, ruta, ir, listo, pausar }: {
+function Recorrido({ punto, lista, hechos, esc, ruta, ir, listo, pausar, practica = false }: {
+  practica?: boolean;
   punto: string; lista: string[]; hechos: Set<string>; esc: boolean; ruta: string; ir: (r: string) => void; listo: () => void; pausar: () => void;
 }) {
   const P = PUNTOS[punto];
@@ -200,6 +210,8 @@ function Recorrido({ punto, lista, hechos, esc, ruta, ir, listo, pausar }: {
       // Los enlaces del menú cambian de pantalla solos; si fue un botón (abrir el menú), se busca de nuevo.
       if (!paso) { setPasando(true); setCaja(null); setTimeout(() => setVuelta((v) => v + 1), 300); return; }
       if (paso.modo === "pasa" && !paso.hasta) { setPasando(true); setTimeout(avanzar, 260); }
+      // En un negocio de prueba el último botón sí funciona: se guarda de verdad y se ve el resultado.
+      else if (practica && paso.modo === "final") { setPasando(true); setTimeout(avanzar, 1500); }
     };
     document.addEventListener("click", toque, true);
     return () => document.removeEventListener("click", toque, true);
@@ -208,9 +220,10 @@ function Recorrido({ punto, lista, hechos, esc, ruta, ir, listo, pausar }: {
   const n = lista.indexOf(punto) + 1;
   const tactil = !esc;
   const titulo = !paso ? `Vamos a ${P.nombre}` : usaAlt && paso.alt ? paso.alt.t : paso.t;
-  const texto = !paso ? (enRuta ? "" : `Toca aquí para entrar. ${P.ejemplo}`) : usaAlt && paso.alt ? paso.alt.x : paso.x;
+  const texto = !paso ? (enRuta ? "" : `Toca aquí para entrar. ${P.ejemplo}`) : usaAlt && paso.alt ? paso.alt.x
+    : practica && paso.modo === "final" ? `${paso.x} Es un negocio de prueba: sí se guarda, para que veas el resultado.` : paso.x;
   const accion = !paso ? "Toca aquí" : paso.h;
-  const intercepta = !!paso && paso.modo !== "pasa";
+  const intercepta = !!paso && paso.modo !== "pasa" && !(practica && paso.modo === "final");
 
   // Globo: abajo del elemento si cabe; si no, arriba; en teléfono centrado.
   const vw = typeof window === "undefined" ? 400 : window.innerWidth / zoomPagina();

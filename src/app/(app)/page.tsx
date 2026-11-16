@@ -43,7 +43,8 @@ function TarjetaSemana({ r }: { r: ResumenSemana }) {
     </section>
   );
 }
-import { pendientesDe, type Pendiente } from "./pendientes";
+import { pendientesConfig, pendientesDe, type Pendiente } from "./pendientes";
+import { PrimerosPasos } from "./PrimerosPasos";
 
 type Q = { aviso?: string; error?: string };
 type Sesion = Awaited<ReturnType<typeof requerirSesion>>;
@@ -231,6 +232,7 @@ function InicioVista(v: Vista) {
         </div>
         <AccionesEscritorio acciones={v.acciones.visibles} personalizar={v.acciones} />
       </div>
+      <PrimerosPasos s={s} />
 
       {/* Teléfono */}
       <section className="glass ini-hoy-m solo-movil subir d1">
@@ -319,7 +321,8 @@ export default async function Inicio({ searchParams }: { searchParams: Promise<Q
     equipoQueAtiende(s.barberia.id),
     porLlegar(s, hoy, zona),
   ]);
-  const pendientes = await pendientesDe(s, hoy, zona);
+  // Arriba, lo que falta configurar (solo para quien configura); después, lo que falta registrar.
+  const pendientes = [...await pendientesConfig(s), ...await pendientesDe(s, hoy, zona)];
   const pagadas = ventas.filter((v) => v.estado === "pagada");
   const deHoy = pagadas.filter((v) => v.fecha === hoy);
   const total = deHoy.reduce((a, v) => a + v.total, 0);

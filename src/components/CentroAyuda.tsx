@@ -9,8 +9,9 @@ import { useAbrirPanel } from "./BarraMovil";
 import { Cajon } from "./Cajon";
 import { Icono } from "./Icono";
 import { Selector } from "./ui";
+import { ayudaDe } from "@/lib/ayuda-pantallas";
 
-type Vista = { v: "inicio" } | { v: "nuevo"; tipo: TipoSolicitud } | { v: "enviado"; folio: number; id: string } | { v: "lista" } | { v: "detalle"; id: string };
+type Vista = { v: "inicio" } | { v: "soporte" } | { v: "nuevo"; tipo: TipoSolicitud } | { v: "enviado"; folio: number; id: string } | { v: "lista" } | { v: "detalle"; id: string };
 
 const TEXTO: Record<TipoSolicitud, { etiqueta: string; ayuda: string }> = {
   problema: { etiqueta: "Describe el problema", ayuda: "Cuéntanos qué estabas haciendo y qué sucedió..." },
@@ -19,7 +20,7 @@ const TEXTO: Record<TipoSolicitud, { etiqueta: string; ayuda: string }> = {
 };
 
 /** Botón de ayuda junto a las notificaciones. Abre un panel lateral sin salir de la página. */
-export function CentroAyuda({ abiertas, nuevas }: { abiertas: number; nuevas: number }) {
+export function CentroAyuda({ abiertas, nuevas, guias = [] }: { abiertas: number; nuevas: number; /** Temas de la guía que puede repasar: [id, nombre]. */ guias?: [string, string][] }) {
   const [abierto, setAbierto] = useState(false);
   const [vista, setVista] = useState<Vista>({ v: "inicio" });
   const params = useSearchParams();
@@ -37,7 +38,7 @@ export function CentroAyuda({ abiertas, nuevas }: { abiertas: number; nuevas: nu
   }, [pedida, params, router, ruta]);
   useAbrirPanel("ayuda", useCallback(() => setAbierto(true), []));
   const cerrar = () => { setAbierto(false); setVista({ v: "inicio" }); router.refresh(); };
-  const atras = vista.v === "nuevo" || vista.v === "lista" ? () => setVista({ v: "inicio" }) : vista.v === "detalle" || vista.v === "enviado" ? () => setVista({ v: "lista" }) : null;
+  const atras = vista.v === "soporte" || vista.v === "lista" ? () => setVista({ v: "inicio" }) : vista.v === "nuevo" ? () => setVista({ v: "soporte" }) : vista.v === "detalle" || vista.v === "enviado" ? () => setVista({ v: "lista" }) : null;
   return (
     <>
       <button type="button" className="icb ayuda-b" onClick={() => setAbierto(true)} aria-label="Centro de ayuda" title="Centro de ayuda">
@@ -46,7 +47,8 @@ export function CentroAyuda({ abiertas, nuevas }: { abiertas: number; nuevas: nu
       <Cajon abierto={abierto} cerrar={cerrar} titulo={
         <span className="tit-ayuda">{atras && <button type="button" className="icb" onClick={atras} aria-label="Atrás"><Icono n="izquierda" /></button>}Centro de ayuda</span>
       }>
-        {vista.v === "inicio" && <Inicio ir={setVista} abiertas={abiertas} nuevas={nuevas} />}
+        {vista.v === "inicio" && <Inicio ir={setVista} abiertas={abiertas} nuevas={nuevas} guias={guias} verGuia={(p) => { cerrar(); window.dispatchEvent(new CustomEvent("crabs:guia", { detail: { punto: p } })); }} />}
+        {vista.v === "soporte" && <Soporte ir={setVista} />}
         {vista.v === "nuevo" && <Formulario key={vista.tipo} tipo={vista.tipo} listo={(folio, id) => setVista({ v: "enviado", folio, id })} />}
         {vista.v === "enviado" && (
           <div className="enviado-a">
@@ -63,21 +65,61 @@ export function CentroAyuda({ abiertas, nuevas }: { abiertas: number; nuevas: nu
   );
 }
 
-function Inicio({ ir, abiertas, nuevas }: { ir: (v: Vista) => void; abiertas: number; nuevas: number }) {
+/**
+ * Ayuda en tres niveles: primero las respuestas de la pantalla en la que estás y cómo se hace cada cosa;
+ * si no se resolvió, escribir a soporte de Crabs.
+ */
+function Inicio({ ir, abiertas, nuevas, guias, verGuia }: { ir: (v: Vista) => void; abiertas: number; nuevas: number; guias: [string, string][]; verGuia: (p: string) => void }) {
+  const ruta = usePathname();
+  const a = ayudaDe(ruta);
+  const [abierta, setAbierta] = useState<number | null>(null);
+  const guiaPantalla = a?.guia && guias.some(([g]) => g === a.guia) ? a.guia : null;
   return (
     <div className="inicio-a">
-      <p className="pregunta-a">¿En qué podemos ayudarte?</p>
+      {a && (
+        <section className="ay-sec">
+          <span className="lab">Sobre esta pantalla, {a.nombre}</span>
+          {a.preguntas.map(([q, r], i) => (
+            <div key={q} className={`ay-q ${abierta === i ? "on" : ""}`}>
+              <button type="button" aria-expanded={abierta === i} onClick={() => setAbierta(abierta === i ? null : i)}><span>{q}</span><Icono n="abajo" /></button>
+              {abierta === i && <p>{r}</p>}
+            </div>
+          ))}
+          {guiaPantalla && <button type="button" className="link-c ay-guia" onClick={() => verGuia(guiaPantalla)}><Icono n="tutorial" />Ver cómo se hace, paso a paso</button>}
+        </section>
+      )}
+      {guias.length > 0 && (
+        <details className="ay-sec ay-como">
+          <summary><span className="lab">¿Cómo se hace?</span><Icono n="abajo" /></summary>
+          <div className="ay-temas">{guias.map(([id, nombre]) => <button key={id} type="button" onClick={() => verGuia(id)}><span>{nombre}</span><Icono n="derecha" /></button>)}</div>
+        </details>
+      )}
+      <section className="ay-sec">
+        <span className="lab">Si no lo resolviste</span>
+        <button type="button" className="opcion-a" onClick={() => ir({ v: "soporte" })}>
+          <span><b>Escribir a soporte de Crabs</b><small>Un problema, una duda o una idea para mejorar. Respondemos de lunes a sábado.</small></span><Icono n="derecha" />
+        </button>
+        <button type="button" className="opcion-a mis-a" onClick={() => ir({ v: "lista" })}>
+          <span>
+            <b>Mis solicitudes{abiertas > 0 && <span className="chip-p">{abiertas} {abiertas === 1 ? "abierta" : "abiertas"}</span>}{nuevas > 0 && <span className="chip-p alerta">{nuevas} {nuevas === 1 ? "respuesta nueva" : "respuestas nuevas"}</span>}</b>
+            <small>Lo que has enviado a soporte y sus respuestas.</small>
+          </span><Icono n="derecha" />
+        </button>
+      </section>
+    </div>
+  );
+}
+
+/** Escribir a soporte de Crabs: un problema, una duda o una mejora. */
+function Soporte({ ir }: { ir: (v: Vista) => void }) {
+  return (
+    <div className="inicio-a">
+      <p className="pregunta-a">¿Qué quieres contarnos?</p>
       {(Object.keys(TIPOS_SOLICITUD) as TipoSolicitud[]).map((k) => (
         <button key={k} type="button" className="opcion-a" onClick={() => ir({ v: "nuevo", tipo: k })}>
           <span><b>{TIPOS_SOLICITUD[k].titulo}</b><small>{TIPOS_SOLICITUD[k].detalle}</small></span><Icono n="derecha" />
         </button>
       ))}
-      <button type="button" className="opcion-a mis-a" onClick={() => ir({ v: "lista" })}>
-        <span>
-          <b>Mis solicitudes{abiertas > 0 && <span className="chip-p">{abiertas} {abiertas === 1 ? "abierta" : "abiertas"}</span>}{nuevas > 0 && <span className="chip-p alerta">{nuevas} {nuevas === 1 ? "respuesta nueva" : "respuestas nuevas"}</span>}</b>
-          <small>Consulta las solicitudes que has enviado y sus respuestas.</small>
-        </span><Icono n="derecha" />
-      </button>
     </div>
   );
 }

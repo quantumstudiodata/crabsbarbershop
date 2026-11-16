@@ -43,7 +43,8 @@ export default async function Cobrar({ searchParams }: { searchParams: Promise<{
   let turno: Turno | null = null;
   if (t) {
     // Quien no ve al equipo completo solo ve su propia comisión en el corte.
-    const verTodo = s.puede("ventas.ver_todas") || s.puede("equipo.pagar");
+    // Con caja compartida, quien cierre (aunque sea un barbero) ve y entrega lo de todo el equipo: el corte es uno para todos.
+    const verTodo = s.puede("ventas.ver_todas") || s.puede("equipo.pagar") || s.barberia.modeloCaja !== "individual";
     const mio = <T extends { id: string }>(xs: T[]) => (verTodo ? xs : xs.filter((x) => x.id === s.usuario.id));
     const [datos, [abrio], folio, comisiones, entregas, propinasEq] = await Promise.all([
       movimientosDeTurno(s.barberia.id, t.id, t.fondoInicial),

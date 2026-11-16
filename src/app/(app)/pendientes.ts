@@ -6,7 +6,7 @@ import { formatoDinero } from "@/lib/money";
 import { DIAS_TRANSFERENCIA, autoconfirmarTransferencias } from "@/lib/transferencias";
 
 type Sesion = Awaited<ReturnType<typeof requerirSesion>>;
-export type Pendiente = { id: string; tipo: "llegar" | "cobrar" | "pago" | "transferencia" | "recordar"; titulo: string; detalle: string; citaId: string; dia: string; tel?: string; enlace?: string; cliente?: string; hora?: string; comprobante?: boolean;
+export type Pendiente = { id: string; tipo: "llegar" | "cobrar" | "pago" | "transferencia" | "recordar" | "config"; titulo: string; detalle: string; citaId: string; dia: string; tel?: string; enlace?: string; cliente?: string; hora?: string; comprobante?: boolean;
   /** Citas de mañana para recordar por WhatsApp. */
   lista?: { id: string; cliente: string; hora: string; tel: string; enlace: string; con: string }[] };
 
@@ -63,4 +63,34 @@ export async function pendientesDe(s: Sesion, hoy: string, zona: string, persona
       detalle: "Un mensaje por WhatsApp con su hora y su enlace baja las inasistencias",
       lista: deManana.map((c) => ({ id: c.id, cliente: primer(c.cliente), hora: horaCorta(c.inicio, zona), tel: c.tel, con: primer(c.barbero), enlace: s.barberia.slug ? `/reservar/${s.barberia.slug}/cita/${c.token}` : "" })) }] : []),
   ];
+}
+
+/**
+ * Lo que falta configurar para que el negocio funcione sin tropiezos (solo para quien configura).
+ * Se descubre aquí antes de que falle: persona sin forma de pago, transferencia sin cuenta y reservas sin horario.
+ */
+export async function pendientesConfig(s: Sesion): Promise<Pendiente[]> {
+  const configura = s.usuario.rol === "duena" || s.puede("configuracion.cobros") || s.puede("usuarios.editar");
+  if (!configura || s.vista) return [];
+  const b = s.barberia;
+  const [gente, reglas, metodos] = await Promise.all([
+    db.select({ id: schema.usuarios.id, nombre: schema.usuarios.nombre }).from(schema.usuarios)
+      .where(and(eq(schema.usuarios.barberiaId, b.id), eq(schema.usuarios.activo, true), inArray(schema.usuarios.rol, ["barbera", "encargada"]))),
+    db.select({ id: schema.reglasComision.barberoId }).from(schema.reglasComision)
+      .where(and(eq(schema.reglasComision.barberiaId, b.id), isNull(schema.reglasComision.vigenteHasta))),
+    db.select({ nombre: schema.metodosPago.nombre }).from(schema.metodosPago).where(and(eq(schema.metodosPago.barberiaId, b.id), eq(schema.metodosPago.activo, true))),
+  ]);
+  const conRegla = new Set(reglas.map((r) => r.id));
+  const sinRegla = gente.filter((g) => !conRegla.has(g.id));
+  const fila = (id: string, titulo: string, detalle: string, enlace: string): Pendiente => ({ id: `cfg-${id}`, tipo: "config", titulo, detalle, enlace, citaId: "", dia: "" });
+  const out: Pendiente[] = [];
+  if (sinRegla.length) out.push(fila("regla", sinRegla.length === 1 ? `Falta decir cómo se le paga a ${primer(sinRegla[0].nombre)}` : `Falta decir cómo se les paga a ${sinRegla.length} personas`,
+    "Sin esto no se calculan sus comisiones ni lo que se le debe.", sinRegla.length === 1 ? `/ajustes?editar=${sinRegla[0].id}` : "/ajustes"));
+  const conTransferencia = metodos.some((m) => /transfer/i.test(m.nombre));
+  if (conTransferencia && !(b.transferenciaClabe ?? "").trim()) out.push(fila("clabe", "Falta la cuenta para transferencias",
+    "Los clientes que pagan por transferencia no tienen a dónde mandar el dinero.", "/ajustes/cobro"));
+  const horario = (b.horario ?? {}) as Record<string, unknown>;
+  if (b.usaCitas && Object.keys(horario).length === 0) out.push(fila("horario", "Las reservas en línea no tienen horario",
+    "Sin horario, los clientes no ven horas disponibles para reservar.", "/ajustes/citas?tab=horarios"));
+  return out;
 }

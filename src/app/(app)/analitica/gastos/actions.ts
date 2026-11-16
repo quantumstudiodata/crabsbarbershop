@@ -9,7 +9,7 @@ import { registrar } from "@/lib/historial";
 import { formatoDinero, leerPesos } from "@/lib/money";
 import { texto } from "@/lib/volver";
 
-export type EstadoGasto = { ok?: boolean; error?: string; mensaje?: string; n?: number };
+export type EstadoGasto = { ok?: boolean; error?: string; mensaje?: string; n?: number; /** Hay otro gasto igual ese día: se pide confirmar. */ duplicado?: string };
 
 const listo = (mensaje: string): EstadoGasto => {
   revalidatePath("/", "layout");
@@ -63,6 +63,13 @@ export async function registrarEgreso(_: EstadoGasto, form: FormData): Promise<E
     sql`${schema.gastos.creadoEn} > now() - interval '20 seconds'`,
   ));
   if (repetido) return { error: "Ese egreso ya se guardó hace unos segundos." };
+
+  // Posible duplicado: mismo monto el mismo día, ya registrado como egreso o como gasto pagado con la caja. Solo avisa.
+  if (texto(form, "duplicadoOk") !== "1") {
+    const [igual] = await db.select({ concepto: schema.gastos.concepto, turnoId: schema.gastos.turnoId }).from(schema.gastos).where(and(
+      eq(schema.gastos.barberiaId, s.barberia.id), eq(schema.gastos.monto, monto), eq(schema.gastos.fecha, fecha), isNull(schema.gastos.canceladoEn))).limit(1);
+    if (igual) return { duplicado: `Ese mismo día ya hay un ${igual.turnoId ? "gasto pagado con la caja" : "egreso"} de ${formatoDinero(monto)}: "${igual.concepto}". Si es otro pago, toca Guardar otra vez.`, n: Date.now() };
+  }
 
   await db.transaction(async (tx) => {
     const [g] = await tx.insert(schema.gastos).values({

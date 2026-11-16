@@ -124,14 +124,15 @@ export async function cerrarCaja(_: EstadoCaja, form: FormData): Promise<EstadoC
       .from(schema.pagosComision).innerJoin(schema.usuarios, eq(schema.usuarios.id, schema.pagosComision.barberoId))
       .where(and(eq(schema.pagosComision.barberiaId, s.barberia.id), eq(schema.pagosComision.tipo, "pago"), like(schema.pagosComision.nota, `${POR_ENTREGAR}:%`), sql`${schema.pagosComision.monto} > 0`));
     // Solo se tocan las que se mostraron en el corte; las demás siguen pendientes.
-    const verTodo = s.puede("ventas.ver_todas") || s.puede("equipo.pagar");
+    // Caja compartida: el corte es uno para todo el equipo, así que se entrega lo de todos, cierre quien cierre.
+    const verTodo = s.puede("ventas.ver_todas") || s.puede("equipo.pagar") || s.barberia.modeloCaja !== "individual";
     entregas = pend.filter((x) => verTodo || x.barberoId === s.usuario.id)
       .map((x) => ({ ...x, decision: texto(form, `entrega:${x.barberoId}`) })).filter((x) => ["caja", "transferencia"].includes(x.decision));
   }
   const deCaja = entregas.filter((x) => x.decision === "caja").reduce((a, x) => a + x.monto, 0);
   // Propinas del turno: se calculan aquí con lo guardado, no con lo que mande la pantalla. Del formulario solo se lee cómo se entrega lo de tarjeta.
   // Solo las propinas que se mostraron: quien no ve al equipo entrega solo las suyas; las demás siguen en la caja.
-  const verEquipo = s.puede("ventas.ver_todas") || s.puede("equipo.pagar");
+  const verEquipo = s.puede("ventas.ver_todas") || s.puede("equipo.pagar") || s.barberia.modeloCaja !== "individual";
   const propinas = (await propinasDeTurno(s.barberia.id, turno.id)).filter((p) => verEquipo || p.id === s.usuario.id).map((p) => {
     const transferencia = p.otro > 0 && texto(form, `propina:${p.id}`) === "transferencia";
     return { ...p, transferencia, deCaja: p.efectivo + (transferencia ? 0 : p.otro) };

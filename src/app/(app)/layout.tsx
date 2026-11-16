@@ -1,3 +1,5 @@
+import { PrimeraVez } from "@/components/PrimeraVez";
+import { PUNTOS } from "@/components/guia-pasos";
 import { eq } from "drizzle-orm";
 import { QrGlobal } from "./cobrar/QrGlobal";
 import { cobraEnLinea } from "@/lib/stripe";
@@ -58,7 +60,7 @@ export default async function LayoutApp({ children }: { children: React.ReactNod
           <TituloMovil negocio={s.barberia.nombre} nombre={s.usuario.nombre.split(" ")[0]} fecha={fechaLarga(fechaLocal(new Date(), s.barberia.zonaHoraria))} items={items} grupos={grupos} />
           <Nav items={items} grupos={grupos} destacado={soporte && !s.vista ? { href: "/soporte", texto: "Soporte", icono: "llave" } : undefined} />
           <div className="herramientas">
-            {!soporte && <Suspense fallback={null}><CentroAyuda {...await conteoAyuda(s.usuario.id)} /></Suspense>}
+            {!soporte && <Suspense fallback={null}><CentroAyuda {...await conteoAyuda(s.usuario.id)} guias={puntosGuia(s, atiende).filter((p) => PUNTOS[p]).map((p) => [p, PUNTOS[p].nombre] as [string, string])} /></Suspense>}
             <Campana />
             {s.puede("ideas.decidir") && <PanelIdeas />}
             <MenuUsuario
@@ -74,7 +76,7 @@ export default async function LayoutApp({ children }: { children: React.ReactNod
           </div>
         </div>
       </header>
-      <main className="contenedor">{children}</main>
+      <main className="contenedor">{!s.vista && <PrimeraVez />}{children}</main>
       {(s.puede("ventas.registrar") || s.puede("ventas.registrar_otros")) && cobraEnLinea(s.barberia) && <QrGlobal />}
       <BarraInferior items={items} mas={{
         historial: s.puede("ventas.ver_todas") || atiende,
@@ -82,7 +84,7 @@ export default async function LayoutApp({ children }: { children: React.ReactNod
         ideas: s.puede("ideas.decidir"), ayuda: !soporte, soporte: soporte && !s.vista,
       }} />
       <VentanaVivo />
-      {!s.vista && <Suspense fallback={null}><GuiaDe usuario={s.usuario.id} nombre={s.usuario.nombre.split(" ")[0]} puntos={puntosGuia(s, atiende)} /></Suspense>}
+      {!s.vista && <Suspense fallback={null}><GuiaDe practica={s.barberia.esPrueba} usuario={s.usuario.id} nombre={s.usuario.nombre.split(" ")[0]} puntos={puntosGuia(s, atiende)} /></Suspense>}
       {s.barberia.usaCitas && s.puede("citas.ver") && <AvisoPagoLinea />}
     </>
   );
@@ -109,7 +111,7 @@ function puntosGuia(s: Awaited<ReturnType<typeof requerirSesion>>, atiende: bool
 }
 
 /** Guía de primer uso: se muestra hasta que la persona la termina (guardado en su usuario). */
-async function GuiaDe({ usuario, nombre, puntos }: { usuario: string; nombre: string; puntos: string[] }) {
+async function GuiaDe({ usuario, nombre, puntos, practica }: { usuario: string; nombre: string; puntos: string[]; practica: boolean }) {
   const [u] = await db.select({ v: schema.usuarios.consejosVistos }).from(schema.usuarios).where(eq(schema.usuarios.id, usuario)).limit(1).catch(() => [] as { v: string[] }[]);
-  return <Guia vistos={u?.v ?? []} puntos={puntos} nombre={nombre} />;
+  return <Guia vistos={u?.v ?? []} puntos={puntos} nombre={nombre} practica={practica} />;
 }

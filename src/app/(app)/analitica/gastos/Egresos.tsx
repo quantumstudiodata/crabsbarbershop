@@ -1,5 +1,6 @@
 "use client";
 
+import { Ayuda } from "@/components/Ayuda";
 import Link from "next/link";
 import { Vacio } from "@/components/Vacio";
 import { prepararArchivo } from "@/lib/archivo";
@@ -62,7 +63,7 @@ export function Egresos({ dias, hoy, cajaAbierta, puede, categorias, resumen, et
                   {d.filas.map((f) => (
                     <div key={f.id} className={`hist-fila ${f.cancelado ? "cancelada" : ""} ${abierta === f.id ? "abierta" : ""}`}>
                       <button type="button" className="hist-linea egreso-l" aria-expanded={abierta === f.id} onClick={() => setAbierta(abierta === f.id ? null : f.id)}>
-                        <span className="srv">{f.concepto}<small>{f.categoria}{f.comprobante ? " · con comprobante" : ""}</small></span>
+                        <span className="srv">{f.concepto}<small>{f.categoria}{f.comprobante ? ", con comprobante" : ""}</small></span>
                         <span className={`met-tag ${f.metodo}`}>{f.metodo === "transferencia" ? "Transferencia" : f.metodo === "tarjeta" ? "Tarjeta" : "Efectivo"}</span>
                         <span className="num">{formatoDinero(f.monto)}</span>
                         <Icono n="abajo" />
@@ -97,7 +98,7 @@ export function Egresos({ dias, hoy, cajaAbierta, puede, categorias, resumen, et
 const pct = (a: number, b: number) => (b ? `${Math.round((a / b) * 100)}%` : "0%");
 
 export type Frecuente = { id: string; concepto: string; categoria: string; monto: number; metodo: string; periodicidad: string };
-export type OpcionesEgreso = { /** Dónde se registra lo que sale de la caja; null si la persona no puede. */ cajaHref?: string | null; periodicidad: boolean; comprobantes: boolean; obligatorio?: boolean; frecuentes: Frecuente[]; metodos: string[] };
+export type OpcionesEgreso = { /** Dónde se registra lo que sale de la caja; null si la persona no puede. */ cajaHref?: string | null; periodicidad: boolean; comprobantes: boolean; obligatorio?: boolean; frecuentes: Frecuente[]; /** Concepto ya usado y su categoría, para sugerirla. */ sugeridas?: [string, string][]; metodos: string[] };
 const PERIODOS: [string, string][] = [["unica", "Una vez"], ["diaria", "Diaria"], ["semanal", "Semanal"], ["quincenal", "Quincenal"], ["mensual", "Mensual"]];
 
 export function Nuevo({ hoy, categorias, cerrar, otro, opciones }: { hoy: string; categorias: Categoria[]; cerrar: () => void; otro: () => void; opciones: OpcionesEgreso }) {
@@ -115,6 +116,17 @@ export function Nuevo({ hoy, categorias, cerrar, otro, opciones }: { hoy: string
   };
   const [fecha, setFecha] = useState(hoy);
   const [categoria, setCategoria] = useState(categorias[0]?.nombre ?? "");
+  // Categoría sugerida: si el concepto ya se usó antes, se propone la misma categoría (se puede cambiar).
+  const [eligioCategoria, setEligioCategoria] = useState(false);
+  const [sugerida, setSugerida] = useState(false);
+  const normal = (t: string) => t.normalize("NFD").replace(/[\u0300-\u036f]/g, "").toLowerCase().trim();
+  const escribirConcepto = (t: string) => {
+    setConcepto(t);
+    if (eligioCategoria || t.trim().length < 3) return;
+    const n = normal(t);
+    const hallada = (opciones.sugeridas ?? []).find(([c]) => normal(c) === n) ?? (opciones.sugeridas ?? []).find(([c]) => normal(c).startsWith(n) || n.startsWith(normal(c)));
+    if (hallada && categorias.some((c) => c.nombre === hallada[1])) { setCategoria(hallada[1]); setSugerida(true); }
+  };
   const [seguir, setSeguir] = useState(false);
   useEffect(() => { if (e.ok) { if (seguir) otro(); else cerrar(); } }, [e.ok, e.n, seguir, otro, cerrar]);
   // En efectivo no se adjunta comprobante: la evidencia es el efectivo.
@@ -159,8 +171,8 @@ export function Nuevo({ hoy, categorias, cerrar, otro, opciones }: { hoy: string
               <div className="chips-cat">{opciones.frecuentes.map((f) => <button key={f.id} type="button" className={`chip-cat ${concepto === f.concepto ? "on" : ""}`} onClick={() => usar(f)}><Icono n="historial" /><span>{f.concepto}</span>{f.monto ? <b>{formatoDinero(f.monto)}</b> : null}</button>)}</div>
             </div>
           )}
-          <label className="campo"><span>Concepto</span><input className="input" name="concepto" value={concepto} onChange={(x) => setConcepto(x.target.value)} placeholder="Ejemplo: Recibo de luz de octubre" required maxLength={120} /></label>
-          <div className="campo"><span>Categoría</span><Selector etiqueta="Categoría" valor={categoria} onChange={setCategoria} opciones={categorias.map((c) => ({ valor: c.nombre, texto: c.nombre }))} /></div>
+          <label className="campo"><span>Concepto</span><input className="input" name="concepto" value={concepto} onChange={(x) => escribirConcepto(x.target.value)} placeholder="Ejemplo: Recibo de luz de octubre" required maxLength={120} /></label>
+          <div className="campo"><span>Categoría{sugerida && !eligioCategoria && <small className="muted" style={{ marginLeft: 8, textTransform: "none", letterSpacing: 0 }}>sugerida por egresos anteriores</small>}</span><Selector etiqueta="Categoría" valor={categoria} onChange={(c) => { setCategoria(c); setEligioCategoria(true); }} opciones={categorias.map((c) => ({ valor: c.nombre, texto: c.nombre }))} /></div>
         </div>
 
         <div className="pila" hidden={paso !== 2}>
@@ -181,7 +193,7 @@ export function Nuevo({ hoy, categorias, cerrar, otro, opciones }: { hoy: string
         <div className="pila" hidden={paso !== 3}>
           {conComprobante && (
             <div className="campo">
-              <span>Comprobante{opciones.obligatorio ? "" : " (opcional)"}</span>
+              <span className="lab-ay">Comprobante{opciones.obligatorio ? "" : " (opcional)"}<Ayuda titulo="Comprobante">Foto del ticket, factura o captura de la transferencia. Sirve para que el contador cuadre los gastos sin preguntar.</Ayuda></span>
               <label className="subir-arch">
                 <input type="file" accept="image/*,application/pdf" onChange={async (x) => {
                   const f = x.target.files?.[0]; setErrArchivo(null);
@@ -203,6 +215,8 @@ export function Nuevo({ hoy, categorias, cerrar, otro, opciones }: { hoy: string
         </div>
 
         {e.error && <p className="aviso error">{e.error}</p>}
+        {/* Posible duplicado: se avisa una vez; si se vuelve a guardar, se guarda. */}
+        {e.duplicado && <><p className="aviso">{e.duplicado}</p><input type="hidden" name="duplicadoOk" value="1" /></>}
         <div className="ck-acc">
           {paso > 1 ? <button key="ant" type="button" className="ck-atras" aria-label="Anterior" onClick={() => setPaso(paso - 1)}><Icono n="regresar" /></button> : <span />}
           {paso < total

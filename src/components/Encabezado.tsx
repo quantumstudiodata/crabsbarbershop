@@ -1,3 +1,5 @@
+import { PedirPermiso } from "./PedirPermiso";
+
 export function Encabezado({ etiqueta, titulo, sub, children }: { etiqueta?: React.ReactNode; titulo: React.ReactNode; sub?: React.ReactNode; children?: React.ReactNode }) {
   return (
     <div className="entre" style={{ alignItems: "flex-end" }}>
@@ -17,7 +19,7 @@ export function Aviso({ tipo, children }: { tipo?: "ok" | "error"; children: Rea
 
 /** Mensajes cortos que regresan las acciones por la URL (?aviso=...). */
 export const AVISOS: Record<string, { tipo?: "ok" | "error"; texto: string }> = {
-  "sin-permiso": { tipo: "error", texto: "No tienes permiso para entrar a esa sección." },
+  "sin-permiso": { tipo: "error", texto: "No tienes permiso para entrar a esa sección. Pídeselo a quien administra el negocio." },
   contrasena: { tipo: "ok", texto: "Listo. Tu contraseña quedó guardada." },
   guardado: { tipo: "ok", texto: "Guardado." },
   cancelada: { tipo: "ok", texto: "La venta quedó cancelada. Sigue visible en el historial." },
@@ -27,7 +29,7 @@ export function AvisoUrl({ aviso, error }: { aviso?: string; error?: string }) {
   const a = aviso ? AVISOS[aviso] : undefined;
   return (
     <>
-      {a && <Aviso tipo={a.tipo}>{a.texto}</Aviso>}
+      {a && <Aviso tipo={a.tipo}>{a.texto}{aviso === "sin-permiso" && <PedirPermiso />}</Aviso>}
       {error && <Aviso tipo="error">{error}</Aviso>}
     </>
   );

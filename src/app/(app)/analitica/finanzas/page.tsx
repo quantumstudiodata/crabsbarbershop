@@ -302,6 +302,9 @@ export default async function MovimientosPagina({ searchParams }: { searchParams
     categoriasGasto(bId, false),
     db.select().from(t.conceptosFrecuentes).where(eq(t.conceptosFrecuentes.barberiaId, bId)),
   ]);
+  // Conceptos ya usados con su categoría (el más reciente manda), para sugerirla al registrar un egreso.
+  const sugeridas: [string, string][] = s.puede("gastos.registrar") ? [...new Map((await db.select({ c: t.gastos.concepto, k: t.gastos.categoria }).from(t.gastos)
+    .where(and(eq(t.gastos.barberiaId, bId), isNull(t.gastos.canceladoEn))).orderBy(desc(t.gastos.creadoEn)).limit(400)).reverse().map((x) => [x.c.trim().toLowerCase(), [x.c.trim(), x.k] as [string, string]])).values()] : [];
   const retirado = verTodo ? (await db.select({ concepto: t.movimientosCaja.concepto, monto: t.movimientosCaja.monto }).from(t.movimientosCaja)
     .where(and(eq(t.movimientosCaja.barberiaId, bId), eq(t.movimientosCaja.tipo, "retiro"), enP(t.movimientosCaja.creadoEn)))).filter((x) => !esPagoEquipo(x.concepto) && !esPropinaEntregada(x.concepto)).reduce((a, x) => a + x.monto, 0) : 0;
   const ventasP = rp?.netas ?? 0;
@@ -365,7 +368,7 @@ export default async function MovimientosPagina({ searchParams }: { searchParams
       <Movimientos corregir={s.puede("caja.corregir")} abrirCorte={q.corte} botonCaja={movCaja ? <BotonCaja abierta={!!turno} /> : undefined} abrirEgreso={q.egreso === "1"} dias={historial} registrar={s.puede("gastos.registrar")} hoy={hoy} cajaAbierta={!!turno} categorias={cats}
         regreso={`/analitica/finanzas${new URLSearchParams(Object.entries(q).filter(([k, v]) => v && !["aviso", "error", "egreso", "caja"].includes(k)) as [string, string][]).toString() ? `?${new URLSearchParams(Object.entries(q).filter(([k, v]) => v && !["aviso", "error", "egreso", "caja"].includes(k)) as [string, string][])}` : ""}`}
         opcionesVenta={opcionesVenta}
-        opciones={{ cajaHref: cobra && s.puede("caja.retiros") ? "/cobrar?caja=movimiento" : movCaja ? "/analitica/finanzas?caja=movimiento" : null, metodos: s.barberia.metodosEgreso, periodicidad: false, comprobantes: s.barberia.usaComprobantes, obligatorio: s.barberia.comprobanteObligatorio, frecuentes: frecuentes.map(({ id, concepto, categoria, monto, metodo, periodicidad }) => ({ id, concepto, categoria, monto, metodo, periodicidad })) }}
+        opciones={{ cajaHref: cobra && s.puede("caja.retiros") ? "/cobrar?caja=movimiento" : movCaja ? "/analitica/finanzas?caja=movimiento" : null, metodos: s.barberia.metodosEgreso, periodicidad: false, comprobantes: s.barberia.usaComprobantes, obligatorio: s.barberia.comprobanteObligatorio, frecuentes: frecuentes.map(({ id, concepto, categoria, monto, metodo, periodicidad }) => ({ id, concepto, categoria, monto, metodo, periodicidad })), sugeridas }}
         filtros={<BarraFiltros p={f.periodo} hoy={hoy} personas={equipo} persona={persona} buscar={f.buscar} sinPeriodo="Todas las fechas" textoBuscar="Buscar folio, servicio, persona o concepto"
           descarga={descarga}
           extra={TIPOS.length > 2 ? <SelectorUrl nombre="tipo" valor={tipo} opciones={TIPOS.map(([valor, texto]) => ({ valor, texto }))} etiqueta="Tipo de movimiento" /> : undefined} />} />

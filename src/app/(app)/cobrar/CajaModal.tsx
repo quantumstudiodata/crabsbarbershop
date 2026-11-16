@@ -1,5 +1,6 @@
 "use client";
 
+import { Ayuda } from "@/components/Ayuda";
 import { startTransition, useActionState, useEffect, useState } from "react";
 import { Avatar } from "@/components/Avatar";
 import { EvidenciasCorte } from "./EvidenciasCorte";
@@ -420,7 +421,7 @@ function CortePasos({ turno, accion, cerrando, error, contado, setContado, limit
             {m.retiros - (turno.pagosEquipo ?? 0) > 0 && <div><span>Dinero que se sacó</span><span className="num">−{formatoDinero(m.retiros - (turno.pagosEquipo ?? 0))}</span></div>}
             {det.sacado.map((x, k) => <div key={`s${k}`} className="ck-sub"><span>{x.concepto}</span><span className="num">{formatoDinero(x.monto)}</span></div>)}
             {m.devolucionesEfectivo > 0 && <div><span>Devoluciones en efectivo</span><span className="num">−{formatoDinero(m.devolucionesEfectivo)}</span></div>}
-            <div className="t"><span>Efectivo esperado</span><b className="num">{formatoDinero(esperado)}</b></div>
+            <div className="t"><span className="lab-ay">Efectivo esperado<Ayuda titulo="Efectivo esperado">Lo que debe haber en la caja según lo registrado: con lo que se abrió, más las ventas en efectivo y lo que se puso, menos lo que se pagó, se sacó o se entregó al equipo. Las propinas en efectivo van aparte.</Ayuda></span><b className="num">{formatoDinero(esperado)}</b></div>
           </div>
           </details>
         </div>
@@ -446,7 +447,7 @@ function CortePasos({ turno, accion, cerrando, error, contado, setContado, limit
               ].filter(Boolean).join(" + ");
               return <div key={`e${x.id}`} className="ck-sub"><span>{x.nombre.split(" ")[0]}: {partes}</span><span /></div>;
             })}
-            <div><span>Efectivo esperado</span><span className="num">{formatoDinero(esperado)}</span></div>
+            <div><span className="lab-ay">Efectivo esperado<Ayuda titulo="Efectivo esperado">Lo que debe haber en la caja según lo registrado: con lo que se abrió, más las ventas en efectivo y lo que se puso, menos lo que se pagó, se sacó o se entregó al equipo. Las propinas en efectivo van aparte.</Ayuda></span><span className="num">{formatoDinero(esperado)}</span></div>
             <div><span>Efectivo contado</span><span>{c === null ? "Sin contar" : `${formatoDinero(c)}, ${dif === 0 ? "coincide" : dif! > 0 ? `sobran ${formatoDinero(dif!)}` : `faltan ${formatoDinero(-dif!)}`}`}</span></div>
             {conComprobantes && <div><span>Comprobantes</span><span>{faltan ? `Falta en ${faltan} ${faltan === 1 ? "forma de pago" : "formas de pago"}` : `${archivos} ${archivos === 1 ? "archivo" : "archivos"}, al menos uno por forma de pago`}</span></div>}
             {qr > 0 && <div><span>Pago con QR</span><span>{qr} {qr === 1 ? "verificado" : "verificados"} por Stripe</span></div>}
