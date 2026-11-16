@@ -5783,3 +5783,11 @@ button.corte-tj:hover > .ic { transform: translateX(3px); color: var(--fg); }
 .pv-l { display: grid; grid-template-columns: 18px minmax(0, 1fr) auto; gap: 10px; align-items: center; margin: 0 0 14px; padding: 8px 8px 8px 14px; border-radius: 14px; background: rgba(255,255,255,.55); box-shadow: inset 0 0 0 1px rgba(43,58,71,.08); font-size: 13px; color: var(--muted); }
 .pv-l > .ic { width: 16px; height: 16px; color: #4b6274; }
 .pv-l .icb { width: 30px; height: 30px; }
+
+/* Peticiones internas en el Centro de ayuda */
+.pt-f { display: grid; gap: 6px; padding: 12px 14px; border-radius: 14px; background: rgba(255,255,255,.6); box-shadow: inset 0 0 0 1px rgba(43,58,71,.08); }
+.pt-f.resuelta { background: rgba(255,255,255,.35); }
+.pt-cab { display: flex; justify-content: space-between; align-items: center; gap: 10px; font-size: 13.5px; }
+.pt-txt { margin: 0; font-size: 13.5px; line-height: 1.45; }
+.pt-resp { margin: 0; font-size: 13px; color: var(--fg); padding: 8px 10px; border-radius: 10px; background: rgba(43,58,71,.06); }
+.pt-f .acciones { justify-content: flex-end; align-items: center; gap: 12px; }

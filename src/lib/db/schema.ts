@@ -569,6 +569,32 @@ export const solicitudesSoporte = pgTable(
   (t) => [index("solicitudes_soporte_estado_idx").on(t.estado, t.actualizadoEn), index("solicitudes_soporte_usuario_idx").on(t.usuarioId)],
 );
 
+/**
+ * Peticiones internas: lo que alguien del equipo le pide a quien administra el negocio (un permiso, una corrección,
+ * su contraseña). Nunca salen del negocio: soporte de plataforma no las ve.
+ */
+export const peticionesInternas = pgTable(
+  "peticiones_internas",
+  {
+    id: id(),
+    barberiaId: barberiaId(),
+    usuarioId: uuid("usuario_id").notNull().references(() => usuarios.id),
+    // permiso, correccion, contrasena u otro
+    tipo: text("tipo").notNull(),
+    texto: text("texto").notNull(),
+    // Pantalla desde la que se pidió, para saber de qué se habla.
+    pagina: text("pagina").notNull().default(""),
+    // abierta o resuelta
+    estado: text("estado").notNull().default("abierta"),
+    respuesta: text("respuesta"),
+    resueltaPor: uuid("resuelta_por").references(() => usuarios.id),
+    resueltaEn: timestamp("resuelta_en", { withTimezone: true }),
+    vistoUsuarioEn: timestamp("visto_usuario_en", { withTimezone: true }),
+    creadoEn: creadoEn(),
+  },
+  (t) => [index("peticiones_internas_barberia_idx").on(t.barberiaId, t.estado), index("peticiones_internas_usuario_idx").on(t.usuarioId)],
+);
+
 export const mensajesSoporte = pgTable(
   "mensajes_soporte",
   {

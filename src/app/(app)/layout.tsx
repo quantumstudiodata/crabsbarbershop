@@ -1,3 +1,4 @@
+import { conteoPeticiones, esAdministra } from "@/lib/peticiones";
 import { PrimeraVez } from "@/components/PrimeraVez";
 import { PUNTOS } from "@/components/guia-pasos";
 import { eq } from "drizzle-orm";
@@ -60,7 +61,7 @@ export default async function LayoutApp({ children }: { children: React.ReactNod
           <TituloMovil negocio={s.barberia.nombre} nombre={s.usuario.nombre.split(" ")[0]} fecha={fechaLarga(fechaLocal(new Date(), s.barberia.zonaHoraria))} items={items} grupos={grupos} />
           <Nav items={items} grupos={grupos} destacado={soporte && !s.vista ? { href: "/soporte", texto: "Soporte", icono: "llave" } : undefined} />
           <div className="herramientas">
-            {!soporte && <Suspense fallback={null}><CentroAyuda {...await conteoAyuda(s.usuario.id)} guias={puntosGuia(s, atiende).filter((p) => PUNTOS[p]).map((p) => [p, PUNTOS[p].nombre] as [string, string])} /></Suspense>}
+            {!soporte && <Suspense fallback={null}><CentroAyuda {...await conteoAyuda(s.usuario.id)} administra={esAdministra(s)} peticiones={await conteoPeticiones(s)} guias={puntosGuia(s, atiende).filter((p) => PUNTOS[p]).map((p) => [p, PUNTOS[p].nombre] as [string, string])} /></Suspense>}
             <Campana />
             {s.puede("ideas.decidir") && <PanelIdeas />}
             <MenuUsuario

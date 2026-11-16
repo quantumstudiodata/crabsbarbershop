@@ -10,8 +10,10 @@ import { Cajon } from "./Cajon";
 import { Icono } from "./Icono";
 import { Selector } from "./ui";
 import { ayudaDe } from "@/lib/ayuda-pantallas";
+import { TIPOS_PETICION, type TipoPeticion } from "@/lib/peticiones-tipos";
+import { enviarPeticion, type EstadoPeticion, misPeticiones, type Peticion, peticionesEquipo, resolverPeticion } from "@/app/(app)/peticiones-actions";
 
-type Vista = { v: "inicio" } | { v: "soporte" } | { v: "nuevo"; tipo: TipoSolicitud } | { v: "enviado"; folio: number; id: string } | { v: "lista" } | { v: "detalle"; id: string };
+type Vista = { v: "inicio" } | { v: "soporte" } | { v: "pedir"; tipo?: TipoPeticion } | { v: "pedido" } | { v: "equipo" } | { v: "nuevo"; tipo: TipoSolicitud } | { v: "enviado"; folio: number; id: string } | { v: "lista" } | { v: "detalle"; id: string };
 
 const TEXTO: Record<TipoSolicitud, { etiqueta: string; ayuda: string }> = {
   problema: { etiqueta: "Describe el problema", ayuda: "Cuéntanos qué estabas haciendo y qué sucedió..." },
@@ -20,7 +22,10 @@ const TEXTO: Record<TipoSolicitud, { etiqueta: string; ayuda: string }> = {
 };
 
 /** Botón de ayuda junto a las notificaciones. Abre un panel lateral sin salir de la página. */
-export function CentroAyuda({ abiertas, nuevas, guias = [] }: { abiertas: number; nuevas: number; /** Temas de la guía que puede repasar: [id, nombre]. */ guias?: [string, string][] }) {
+export function CentroAyuda({ abiertas, nuevas, guias = [], administra = false, peticiones = { equipo: 0, respondidas: 0 } }: {
+  abiertas: number; nuevas: number; /** Temas de la guía que puede repasar: [id, nombre]. */ guias?: [string, string][];
+  /** Quien administra recibe las peticiones del equipo; los demás pueden pedirle algo. */ administra?: boolean; peticiones?: { equipo: number; respondidas: number };
+}) {
   const [abierto, setAbierto] = useState(false);
   const [vista, setVista] = useState<Vista>({ v: "inicio" });
   const params = useSearchParams();
@@ -37,17 +42,37 @@ export function CentroAyuda({ abiertas, nuevas, guias = [] }: { abiertas: number
     router.replace(n.toString() ? `${ruta}?${n}` : ruta, { scroll: false });
   }, [pedida, params, router, ruta]);
   useAbrirPanel("ayuda", useCallback(() => setAbierto(true), []));
+  // Desde otros lugares: "Pedir permiso" abre directo el formulario; "Ver" en Inicio abre las peticiones del equipo.
+  useEffect(() => {
+    const f = (e: Event) => {
+      const d = (e as CustomEvent).detail as { pedir?: TipoPeticion; ver?: string } | undefined;
+      if (d?.pedir && !administra) setVista({ v: "pedir", tipo: d.pedir });
+      else if (d?.ver === "peticiones" && administra) setVista({ v: "equipo" });
+    };
+    window.addEventListener("crabs:ayuda", f);
+    return () => window.removeEventListener("crabs:ayuda", f);
+  }, [administra]);
   const cerrar = () => { setAbierto(false); setVista({ v: "inicio" }); router.refresh(); };
-  const atras = vista.v === "soporte" || vista.v === "lista" ? () => setVista({ v: "inicio" }) : vista.v === "nuevo" ? () => setVista({ v: "soporte" }) : vista.v === "detalle" || vista.v === "enviado" ? () => setVista({ v: "lista" }) : null;
+  const atras = vista.v === "soporte" || vista.v === "lista" || vista.v === "pedir" || vista.v === "pedido" || vista.v === "equipo" ? () => setVista({ v: "inicio" }) : vista.v === "nuevo" ? () => setVista({ v: "soporte" }) : vista.v === "detalle" || vista.v === "enviado" ? () => setVista({ v: "lista" }) : null;
   return (
     <>
       <button type="button" className="icb ayuda-b" onClick={() => setAbierto(true)} aria-label="Centro de ayuda" title="Centro de ayuda">
-        <Icono n="ayuda" />{nuevas > 0 && <span className="punto-a" aria-label={`${nuevas} respuestas nuevas`} />}
+        <Icono n="ayuda" />{(nuevas > 0 || peticiones.equipo > 0 || peticiones.respondidas > 0) && <span className="punto-a" aria-label="Hay respuestas o peticiones nuevas" />}
       </button>
       <Cajon abierto={abierto} cerrar={cerrar} titulo={
         <span className="tit-ayuda">{atras && <button type="button" className="icb" onClick={atras} aria-label="Atrás"><Icono n="izquierda" /></button>}Centro de ayuda</span>
       }>
-        {vista.v === "inicio" && <Inicio ir={setVista} abiertas={abiertas} nuevas={nuevas} guias={guias} verGuia={(p) => { cerrar(); window.dispatchEvent(new CustomEvent("crabs:guia", { detail: { punto: p } })); }} />}
+        {vista.v === "pedir" && <Pedir key={vista.tipo ?? "x"} inicial={vista.tipo} listo={() => setVista({ v: "pedido" })} />}
+        {vista.v === "pedido" && (
+          <div className="enviado-a">
+            <span className="icono-ok"><Icono n="palomita" /></span>
+            <b>Se lo hicimos saber a quien administra</b>
+            <p className="muted">Te avisaremos aquí cuando te responda. Tus peticiones quedan en esta misma sección.</p>
+            <button type="button" className="bt sec" onClick={() => setVista({ v: "pedir" })}>Ver mis peticiones</button>
+          </div>
+        )}
+        {vista.v === "equipo" && <PeticionesEquipo />}
+        {vista.v === "inicio" && <Inicio administra={administra} peticiones={peticiones} ir={setVista} abiertas={abiertas} nuevas={nuevas} guias={guias} verGuia={(p) => { cerrar(); window.dispatchEvent(new CustomEvent("crabs:guia", { detail: { punto: p } })); }} />}
         {vista.v === "soporte" && <Soporte ir={setVista} />}
         {vista.v === "nuevo" && <Formulario key={vista.tipo} tipo={vista.tipo} listo={(folio, id) => setVista({ v: "enviado", folio, id })} />}
         {vista.v === "enviado" && (
@@ -69,13 +94,20 @@ export function CentroAyuda({ abiertas, nuevas, guias = [] }: { abiertas: number
  * Ayuda en tres niveles: primero las respuestas de la pantalla en la que estás y cómo se hace cada cosa;
  * si no se resolvió, escribir a soporte de Crabs.
  */
-function Inicio({ ir, abiertas, nuevas, guias, verGuia }: { ir: (v: Vista) => void; abiertas: number; nuevas: number; guias: [string, string][]; verGuia: (p: string) => void }) {
+function Inicio({ ir, abiertas, nuevas, guias, verGuia, administra, peticiones }: {
+  ir: (v: Vista) => void; abiertas: number; nuevas: number; guias: [string, string][]; verGuia: (p: string) => void; administra: boolean; peticiones: { equipo: number; respondidas: number };
+}) {
   const ruta = usePathname();
   const a = ayudaDe(ruta);
   const [abierta, setAbierta] = useState<number | null>(null);
   const guiaPantalla = a?.guia && guias.some(([g]) => g === a.guia) ? a.guia : null;
   return (
     <div className="inicio-a">
+      {administra && (
+        <button type="button" className="opcion-a" onClick={() => ir({ v: "equipo" })}>
+          <span><b>Peticiones del equipo{peticiones.equipo > 0 && <span className="chip-p alerta">{peticiones.equipo} sin resolver</span>}</b><small>Permisos, correcciones o contraseñas que te pide tu equipo.</small></span><Icono n="derecha" />
+        </button>
+      )}
       {a && (
         <section className="ay-sec">
           <span className="lab">Sobre esta pantalla, {a.nombre}</span>
@@ -96,6 +128,11 @@ function Inicio({ ir, abiertas, nuevas, guias, verGuia }: { ir: (v: Vista) => vo
       )}
       <section className="ay-sec">
         <span className="lab">Si no lo resolviste</span>
+        {!administra && (
+          <button type="button" className="opcion-a" onClick={() => ir({ v: "pedir" })}>
+            <span><b>Pedir algo a quien administra{peticiones.respondidas > 0 && <span className="chip-p alerta">{peticiones.respondidas} {peticiones.respondidas === 1 ? "respuesta" : "respuestas"}</span>}</b><small>Permisos, correcciones o tu contraseña. Lo ve solo quien administra el negocio.</small></span><Icono n="derecha" />
+          </button>
+        )}
         <button type="button" className="opcion-a" onClick={() => ir({ v: "soporte" })}>
           <span><b>Escribir a soporte de Crabs</b><small>Un problema, una duda o una idea para mejorar. Respondemos de lunes a sábado.</small></span><Icono n="derecha" />
         </button>
@@ -235,6 +272,81 @@ function Detalle({ id }: { id: string }) {
         <div className="entre"><Adjunto chico /><button className="bt chico" disabled={enviando}>{enviando ? "Enviando…" : "Responder"}<Icono n="enviar" /></button></div>
         {e.error && <p className="aviso error">{e.error}</p>}
       </form>
+    </div>
+  );
+}
+
+const fechaCorta = (iso: string) => new Date(iso).toLocaleDateString("es-MX", { day: "numeric", month: "short" }).replace(".", "");
+
+/** Pedir algo a quien administra: qué se necesita y una frase. Abajo, lo que ya se pidió y su respuesta. */
+function Pedir({ inicial, listo }: { inicial?: TipoPeticion; listo: () => void }) {
+  const [e, accion, enviando] = useActionState<EstadoPeticion, FormData>(enviarPeticion, {});
+  const [tipo, setTipo] = useState<TipoPeticion>(inicial ?? "permiso");
+  const [mias, setMias] = useState<Peticion[] | null>(null);
+  const ruta = usePathname();
+  useEffect(() => { if (e.ok) listo(); }, [e, listo]);
+  useEffect(() => { misPeticiones().then(setMias).catch(() => setMias([])); }, []);
+  return (
+    <div className="pila">
+      <form action={accion} className="pila">
+        <input type="hidden" name="tipo" value={tipo} />
+        <input type="hidden" name="pagina" value={ruta} />
+        <p className="pregunta-a">¿Qué necesitas?</p>
+        <div className="opciones-t" role="radiogroup" aria-label="Qué necesitas">
+          {(Object.keys(TIPOS_PETICION) as TipoPeticion[]).map((k) => (
+            <label key={k} className="opcion-t"><input type="radio" name="t" checked={tipo === k} onChange={() => setTipo(k)} /><b>{TIPOS_PETICION[k].titulo}</b><small>{TIPOS_PETICION[k].detalle}</small></label>
+          ))}
+        </div>
+        <label className="campo"><span>Cuéntale en una frase</span><textarea className="input" name="texto" rows={3} maxLength={600} placeholder={TIPOS_PETICION[tipo].ejemplo} required /></label>
+        {e.error && <p className="aviso error">{e.error}</p>}
+        <div className="acciones"><button className="bt" disabled={enviando}>{enviando ? "Enviando…" : "Enviar"}</button></div>
+      </form>
+      {mias && mias.length > 0 && (
+        <section className="ay-sec">
+          <span className="lab">Tus peticiones</span>
+          {mias.map((p) => (
+            <div key={p.id} className={`pt-f ${p.estado}`}>
+              <span className="pt-cab"><b>{TIPOS_PETICION[p.tipo]?.titulo ?? "Petición"}</b><span className="chip-p">{p.estado === "abierta" ? "En espera" : "Resuelta"}</span></span>
+              <small className="muted">{fechaCorta(p.t)}: {p.texto}</small>
+              {p.estado === "resuelta" && <p className="pt-resp">{p.respuesta || "Quedó resuelta."}{p.resolvio ? ` (${p.resolvio})` : ""}</p>}
+            </div>
+          ))}
+        </section>
+      )}
+    </div>
+  );
+}
+
+/** Para quien administra: lo que pide el equipo. Se responde y se marca como resuelta. */
+function PeticionesEquipo() {
+  const [lista, setLista] = useState<Peticion[] | null>(null);
+  const cargar = useCallback(() => { peticionesEquipo().then(setLista).catch(() => setLista([])); }, []);
+  useEffect(() => { cargar(); }, [cargar]);
+  if (!lista) return <p className="muted">Cargando…</p>;
+  if (!lista.length) return <p className="muted">Tu equipo no te ha pedido nada por ahora.</p>;
+  return (
+    <div className="pila">
+      {lista.map((p) => <PeticionFila key={p.id} p={p} listo={cargar} />)}
+    </div>
+  );
+}
+
+function PeticionFila({ p, listo }: { p: Peticion; listo: () => void }) {
+  const [e, accion, guardando] = useActionState<EstadoPeticion, FormData>(resolverPeticion, {});
+  useEffect(() => { if (e.ok) listo(); }, [e, listo]);
+  const ir = p.tipo === "permiso" || p.tipo === "contrasena" ? { href: "/ajustes", texto: "Ir a Usuarios" } : null;
+  return (
+    <div className={`pt-f ${p.estado}`}>
+      <span className="pt-cab"><b>{p.quien?.split(" ")[0]}: {TIPOS_PETICION[p.tipo]?.titulo.toLowerCase() ?? "petición"}</b><span className="chip-p">{p.estado === "abierta" ? fechaCorta(p.t) : "Resuelta"}</span></span>
+      <p className="pt-txt">{p.texto}</p>
+      {p.estado === "abierta" ? (
+        <form action={accion} className="pila">
+          <input type="hidden" name="id" value={p.id} />
+          <textarea className="input" name="respuesta" rows={2} maxLength={400} placeholder="Respuesta (opcional). Ejemplo: listo, ya tienes el permiso" />
+          {e.error && <p className="aviso error">{e.error}</p>}
+          <div className="acciones">{ir && <a className="link-c" href={ir.href}>{ir.texto}</a>}<button className="bt chico" disabled={guardando}>{guardando ? "Guardando…" : "Marcar como resuelta"}</button></div>
+        </form>
+      ) : p.respuesta ? <small className="muted">Respuesta: {p.respuesta}</small> : null}
     </div>
   );
 }

@@ -4,9 +4,10 @@ import { db, schema } from "@/lib/db";
 import { fechaLocal, horaCorta } from "@/lib/fechas";
 import { formatoDinero } from "@/lib/money";
 import { DIAS_TRANSFERENCIA, autoconfirmarTransferencias } from "@/lib/transferencias";
+import { esAdministra } from "@/lib/peticiones";
 
 type Sesion = Awaited<ReturnType<typeof requerirSesion>>;
-export type Pendiente = { id: string; tipo: "llegar" | "cobrar" | "pago" | "transferencia" | "recordar" | "config"; titulo: string; detalle: string; citaId: string; dia: string; tel?: string; enlace?: string; cliente?: string; hora?: string; comprobante?: boolean;
+export type Pendiente = { id: string; tipo: "llegar" | "cobrar" | "pago" | "transferencia" | "recordar" | "config" | "peticion"; titulo: string; detalle: string; citaId: string; dia: string; tel?: string; enlace?: string; cliente?: string; hora?: string; comprobante?: boolean;
   /** Citas de mañana para recordar por WhatsApp. */
   lista?: { id: string; cliente: string; hora: string; tel: string; enlace: string; con: string }[] };
 
@@ -84,6 +85,15 @@ export async function pendientesConfig(s: Sesion): Promise<Pendiente[]> {
   const sinRegla = gente.filter((g) => !conRegla.has(g.id));
   const fila = (id: string, titulo: string, detalle: string, enlace: string): Pendiente => ({ id: `cfg-${id}`, tipo: "config", titulo, detalle, enlace, citaId: "", dia: "" });
   const out: Pendiente[] = [];
+  // Lo que pide el equipo a quien administra (si la tabla todavía no existe en la base, simplemente no sale).
+  if (esAdministra(s)) {
+    const pedidas = await db.select({ id: schema.peticionesInternas.id, texto: schema.peticionesInternas.texto, quien: schema.usuarios.nombre }).from(schema.peticionesInternas)
+      .innerJoin(schema.usuarios, eq(schema.usuarios.id, schema.peticionesInternas.usuarioId))
+      .where(and(eq(schema.peticionesInternas.barberiaId, b.id), eq(schema.peticionesInternas.estado, "abierta"))).limit(5).catch(() => []);
+    if (pedidas.length) out.push({ id: "cfg-peticiones", tipo: "peticion", citaId: "", dia: "",
+      titulo: pedidas.length === 1 ? `${primer(pedidas[0].quien)} te pide algo` : `Tu equipo te pide ${pedidas.length} cosas`,
+      detalle: pedidas.length === 1 ? pedidas[0].texto.slice(0, 90) : "Permisos, correcciones o contraseñas. Respóndelas desde la ayuda." });
+  }
   if (sinRegla.length) out.push(fila("regla", sinRegla.length === 1 ? `Falta decir cómo se le paga a ${primer(sinRegla[0].nombre)}` : `Falta decir cómo se les paga a ${sinRegla.length} personas`,
     "Sin esto no se calculan sus comisiones ni lo que se le debe.", sinRegla.length === 1 ? `/ajustes?editar=${sinRegla[0].id}` : "/ajustes"));
   const conTransferencia = metodos.some((m) => /transfer/i.test(m.nombre));
