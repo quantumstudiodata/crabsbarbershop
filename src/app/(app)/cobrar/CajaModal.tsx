@@ -259,9 +259,8 @@ const fechasCortas = (t: string) => t.replace(/ de ([a-záéíóú]+)/gi, (_, m:
 function Rg({ s, t, sub, v, cls = "", children }: { s?: string; t: React.ReactNode; sub?: React.ReactNode; v: React.ReactNode; cls?: string; children?: React.ReactNode }) {
   return (
     <div className={`ct-r ${cls}`}>
-      <span className="ct-s" aria-hidden="true">{s ?? ""}</span>
       <span className="ct-t">{t}{sub ? <small>{sub}</small> : null}{children}</span>
-      <span className="ct-v num">{v}</span>
+      <span className="ct-v num">{s === "-" ? "−" : s === "+" ? "+" : ""}{v}</span>
     </div>
   );
 }
@@ -364,14 +363,14 @@ function CortePasos({ turno, accion, cerrando, error, contado, setContado, limit
             <p className="ct-ins">Saca este dinero de la caja y entrégalo. Palomea al darlo.</p>
             <div className="ct-hoja">
               <Rg t="En la caja" v={formatoDinero(enCaja)} />
-              <Rg s="-" t="Fondo para mañana" sub="Se queda en la caja" v={formatoDinero(Math.min(fondo, enCaja))} />
+              {fondo > 0 && <Rg s="-" t="Fondo para mañana" sub="Se queda en la caja" v={formatoDinero(Math.min(fondo, enCaja))} />}
               <Rg s="=" t="Para repartir" v={formatoDinero(paraRepartir)} cls="tot" />
               {reparto.map((x) => {
                 const r = resto[x.id] ?? "manana";
                 const quePaga = [x.comision ? (x.detalle === "de hoy" ? "Comisión de hoy" : `Comisión ${fechasCortas(x.detalle)}`) : "", x.otro ? `propinas con tarjeta ${formatoDinero(x.otro)}` : ""].filter(Boolean).join(" y ").replace(/^p/, "P");
                 return (
                   <div key={x.id} className={`ct-per ${x.ef === 0 ? "nada" : ""}`}>
-                    <Rg s="-" v={formatoDinero(x.ef)} t={
+                    <Rg s={x.ef > 0 ? "-" : undefined} v={formatoDinero(x.ef)} t={
                       <label className="ct-chk">
                         <input type="checkbox" checked={!!dados[x.id]} disabled={x.ef === 0} onChange={(e) => setDados((d) => ({ ...d, [x.id]: e.target.checked }))} />
                         <span>{x.nombre}</span>

@@ -5841,7 +5841,7 @@ button.corte-tj:hover > .ic { transform: translateX(3px); color: var(--fg); }
 /* Corte de caja de corridito: cada renglón suma o resta, y el total va abajo. */
 .ct-ins { margin: 0; font-size: 13px; color: var(--muted); }
 .ct-hoja { display: grid; padding: 4px 14px; border-radius: 16px; background: #fff; box-shadow: inset 0 0 0 1px rgba(43,58,71,.08); }
-.ct-r { display: grid; grid-template-columns: 14px minmax(0, 1fr) auto; gap: 8px; align-items: baseline; padding: 7px 0; font-size: 13.5px; }
+.ct-r { display: grid; grid-template-columns: minmax(0, 1fr) auto; gap: 12px; align-items: baseline; padding: 7px 0; font-size: 13.5px; }
 .ct-s { font: 600 13px var(--f-mono); color: var(--faint); text-align: center; }
 .ct-t { min-width: 0; overflow-wrap: anywhere; }
 .ct-t > small { display: block; margin-top: 1px; font-size: 12px; color: var(--muted); }

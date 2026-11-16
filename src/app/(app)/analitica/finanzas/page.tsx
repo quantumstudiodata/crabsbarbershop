@@ -58,6 +58,10 @@ export default async function MovimientosPagina({ searchParams }: { searchParams
   const verEgresos = verTodo || s.puede("gastos.ver");
   // Entradas y salidas de caja: quien maneja la caja (cobra, saca o pone dinero) o ve los cortes.
   const verCaja = verTodo || s.puede("caja.retiros") || s.puede("cortes.ver");
+  // Pagos al equipo: quien ve reportes ve los de todos. Quien atiende también los ve, para saber de dónde sale el dinero de la caja;
+  // solo con caja individual ve únicamente los suyos (entregados y pendientes).
+  const verPagos = verTodo || atiende;
+  const soloMios = !verTodo && atiende && s.barberia.modeloCaja === "individual";
   if (!verVentas && !verEgresos && !verCortes) redirect("/?aviso=sin-permiso");
   const q = await searchParams;
   const zona = s.barberia.zonaHoraria;
@@ -68,12 +72,13 @@ export default async function MovimientosPagina({ searchParams }: { searchParams
   const movCaja = s.puede("caja.retiros") && !cobra;
   const TIPOS: [string, string][] = [["", "Todos los movimientos"],
     ...(verVentas ? [["ventas", "Ventas"] as [string, string]] : []), ...(verCortes ? [["cortes", "Cortes de caja"] as [string, string]] : []),
-    ...(verEgresos ? [["egresos", "Egresos"] as [string, string]] : []), ...(verTodo ? [["equipo", "Pagos al equipo"] as [string, string]] : []),
+    ...(verEgresos ? [["egresos", "Egresos"] as [string, string]] : []), ...(verPagos ? [["equipo", soloMios ? "Mis pagos" : "Pagos al equipo"] as [string, string]] : []),
     ...(verCaja ? [["caja", "Entradas y salidas de caja"] as [string, string]] : [])];
   const tipo = TIPOS.some(([k]) => k === q.tipo) ? q.tipo ?? "" : "";
   const equipo = verTodas || verTodo ? await equipoConVentas(bId) : [];
   const f = leerFiltros(q, hoy, equipo.map((e) => e.id));
   const persona = f.persona;
+  const pagosDe = soloMios ? s.usuario.id : persona;
   // Con una persona elegida solo se ve lo suyo: sus ventas y lo que se le pagó. Lo demás no es de nadie en particular.
   const ver = (x: string) => (!tipo || tipo === x) && (!persona || x === "ventas" || x === "equipo");
   const desde = f.periodo?.desde, hasta = f.periodo?.hasta;
@@ -107,13 +112,13 @@ export default async function MovimientosPagina({ searchParams }: { searchParams
       return b ? x.filter((c) => (folios.get(c.id) ?? "").toLowerCase().includes(b) || (c.cerradoPor ?? "").toLowerCase().includes(b)) : x;
     }) : [],
     verGastos ? db.select(porFila(diaGasto)).from(t.gastos).where(and(...condGasto)).groupBy(sql`1`) : [],
-    verTodo && ver("equipo") ? db.select(porFila(local(t.pagosComision.creadoEn))).from(t.pagosComision).innerJoin(t.usuarios, eq(t.usuarios.id, t.pagosComision.barberoId))
-      .where(and(eq(t.pagosComision.barberiaId, bId), ...enFechas(t.pagosComision.creadoEn), ...(persona ? [eq(t.pagosComision.barberoId, persona)] : []), ...(texto ? [ilike(t.usuarios.nombre, texto)] : []))).groupBy(sql`1`) : [],
+    verPagos && ver("equipo") ? db.select(porFila(local(t.pagosComision.creadoEn))).from(t.pagosComision).innerJoin(t.usuarios, eq(t.usuarios.id, t.pagosComision.barberoId))
+      .where(and(eq(t.pagosComision.barberiaId, bId), ...enFechas(t.pagosComision.creadoEn), ...(pagosDe ? [eq(t.pagosComision.barberoId, pagosDe)] : []), ...(texto ? [ilike(t.usuarios.nombre, texto)] : []))).groupBy(sql`1`) : [],
     // Las salidas por pagos al equipo no se cuentan: ya aparecen como pago.
     verCaja && ver("caja") ? db.select(porFila(diaCaja)).from(t.movimientosCaja).innerJoin(t.turnosCaja, eq(t.turnosCaja.id, t.movimientosCaja.turnoId))
       .where(and(...condMov, sql`${t.movimientosCaja.concepto} !~ '^Pago (de comisiones |anulado )?a '`)).groupBy(sql`1`) : [],
-    verTodo && ver("equipo") ? db.select(porFila(local(t.historial.creadoEn))).from(t.historial)
-      .where(and(eq(t.historial.barberiaId, bId), sql`${t.historial.detalle} ? 'propinaTransferencia'`, ...enFechas(t.historial.creadoEn), ...(persona ? [sql`${t.historial.detalle}->>'barberoId' = ${persona}`] : []))).groupBy(sql`1`) : [],
+    verPagos && ver("equipo") ? db.select(porFila(local(t.historial.creadoEn))).from(t.historial)
+      .where(and(eq(t.historial.barberiaId, bId), sql`${t.historial.detalle} ? 'propinaTransferencia'`, ...enFechas(t.historial.creadoEn), ...(pagosDe ? [sql`${t.historial.detalle}->>'barberoId' = ${pagosDe}`] : []))).groupBy(sql`1`) : [],
   ]);
   const porDia = new Map<string, number>();
   const sumar = (d: string, n: number) => { if (d) porDia.set(d, (porDia.get(d) ?? 0) + n); };
@@ -161,13 +166,13 @@ export default async function MovimientosPagina({ searchParams }: { searchParams
       .where(and(...condGasto, gte(t.gastos.fecha, pd), lte(t.gastos.fecha, ph)))
       .orderBy(desc(t.gastos.creadoEn)) : [],
     diasP.length ? db.select({ p: t.pagosComision, nombre: t.usuarios.nombre }).from(t.pagosComision).innerJoin(t.usuarios, eq(t.usuarios.id, t.pagosComision.barberoId))
-      .where(and(eq(t.pagosComision.barberiaId, bId), ...enPagina(t.pagosComision.creadoEn), ...(persona ? [eq(t.pagosComision.barberoId, persona)] : []), ...(texto ? [ilike(t.usuarios.nombre, texto)] : []))) : [],
+      .where(and(eq(t.pagosComision.barberiaId, bId), ...enPagina(t.pagosComision.creadoEn), ...(pagosDe ? [eq(t.pagosComision.barberoId, pagosDe)] : []), ...(texto ? [ilike(t.usuarios.nombre, texto)] : []))) : [],
     // Los movimientos de caja se traen también para el filtro de pagos: con ellos se sabe en qué corte se entregó cada pago.
     (diasM.length || diasP.length) && pd && ph ? db.select({ id: t.movimientosCaja.id, turnoId: t.movimientosCaja.turnoId, dia: sql<string>`${diaCaja}`, tipo: t.movimientosCaja.tipo, monto: t.movimientosCaja.monto, concepto: t.movimientosCaja.concepto, creadoEn: t.movimientosCaja.creadoEn, quien: t.usuarios.nombre })
       .from(t.movimientosCaja).innerJoin(t.usuarios, eq(t.usuarios.id, t.movimientosCaja.usuarioId)).innerJoin(t.turnosCaja, eq(t.turnosCaja.id, t.movimientosCaja.turnoId))
       .where(and(...condMovBase, gte(t.turnosCaja.fechaOperativa, pd), lte(t.turnosCaja.fechaOperativa, ph))) : [],
     diasT.length ? db.select({ id: t.historial.id, creadoEn: t.historial.creadoEn, accion: t.historial.accion, detalle: t.historial.detalle }).from(t.historial)
-      .where(and(eq(t.historial.barberiaId, bId), sql`${t.historial.detalle} ? 'propinaTransferencia'`, ...enPagina(t.historial.creadoEn), ...(persona ? [sql`${t.historial.detalle}->>'barberoId' = ${persona}`] : []))) : [],
+      .where(and(eq(t.historial.barberiaId, bId), sql`${t.historial.detalle} ? 'propinaTransferencia'`, ...enPagina(t.historial.creadoEn), ...(pagosDe ? [sql`${t.historial.detalle}->>'barberoId' = ${pagosDe}`] : []))) : [],
     cajaDe(s),
     s.puede("ventas.modificar") ? metodosActivos(bId) : Promise.resolve([]),
   ]);
@@ -176,10 +181,10 @@ export default async function MovimientosPagina({ searchParams }: { searchParams
     .where(and(eq(t.historial.barberiaId, bId), eq(t.historial.tipo, "caja"), sql`${t.historial.detalle} ? 'comisiones'`, ...enPagina(t.historial.creadoEn))) : [];
   // Pagos que siguen pendientes de entregar: se muestran siempre en la primera página, sean del día que sean,
   // para que nadie pierda de vista de cuándo es ese dinero.
-  const pendientesTodos = verTodo && ver("equipo") && pagina === 1 && !f.periodo
+  const pendientesTodos = verPagos && ver("equipo") && pagina === 1 && !f.periodo
     ? await db.select({ p: t.pagosComision, nombre: t.usuarios.nombre }).from(t.pagosComision).innerJoin(t.usuarios, eq(t.usuarios.id, t.pagosComision.barberoId))
       .where(and(eq(t.pagosComision.barberiaId, bId), eq(t.pagosComision.tipo, "pago"), sql`${t.pagosComision.nota} like 'Por entregar de caja:%'`, sql`${t.pagosComision.monto} > 0`,
-        ...(persona ? [eq(t.pagosComision.barberoId, persona)] : []), ...(texto ? [ilike(t.usuarios.nombre, texto)] : [])))
+        ...(pagosDe ? [eq(t.pagosComision.barberoId, pagosDe)] : []), ...(texto ? [ilike(t.usuarios.nombre, texto)] : [])))
     : [];
   const comps = gastos.length ? await db.select({ id: t.comprobantes.id, gastoId: t.comprobantes.gastoId, nombre: t.comprobantes.nombre }).from(t.comprobantes)
     .where(and(eq(t.comprobantes.barberiaId, bId), inArray(t.comprobantes.gastoId, gastos.map((x) => x.g.id)))) : [];
@@ -301,7 +306,7 @@ export default async function MovimientosPagina({ searchParams }: { searchParams
   for (const { p, nombre } of pagos) {
     if (pendIds.has(p.id)) continue;
     // Los pendientes no se repiten en su día: salen arriba, en la primera página.
-    if (p.tipo === "pago" && p.monto > 0 && p.nota.startsWith("Por entregar de caja") && !f.periodo && verTodo && ver("equipo")) continue;
+    if (p.tipo === "pago" && p.monto > 0 && p.nota.startsWith("Por entregar de caja") && !f.periodo && verPagos && ver("equipo")) continue;
     items.push(filaPago(p, nombre, { corte: turnoDePago(p, nombre) }));
   }
   // Lo que entró o salió de la caja sin ser venta ni gasto. Los pagos al equipo ya aparecen como pago; aquí no se repiten.
@@ -312,6 +317,14 @@ export default async function MovimientosPagina({ searchParams }: { searchParams
       sub: propina ? "Es de quien hizo el servicio" : sale ? "Se sacó de la caja. No es un gasto" : "Se puso en la caja. No es una venta", monto: sale ? -c.monto : c.monto,
       detalle: [["Registró", `${c.quien.split(" ")[0]}, ${horaCorta(c.creadoEn, zona)}`],
         ["Cuenta en la ganancia", propina ? "No. La propina es de quien hizo el servicio" : "No. Solo cambia el efectivo de la caja"]],
+    } });
+  }
+  // Quien atiende y no ve la caja completa ve las propinas que se entregaron en el corte (con caja individual, solo las suyas).
+  const mioNombre = s.usuario.nombre.split(" ")[0];
+  if (!(verCaja && ver("caja")) && !verTodo && atiende && ver("equipo")) for (const c of movsCaja.filter((x) => esPropinaEntregada(x.concepto) && (!soloMios || x.concepto.endsWith(` ${mioNombre}`)))) {
+    items.push({ k: "mov", dia: c.dia, t: c.creadoEn.getTime(), corte: c.turnoId, m: {
+      id: `c${c.id}`, tipo: "propina", titulo: c.concepto, hora: horaCorta(c.creadoEn, zona), sub: "Es de quien hizo el servicio", monto: -c.monto,
+      detalle: [["Cuenta en la ganancia", "No. La propina es de quien hizo el servicio"]],
     } });
   }
   for (const h of propTrans) {

@@ -183,9 +183,8 @@ function Detalle({ c, cerrar, ajustar }: { c: Corte | null; cerrar: () => void; 
 function Rg({ s, t, sub, v, cls = "" }: { s?: string; t: React.ReactNode; sub?: React.ReactNode; v: React.ReactNode; cls?: string }) {
   return (
     <div className={`ct-r ${cls}`}>
-      <span className="ct-s" aria-hidden="true">{s ?? ""}</span>
       <span className="ct-t">{t}{sub ? <small>{sub}</small> : null}</span>
-      <span className="ct-v num">{v}</span>
+      <span className="ct-v num">{s === "-" ? "−" : s === "+" ? "+" : ""}{v}</span>
     </div>
   );
 }
