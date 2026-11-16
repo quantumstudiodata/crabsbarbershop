@@ -44,7 +44,6 @@ function TarjetaSemana({ r }: { r: ResumenSemana }) {
   );
 }
 import { pendientesConfig, pendientesDe, type Pendiente } from "./pendientes";
-import { PrimerosPasos } from "./PrimerosPasos";
 
 type Q = { aviso?: string; error?: string };
 type Sesion = Awaited<ReturnType<typeof requerirSesion>>;
@@ -232,7 +231,6 @@ function InicioVista(v: Vista) {
         </div>
         <AccionesEscritorio acciones={v.acciones.visibles} personalizar={v.acciones} />
       </div>
-      <PrimerosPasos s={s} />
 
       {/* Teléfono */}
       <section className="glass ini-hoy-m solo-movil subir d1">
