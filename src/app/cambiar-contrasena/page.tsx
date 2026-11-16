@@ -1,10 +1,10 @@
 import Link from "next/link";
 import { redirect } from "next/navigation";
-import { Cangrejo } from "@/components/Cangrejo";
 import { obtenerSesion } from "@/lib/auth";
 import { FormCambio } from "./FormCambio";
 
 export const metadata = { title: "Cambiar contraseña" };
+export const viewport = { themeColor: "#dfe6ec" };
 
 export default async function CambiarContrasena() {
   const s = await obtenerSesion();
@@ -12,9 +12,9 @@ export default async function CambiarContrasena() {
   return (
     <main className="entrada">
       <div className="glass entrada-c">
-        <div className="marca" aria-hidden="true">
-          <Cangrejo className="cangrejo" />
-          <span className="palabra">CRABS</span>
+        <div className="marca">
+          {/* eslint-disable-next-line @next/next/no-img-element */}
+          <img className="marca-logo" src="/logo-crabs.png" alt="Crabs Barbershop" width={946} height={209} />
         </div>
         <div className="form-entrada">
           <div>

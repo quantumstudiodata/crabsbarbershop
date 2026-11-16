@@ -240,7 +240,7 @@ function Asistente({ inicial, servicios, hoy, cerrar, alGuardar }: { inicial: Bo
 
         {error && <p className="aviso error" style={{ margin: 0 }}>{error}</p>}
         <div className="acciones-p">
-          {paso > 0 ? <button type="button" className="ck-atras" aria-label="Anterior" onClick={() => { setError(null); setPaso(paso - 1); }}><Icono n="izquierda" /></button> : <span />}
+          {paso > 0 ? <button type="button" className="ck-atras" aria-label="Anterior" onClick={() => { setError(null); setPaso(paso - 1); }}><Icono n="regresar" /></button> : <span />}
           {paso < 5
             ? <button type="button" className="bt" onClick={siguiente}>Siguiente<Fl /></button>
             : <button type="button" className="bt" disabled={pendiente} onClick={guardar}>{pendiente ? "Guardando…" : b.id ? "Guardar cambios" : "Crear promoción"}<Fl /></button>}

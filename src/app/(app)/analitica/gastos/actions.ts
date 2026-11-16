@@ -105,6 +105,11 @@ export async function cancelarEgreso(_: EstadoGasto, form: FormData): Promise<Es
   return listo("Egreso cancelado. Queda en el historial.");
 }
 
+/** Para comparar nombres de categoría: sin acentos, mayúsculas, espacios ni números al final ("Papelería2" y "papeleria" son la misma). */
+function claveCategoria(n: string) {
+  return n.normalize("NFD").replace(/[\u0300-\u036f]/g, "").toLowerCase().replace(/[\s\d]+$/, "").replace(/\s+/g, " ").trim();
+}
+
 /** Crea una categoría, o vuelve a mostrar una que estaba oculta. */
 export async function crearCategoria(_: EstadoGasto, form: FormData): Promise<EstadoGasto> {
   const s = await requerirSesion();
@@ -113,8 +118,8 @@ export async function crearCategoria(_: EstadoGasto, form: FormData): Promise<Es
   if (nombre.length < 2) return { error: "Escribe el nombre de la categoría." };
   const nombreBonito = nombre[0].toUpperCase() + nombre.slice(1);
   const existentes = await db.select().from(schema.categoriasGasto).where(eq(schema.categoriasGasto.barberiaId, s.barberia.id));
-  const igual = existentes.find((c) => c.nombre.toLowerCase() === nombreBonito.toLowerCase());
-  if (igual?.activo) return { error: "Esa categoría ya existe." };
+  const igual = existentes.find((c) => claveCategoria(c.nombre) === claveCategoria(nombreBonito));
+  if (igual?.activo) return { error: `Ya existe ${igual.nombre}. Úsala en lugar de crear otra.` };
   try {
   await db.transaction(async (tx) => {
     if (igual) await tx.update(schema.categoriasGasto).set({ activo: true }).where(eq(schema.categoriasGasto.id, igual.id));
@@ -176,8 +181,9 @@ export async function renombrarCategoriaGasto(id: string, nombre: string): Promi
   const [c] = await db.select().from(schema.categoriasGasto).where(and(eq(schema.categoriasGasto.id, String(id)), eq(schema.categoriasGasto.barberiaId, s.barberia.id)));
   if (!c) return { error: "No se encontró la categoría." };
   if (c.nombre === bonito) return listo("Sin cambios.");
-  const [igual] = await db.select({ id: schema.categoriasGasto.id }).from(schema.categoriasGasto).where(and(eq(schema.categoriasGasto.barberiaId, s.barberia.id), sql`lower(${schema.categoriasGasto.nombre}) = lower(${bonito})`));
-  if (igual) return { error: "Ya hay una categoría con ese nombre." };
+  const otras = await db.select({ id: schema.categoriasGasto.id, nombre: schema.categoriasGasto.nombre }).from(schema.categoriasGasto).where(eq(schema.categoriasGasto.barberiaId, s.barberia.id));
+  const igual = otras.find((o) => o.id !== c.id && claveCategoria(o.nombre) === claveCategoria(bonito));
+  if (igual) return { error: `Ya existe ${igual.nombre}.` };
   await db.transaction(async (tx) => {
     await tx.update(schema.categoriasGasto).set({ nombre: bonito }).where(eq(schema.categoriasGasto.id, c.id));
     // Solo cambia la etiqueta: los importes y fechas de cada egreso quedan igual.

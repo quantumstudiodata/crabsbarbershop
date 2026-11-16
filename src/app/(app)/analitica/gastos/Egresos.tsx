@@ -204,7 +204,7 @@ export function Nuevo({ hoy, categorias, cerrar, otro, opciones }: { hoy: string
 
         {e.error && <p className="aviso error">{e.error}</p>}
         <div className="ck-acc">
-          {paso > 1 ? <button key="ant" type="button" className="ck-atras" aria-label="Anterior" onClick={() => setPaso(paso - 1)}><Icono n="izquierda" /></button> : <span />}
+          {paso > 1 ? <button key="ant" type="button" className="ck-atras" aria-label="Anterior" onClick={() => setPaso(paso - 1)}><Icono n="regresar" /></button> : <span />}
           {paso < total
             ? <button key="sig" type="button" className="bt" disabled={!valido} onClick={() => setPaso(paso + 1)}>Siguiente<Fl /></button>
             : <span className="ck-fin">

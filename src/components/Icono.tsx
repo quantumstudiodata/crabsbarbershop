@@ -27,6 +27,7 @@ const P: Record<string, React.ReactNode> = {
   arriba: <path d="M6 15l6-6 6 6" />,
   izquierda: <path d="M15 6l-6 6 6 6" />,
   derecha: <path d="M9 6l6 6-6 6" />,
+  regresar: <path d="M19 12H5M11 6l-6 6 6 6" />,
   flechaDiag: <path d="M7 17 17 7M9 7h8v8" />,
   mas: <path d="M12 5v14M5 12h14" />,
   puntos: <path d="M5 12h.01M12 12h.01M19 12h.01" strokeWidth="3.2" />,

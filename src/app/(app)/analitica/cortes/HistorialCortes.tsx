@@ -1,5 +1,6 @@
 "use client";
 
+import { zoomPagina } from "@/lib/zoom";
 import { useState } from "react";
 import { Vacio } from "@/components/Vacio";
 import { Avatar } from "@/components/Avatar";
@@ -94,7 +95,13 @@ function imprimir(folio: string) {
   const antes = document.title;
   document.title = `Corte de caja ${folio}`;
   document.body.classList.add("imprimiendo-ticket");
-  const fin = () => { document.title = antes; document.body.classList.remove("imprimiendo-ticket"); window.removeEventListener("afterprint", fin); };
+  // Rollo de 80 mm: la hoja mide lo mismo que el ticket, para que la impresora no avance papel en blanco.
+  const papel = document.querySelector(".rc-papel");
+  const mm = papel ? Math.ceil((papel.getBoundingClientRect().height / zoomPagina()) * 25.4 / 96) + 4 : 200;
+  const hoja = document.createElement("style");
+  hoja.textContent = `@page { size: 80mm ${mm}mm; margin: 0; }`;
+  document.head.appendChild(hoja);
+  const fin = () => { document.title = antes; document.body.classList.remove("imprimiendo-ticket"); hoja.remove(); window.removeEventListener("afterprint", fin); };
   window.addEventListener("afterprint", fin);
   window.print();
 }
