@@ -64,7 +64,8 @@ export default async function Cobrar({ searchParams }: { searchParams: Promise<{
       comisiones: mio(comisiones), entregas: mio(entregas), verTodo, sinCobrar: sinCobrar?.n ?? 0,
       pagosEquipo: datos.movimientos.filter((x) => x.tipo === "retiro" && esPagoEquipo(x.concepto)).reduce((a, x) => a + x.monto, 0),
       // Las propinas se ven con nombre: quien cierra la caja es quien las entrega.
-      propinasEquipo: propinasEq,
+      // Quien atiende ve solo lo suyo; la encargada o titular, el sobre de cada persona.
+      propinasEquipo: mio(propinasEq),
       detalle: {
         gastos: datos.gastos.map((g) => ({ concepto: g.concepto, monto: g.monto })),
         sacado: datos.movimientos.filter((x) => x.tipo === "retiro" && !esPagoEquipo(x.concepto) && !esPropinaEntregada(x.concepto)).map((x) => ({ concepto: x.concepto, monto: x.monto })),

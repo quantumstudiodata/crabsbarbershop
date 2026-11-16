@@ -130,7 +130,9 @@ export async function cerrarCaja(_: EstadoCaja, form: FormData): Promise<EstadoC
   }
   const deCaja = entregas.filter((x) => x.decision === "caja").reduce((a, x) => a + x.monto, 0);
   // Propinas del turno: se calculan aquí con lo guardado, no con lo que mande la pantalla. Del formulario solo se lee cómo se entrega lo de tarjeta.
-  const propinas = (await propinasDeTurno(s.barberia.id, turno.id)).map((p) => {
+  // Solo las propinas que se mostraron: quien no ve al equipo entrega solo las suyas; las demás siguen en la caja.
+  const verEquipo = s.puede("ventas.ver_todas") || s.puede("equipo.pagar");
+  const propinas = (await propinasDeTurno(s.barberia.id, turno.id)).filter((p) => verEquipo || p.id === s.usuario.id).map((p) => {
     const transferencia = p.otro > 0 && texto(form, `propina:${p.id}`) === "transferencia";
     return { ...p, transferencia, deCaja: p.efectivo + (transferencia ? 0 : p.otro) };
   });

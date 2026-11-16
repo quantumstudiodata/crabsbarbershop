@@ -5041,7 +5041,7 @@ html, body { overscroll-behavior-y: none; }
 }
 
 /* Corte de caja: comisiones del corte y entregas */
-.ck-con > .ck-per, .ck-ent > .ck-per { display: grid; grid-template-columns: auto 1fr auto; gap: 10px; align-items: center; text-align: left; }
+.ck-con > .ck-per, .ck-ent > .ck-per, .ck-sobre > .ck-per { display: grid; grid-template-columns: auto 1fr auto; gap: 10px; align-items: center; text-align: left; }
 .ck-con > .ck-ent { display: grid; justify-content: stretch; }
 .ck-per > span:not(.avatar) { display: flex; align-items: flex-start; flex-direction: column; font-weight: 600; font-size: 14px; }
 .ck-per > span:not(.avatar) small { font-weight: 400; font-size: 12px; color: var(--muted); }
@@ -5616,3 +5616,11 @@ html:has(.fx-raiz .mc) body::before, html:has(.fx-raiz .mc) body::after { displa
 .hist-corte .hc-v b { color: var(--fg); margin-left: 4px; }
 .hist-corte .hc-l { color: var(--fg); font-weight: 600; text-decoration: underline; text-underline-offset: 2px; }
 @media (max-width: 520px) { .hist-corte .t { width: auto; } .hist-corte .hc-v { margin-left: 0; } }
+
+/* Corte: un sobre por persona con sus opciones a la vista. */
+.ck-sobres { display: grid; gap: 4px; }
+.ck-sobre { display: grid; gap: 8px; padding: 12px 0; border-top: 1px solid var(--line); }
+.ck-sobre:first-child { border-top: 0; padding-top: 4px; }
+.ck-sobre .ck-per small { white-space: normal; }
+.ck-seg.n2 { grid-template-columns: repeat(2, 1fr); }
+.ck-tot { display: flex; justify-content: space-between; align-items: baseline; padding-top: 10px; border-top: 1px solid var(--fg); font-weight: 600; }

@@ -106,7 +106,7 @@ export const PUNTOS: Record<string, Punto> = {
       { sel: ".em-menu button|Corte de caja", modo: "pasa", solo: "mov", t: "Elige Corte de caja", x: "", h: "Toca Corte de caja" },
       { sel: "[role=dialog] .ck-res", modo: "leer", t: "Lo que se vendió", x: "El resumen del turno, separado por forma de pago: efectivo, tarjeta, transferencia.", h: "Toca Siguiente" },
       { sel: "[role=dialog] .ck-acc .bt", modo: "pasa", t: "Sigue al siguiente paso", x: "Toca el botón para continuar con el corte.", h: "Toca el botón" },
-      { sel: "[role=dialog] .ck-com", modo: "leer", opcional: true, t: "Lo que le toca a cada quien", x: "La comisión que generó cada persona con las ventas de este corte. Si hoy toca pagar, eliges si sale de la caja, mañana o por transferencia.", h: "Toca Siguiente" },
+      { sel: "[role=dialog] .ck-com", modo: "leer", opcional: true, t: "Entrega a cada quien", x: "Cada persona con lo que se le da hoy: su comisión y sus propinas, ya sumadas. Ya viene marcado De la caja; si a alguien se le paga distinto, toca Transferencia o Mañana.", h: "Toca Siguiente" },
       { sel: "[role=dialog] .ck-acc .bt|Contar efectivo", modo: "pasa", opcional: true, t: "Ahora a contar", x: "Toca para pasar al conteo del efectivo.", h: "Toca Contar efectivo" },
       { sel: '[role=dialog] input[name="contado"]', modo: "leer", t: "¿Cuánto efectivo hay?", x: "Cuenta los billetes y monedas de la caja y escribe el total. Después de escribirlo, la app te dice si coincide, si sobra o si falta.", h: "Toca Siguiente" },
       { sel: "[role=dialog] .ck-acc .bt", modo: "final", despues: CERRAR, t: "Cierra la caja", x: "En el último paso tocas Cerrar caja y el corte queda guardado con su folio.", h: "Toca el botón" },
