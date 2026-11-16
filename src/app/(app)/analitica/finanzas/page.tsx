@@ -116,21 +116,30 @@ export default async function MovimientosPagina({ searchParams }: { searchParams
   for (const c of turnos) sumar(c.fechaOperativa, 1);
   for (const x of [...diasG, ...diasP, ...diasM, ...diasT]) sumar(x.d, x.n);
   const todosDias = [...porDia.keys()].sort().reverse();
+  const totalFilas = [...porDia.values()].reduce((a, n) => a + n, 0);
   // Páginas por filas: se juntan días completos hasta llegar a unas 30 filas (15 en el teléfono). Un día muy lleno va solo en su página.
   const movil = await esMovil();
   const LIMITE = movil ? 15 : 30;
-  const grupos: string[][] = [];
+  // Un día con más filas que el límite se reparte en varias páginas (parte: desde qué fila y hasta cuál de ese día).
+  type Grupo = { dias: string[]; parte?: { desde: number; hasta: number } };
+  const grupos: Grupo[] = [];
   for (const d of todosDias) {
+    const n = porDia.get(d) ?? 0;
+    if (n > LIMITE) {
+      for (let i = 0; i < n; i += LIMITE) grupos.push({ dias: [d], parte: { desde: i, hasta: i + LIMITE >= n ? Infinity : i + LIMITE } });
+      continue;
+    }
     const ultimo = grupos[grupos.length - 1];
-    const lleva = ultimo ? ultimo.reduce((a, x) => a + (porDia.get(x) ?? 0), 0) : 0;
-    if (!ultimo || lleva + (porDia.get(d) ?? 0) > LIMITE) grupos.push([d]); else ultimo.push(d);
+    const lleva = ultimo && !ultimo.parte ? ultimo.dias.reduce((a, x) => a + (porDia.get(x) ?? 0), 0) : Infinity;
+    if (lleva + n > LIMITE) grupos.push({ dias: [d] }); else ultimo.dias.push(d);
   }
   const paginas = Math.max(1, grupos.length);
   // Al llegar con ?corte=<id> (desde un aviso), se abre la página donde está ese corte.
   const pedido = q.corte ? turnos.find((c) => c.id === q.corte) : undefined;
-  const paginaPedida = pedido ? grupos.findIndex((g) => g.includes(pedido.fechaOperativa)) + 1 : 0;
+  const paginaPedida = pedido ? grupos.findIndex((g) => g.dias.includes(pedido.fechaOperativa)) + 1 : 0;
   const pagina = Math.min(paginaPedida || f.pagina, paginas);
-  const dias = grupos[pagina - 1] ?? [];
+  const grupo = grupos[pagina - 1];
+  const dias = grupo?.dias ?? [];
   const pd = dias.length ? dias[dias.length - 1] : null, ph = dias.length ? dias[0] : null;
   // Un día más hacia adelante: lo que se entregó al cerrar después de medianoche pertenece al día anterior.
   const phMas = ph ? sumarDias(ph, 1) : null;
@@ -260,9 +269,11 @@ export default async function MovimientosPagina({ searchParams }: { searchParams
     if (it.k !== "corte" && c) { it.dia = c.dia; it.t = c.t - 1; }
   }
   const historial: DiaHistorial[] = dias.map((d) => {
-    const delDia = items.filter((x) => x.dia === d).sort((a, b) => b.t - a.t || (a.k === "corte" ? -1 : b.k === "corte" ? 1 : 0));
+    const ordenados = items.filter((x) => x.dia === d).sort((a, b) => b.t - a.t || (a.k === "corte" ? -1 : b.k === "corte" ? 1 : 0));
+    const delDia = grupo?.parte ? ordenados.slice(grupo.parte.desde, grupo.parte.hasta) : ordenados;
     const total = ventas.filter((v) => v.fecha === d && v.estado === "pagada").reduce((a, v) => a + monto(v), 0);
-    return { fecha: d, titulo: d === hoy ? "Hoy" : fechaLarga(d), total, items: delDia };
+    const nombre = d === hoy ? "Hoy" : fechaLarga(d);
+    return { fecha: d, titulo: grupo?.parte && grupo.parte.desde > 0 ? `${nombre}, continúa` : nombre, total, items: delDia };
   }).filter((d) => d.items.length);
 
   // Encabezado: el periodo elegido o el mes en curso (el día 1, el mes anterior).
@@ -351,7 +362,7 @@ export default async function MovimientosPagina({ searchParams }: { searchParams
           descarga={descarga}
           extra={TIPOS.length > 2 ? <SelectorUrl nombre="tipo" valor={tipo} opciones={TIPOS.map(([valor, texto]) => ({ valor, texto }))} etiqueta="Tipo de movimiento" /> : undefined} />} />
       <Paginacion ruta="/analitica/finanzas" params={q as Record<string, string | undefined>} pagina={pagina} paginas={paginas}
-        texto={todosDias.length ? `${todosDias.length} ${todosDias.length === 1 ? "día" : "días"} con movimientos${paginas > 1 ? `, página ${pagina} de ${paginas}` : ""}` : ""} />
+        texto={todosDias.length ? `${totalFilas} ${totalFilas === 1 ? "movimiento" : "movimientos"}${paginas > 1 ? `, página ${pagina} de ${paginas}` : ""}` : ""} />
     </>
   );
 }

@@ -5,7 +5,7 @@ import { usePathname, useRouter } from "next/navigation";
 import { useEffect, useLayoutEffect, useRef, useState } from "react";
 import { Icono } from "./Icono";
 import { grupoDe, pestanaActiva } from "@/lib/menu";
-import { enSeccion, type ItemNav, type SubNav } from "./Nav";
+import { seccionActiva, type ItemNav, type SubNav } from "./Nav";
 
 /** Abre un panel que vive en la barra de escritorio (Ayuda, Ideas) desde el teléfono. */
 export const abrirPanel = (cual: "ayuda" | "ideas") => window.dispatchEvent(new Event(`crabs:${cual}`));
@@ -36,7 +36,7 @@ export function TituloMovil({ negocio, nombre, fecha, items, grupos }: { negocio
   }, []);
   useEffect(() => { document.querySelector(".barra")?.classList.toggle("compacta-m", compacta); }, [compacta]);
   const enCobro = ruta.startsWith("/cobrar");
-  const seccion = enCobro ? "Cobro" : items.find((i) => i.href !== "/" && enSeccion(ruta, i))?.texto
+  const seccion = enCobro ? "Cobro" : seccionActiva(ruta, items.filter((i) => i.href !== "/"))?.texto
     ?? (ruta === "/" ? null : OTRAS.find(([r]) => ruta.startsWith(r))?.[1] ?? "");
   const grupo = grupoDe(ruta, grupos);
   // Al llegar a una pestaña que está fuera de la vista (por ejemplo Finanzas, al final), el menú se desliza hasta ella.
@@ -100,7 +100,7 @@ export function BarraInferior({ items }: { items: ItemNav[]; mas?: Mas }) {
       <nav ref={nav} className="secc-m" aria-label="Secciones">
         <span className="burbuja-m" style={pill} aria-hidden="true" />
         {secciones.map((i) => (
-          <Link key={i.href} href={i.href} className="tab-m" aria-current={enSeccion(ruta, i) ? "page" : undefined}>
+          <Link key={i.href} href={i.href} className="tab-m" aria-current={seccionActiva(ruta, items) === i ? "page" : undefined}>
             <Icono n={i.icono} />{i.texto}
           </Link>
         ))}

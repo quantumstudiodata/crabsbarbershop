@@ -5,7 +5,8 @@ import { Grafica } from "@/components/Grafica";
 import { zoomPagina } from "@/lib/zoom";
 
 type Reparto = { eq: boolean; gan: boolean };
-const GRAF_MIN = 84;
+// Altura mínima de la gráfica de hoy: menos que esto ya no se leen la línea ni sus marcas.
+const GRAF_MIN = 130;
 const GAP = 20;
 
 /**
@@ -88,20 +89,22 @@ export function RejillaInicio({ hoyCon, hoySin, equipo, ganado, der, inicial }: 
 /** La gráfica de hoy ocupa todo el espacio que le dejan y se redibuja a esa altura, sin estirarse. */
 export function GraficaAjustable(props: React.ComponentProps<typeof Grafica>) {
   const caja = useRef<HTMLDivElement>(null);
-  const [alto, setAlto] = useState(props.alto ?? 150);
+  const [tam, setTam] = useState({ ancho: props.ancho ?? 640, alto: props.alto ?? 150 });
   useEffect(() => {
     const c = caja.current;
     if (!c) return;
     const medir = () => {
-      const { width, height } = c.getBoundingClientRect();
+      const z = zoomPagina() || 1;
+      const r = c.getBoundingClientRect();
+      const width = r.width / z, height = r.height / z;
       if (width < 50 || height < 50) return;
-      // 22 px son los ejes de abajo; la proporción del dibujo sigue la del espacio disponible.
-      setAlto(Math.max(36, Math.round(((height - 22) * (props.ancho ?? 640)) / width)));
+      // 22 px son los ejes de abajo. El dibujo usa el tamaño real (un punto por pixel): así las letras y los puntos no se agrandan ni se achican.
+      setTam({ ancho: Math.round(width), alto: Math.max(80, Math.round(height - 22)) });
     };
     medir();
     const ro = new ResizeObserver(medir);
     ro.observe(c);
     return () => ro.disconnect();
-  }, [props.ancho]);
-  return <div ref={caja} className="graf-ajustable"><div><Grafica {...props} alto={alto} /></div></div>;
+  }, []);
+  return <div ref={caja} className="graf-ajustable"><div><Grafica {...props} ancho={tam.ancho} alto={tam.alto} /></div></div>;
 }

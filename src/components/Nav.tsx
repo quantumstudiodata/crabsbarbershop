@@ -9,8 +9,15 @@ export type ItemNav = { href: string; texto: string; icono: string; /** Función
 export type SubNav = GrupoMenu;
 
 /** Si la ruta pertenece a la sección (su ruta o alguna de las que agrupa). */
-export const enSeccion = (ruta: string, i: ItemNav) =>
-  i.href === "/" ? ruta === "/" : [i.href, ...(i.tambien ?? [])].some((h) => ruta === h || ruta.startsWith(h + "/"));
+export const enSeccion = (ruta: string, i: ItemNav) => largoCoincidencia(ruta, i) > 0;
+const largoCoincidencia = (ruta: string, i: ItemNav) =>
+  i.href === "/" ? (ruta === "/" ? 1 : 0) : Math.max(0, ...[i.href, ...(i.tambien ?? [])].filter((h) => ruta === h || ruta.startsWith(h + "/")).map((h) => h.length));
+/** La sección activa es la que coincide de forma más precisa: en /analitica/finanzas gana Movimientos sobre Reportes (/analitica). */
+export function seccionActiva(ruta: string, items: ItemNav[]) {
+  let mejor: ItemNav | undefined, largo = 0;
+  for (const i of items) { const l = largoCoincidencia(ruta, i); if (l > largo) { mejor = i; largo = l; } }
+  return mejor;
+}
 
 /**
  * Menú principal. Dentro de una sección con pestañas (Analítica, Clientes), el menú principal sale hacia la izquierda
@@ -20,16 +27,17 @@ export function Nav({ items, grupos, destacado }: { items: ItemNav[]; grupos: Su
   const ruta = usePathname();
   const actual = grupoDe(ruta, grupos);
   const dentro = !!actual;
+  const activa = seccionActiva(ruta, destacado ? [destacado, ...items] : items);
   return (
     <nav className={`nav glass desliza-n ${dentro ? "dentro" : ""}`} aria-label="Secciones">
       <div className="capa-n pri" aria-hidden={dentro || undefined}>
         {destacado && (
-          <Link href={destacado.href} className="destacado-n" tabIndex={dentro ? -1 : undefined} aria-current={enSeccion(ruta, destacado) ? "page" : undefined}>
+          <Link href={destacado.href} className="destacado-n" tabIndex={dentro ? -1 : undefined} aria-current={activa === destacado ? "page" : undefined}>
             <Icono n={destacado.icono} /><span>{destacado.texto}</span>
           </Link>
         )}
         {items.map((i) => (
-          <Link key={i.href} href={i.href} className={i.resalta ? "resalta-datos" : undefined} tabIndex={dentro ? -1 : undefined} aria-current={enSeccion(ruta, i) ? "page" : undefined}>
+          <Link key={i.href} href={i.href} className={i.resalta ? "resalta-datos" : undefined} tabIndex={dentro ? -1 : undefined} aria-current={activa === i ? "page" : undefined}>
             <Icono n={i.icono} />
             <span>{i.texto}</span>
           </Link>

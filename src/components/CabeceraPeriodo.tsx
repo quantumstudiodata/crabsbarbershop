@@ -1,4 +1,4 @@
-import { Grafica } from "./Grafica";
+import { GraficaMedida } from "./GraficaMedida";
 import { resumenPeriodo } from "@/lib/datos";
 import { diasEntre, fechaCorta, inicioDeMes, sumarDias } from "@/lib/fechas";
 import { cambio, formatoDinero } from "@/lib/money";
@@ -42,7 +42,7 @@ export async function CabeceraVentas({ barberiaId, zona, hoy, p, anterior, perso
         </div>
         {largo > 1 && largo <= 62 && (
           <div className="cv-graf">
-            <Grafica id="cab-ventas" actual={dias.map((d) => (d <= hoy ? r.porDia.get(d) ?? 0 : null))} etiquetas={dias.map(() => "")} alto={84} ancho={420} descripcion="Ventas por día" vacio="Sin ventas" />
+            <GraficaMedida id="cab-ventas" actual={dias.map((d) => (d <= hoy ? r.porDia.get(d) ?? 0 : null))} etiquetas={dias.map(() => "")} alto={84} ancho={420} descripcion="Ventas por día" vacio="Sin ventas" />
           </div>
         )}
         <div className="cv-concl">
