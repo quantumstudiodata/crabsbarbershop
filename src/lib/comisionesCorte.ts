@@ -23,6 +23,9 @@ export async function comisionesDeTurno(barberiaId: string, turnoId: string): Pr
   return filas.filter((x): x is ComisionCorte => !!x.id);
 }
 
+/** "13 de noviembre" pasa a "del 13 de noviembre"; lo que ya empieza con "de" o "del" se deja igual. */
+const conFecha = (t: string) => (!t.trim() ? "de días anteriores" : /^(de|del)\s/i.test(t.trim()) ? t.trim() : `del ${t.trim()}`);
+
 /** Comisiones ya liquidadas que esperan entregarse en efectivo, más las que se liquidan hoy al hacer el corte. */
 export async function entregasDeCorte(barberiaId: string, zona: string, desdePago: string | null): Promise<EntregaCorte[]> {
   const hoy = fechaLocal(new Date(), zona);
@@ -36,7 +39,7 @@ export async function entregasDeCorte(barberiaId: string, zona: string, desdePag
     x.monto += monto; x.detalle = [x.detalle, detalle].filter(Boolean).join(" y ");
     mapa.set(id, x);
   };
-  for (const p of pendientes) sumar(p.id, p.nombre, p.avatar, p.monto, p.nota.slice(POR_ENTREGAR.length + 2).replace(/^Pago automático\s*/, "").replace(/^del /, "del "));
+  for (const p of pendientes) sumar(p.id, p.nombre, p.avatar, p.monto, conFecha(p.nota.slice(POR_ENTREGAR.length + 2).replace(/^Pago automático\s*/, "")));
   // Periodos que se pagan hoy y terminan hoy: se liquidan al cerrar la caja con lo vendido en el día.
   if (desdePago) {
     const reglas = await reglasDe(barberiaId);

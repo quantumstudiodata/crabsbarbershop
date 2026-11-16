@@ -281,7 +281,12 @@ function CortePasos({ turno, accion, cerrando, error, contado, setContado, limit
   const [faltan, setFaltan] = useState(() => grupos.filter((g) => !g.enLinea).length);
   const [archivos, setArchivos] = useState(0);
   // Cada entrega sale de la caja salvo que se elija otra cosa.
-  const [decision, setDecision] = useState<Record<string, string>>(() => Object.fromEntries(entregas.map((e) => [e.id, "caja"])));
+  // Por defecto se paga de la caja solo lo que alcanza con el efectivo del día; lo demás queda para mañana.
+  const [decision, setDecision] = useState<Record<string, string>>(() => {
+    let queda = turno.esperado;
+    return Object.fromEntries(entregas.map((e) => { const alcanza = queda >= e.monto; if (alcanza) queda -= e.monto; return [e.id, alcanza ? "caja" : "manana"]; }));
+  });
+  const alcanzaCaja = turno.esperado - entregas.filter((e) => decision[e.id] === "caja").reduce((a, e) => a + e.monto, 0) >= 0;
   const deCaja = entregas.filter((e) => decision[e.id] === "caja").reduce((a, e) => a + e.monto, 0);
   const esperado = turno.esperado - deCaja;
   const anulados = turno.pagosAnulados ?? 0;
@@ -322,21 +327,20 @@ function CortePasos({ turno, accion, cerrando, error, contado, setContado, limit
 
         {conComisiones && (
           <div className="pila ck-com" hidden={paso !== n("Comisiones")}>
-            {comisiones.length > 0 && (
-              <div className="ck-con">
-                <span className="ck-lab">{turno.verTodo ? "Lo que le toca a cada quien por este corte" : "Lo que te toca por tus servicios de este corte"}</span>
+            <div className="ck-con">
+              <span className="ck-lab">{turno.verTodo ? "Comisión por los servicios de hoy" : "Tu comisión por los servicios de hoy"}</span>
+              {comisiones.length === 0 && <small className="muted">Hoy no hubo servicios cobrados en esta caja, así que hoy no se generó comisión.</small>}
                 {comisiones.map((x) => (
                   <div key={x.id} className="ck-per"><Avatar avatar={x.avatar} nombre={x.nombre} t={26} /><span>{x.nombre.split(" ")[0]}<small>{x.servicios} {x.servicios === 1 ? "servicio" : "servicios"}</small></span><b className="num">{formatoDinero(x.monto)}</b></div>
-                ))}
-              </div>
-            )}
+              ))}
+            </div>
             {entregas.length > 0 && (
               <div className="ck-con">
-                <span className="ck-lab">Hoy toca pagar</span>
+                <span className="ck-lab">Comisiones de días anteriores que toca pagar hoy</span>
                 {entregas.map((e) => (
                   <div key={e.id} className="ck-ent">
                     <input type="hidden" name={`entrega:${e.id}`} value={decision[e.id] ?? "caja"} />
-                    <div className="ck-per"><Avatar avatar={e.avatar} nombre={e.nombre} t={26} /><span>{e.nombre.split(" ")[0]}<small>Comisión {e.detalle}</small></span><b className="num">{formatoDinero(e.monto)}</b></div>
+                    <div className="ck-per"><Avatar avatar={e.avatar} nombre={e.nombre} t={26} /><span>{e.nombre.split(" ")[0]}<small>Por sus servicios {e.detalle}</small></span><b className="num">{formatoDinero(e.monto)}</b></div>
                     <div className="seg ck-seg" role="radiogroup" aria-label={`Cómo se le paga a ${e.nombre.split(" ")[0]}`}>
                       {([["caja", "De la caja"], ["manana", "Mañana"], ["transferencia", "Transferencia"]] as const).map(([k, t]) => (
                         <button key={k} type="button" role="radio" aria-checked={decision[e.id] === k} className={decision[e.id] === k ? "on" : ""} onClick={() => setDecision((d) => ({ ...d, [e.id]: k }))}>{t}</button>
@@ -344,7 +348,8 @@ function CortePasos({ turno, accion, cerrando, error, contado, setContado, limit
                     </div>
                   </div>
                 ))}
-                <small className="muted">Lo que se paga de la caja se descuenta del efectivo que debe haber. Si hoy no hay cambio, elige Mañana y saldrá en el siguiente corte.</small>
+                <small className="muted">No son de los servicios de hoy: es lo que ganaron en esas fechas y hoy es su día de pago. Lo que se paga de la caja se descuenta del efectivo que debe haber. Si no alcanza, elige Mañana o Transferencia.</small>
+                {!alcanzaCaja && <small className="aviso" style={{ margin: 0 }}>El efectivo de la caja no alcanza para pagar todo lo que marcaste De la caja.</small>}
               </div>
             )}
           </div>
@@ -390,7 +395,7 @@ function CortePasos({ turno, accion, cerrando, error, contado, setContado, limit
           <div className="ck-con">
             <div><span>Total vendido</span><b className="num">{formatoDinero(total)}</b></div>
             {comisiones.length > 0 && <div><span>{turno.verTodo ? "Comisiones de este corte" : "Tu comisión de este corte"}</span><span className="num">{turno.verTodo ? comisiones.map((x) => `${x.nombre.split(" ")[0]} ${formatoDinero(x.monto)}`).join(", ") : formatoDinero(comisiones.reduce((a, x) => a + x.monto, 0))}</span></div>}
-            {entregas.length > 0 && <div><span>Comisiones que se pagan hoy</span><span className="num">{entregas.map((e) => `${e.nombre.split(" ")[0]} ${formatoDinero(e.monto)} ${decision[e.id] === "caja" ? "de la caja" : decision[e.id] === "transferencia" ? "por transferencia" : "mañana"}`).join(", ")}</span></div>}
+            {entregas.length > 0 && <div><span>Comisiones de días anteriores</span><span className="num">{entregas.map((e) => `${e.nombre.split(" ")[0]} ${formatoDinero(e.monto)}, servicios ${e.detalle}, ${decision[e.id] === "caja" ? "de la caja" : decision[e.id] === "transferencia" ? "por transferencia" : "mañana"}`).join(", ")}</span></div>}
             <div><span>Efectivo esperado</span><span className="num">{formatoDinero(esperado)}</span></div>
             <div><span>Efectivo contado</span><span>{c === null ? "Sin contar" : `${formatoDinero(c)}, ${dif === 0 ? "coincide" : dif! > 0 ? `sobran ${formatoDinero(dif!)}` : `faltan ${formatoDinero(-dif!)}`}`}</span></div>
             {conComprobantes && <div><span>Comprobantes</span><span>{faltan ? `Falta en ${faltan} ${faltan === 1 ? "forma de pago" : "formas de pago"}` : `${archivos} ${archivos === 1 ? "archivo" : "archivos"}, al menos uno por forma de pago`}</span></div>}
