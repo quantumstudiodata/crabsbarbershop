@@ -88,7 +88,7 @@ export function FilaCorte({ c, corregir, abrir, ver = true, hijos = [] }: { c: C
       </div>
       {todos.length > 0 && (
         <div className="cp-hijos">
-          {todos.map((h) => <div key={h.id} className={h.pend ? "pend" : h.aparte ? "ap" : ""}><span>{h.pend && <i className="cp-pend" aria-label="Pendiente" />}{h.nombre} <small>{h.que}</small></span><span className="num">{h.monto}</span></div>)}
+          {todos.map((h) => <div key={h.id} className={h.pend ? "cp-pe" : h.aparte ? "ap" : ""}><span>{h.pend && <i className="cp-pend" aria-label="Pendiente" />}{h.nombre} <small>{h.que}</small></span><span className="num">{h.monto}</span></div>)}
         </div>
       )}
       {ver && <Detalle c={abierto ? c : null} cerrar={() => setAbierto(false)} ajustar={corregir ? () => { setAbierto(false); setAjuste(true); } : undefined} />}
