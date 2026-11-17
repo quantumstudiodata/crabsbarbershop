@@ -5939,3 +5939,9 @@ button.cp-pill:focus-visible { outline: 2px solid #2b3a47; outline-offset: 2px; 
 /* Quién hizo la venta, junto al servicio. */
 .hist-linea .srv .srv-q { display: inline; flex: none; white-space: nowrap; margin-left: 12px; font-size: 12.5px; font-weight: 400; color: var(--muted); }
 @media (max-width: 640px) { .hist-linea .srv .srv-q { margin-left: 8px; font-size: 12px; } }
+/* Pendiente dentro del desglose del corte: mismo tamaño, con un punto ámbar que late suave. */
+.cp-hijos > div.pend .num { color: #8a5a1e; }
+.cp-hijos > div.pend small { color: var(--muted); }
+.cp-pend { display: inline-block; width: 8px; height: 8px; margin-right: 6px; vertical-align: 1px; border-radius: 3px; background: #c58a3e; animation: pend-latido 2.6s ease-in-out infinite; }
+@media (prefers-reduced-motion: reduce) { .cp-pend { animation: none; } }
+.cp-hijos > div.pend > span:first-child { color: #3b4a58; }

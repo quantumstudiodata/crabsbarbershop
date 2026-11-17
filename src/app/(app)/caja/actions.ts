@@ -94,6 +94,11 @@ export async function registrarGasto(_: EstadoCaja, form: FormData): Promise<Est
  * Corte de caja, como en un punto de venta: se suman todos los cobros por método (esa es la venta total)
  * y se concilia solo el efectivo físico contra lo que debería haber.
  */
+const MES_CORTO: Record<string, string> = { enero: "ene", febrero: "feb", marzo: "mar", abril: "abr", mayo: "may", junio: "jun", julio: "jul", agosto: "ago", septiembre: "sep", octubre: "oct", noviembre: "nov", diciembre: "dic" };
+/** "Pago automático del 10 de noviembre al 15 de noviembre" pasa a "10 al 15 nov". Sin comas ni paréntesis, para que el resumen se pueda leer. */
+const diasCortos = (t: string) => t.replace(/^\s*Pago automático\s*/i, "").replace(/^(de|del)\s+/i, "")
+  .replace(/ de ([a-záéíóú]+)/gi, (_, m: string) => ` ${MES_CORTO[m.toLowerCase()] ?? m}`).replace(/(\d+) (\w+) al (\d+) \2\b/, "$1 al $3 $2").replace(/[(),]/g, "").trim();
+
 export async function cerrarCaja(_: EstadoCaja, form: FormData): Promise<EstadoCaja> {
   const s = await requerirSesion();
   if (!s.puede("caja.operar")) return { error: "No tienes permiso para cerrar la caja." };
@@ -166,8 +171,12 @@ export async function cerrarCaja(_: EstadoCaja, form: FormData): Promise<EstadoC
       partes.push({ fila: f, deCaja, resto: f.monto - deCaja, transf: restoTransf });
     }
     const nombre = (filas[0]?.nombre ?? prop?.nombre ?? "").split(" ")[0];
-    if (comCaja) resumenCom.push(`${nombre} ${formatoDinero(comCaja)} de la caja`);
-    if (totalCom - comCaja) resumenCom.push(`${nombre} ${formatoDinero(totalCom - comCaja)} ${restoTransf ? "por transferencia" : "para el próximo corte"}`);
+    // Un renglón por pago, con sus días: así cada pago se encuentra después en su corte y un pendiente se puede seguir de corte en corte.
+    for (const p of partes.filter((x) => x.fila.barberoId === id)) {
+      const dias = diasCortos(p.fila.nota.slice(POR_ENTREGAR.length + 2));
+      if (p.deCaja) resumenCom.push(`${nombre} ${formatoDinero(p.deCaja)} de la caja`);
+      if (p.resto) resumenCom.push(`${nombre} ${formatoDinero(p.resto)} ${restoTransf ? "por transferencia" : "para el próximo corte"}${dias ? ` (${dias})` : ""}`);
+    }
     porPersona.set(id, { nombre, comCaja, propCaja, propTransf, efectivo: prop?.efectivo ?? 0 });
   }
   const deCaja = [...porPersona.values()].reduce((a, x) => a + x.comCaja, 0);

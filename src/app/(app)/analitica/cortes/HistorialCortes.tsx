@@ -17,7 +17,7 @@ export type Corte = {
   esperado: number; contado: number; diferencia: number; ajustado?: number; notas: string | null;
   movimientos: { hora: string; tipo?: string; titulo: string; detalle: string; monto: number }[];
   /** Pagos decididos en el cierre que no salieron de la caja. */
-  fueraCaja?: { nombre: string; monto: number; como: string }[];
+  fueraCaja?: { nombre: string; monto: number; como: string; dias?: string; desde?: string }[];
   ajustes: string[];
   evidencias: { id: string; etiqueta: string; nombre: string; tipo: string }[];
   abrioId?: string;
@@ -61,7 +61,7 @@ export function NecesitaRevision({ cortes, puede }: { cortes: Corte[]; puede: bo
 }
 
 /** Lo que se entregó al cerrar, en renglones bajo la pastilla del corte. */
-export type HijoCorte = { id: string; nombre: string; que: string; monto: string; aparte?: boolean };
+export type HijoCorte = { id: string; nombre: string; que: string; monto: string; aparte?: boolean; pend?: boolean };
 
 /**
  * Un corte dentro de Movimientos: una pastilla sobre una línea con la hora, cómo quedó y lo vendido;
@@ -72,6 +72,12 @@ export function FilaCorte({ c, corregir, abrir, ver = true, hijos = [] }: { c: C
   const [ajuste, setAjuste] = useState(false);
   const hora = c.horario.split(" a ")[1] || c.horario;
   const estado = c.diferencia === 0 ? "cuadró" : `${c.diferencia < 0 ? "faltaron" : "sobraron"} ${$(Math.abs(c.diferencia))}`;
+  // Lo que quedó pendiente en este corte: va al final del desglose, con su ícono y de qué días y de qué corte viene.
+  const pendientes: HijoCorte[] = (c.fueraCaja ?? []).filter((x) => x.como === "para el próximo corte").map((x, i) => ({
+    id: `pend${i}`, nombre: x.nombre, pend: true, monto: $(x.monto),
+    que: `comisión${x.dias ? ` del ${x.dias}` : ""}, pendiente ${x.desde ? `desde el corte ${x.desde}` : "para el próximo corte"}`,
+  }));
+  const todos = [...hijos, ...pendientes];
   const contenido = <><span className="cp-txt">Corte {hora}, <span className={c.diferencia < 0 ? "cp-falta" : ""}>{ver ? estado : "cerrado"}</span></span>{ver && <small>{$(c.total)} vendido</small>}</>;
   return (
     <div className={`hist-fila t-corte ${abierto ? "abierta" : ""}`}>
@@ -80,9 +86,9 @@ export function FilaCorte({ c, corregir, abrir, ver = true, hijos = [] }: { c: C
         {ver ? <button type="button" className="cp-pill" aria-label={`Ver corte ${c.folio}`} onClick={() => setAbierto(true)}>{contenido}</button> : <span className="cp-pill">{contenido}</span>}
         <span className="cp-ln" />
       </div>
-      {hijos.length > 0 && (
+      {todos.length > 0 && (
         <div className="cp-hijos">
-          {hijos.map((h) => <div key={h.id} className={h.aparte ? "ap" : ""}><span>{h.nombre} <small>{h.que}</small></span><span className="num">{h.monto}</span></div>)}
+          {todos.map((h) => <div key={h.id} className={h.pend ? "pend" : h.aparte ? "ap" : ""}><span>{h.pend && <i className="cp-pend" aria-label="Pendiente" />}{h.nombre} <small>{h.que}</small></span><span className="num">{h.monto}</span></div>)}
         </div>
       )}
       {ver && <Detalle c={abierto ? c : null} cerrar={() => setAbierto(false)} ajustar={corregir ? () => { setAbierto(false); setAjuste(true); } : undefined} />}
@@ -145,7 +151,7 @@ function Detalle({ c, cerrar, ajustar }: { c: Corte | null; cerrar: () => void; 
           {propDeCaja > 0 && <Rg s="-" t="Propinas con tarjeta" sub="Se pagaron con la caja" v={$(propDeCaja)} />}
           <Rg s="=" t="Debía quedar" v={$(c.esperado)} cls="tot" />
           <Rg t="Se contó" sub={c.diferencia === 0 ? "Cuadró" : estado.replace(/^./, (x) => x.toUpperCase())} v={$(c.contado)} />
-          {(c.fueraCaja ?? []).map((x, i) => <Rg key={`f${i}`} t={`${x.nombre}, comisión`} sub={x.como === "por transferencia" ? "Por transferencia, no sale de la caja" : "Para el próximo corte"} v={$(x.monto)} cls="mu" />)}
+          {(c.fueraCaja ?? []).map((x, i) => <Rg key={`f${i}`} t={`${x.nombre}, comisión`} sub={x.como === "por transferencia" ? "Por transferencia, no sale de la caja" : `Pendiente${x.dias ? `, del ${x.dias}` : ""}${x.desde ? `, desde el corte ${x.desde}` : ", para el próximo corte"}`} v={$(x.monto)} cls="mu" />)}
           {c.propinasEfectivo > 0 && <Rg t="Propinas en efectivo" sub="Aparte de la caja" v={$(c.propinasEfectivo)} cls="mu" />}
         </div>
         {c.otrosEgresos.length > 0 && (

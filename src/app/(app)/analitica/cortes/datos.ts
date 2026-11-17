@@ -1,4 +1,4 @@
-import { and, eq, gte, inArray, isNull, lte, ne, sql } from "drizzle-orm";
+import { and, desc, eq, inArray, isNull, lte, ne, sql } from "drizzle-orm";
 import { esPagoAnulado, esPagoEquipo, esPropinaEntregada } from "@/lib/caja";
 import { cobradoresDe } from "@/lib/faltantes";
 import { ajustesDeTurnos, detalleCortes, metodosActivos, turnosCerrados } from "@/lib/datos";
@@ -14,7 +14,7 @@ type Persona = { id: string; nombre: string; avatar: string; activo: boolean };
  * Arma el comprobante completo de cada corte (cobros, efectivo, movimientos, evidencias y ajustes).
  * Lo usa Movimientos, donde cada corte se abre a un lado sin salir de la página.
  */
-export async function armarCortes(barberiaId: string, turnos: Turno[], o: { zona: string; hoy: string; gente: Persona[]; folios: Map<string, string>; verEgresos: boolean }) {
+export async function armarCortes(barberiaId: string, turnos: Turno[], o: { zona: string; hoy: string; gente: Persona[]; folios: Map<string, string>; verEgresos: boolean; /** Todos los cortes, para saber de qué corte viene un pendiente. */ todos?: Turno[] }) {
   if (!turnos.length) return [];
   const ids = turnos.map((c) => c.id);
   const [ajustes, det, evid, activos] = await Promise.all([
@@ -27,17 +27,43 @@ export async function armarCortes(barberiaId: string, turnos: Turno[], o: { zona
   const fechas = [...new Set(turnos.map((c) => c.fechaOperativa))];
   const otrosEgresos = o.verEgresos ? await db.select({ fecha: schema.gastos.fecha, concepto: schema.gastos.concepto, metodo: schema.gastos.metodo, monto: schema.gastos.monto }).from(schema.gastos)
     .where(and(eq(schema.gastos.barberiaId, barberiaId), inArray(schema.gastos.fecha, fechas), isNull(schema.gastos.turnoId), ne(schema.gastos.metodo, "efectivo"), isNull(schema.gastos.canceladoEn))) : [];
-  // Lo que se decidió en cada cierre y no salió de la caja (por transferencia o para el próximo corte): solo se informa en el detalle.
+  // Lo que se decidió en cada cierre y no salió de la caja (por transferencia o para el próximo corte): se informa en el detalle,
+  // y lo que quedó pendiente se muestra en el desglose del corte. Si un pendiente sigue sin pagarse, vuelve a salir en el corte siguiente
+  // y dice desde qué corte viene.
   const cerrados = turnos.map((c) => c.cerradoEn).filter((x): x is Date => !!x).map((x) => x.getTime());
   const cierres = cerrados.length ? await db.select({ creadoEn: schema.historial.creadoEn, detalle: schema.historial.detalle }).from(schema.historial)
     .where(and(eq(schema.historial.barberiaId, barberiaId), eq(schema.historial.tipo, "caja"), sql`${schema.historial.detalle} ? 'comisiones'`,
-      gte(schema.historial.creadoEn, new Date(Math.min(...cerrados) - 5 * 60000)), lte(schema.historial.creadoEn, new Date(Math.max(...cerrados) + 5 * 60000)))) : [];
+      lte(schema.historial.creadoEn, new Date(Math.max(...cerrados) + 5 * 60000))))
+    .orderBy(desc(schema.historial.creadoEn)).limit(Math.max(60, turnos.length + 30)) : [];
+  const todos = o.todos ?? turnos;
+  const leer = (h: (typeof cierres)[number] | undefined) => [...String((h?.detalle as { comisiones?: string } | undefined)?.comisiones ?? "")
+    .matchAll(/([^,]+?) \$([\d,]+(?:\.\d{1,2})?) (por transferencia|para el próximo corte)(?: \(([^)]*)\))?/g)]
+    .map((m) => ({ nombre: m[1].trim(), monto: Math.round(Number(m[2].replace(/,/g, "")) * 100), como: m[3], dias: m[4] ?? "" }));
+  // El cierre se anota en el historial justo al cerrar la caja: se toma el más cercano (dos cortes pueden cerrarse con minutos de diferencia).
+  const cercano = <T,>(lista: T[], hora: (x: T) => number, t: number) => {
+    let mejor = -1, dif = 5 * 60000;
+    lista.forEach((x, i) => { const d = Math.abs(hora(x) - t); if (d < dif) { dif = d; mejor = i; } });
+    return mejor;
+  };
+  const folioDe = (h: (typeof cierres)[number]) => {
+    const conCierre = todos.filter((x) => x.cerradoEn);
+    const k = cercano(conCierre, (x) => x.cerradoEn!.getTime(), h.creadoEn.getTime());
+    return k >= 0 ? o.folios.get(conCierre[k].id) ?? "" : "";
+  };
   const fueraDe = (cerradoEn: Date | null) => {
     if (!cerradoEn) return [];
-    const h = cierres.find((x) => Math.abs(x.creadoEn.getTime() - cerradoEn.getTime()) < 5 * 60000);
-    const txt = String((h?.detalle as { comisiones?: string } | undefined)?.comisiones ?? "");
-    return [...txt.matchAll(/([^,]+?) \$([\d,]+(?:\.\d{1,2})?) (por transferencia|para el próximo corte)/g)]
-      .map((m) => ({ nombre: m[1].trim(), monto: Math.round(Number(m[2].replace(/,/g, "")) * 100), como: m[3] }));
+    const i = cercano(cierres, (x) => x.creadoEn.getTime(), cerradoEn.getTime());
+    if (i < 0) return [];
+    return leer(cierres[i]).map((x) => {
+      if (x.como !== "para el próximo corte") return x;
+      // Se busca hacia atrás mientras el mismo pendiente (persona, monto y días) siga apareciendo.
+      let desde = "";
+      for (let k = i + 1; k < cierres.length; k++) {
+        if (!leer(cierres[k]).some((y) => y.como === x.como && y.nombre === x.nombre && y.monto === x.monto && y.dias === x.dias)) break;
+        desde = folioDe(cierres[k]);
+      }
+      return { ...x, desde };
+    });
   };
   const { zona, hoy, gente, folios } = o;
   const persona = (id: string | null) => gente.find((g) => g.id === id) ?? { nombre: "", avatar: "iniciales" };

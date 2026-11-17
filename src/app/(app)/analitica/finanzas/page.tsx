@@ -160,7 +160,7 @@ export default async function MovimientosPagina({ searchParams }: { searchParams
   const turnosPagina = turnos.filter((c) => dias.includes(c.fechaOperativa));
   const [ventas, cortes, gastos, pagos, movsCaja, propTrans, turno, metodos] = await Promise.all([
     diasV.length && pd && ph ? ventasEntre(bId, pd, ph, { zona, condiciones: condV }).then((r) => r.ventas) : [],
-    armarCortes(bId, turnosPagina, { zona, hoy, gente, folios, verEgresos }),
+    armarCortes(bId, turnosPagina, { zona, hoy, gente, folios, verEgresos, todos: turnos }),
     diasG.length && pd && ph ? db.select({ g: t.gastos, quien: quien.nombre, cancelo: cancelo.nombre }).from(t.gastos)
       .innerJoin(quien, eq(quien.id, t.gastos.usuarioId)).leftJoin(cancelo, eq(cancelo.id, t.gastos.canceladoPor))
       .where(and(...condGasto, gte(t.gastos.fecha, pd), lte(t.gastos.fecha, ph)))
@@ -269,13 +269,18 @@ export default async function MovimientosPagina({ searchParams }: { searchParams
         const hay = [...txt.matchAll(/([^,]+?) \$([\d,]+(?:\.\d{1,2})?) (de la caja|por transferencia)/g)]
           .some((m) => m[1].trim() === primero && Math.round(Number(m[2].replace(/,/g, "")) * 100) === p.monto);
         if (!hay) continue;
-        const c = cortesAsc.find((x) => Math.abs(x.cerradoEn!.getTime() - h.creadoEn.getTime()) < 5 * 60000);
+        // El corte más cercano al momento del cierre (dos cortes pueden cerrarse con minutos de diferencia).
+        const c = cortesAsc.reduce<{ c?: (typeof cortesAsc)[number]; d: number }>((m, x) => {
+          const d = Math.abs(x.cerradoEn!.getTime() - h.creadoEn.getTime());
+          return d < m.d ? { c: x, d } : m;
+        }, { d: 5 * 60000 }).c;
         if (c) return c.id;
       }
       if (/Pago automático/.test(p.nota)) return corteDespuesDe(p.creadoEn)?.id;
     }
     return undefined;
   };
+  const diasCortos = (t: string) => t.replace(/^(de|del)\s+/i, "").replace(/ de ([a-záéíóú]+)/gi, (_, m: string) => ` ${({ enero: "ene", febrero: "feb", marzo: "mar", abril: "abr", mayo: "may", junio: "jun", julio: "jul", agosto: "ago", septiembre: "sep", octubre: "oct", noviembre: "nov", diciembre: "dic" } as Record<string, string>)[m.toLowerCase()] ?? m}`).replace(/(\d+) (\w+) al (\d+) \2\b/, "$1 al $3 $2");
   const DE_QUE = (nota: string) => nota.slice(nota.indexOf(":") + 1).replace(/^\s*Pago automático\s*/, "").trim();
   const filaPago = (p: (typeof pagos)[number]["p"], nombre: string, extra: { corte?: string; pend?: boolean } = {}): ItemHistorial & { dia: string } => {
     const renta = p.tipo === "renta";
@@ -299,15 +304,26 @@ export default async function MovimientosPagina({ searchParams }: { searchParams
   // Pendientes: si se dejaron en el último corte, van debajo de ese corte; si no, arriba de todo (o al inicio de hoy si hoy no hay corte).
   const pendIds = new Set(pendientesTodos.map((x) => x.p.id));
   const fijos: (ItemHistorial & { dia: string })[] = [];
+  // Con los cortes a la vista, lo pendiente va en el desglose de cada corte (en chico, con su ícono), no como renglón suelto.
+  // Si el cierre no lo dejó anotado (cortes de antes), se agrega al corte donde se quedó pendiente.
+  const enCortes = verCortes && ver("cortes");
   for (const { p, nombre } of pendientesTodos) {
     const origen = corteDespuesDe(p.creadoEn);
+    if (enCortes) {
+      const c = origen ? cortes.find((x) => x.id === origen.id) : undefined;
+      const nom = nombre.split(" ")[0];
+      const lista = c ? (c.fueraCaja ??= []) : null;
+      if (lista && !lista.some((y) => y.como === "para el próximo corte" && y.nombre === nom && y.monto === p.monto))
+        lista.push({ nombre: nom, monto: p.monto, como: "para el próximo corte", dias: diasCortos(DE_QUE(p.nota)) });
+      continue;
+    }
     if (origen && origen.id === ultimoCorte?.id && turnosPagina.some((c) => c.id === origen.id)) items.push(filaPago(p, nombre, { corte: origen.id, pend: true }));
     else fijos.push(filaPago(p, nombre));
   }
   for (const { p, nombre } of pagos) {
     if (pendIds.has(p.id)) continue;
     // Los pendientes no se repiten en su día: salen arriba, en la primera página.
-    if (p.tipo === "pago" && p.monto > 0 && p.nota.startsWith("Por entregar de caja") && !f.periodo && verPagos && ver("equipo")) continue;
+    if (p.tipo === "pago" && p.monto > 0 && p.nota.startsWith("Por entregar de caja") && (enCortes || (!f.periodo && verPagos && ver("equipo")))) continue;
     items.push(filaPago(p, nombre, { corte: turnoDePago(p, nombre) }));
   }
   // Lo que entró o salió de la caja sin ser venta ni gasto. Los pagos al equipo ya aparecen como pago; aquí no se repiten.
