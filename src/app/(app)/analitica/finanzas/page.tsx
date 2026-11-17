@@ -179,6 +179,14 @@ export default async function MovimientosPagina({ searchParams }: { searchParams
   // Lo que se decidió en cada cierre (quién recibió cuánto y cómo): sirve para poner cada pago debajo de su corte.
   const cierres = diasP.length && pd && ph ? await db.select({ creadoEn: t.historial.creadoEn, detalle: t.historial.detalle }).from(t.historial)
     .where(and(eq(t.historial.barberiaId, bId), eq(t.historial.tipo, "caja"), sql`${t.historial.detalle} ? 'comisiones'`, ...enPagina(t.historial.creadoEn))) : [];
+  // Pagos de días anteriores a la página que se entregaron (o se dejaron pendientes) en un corte que sí está en la página:
+  // sin ellos, un corte no mostraría a quién le pagó una comisión vieja.
+  const pagosAntes = verCortes && ver("cortes") && verPagos && ver("equipo") && pd && turnosPagina.length
+    ? await db.select({ p: t.pagosComision, nombre: t.usuarios.nombre }).from(t.pagosComision).innerJoin(t.usuarios, eq(t.usuarios.id, t.pagosComision.barberoId))
+      .where(and(eq(t.pagosComision.barberiaId, bId), eq(t.pagosComision.tipo, "pago"), sql`${t.pagosComision.nota} like '%Pago automático%'`, sql`${t.pagosComision.nota} not like 'Por entregar de caja:%'`,
+        sql`(${t.pagosComision.creadoEn} at time zone ${zona})::date between ${sumarDias(pd, -45)}::date and ${sumarDias(pd, -1)}::date`,
+        ...(pagosDe ? [eq(t.pagosComision.barberoId, pagosDe)] : [])))
+    : [];
   // Pagos que siguen pendientes de entregar: se muestran siempre en la primera página, sean del día que sean,
   // para que nadie pierda de vista de cuándo es ese dinero.
   const pendientesTodos = verPagos && ver("equipo") && pagina === 1 && !f.periodo
@@ -253,13 +261,21 @@ export default async function MovimientosPagina({ searchParams }: { searchParams
   const cortesAsc = [...turnos].filter((c) => c.cerradoEn).sort((a, b) => a.cerradoEn!.getTime() - b.cerradoEn!.getTime());
   const corteDespuesDe = (d: Date) => cortesAsc.find((c) => c.cerradoEn!.getTime() > d.getTime());
   const ultimoCorte = cortesAsc[cortesAsc.length - 1];
+  // Cada pago se resuelve una sola vez: la salida de caja que le corresponde se aparta y no puede usarse para otro pago.
+  const corteDePago = new Map<string, string | undefined>();
+  // Pagos cuyo corte se supo por su salida de caja o por lo anotado en el cierre (no por cercanía de fechas).
+  const seguro = new Set<string>();
   const turnoDePago = (p: (typeof pagos)[number]["p"], nombre: string) => {
+    if (!corteDePago.has(p.id)) corteDePago.set(p.id, buscarCorteDePago(p, nombre));
+    return corteDePago.get(p.id);
+  };
+  const buscarCorteDePago = (p: (typeof pagos)[number]["p"], nombre: string) => {
     if (p.tipo !== "pago") return undefined;
     if (/^Efectivo de caja/.test(p.nota)) {
       const primero = nombre.split(" ")[0];
       const m = salidasPago.filter((x) => !usadas.has(x.id) && x.monto === p.monto && x.concepto.endsWith(` ${primero}`))
         .sort((a, b) => Math.abs(a.creadoEn.getTime() - p.creadoEn.getTime()) - Math.abs(b.creadoEn.getTime() - p.creadoEn.getTime()))[0];
-      if (m) { usadas.add(m.id); return m.turnoId; }
+      if (m) { usadas.add(m.id); seguro.add(p.id); return m.turnoId; }
     }
     // Comisión entregada en un corte (por transferencia o en efectivo): el cierre guardó "Ana $1,250 por transferencia".
     if (!p.nota.startsWith("Por entregar de caja")) {
@@ -274,14 +290,14 @@ export default async function MovimientosPagina({ searchParams }: { searchParams
           const d = Math.abs(x.cerradoEn!.getTime() - h.creadoEn.getTime());
           return d < m.d ? { c: x, d } : m;
         }, { d: 5 * 60000 }).c;
-        if (c) return c.id;
+        if (c) { seguro.add(p.id); return c.id; }
       }
       if (/Pago automático/.test(p.nota)) return corteDespuesDe(p.creadoEn)?.id;
     }
     return undefined;
   };
   const diasCortos = (t: string) => t.replace(/^(de|del)\s+/i, "").replace(/ de ([a-záéíóú]+)/gi, (_, m: string) => ` ${({ enero: "ene", febrero: "feb", marzo: "mar", abril: "abr", mayo: "may", junio: "jun", julio: "jul", agosto: "ago", septiembre: "sep", octubre: "oct", noviembre: "nov", diciembre: "dic" } as Record<string, string>)[m.toLowerCase()] ?? m}`).replace(/(\d+) (\w+) al (\d+) \2\b/, "$1 al $3 $2");
-  const DE_QUE = (nota: string) => nota.slice(nota.indexOf(":") + 1).replace(/^\s*Pago automático\s*/, "").trim();
+  const DE_QUE = (nota: string) => nota.slice(nota.indexOf(":") + 1).replace(/^\s*Pago automático\s*/, "").replace(/\s*\(entregado en el corte\)\s*$/, "").trim();
   const filaPago = (p: (typeof pagos)[number]["p"], nombre: string, extra: { corte?: string; pend?: boolean } = {}): ItemHistorial & { dia: string } => {
     const renta = p.tipo === "renta";
     const pendiente = !renta && p.monto > 0 && p.nota.startsWith("Por entregar de caja");
@@ -304,19 +320,34 @@ export default async function MovimientosPagina({ searchParams }: { searchParams
   // Pendientes: si se dejaron en el último corte, van debajo de ese corte; si no, arriba de todo (o al inicio de hoy si hoy no hay corte).
   const pendIds = new Set(pendientesTodos.map((x) => x.p.id));
   const fijos: (ItemHistorial & { dia: string })[] = [];
-  // Con los cortes a la vista, lo pendiente va en el desglose de cada corte (en chico, con su ícono), no como renglón suelto.
-  // Si el cierre no lo dejó anotado (cortes de antes), se agrega al corte donde se quedó pendiente.
+  // Con los cortes a la vista, lo pendiente va en el desglose de cada corte (en chico, con su ícono), no como renglón suelto:
+  // en el corte donde se quedó ("para el próximo corte") y en cada corte siguiente mientras no se pagó ("desde el corte C-…").
+  // Los cierres nuevos lo dejan anotado; para los de antes se reconstruye con la fecha de la comisión y el corte donde se pagó.
   const enCortes = verCortes && ver("cortes");
+  const seguirPendiente = (p: (typeof pagos)[number]["p"], nombre: string, pagadoEn?: string) => {
+    const origen = corteDespuesDe(p.creadoEn);
+    if (!origen) return;
+    const iO = cortesAsc.findIndex((x) => x.id === origen.id);
+    const iH = pagadoEn ? cortesAsc.findIndex((x) => x.id === pagadoEn) : cortesAsc.length;
+    if (iH <= iO) return; // se entregó en el mismo corte: nunca estuvo pendiente
+    const nom = nombre.split(" ")[0], dias = diasCortos(DE_QUE(p.nota)), desde = folios.get(origen.id) ?? "";
+    for (let k = iO; k < iH; k++) {
+      const c = cortes.find((x) => x.id === cortesAsc[k].id);
+      if (!c) continue;
+      const lista = (c.fueraCaja ??= []);
+      if (lista.some((y) => y.como === "para el próximo corte" && y.nombre === nom && y.monto === p.monto)) continue;
+      lista.push({ nombre: nom, monto: p.monto, como: "para el próximo corte", dias, desde: k === iO ? undefined : desde });
+    }
+  };
+  if (enCortes) for (const { p, nombre } of [...pagos, ...pagosAntes]) {
+    // Comisiones que ya se pagaron: estuvieron pendientes en los cortes entre el día de la comisión y el corte donde se entregaron.
+    if (p.tipo !== "pago" || p.monto <= 0 || p.nota.startsWith("Por entregar de caja") || !/Pago automático/.test(p.nota)) continue;
+    const pagado = turnoDePago(p, nombre);
+    if (pagado && seguro.has(p.id)) seguirPendiente(p, nombre, pagado);
+  }
   for (const { p, nombre } of pendientesTodos) {
     const origen = corteDespuesDe(p.creadoEn);
-    if (enCortes) {
-      const c = origen ? cortes.find((x) => x.id === origen.id) : undefined;
-      const nom = nombre.split(" ")[0];
-      const lista = c ? (c.fueraCaja ??= []) : null;
-      if (lista && !lista.some((y) => y.como === "para el próximo corte" && y.nombre === nom && y.monto === p.monto))
-        lista.push({ nombre: nom, monto: p.monto, como: "para el próximo corte", dias: diasCortos(DE_QUE(p.nota)) });
-      continue;
-    }
+    if (enCortes) { seguirPendiente(p, nombre); continue; }
     if (origen && origen.id === ultimoCorte?.id && turnosPagina.some((c) => c.id === origen.id)) items.push(filaPago(p, nombre, { corte: origen.id, pend: true }));
     else fijos.push(filaPago(p, nombre));
   }
@@ -325,6 +356,11 @@ export default async function MovimientosPagina({ searchParams }: { searchParams
     // Los pendientes no se repiten en su día: salen arriba, en la primera página.
     if (p.tipo === "pago" && p.monto > 0 && p.nota.startsWith("Por entregar de caja") && (enCortes || (!f.periodo && verPagos && ver("equipo")))) continue;
     items.push(filaPago(p, nombre, { corte: turnoDePago(p, nombre) }));
+  }
+  // Los de días anteriores solo salen si se entregaron en un corte de esta página, debajo de ese corte.
+  for (const { p, nombre } of pagosAntes) {
+    const corte = turnoDePago(p, nombre);
+    if (corte && seguro.has(p.id) && turnosPagina.some((c) => c.id === corte)) items.push(filaPago(p, nombre, { corte }));
   }
   // Lo que entró o salió de la caja sin ser venta ni gasto. Los pagos al equipo ya aparecen como pago; aquí no se repiten.
   if (verCaja && ver("caja")) for (const c of movsCaja.filter((x) => !esPagoEquipo(x.concepto) && !esPagoAnulado(x.concepto) && (!f.buscar || x.concepto.toLowerCase().includes(f.buscar.toLowerCase())))) {
