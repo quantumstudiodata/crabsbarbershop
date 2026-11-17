@@ -87,3 +87,20 @@ export function nombreDia(dia: number): string {
 export function esFechaValida(t: string | null | undefined): t is string {
   return !!t && /^\d{4}-\d{2}-\d{2}$/.test(t) && !Number.isNaN(aUTC(t).getTime()) && deUTC(aUTC(t)) === t;
 }
+
+const DIA_LARGO = ["domingo", "lunes", "martes", "miércoles", "jueves", "viernes", "sábado"];
+const DIA_CORTO = ["Dom", "Lun", "Mar", "Mié", "Jue", "Vie", "Sáb"];
+const MES_CORTO = ["ene", "feb", "mar", "abr", "may", "jun", "jul", "ago", "sep", "oct", "nov", "dic"];
+/** "desde el lunes 16" si fue en la última semana; si no, "desde el 3 nov". */
+export function desdeElDia(fecha: string, hoy: string): string {
+  const d = aUTC(fecha);
+  if (fecha === hoy) return "desde hoy";
+  if (fecha >= sumarDias(hoy, -6)) return `desde el ${DIA_LARGO[d.getUTCDay()]} ${d.getUTCDate()}`;
+  return `desde el ${d.getUTCDate()} ${MES_CORTO[d.getUTCMonth()]}`;
+}
+/** "Lun 16 nov" o "Hoy". */
+export function diaCortoDe(fecha: string, hoy: string): string {
+  if (fecha === hoy) return "Hoy";
+  const d = aUTC(fecha);
+  return `${DIA_CORTO[d.getUTCDay()]} ${d.getUTCDate()} ${MES_CORTO[d.getUTCMonth()]}`;
+}

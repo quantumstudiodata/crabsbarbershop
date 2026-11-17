@@ -5,9 +5,9 @@ import { and, eq, like, sql } from "drizzle-orm";
 import { POR_ENTREGAR, liquidarAutomaticos } from "@/lib/pagosAuto";
 import { revalidatePath } from "next/cache";
 import { requerirSesion } from "@/lib/auth";
-import { CONCEPTO_PROPINA, compararConteo, requiereExplicacion } from "@/lib/caja";
+import { CONCEPTO_DEPOSITO, CONCEPTO_DUENA, CONCEPTO_PROPINA, CONCEPTO_RESGUARDO, ETIQUETA_DEPOSITO, compararConteo, requiereExplicacion } from "@/lib/caja";
 import { propinasDeTurno } from "@/lib/comisionesCorte";
-import { cajaDe, categoriasGasto, folioCorte, movimientosDeTurno } from "@/lib/datos";
+import { cajaDe, categoriasGasto, folioCorte, movimientosDeTurno, resguardoDe } from "@/lib/datos";
 import { db, schema } from "@/lib/db";
 import { fechaLarga, fechaLocal } from "@/lib/fechas";
 import { registrar } from "@/lib/historial";
@@ -52,8 +52,13 @@ export async function registrarMovimiento(_: EstadoCaja, form: FormData): Promis
   if (!s.puede("caja.retiros")) return { error: "No tienes permiso para registrar retiros." };
   const tipo = texto(form, "tipo");
   const monto = leerPesos(texto(form, "monto"));
-  const concepto = texto(form, "concepto");
-  if (tipo !== "entrada" && tipo !== "retiro") return { error: "Elige si es retiro o entrada." };
+  // Sacar efectivo sin gastarlo solo lo hace Titular ("Me llevo efectivo"): cuenta como lo del negocio.
+  // Lo demás que sale de la caja (la parte de la dueña, los pagos al equipo) se hace en el corte.
+  const llevo = tipo === "retiro";
+  if (llevo && s.usuario.rol !== "duena") return { error: "Solo Titular puede sacar efectivo de la caja. Lo de la dueña se saca en el corte." };
+  const quien = texto(form, "quien", 80).trim();
+  const concepto = llevo ? `${CONCEPTO_DUENA}${quien ? `, lo recogió ${quien}` : ""}` : texto(form, "concepto");
+  if (tipo !== "entrada" && tipo !== "retiro") return { error: "Elige qué pasó con el dinero." };
   if (!monto) return { error: "Escribe el monto." };
   if (!concepto) return { error: "Escribe para qué fue." };
   const turno = await cajaDe(s);
@@ -62,10 +67,10 @@ export async function registrarMovimiento(_: EstadoCaja, form: FormData): Promis
     await tx.insert(schema.movimientosCaja).values({ barberiaId: s.barberia.id, turnoId: turno.id, tipo, monto, concepto, usuarioId: s.usuario.id });
     await registrar(tx, {
       barberiaId: s.barberia.id, usuarioId: s.usuario.id, tipo: "caja",
-      accion: `${s.usuario.nombre} registró ${tipo === "retiro" ? "un retiro" : "una entrada"} de ${formatoDinero(monto)}`, detalle: { concepto },
+      accion: llevo ? `${s.usuario.nombre} se llevó ${formatoDinero(monto)} de la caja${quien ? ` (lo recogió ${quien})` : ""}` : `${s.usuario.nombre} registró una entrada de ${formatoDinero(monto)}`, detalle: { concepto },
     });
   });
-  return listo(`${tipo === "retiro" ? "Retiro" : "Entrada"} de ${formatoDinero(monto)} guardado.`);
+  return listo(llevo ? `Se registró que te llevaste ${formatoDinero(monto)}.` : `Entrada de ${formatoDinero(monto)} guardada.`);
 }
 
 export async function registrarGasto(_: EstadoCaja, form: FormData): Promise<EstadoCaja> {
@@ -109,7 +114,8 @@ export async function cerrarCaja(_: EstadoCaja, form: FormData): Promise<EstadoC
   if (!turno) return { error: "La caja ya está cerrada." };
   // Evidencias opcionales (solo si el negocio las tiene activadas): fotos o PDF de transferencias, tarjetas, etc.
   const evidencias: { etiqueta: string; nombre: string; tipo: string; datos: string }[] = [];
-  if (s.barberia.usaEvidenciaCorte) {
+  // Siempre se leen: el comprobante del depósito a la dueña se pide en todos los negocios; los de cobros, solo si el negocio los tiene activados.
+  {
     const datosE = form.getAll("evidencia").map(String), nombres = form.getAll("evidenciaNombre").map(String), etiquetas = form.getAll("evidenciaEtiqueta").map(String);
     if (datosE.length > 6) return { error: "Se pueden adjuntar hasta 6 archivos." };
     for (let i = 0; i < datosE.length; i++) {
@@ -182,6 +188,16 @@ export async function cerrarCaja(_: EstadoCaja, form: FormData): Promise<EstadoC
   const deCaja = [...porPersona.values()].reduce((a, x) => a + x.comCaja, 0);
   const propinasSalen = [...porPersona.values()].reduce((a, x) => a + x.efectivo + x.propCaja, 0);
   datos.esperado -= deCaja + propinasSalen;
+  // La parte del negocio: lo que queda arriba del fondo después de pagar al equipo. Se deposita a la dueña o se guarda
+  // en el sobre del negocio; así al contar siempre debe quedar solo el fondo. (Una pantalla vieja no lo manda: se deja como antes.)
+  const decisionNegocio = texto(form, "negocio");
+  const conNegocio = decisionNegocio === "depositar" || decisionNegocio === "resguardar";
+  const negocio = conNegocio ? Math.max(0, datos.esperado - turno.fondoInicial) : 0;
+  const saldoResguardo = conNegocio ? (await resguardoDe(s.barberia.id)).saldo : 0;
+  const depResguardo = decisionNegocio === "depositar" && texto(form, "incluirResguardo") === "si" ? saldoResguardo : 0;
+  const deposito = decisionNegocio === "depositar" ? negocio + depResguardo : 0;
+  datos.esperado -= negocio;
+  if (deposito > 0 && !evidencias.some((e) => e.etiqueta === ETIQUETA_DEPOSITO)) return { error: "Adjunta el comprobante del depósito a la dueña para cerrar la caja." };
   // Con la función activa, cada forma de pago (que no sea efectivo) con cobros necesita su evidencia.
   if (s.barberia.usaEvidenciaCorte) {
     // Los cobros con QR y los anticipos en línea ya están verificados por Stripe: no piden comprobante.
@@ -213,6 +229,10 @@ export async function cerrarCaja(_: EstadoCaja, form: FormData): Promise<EstadoC
           .where(and(eq(schema.pagosComision.id, f.id), like(schema.pagosComision.nota, `${POR_ENTREGAR}:%`)));
       }
     }
+    if (negocio > 0) await tx.insert(schema.movimientosCaja).values({ barberiaId: s.barberia.id, turnoId: turno.id, tipo: "retiro", monto: negocio,
+      concepto: decisionNegocio === "depositar" ? CONCEPTO_DEPOSITO : CONCEPTO_RESGUARDO, usuarioId: s.usuario.id });
+    if (depResguardo > 0) await registrar(tx, { barberiaId: s.barberia.id, usuarioId: s.usuario.id, tipo: "caja",
+      accion: `${s.usuario.nombre} depositó a la dueña lo resguardado: ${formatoDinero(depResguardo)}`, detalle: { resguardoDepositado: depResguardo, turnoId: turno.id } });
     for (const [id, x] of porPersona) {
       if (x.comCaja > 0) await tx.insert(schema.movimientosCaja).values({ barberiaId: s.barberia.id, turnoId: turno.id, tipo: "retiro", monto: x.comCaja, concepto: `Pago de comisiones a ${x.nombre}`, usuarioId: s.usuario.id });
       // La propina con tarjeta que se manda por transferencia no toca la caja, pero queda como movimiento.
@@ -226,7 +246,8 @@ export async function cerrarCaja(_: EstadoCaja, form: FormData): Promise<EstadoC
       accion: `${s.usuario.nombre} hizo el corte de caja. ${r.texto}`, detalle: { esperado: datos.esperado, contado, diferencia: r.diferencia, notas, verificacion, evidencias: evidencias.length || undefined,
         propinas: [...porPersona.values()].some((x) => x.efectivo + x.propCaja + x.propTransf) ? [...porPersona.values()].filter((x) => x.efectivo + x.propCaja + x.propTransf)
           .map((x) => `${x.nombre} ${[x.efectivo ? `${formatoDinero(x.efectivo)} en efectivo, aparte` : "", x.propCaja ? `${formatoDinero(x.propCaja)} con tarjeta de la caja` : "", x.propTransf ? `${formatoDinero(x.propTransf)} con tarjeta por transferencia` : ""].filter(Boolean).join(" y ")}`).join(", ") : undefined,
-        comisiones: resumenCom.length ? resumenCom.join(", ") : undefined },
+        comisiones: resumenCom.length ? resumenCom.join(", ") : undefined,
+        negocio: conNegocio ? (decisionNegocio === "depositar" ? `Depositado a la dueña ${formatoDinero(deposito)}${depResguardo ? `, ${formatoDinero(depResguardo)} eran resguardados` : ""}` : `Resguardado ${formatoDinero(negocio)}`) : undefined },
     });
   });
   const zona = s.barberia.zonaHoraria;

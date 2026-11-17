@@ -11,17 +11,17 @@ import { SelectorUrl } from "@/components/SelectorUrl";
 import { AvisoUrl, } from "@/components/Encabezado";
 import { requerirSesion } from "@/lib/auth";
 import { faltantesDe } from "@/lib/faltantes";
-import { cajaDe, categoriasGasto, diasYTotalVentas, equipoConVentas, foliosCorte, metodosActivos, resumenPeriodo, turnosCerrados, ventasEntre } from "@/lib/datos";
+import { cajaDe, categoriasGasto, diasYTotalVentas, equipoConVentas, foliosCorte, metodosActivos, resguardoDe, resumenPeriodo, turnosCerrados, ventasEntre } from "@/lib/datos";
 import { armarCortes, cortesPorRevisar } from "../cortes/datos";
 import { NecesitaRevision } from "../cortes/HistorialCortes";
-import { sumarDias } from "@/lib/fechas";
+import { desdeElDia, diaCortoDe, sumarDias } from "@/lib/fechas";
 import { CabeceraVentas } from "@/components/CabeceraPeriodo";
 import { db, schema as t } from "@/lib/db";
 import { fechaLarga, fechaLocal, horaCorta } from "@/lib/fechas";
 import { condicionVentas, type ConsultaFiltros, leerFiltros, urlDescarga } from "@/lib/filtros";
 import { esMovil } from "@/lib/dispositivo";
 import { formatoDinero } from "@/lib/money";
-import { esPagoAnulado, esPagoEquipo, esPropinaEntregada, MINUTOS_CORRECCION } from "@/lib/caja";
+import { esDeposito, esLlevoDuena, esPagoAnulado, esPagoEquipo, esPropinaEntregada, esResguardo, MINUTOS_CORRECCION } from "@/lib/caja";
 import { Ayuda } from "@/components/Ayuda";
 import { CajaModal } from "../../cobrar/CajaModal";
 import { BotonCaja } from "./BotonCaja";
@@ -330,13 +330,13 @@ export default async function MovimientosPagina({ searchParams }: { searchParams
     const iO = cortesAsc.findIndex((x) => x.id === origen.id);
     const iH = pagadoEn ? cortesAsc.findIndex((x) => x.id === pagadoEn) : cortesAsc.length;
     if (iH <= iO) return; // se entregó en el mismo corte: nunca estuvo pendiente
-    const nom = nombre.split(" ")[0], dias = diasCortos(DE_QUE(p.nota)), desde = folios.get(origen.id) ?? "";
+    const nom = nombre.split(" ")[0], dias = diasCortos(DE_QUE(p.nota));
     for (let k = iO; k < iH; k++) {
       const c = cortes.find((x) => x.id === cortesAsc[k].id);
       if (!c) continue;
       const lista = (c.fueraCaja ??= []);
       if (lista.some((y) => y.como === "para el próximo corte" && y.nombre === nom && y.monto === p.monto)) continue;
-      lista.push({ nombre: nom, monto: p.monto, como: "para el próximo corte", dias, desde: k === iO ? undefined : desde });
+      lista.push({ nombre: nom, monto: p.monto, como: "para el próximo corte", dias, origen: origen.id });
     }
   };
   if (enCortes) for (const { p, nombre } of [...pagos, ...pagosAntes]) {
@@ -351,6 +351,43 @@ export default async function MovimientosPagina({ searchParams }: { searchParams
     if (origen && origen.id === ultimoCorte?.id && turnosPagina.some((c) => c.id === origen.id)) items.push(filaPago(p, nombre, { corte: origen.id, pend: true }));
     else fijos.push(filaPago(p, nombre));
   }
+  // El recorrido de cada pendiente: los cortes desde donde se quedó hasta este, con su día y hora. Cada uno abre ese corte.
+  const etiquetaCorte = (t: (typeof cortesAsc)[number]) => `${diaCortoDe(t.fechaOperativa, hoy)}, corte ${horaCorta(t.cerradoEn!, zona)}`;
+  if (enCortes) for (const c of cortes) {
+    const iC = cortesAsc.findIndex((x) => x.id === c.id);
+    if (iC < 0) continue;
+    for (const e of c.fueraCaja ?? []) {
+      if (e.como !== "para el próximo corte") continue;
+      const iO = e.origen ? cortesAsc.findIndex((x) => x.id === e.origen) : -1;
+      const desde = iO >= 0 && iO <= iC ? iO : iC;
+      e.recorrido = cortesAsc.slice(desde, iC + 1).map((t, k) => ({ id: t.id, texto: etiquetaCorte(t), estado: k === 0 ? "quedó pendiente" : "sigue pendiente", monto: e.monto }));
+      e.desdeTxt = desde === iC ? "para el próximo corte" : desdeElDia(cortesAsc[desde].fechaOperativa, hoy);
+      if (c.id === ultimoCorte?.id) e.final = "Se le paga en el próximo corte o por transferencia";
+    }
+  }
+  // Lo del negocio guardado en el sobre: en cada corte se ve lo que sigue resguardado y lo resguardado que ahí se depositó.
+  if (enCortes && cortes.length) {
+    const res = await resguardoDe(bId);
+    if (res.partes.length) for (const c of cortes) {
+      const tc = cortesAsc.find((x) => x.id === c.id);
+      if (!tc?.cerradoEn) continue;
+      // Lo que pasó en este corte o antes: por el orden de los cortes (dos cortes pueden cerrarse con un minuto de diferencia).
+      const iC = cortesAsc.indexOf(tc), fin = tc.cerradoEn.getTime();
+      const hasta = (turnoId: string | null, t: Date) => { const k = turnoId ? cortesAsc.findIndex((x) => x.id === turnoId) : -1; return k >= 0 ? k <= iC : t.getTime() <= fin; };
+      const pasos = (lista: { p: (typeof res.partes)[number]; monto: number }[]) => lista.map(({ p, monto }) => {
+        const t = cortesAsc.find((x) => x.id === p.turnoId);
+        return { id: p.turnoId ?? "", texto: t ? etiquetaCorte(t) : diaCortoDe(fechaLocal(p.creadoEn, zona), hoy), estado: "se resguardó", monto };
+      });
+      const desdeDe = (lista: { p: (typeof res.partes)[number] }[]) => desdeElDia(fechaLocal(lista[0].p.creadoEn, zona), hoy);
+      const aqui = res.partes.flatMap((p) => p.depositos.filter((d) => d.turnoId === c.id).map((d) => ({ p, monto: d.monto })));
+      const vivas = res.partes.filter((p) => hasta(p.turnoId, p.creadoEn))
+        .map((p) => ({ p, monto: p.monto - p.depositos.filter((d) => hasta(d.turnoId, d.creadoEn)).reduce((a, d) => a + d.monto, 0) })).filter((x) => x.monto > 0);
+      const negocioRes: NonNullable<typeof c.negocioRes> = [];
+      if (aqui.length) negocioRes.push({ tipo: "depositado", monto: aqui.reduce((a, x) => a + x.monto, 0), desdeTxt: desdeDe(aqui), recorrido: pasos(aqui) });
+      if (vivas.length) negocioRes.push({ tipo: "resguardado", monto: vivas.reduce((a, x) => a + x.monto, 0), desdeTxt: desdeDe(vivas), recorrido: pasos(vivas) });
+      if (negocioRes.length) c.negocioRes = negocioRes;
+    }
+  }
   for (const { p, nombre } of pagos) {
     if (pendIds.has(p.id)) continue;
     // Los pendientes no se repiten en su día: salen arriba, en la primera página.
@@ -363,11 +400,17 @@ export default async function MovimientosPagina({ searchParams }: { searchParams
     if (corte && seguro.has(p.id) && turnosPagina.some((c) => c.id === corte)) items.push(filaPago(p, nombre, { corte }));
   }
   // Lo que entró o salió de la caja sin ser venta ni gasto. Los pagos al equipo ya aparecen como pago; aquí no se repiten.
-  if (verCaja && ver("caja")) for (const c of movsCaja.filter((x) => !esPagoEquipo(x.concepto) && !esPagoAnulado(x.concepto) && (!f.buscar || x.concepto.toLowerCase().includes(f.buscar.toLowerCase())))) {
+  if (verCaja && ver("caja")) for (const c of movsCaja.filter((x) => !esPagoEquipo(x.concepto) && !esPagoAnulado(x.concepto) && !esResguardo(x.concepto) && (!f.buscar || x.concepto.toLowerCase().includes(f.buscar.toLowerCase())))) {
+    if (esDeposito(c.concepto)) {
+      items.push({ k: "mov", dia: c.dia, t: c.creadoEn.getTime(), corte: c.turnoId, m: {
+        id: `c${c.id}`, tipo: "negocio", titulo: "Negocio", hora: horaCorta(c.creadoEn, zona), sub: "depositado a la dueña", monto: -c.monto, detalle: [],
+      } });
+      continue;
+    }
     const sale = c.tipo === "retiro", propina = esPropinaEntregada(c.concepto);
     items.push({ k: "mov", dia: c.dia, t: c.creadoEn.getTime(), corte: propina ? c.turnoId : undefined, m: {
       id: `c${c.id}`, tipo: propina ? "propina" : "caja", titulo: c.concepto, hora: horaCorta(c.creadoEn, zona),
-      sub: propina ? "Es de quien hizo el servicio" : sale ? "Se sacó de la caja. No es un gasto" : "Se puso en la caja. No es una venta", monto: sale ? -c.monto : c.monto,
+      sub: propina ? "Es de quien hizo el servicio" : esLlevoDuena(c.concepto) ? "Cuenta como lo del negocio. No es un gasto" : sale ? "Se sacó de la caja. No es un gasto" : "Se puso en la caja. No es una venta", monto: sale ? -c.monto : c.monto,
       detalle: [["Registró", `${c.quien.split(" ")[0]}, ${horaCorta(c.creadoEn, zona)}`],
         ["Cuenta en la ganancia", propina ? "No. La propina es de quien hizo el servicio" : "No. Solo cambia el efectivo de la caja"]],
     } });
@@ -469,7 +512,7 @@ export default async function MovimientosPagina({ searchParams }: { searchParams
       {[...gastosP].sort((a, b) => b.monto - a.monto).map((g) => <div key={g.categoria} className="sub-c"><span>{g.categoria}</span><span className="num">{$(g.monto)}</span></div>)}
       <div className="paso-c total"><span><b>Ganancia</b></span><b className="num">{firma(resultado)}</b></div>
       <p className="ayuda-txt">La ganancia es lo que le quedó al negocio en estas fechas: lo que se vendió, menos lo que se gastó y menos lo que le toca al equipo. No es el dinero que hay en la caja ni en el banco.</p>
-      {retirado > 0 && <p className="ayuda-txt">En estas fechas se sacaron {$(retirado)} de la caja para guardarlos. No es un gasto, por eso no se resta aquí.</p>}
+      {retirado > 0 && <p className="ayuda-txt">En estas fechas salieron {$(retirado)} de la caja para la dueña o para guardarlos. No es un gasto, por eso no se resta aquí.</p>}
     </div>
   );
 
@@ -498,7 +541,7 @@ export default async function MovimientosPagina({ searchParams }: { searchParams
       {verVentas && <CabeceraVentas barberiaId={bId} zona={zona} hoy={hoy} persona={verTodas ? persona || undefined : s.usuario.id} propias={!verTodas} {...periodoEncabezado(f.periodo, hoy)} />}
       {revision.length > 0 && <NecesitaRevision cortes={revision} puede={s.puede("caja.corregir")} />}
       {anterior && <p className="aviso-sutil">Mostrando {nombreP} hasta que empiece el mes.</p>}
-      {movCaja && <CajaModal inicial={q.caja === "movimiento" ? "movimiento" : null} turno={null} abierta={!!turno} limiteDiferencia={0}
+      {movCaja && <CajaModal titular={s.usuario.rol === "duena"} inicial={q.caja === "movimiento" ? "movimiento" : null} turno={null} abierta={!!turno} limiteDiferencia={0}
         categorias={cats.filter((c) => c.activo && !esCategoriaComisiones(c.nombre)).map((c) => c.nombre)} configurar={s.puede("configuracion.egresos") && !s.vista} />}
       <Movimientos corregir={s.puede("caja.corregir")} abrirCorte={q.corte} botonCaja={movCaja ? <BotonCaja abierta={!!turno} /> : undefined} abrirEgreso={q.egreso === "1"} dias={historial} registrar={s.puede("gastos.registrar")} hoy={hoy} cajaAbierta={!!turno} categorias={cats}
         regreso={`/analitica/finanzas${new URLSearchParams(Object.entries(q).filter(([k, v]) => v && !["aviso", "error", "egreso", "caja"].includes(k)) as [string, string][]).toString() ? `?${new URLSearchParams(Object.entries(q).filter(([k, v]) => v && !["aviso", "error", "egreso", "caja"].includes(k)) as [string, string][])}` : ""}`}

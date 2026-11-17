@@ -1,11 +1,12 @@
 "use client";
 
 import { startTransition, useActionState, useEffect, useState } from "react";
-import { EvidenciasCorte } from "./EvidenciasCorte";
+import { EvidenciasCorte, type GrupoEvidencia } from "./EvidenciasCorte";
 import { Fl, Icono } from "@/components/Icono";
 import { Modal } from "@/components/ui";
 import type { MovimientosTurno } from "@/lib/caja";
 import { formatoDinero, leerPesos } from "@/lib/money";
+import { ETIQUETA_DEPOSITO, esLlevoDuena } from "@/lib/caja";
 import { abrirCaja, cerrarCaja, registrarGasto, registrarMovimiento, type EstadoCaja, type ResumenCorte } from "../caja/actions";
 
 export type Turno = {
@@ -26,6 +27,10 @@ export type Turno = {
   otrosEgresos?: { concepto: string; metodo: string; monto: number }[];
   /** Cada gasto pagado con la caja y cada vez que se sacó o se puso dinero, para verlos en las cuentas. */
   detalle?: { gastos: { concepto: string; monto: number }[]; sacado: { concepto: string; monto: number }[]; puesto: { concepto: string; monto: number }[] };
+  /** Lo del negocio guardado en el sobre, que todavía no se deposita a la dueña. */
+  resguardo?: { saldo: number; desde: string };
+  /** Titular: es la única que puede sacar efectivo sin gastarlo ("Me llevo efectivo"). */
+  esTitular?: boolean;
   /** Citas atendidas que siguen sin cobrar. */
   sinCobrar?: number;
 };
@@ -138,12 +143,11 @@ function Resumen({ r, cerrar }: { r: ResumenCorte; cerrar: () => void }) {
   );
 }
 
-export function CajaModal({ inicial, turno, limiteDiferencia, categorias, evidencias = false, egresos = false, configurar = false, abierta = false }: { inicial: Vista | null; turno: Turno | null; limiteDiferencia: number; categorias: string[]; evidencias?: boolean; /** Puede registrar egresos en Movimientos. */ egresos?: boolean; /** Puede editar las categorías de gasto. */ configurar?: boolean; /** Fuera de Cobro: hay caja abierta aunque no se tengan sus datos (solo para movimientos, no para el corte). */ abierta?: boolean }) {
+export function CajaModal({ inicial, turno, limiteDiferencia, categorias, evidencias = false, egresos = false, configurar = false, abierta = false, titular = false }: { /** Titular: puede sacar efectivo sin gastarlo ("Me llevo efectivo"). */ titular?: boolean; inicial: Vista | null; turno: Turno | null; limiteDiferencia: number; categorias: string[]; evidencias?: boolean; /** Puede registrar egresos en Movimientos. */ egresos?: boolean; /** Puede editar las categorías de gasto. */ configurar?: boolean; /** Fuera de Cobro: hay caja abierta aunque no se tengan sus datos (solo para movimientos, no para el corte). */ abierta?: boolean }) {
   const [vista, setVista] = useState<Vista | null>(inicial);
   const [eMov, accMov, guardandoMov] = useActionState<EstadoCaja, FormData>(registrarMovimiento, {});
   const [eGasto, accGasto, guardandoGasto] = useActionState<EstadoCaja, FormData>(registrarGasto, {});
   const [eCerrar, accCerrar, cerrando] = useActionState<EstadoCaja, FormData>(cerrarCaja, {});
-  const [tipoMov, setTipoMov] = useState<"retiro" | "entrada">("retiro");
   const [concepto, setConcepto] = useState("");
   const [categoria, setCategoria] = useState(categorias[0] ?? "Otros");
   const [gasto, setGasto] = useState("");
@@ -183,19 +187,22 @@ export function CajaModal({ inicial, turno, limiteDiferencia, categorias, eviden
   );
   if (!turno && !(abierta && vista !== "corte")) return null;
 
+  // Sacar efectivo sin gastarlo solo lo hace Titular; a los demás un enlace viejo de "retiro" les abre las opciones.
+  const vistaReal: Vista = vista === "retiro" && !titular ? "movimiento" : vista;
   // Una sola puerta: la persona dice qué pasó y la app sabe cómo guardarlo.
   const atras = <button type="button" className="mov-atras" onClick={() => setVista("movimiento")}><Icono n="izquierda" />Elegir otra cosa</button>;
-  if (vista === "movimiento") {
+  if (vistaReal === "movimiento") {
+    // Lo demás que sale de la caja (lo del equipo y lo de la dueña) se saca en el corte.
     const ops: [Vista, string, string, string][] = [
-      ["gasto", "etiqueta", "Pagué algo con dinero de la caja", "Compraste o pagaste algo para el negocio con el efectivo de la caja: agua, limpieza, productos. Cuenta como gasto."],
-      ["retiro", "salida", "Saqué dinero de la caja para guardarlo", "El dinero sigue siendo del negocio, solo cambia de lugar: al banco o a otro resguardo. No cuenta como gasto."],
-      ["entrada", "entrada", "Puse dinero en la caja", "Agregaste billetes o monedas para tener cambio. No cuenta como venta."],
+      ["gasto", "etiqueta", "Pagué algo con dinero de la caja", "Agua, limpieza, productos. Cuenta como gasto."],
+      ["entrada", "entrada", "Puse dinero en la caja", "Para tener cambio. No cuenta como venta."],
+      ...(titular ? [["retiro", "salida", "Me llevo efectivo de la caja", "Lo tomo yo o alguien de mi parte. Se descuenta de lo del negocio."] as [Vista, string, string, string]] : []),
     ];
     return (
       <Modal abierto cerrar={cerrar} etiqueta="Caja" titulo="¿Qué pasó con el dinero?">
         <div className="mov-ops">
           {ops.map(([v, ic, t, d]) => (
-            <button type="button" key={v} className="mov-op" onClick={() => { if (v !== "gasto") { setTipoMov(v as "retiro" | "entrada"); setConcepto(""); } setVista(v); }}>
+            <button type="button" key={v} className="mov-op" onClick={() => { if (v !== "gasto") setConcepto(""); setVista(v); }}>
               <span className="mov-ic"><Icono n={ic} /></span><span><b>{t}</b><small>{d}</small></span><Icono n="derecha" />
             </button>
           ))}
@@ -205,18 +212,34 @@ export function CajaModal({ inicial, turno, limiteDiferencia, categorias, eviden
     );
   }
 
-  if (vista === "retiro" || vista === "entrada") {
-    const sugeridos = tipoMov === "retiro" ? ["Depósito al banco", "Resguardo"] : ["Más cambio", "Reposición del fondo"];
+  if (vistaReal === "retiro") {
     return (
-      <Modal abierto cerrar={cerrar} etiqueta="Caja" titulo={tipoMov === "retiro" ? "Saqué dinero de la caja" : "Puse dinero en la caja"}>
+      <Modal abierto cerrar={cerrar} etiqueta="Movimiento de caja" titulo="Me llevo efectivo de la caja">
         <form action={accMov} className="pila">
-          <input type="hidden" name="tipo" value={tipoMov} />
+          <input type="hidden" name="tipo" value="retiro" />
           {atras}
-          <p className="ayuda-txt" style={{ margin: 0 }}>{tipoMov === "retiro" ? "No es un gasto. La caja tendrá menos dinero y el corte lo toma en cuenta." : "No es una venta. La caja tendrá más dinero y el corte lo toma en cuenta."}</p>
+          <label className="campo"><span>¿Cuánto?</span><input className="input grande" name="monto" inputMode="decimal" placeholder="$0" required autoFocus aria-label="Monto" /></label>
+          <label className="campo"><span>¿Quién lo recoge?</span><input className="input" name="quien" maxLength={80} placeholder="Si lo recoges tú, déjalo en blanco" aria-label="Quién lo recoge" /></label>
+          <p className="ayuda-txt" style={{ margin: 0 }}>Se descuenta de lo del negocio de hoy. Si es más, se toma del fondo y el corte lo dice.</p>
+          {eMov.error && <p className="aviso error">{eMov.error}</p>}
+          <div className="acciones"><button className="bt" disabled={guardandoMov}>{guardandoMov ? "Guardando…" : "Guardar"}<Fl /></button></div>
+        </form>
+      </Modal>
+    );
+  }
+
+  if (vistaReal === "entrada") {
+    const sugeridos = ["Más cambio", "Reposición del fondo"];
+    return (
+      <Modal abierto cerrar={cerrar} etiqueta="Caja" titulo="Puse dinero en la caja">
+        <form action={accMov} className="pila">
+          <input type="hidden" name="tipo" value="entrada" />
+          {atras}
+          <p className="ayuda-txt" style={{ margin: 0 }}>No es una venta. La caja tendrá más dinero y el corte lo toma en cuenta.</p>
           <input className="input grande" name="monto" inputMode="decimal" placeholder="$0" required autoFocus aria-label="Monto" />
           <div className="pila-chica">
             <div className="billetes">{sugeridos.map((x) => <button type="button" key={x} className={concepto === x ? "on" : ""} onClick={() => setConcepto(x)}>{x}</button>)}</div>
-            <input className="input" name="concepto" value={concepto} onChange={(e) => setConcepto(e.target.value)} placeholder={tipoMov === "retiro" ? "¿A dónde se llevó?" : "¿Para qué?"} required aria-label="Motivo" />
+            <input className="input" name="concepto" value={concepto} onChange={(e) => setConcepto(e.target.value)} placeholder="¿Para qué?" required aria-label="Motivo" />
           </div>
           {eMov.error && <p className="aviso error">{eMov.error}</p>}
           <div className="acciones"><button className="bt" disabled={guardandoMov}>{guardandoMov ? "Guardando…" : "Guardar"}<Fl /></button></div>
@@ -225,7 +248,7 @@ export function CajaModal({ inicial, turno, limiteDiferencia, categorias, eviden
     );
   }
 
-  if (vista === "gasto") {
+  if (vistaReal === "gasto") {
     return (
       <Modal abierto cerrar={cerrar} etiqueta="Caja" titulo="Pagué algo con dinero de la caja">
         <form action={accGasto} className="pila">
@@ -302,13 +325,26 @@ function CortePasos({ turno, accion, cerrando, error, contado, setContado, limit
   let queda = paraRepartir;
   const reparto = gente.map((x) => { const ef = Math.min(x.total, queda); queda -= ef; return { ...x, ef, falta: x.total - ef }; });
   const saleDeCaja = reparto.reduce((a, x) => a + x.ef, 0);
-  const esperado = enCaja - saleDeCaja;
-  const nombres = ["caja", ...(reparto.length ? ["reparte"] : []), ...(conComprobantes ? ["comprobantes"] : []), "cuenta"];
+  // La parte del negocio: lo que queda arriba del fondo después de pagarle al equipo. Se deposita a la dueña
+  // o se guarda en el sobre del negocio; así al contar siempre debe quedar solo el fondo.
+  const negocio = Math.max(0, queda);
+  const saldoRes = turno.resguardo?.saldo ?? 0;
+  const [decNeg, setDecNeg] = useState<"depositar" | "resguardar">("depositar");
+  const [conRes, setConRes] = useState(true);
+  const depositoTotal = decNeg === "depositar" ? negocio + (conRes ? saldoRes : 0) : 0;
+  const conNegocio = negocio > 0 || saldoRes > 0;
+  const esperado = enCaja - saleDeCaja - negocio;
+  // Comprobantes: los de cobros (si el negocio los pide) y el del depósito a la dueña (siempre que se deposite).
+  const gruposComp: GrupoEvidencia[] = [...(conComprobantes ? grupos : []),
+    ...(depositoTotal > 0 ? [{ metodo: ETIQUETA_DEPOSITO, total: depositoTotal, ventas: 0, icono: "enviar", enLinea: false,
+      nota: decNeg === "depositar" && conRes && saldoRes > 0 && negocio > 0 ? `${formatoDinero(negocio)} de hoy y ${formatoDinero(saldoRes)} que estaban resguardados` : negocio > 0 ? "Lo del negocio de hoy" : "Lo que estaba resguardado" }] : [])];
+  const hayComprobantes = gruposComp.length > 0;
+  const nombres = ["caja", ...(reparto.length || conNegocio ? ["reparte"] : []), "cuenta", ...(hayComprobantes ? ["comprobantes"] : [])];
   const titulos: Record<string, string> = { caja: "Lo que hay en la caja", reparte: turno.verTodo ? "Saca lo de cada quien" : "Saca lo que te toca", comprobantes: "Comprobantes", cuenta: "Cuenta lo que quedó" };
   const botones: Record<string, string> = { reparte: "Repartir", comprobantes: "Comprobantes", cuenta: "Contar" };
   const pasos = nombres.length;
   const [paso, setPaso] = useState(1);
-  const [faltan, setFaltan] = useState(() => grupos.filter((g) => !g.enLinea).length);
+  const [faltan, setFaltan] = useState(() => gruposComp.filter((g) => !g.enLinea && g.total > 0).length);
   const [archivos, setArchivos] = useState(0);
   const c = leerPesos(contado);
   const dif = c === null ? null : c - esperado;
@@ -316,16 +352,20 @@ function CortePasos({ turno, accion, cerrando, error, contado, setContado, limit
   const esCierre = paso === pasos;
   const fueraCaja = grupos.filter((g) => !EN_LINEA.includes(g.metodo));
   const conDif = dif !== null && dif !== 0;
+  // En el paso de contar no se avanza sin escribir cuánto se contó.
+  const puedeSeguir = nombre !== "cuenta" || c !== null;
   return (
     <Modal abierto cerrar={cerrar} etiqueta={`Corte de caja, paso ${paso} de ${pasos}`} titulo={titulos[nombre]}>
       {/* Enter en un paso intermedio avanza al siguiente en lugar de cerrar la caja. */}
       <form className="pila ck ct" onSubmit={(e) => {
         e.preventDefault();
-        if (!esCierre) { setPaso(paso + 1); return; }
+        if (!esCierre) { if (puedeSeguir) setPaso(paso + 1); return; }
         const datos = new FormData(e.currentTarget);
         startTransition(() => accion(datos));
       }}>
         <div className="ck-pasos" aria-hidden="true">{Array.from({ length: pasos }, (_, i) => <i key={i} className={i < paso ? "on" : ""} />)}</div>
+        <input type="hidden" name="negocio" value={decNeg} />
+        <input type="hidden" name="incluirResguardo" value={decNeg === "depositar" && conRes ? "si" : ""} />
         {reparto.map((x) => (
           <span key={`h${x.id}`} hidden>
             <input type="hidden" name={`efectivo:${x.id}`} value={x.ef} />
@@ -342,7 +382,7 @@ function CortePasos({ turno, accion, cerrando, error, contado, setContado, limit
             {propOtras > 0 && <Rg s="+" t="Propinas de otras personas" sub="Siguen en la caja" v={formatoDinero(propOtras)} />}
             {det.gastos.map((x, k) => <Rg key={`g${k}`} s="-" t={x.concepto} sub="Gasto de caja" v={formatoDinero(x.monto)} />)}
             {pagosAntes > 0 && <Rg s="-" t="Pagos al equipo" sub="Ya entregados hoy" v={formatoDinero(pagosAntes)} />}
-            {det.sacado.map((x, k) => <Rg key={`s${k}`} s="-" t={x.concepto} sub="Dinero que se sacó" v={formatoDinero(x.monto)} />)}
+            {det.sacado.map((x, k) => <Rg key={`s${k}`} s="-" t={x.concepto} sub={esLlevoDuena(x.concepto) ? "Cuenta como lo del negocio" : "Dinero que se sacó"} v={formatoDinero(x.monto)} />)}
             {propYa > 0 && <Rg s="-" t="Propinas ya entregadas" v={formatoDinero(propYa)} />}
             {m.devolucionesEfectivo > 0 && <Rg s="-" t="Devoluciones en efectivo" v={formatoDinero(m.devolucionesEfectivo)} />}
             <Rg s="=" t="En la caja" v={formatoDinero(enCaja)} cls="tot" />
@@ -358,7 +398,7 @@ function CortePasos({ turno, accion, cerrando, error, contado, setContado, limit
           )}
         </div>
 
-        {reparto.length > 0 && (
+        {(reparto.length > 0 || conNegocio) && (
           <div className="pila-chica" hidden={nombre !== "reparte"}>
             <p className="ct-ins">Saca este dinero de la caja y entrégalo. Palomea al darlo.</p>
             <div className="ct-hoja">
@@ -401,22 +441,36 @@ function CortePasos({ turno, accion, cerrando, error, contado, setContado, limit
               })}
               {propAparte > 0 && <Rg t="Propinas en efectivo" sub={`Aparte de la caja: ${propinasEq.filter((p) => p.efectivo > 0).map((p) => `${p.nombre.split(" ")[0]} ${formatoDinero(p.efectivo)}`).join(", ")}`} v={formatoDinero(propAparte)} cls="mu" />}
             </div>
+            {conNegocio && (
+              <div className="ng">
+                <div className="ng-cab"><b>Negocio</b><span className="num">{formatoDinero(negocio)}</span></div>
+                <small>{negocio > 0 ? "Lo que queda después del equipo. Para la dueña." : "Hoy no queda efectivo para el negocio."}</small>
+                <div className="ng-op" role="radiogroup" aria-label="Qué se hace con lo del negocio">
+                  {([["depositar", "Depositar ahora"], ["resguardar", "Resguardar"]] as const).map(([k, t]) => (
+                    <button type="button" key={k} role="radio" aria-checked={decNeg === k} className={decNeg === k ? "on" : ""} onClick={() => setDecNeg(k)}>{t}</button>
+                  ))}
+                </div>
+                {decNeg === "depositar" && saldoRes > 0 && (
+                  <label className="ng-chk">
+                    <input type="checkbox" checked={conRes} onChange={(e) => setConRes(e.target.checked)} />
+                    <span>Sumar lo resguardado {turno.resguardo?.desde}, {formatoDinero(saldoRes)}</span>
+                  </label>
+                )}
+                <small className="ng-nota">{decNeg === "depositar"
+                  ? (depositoTotal > 0 ? `Se depositan ${formatoDinero(depositoTotal)}. El comprobante se sube en el último paso.` : "No hay nada que depositar hoy.")
+                  : `Se guarda en el sobre del negocio. Va sumando ${formatoDinero(saldoRes + negocio)}.`}</small>
+              </div>
+            )}
           </div>
         )}
 
-        {conComprobantes && (
-          <div className="pila" hidden={nombre !== "comprobantes"}>
-            <small className="muted">Sube las fotos o archivos de cada forma de pago, en el orden que quieras.</small>
-            <EvidenciasCorte grupos={grupos} obligatorio cambio={(f, n) => { setFaltan(f); setArchivos(n); }} dinero={formatoDinero} />
-          </div>
-        )}
-
-        <div className="pila-chica" hidden={!esCierre}>
+        <div className="pila-chica" hidden={nombre !== "cuenta"}>
           <p className="ct-ins">Cuenta el efectivo que quedó en la caja.</p>
           <div className="ct-hoja">
             <Rg t="En la caja" v={formatoDinero(enCaja)} />
             {reparto.filter((x) => x.ef > 0).map((x) => <Rg key={`c${x.id}`} s="-" t={x.nombre} v={formatoDinero(x.ef)} />)}
-            <Rg s="=" t="Debe quedar" v={formatoDinero(esperado)} cls="tot" />
+            {negocio > 0 && <Rg s="-" t="Negocio" sub={decNeg === "depositar" ? "Se deposita a la dueña" : "Se guarda en el sobre del negocio"} v={formatoDinero(negocio)} />}
+            <Rg s="=" t="Debe quedar" sub={esperado === fondo ? "El fondo para mañana" : undefined} v={formatoDinero(esperado)} cls="tot" />
           </div>
           <label className="campo">
             <span>¿Cuánto contaste?</span>
@@ -430,16 +484,23 @@ function CortePasos({ turno, accion, cerrando, error, contado, setContado, limit
             </label>
           )}
           {dif !== null && dif < 0 && <p className="ayuda-txt" style={{ margin: 0 }}>Si falta dinero, se decide después quién lo cubre.</p>}
-          {conComprobantes && faltan > 0 && <p className="aviso error" style={{ margin: 0 }}>Falta el comprobante de {faltan === 1 ? "una forma de pago" : `${faltan} formas de pago`}. Regresa al paso de comprobantes.</p>}
-          {conComprobantes && faltan === 0 && archivos > 0 && <small className="muted">{archivos} {archivos === 1 ? "comprobante" : "comprobantes"} listos.</small>}
         </div>
+
+        {hayComprobantes && (
+          <div className="pila-chica" hidden={nombre !== "comprobantes"}>
+            <p className="ct-ins">Fotos o PDF de lo que no es efectivo y del depósito a la dueña.</p>
+            <EvidenciasCorte grupos={gruposComp} obligatorio cambio={(f, n) => { setFaltan(f); setArchivos(n); }} dinero={formatoDinero} />
+            {faltan > 0 ? <small className="ct-falta">Falta {faltan === 1 ? "un comprobante" : `${faltan} comprobantes`} para poder cerrar.</small>
+              : archivos > 0 && <small className="muted">{archivos} {archivos === 1 ? "comprobante listo" : "comprobantes listos"}.</small>}
+          </div>
+        )}
 
         {error && <p className="aviso error">{error}</p>}
         <div className="ck-acc">
           {paso > 1 ? <button type="button" className="ck-atras" aria-label="Anterior" onClick={() => setPaso(paso - 1)}><Icono n="regresar" /></button> : <span />}
           {esCierre
-            ? <button key="cerrar" type="submit" className="bt" disabled={cerrando || c === null || (conComprobantes && faltan > 0)}>{cerrando ? "Cerrando…" : "Cerrar corte"}<Fl /></button>
-            : <button key="seguir" type="button" className="bt" onClick={() => setPaso(paso + 1)}>{botones[nombres[paso]] ?? "Continuar"}<Fl /></button>}
+            ? <button key="cerrar" type="submit" className="bt" disabled={cerrando || c === null || (hayComprobantes && faltan > 0)}>{cerrando ? "Cerrando…" : "Cerrar corte"}<Fl /></button>
+            : <button key="seguir" type="button" className="bt" disabled={!puedeSeguir} onClick={() => setPaso(paso + 1)}>{botones[nombres[paso]] ?? "Continuar"}<Fl /></button>}
         </div>
       </form>
     </Modal>

@@ -45,7 +45,7 @@ export const DETALLE_PERMISO: Partial<Record<keyof typeof PERMISOS, string>> = {
   "configuracion.caja": "Apertura, fondo inicial, diferencias y modelo de caja",
   "configuracion.metas": "Activar metas y cambiar los objetivos del negocio y del equipo",
   "configuracion.egresos": "Categorías, gastos frecuentes, comprobantes y periodicidad",
-  "caja.retiros": "Pagar un gasto con la caja, sacar dinero o ponerle cambio",
+  "caja.retiros": "Pagar un gasto con la caja o ponerle cambio",
   "ventas.ver_todas": "Ventas e historial de todo el equipo",
   "citas.modificar": "Agendar citas, cambiar su horario y marcar llegada, atención o término",
   "citas.horarios": "Horarios de cada persona, descansos y horarios bloqueados",

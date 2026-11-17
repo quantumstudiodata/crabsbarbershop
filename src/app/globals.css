@@ -5945,3 +5945,43 @@ button.cp-pill:focus-visible { outline: 2px solid #2b3a47; outline-offset: 2px; 
 .cp-pend { display: inline-block; width: 8px; height: 8px; margin-right: 6px; vertical-align: 1px; border-radius: 3px; background: #c58a3e; animation: pend-latido 2.6s ease-in-out infinite; }
 @media (prefers-reduced-motion: reduce) { .cp-pend { animation: none; } }
 .cp-hijos > div.cp-pe > span:first-child { color: #3b4a58; }
+
+/* Corte: la parte del negocio (para la dueña), después de pagarle al equipo. */
+.ng { display: grid; gap: 4px; padding: 12px 14px; border-radius: 16px; background: #f1f4f7; box-shadow: inset 0 0 0 1px rgba(43,58,71,.08); }
+.ng-cab { display: flex; justify-content: space-between; align-items: baseline; gap: 10px; }
+.ng-cab b { font-size: 14px; font-weight: 600; }
+.ng-cab .num { font: 800 22px/1 var(--f-display); }
+.ng > small { font-size: 12px; color: var(--muted); }
+.ng-op { display: grid; grid-template-columns: 1fr 1fr; gap: 6px; margin-top: 8px; }
+.ng-op button { padding: 10px 6px; border: 0; border-radius: 12px; background: #fff; box-shadow: inset 0 0 0 1px rgba(43,58,71,.14); font: 600 13px var(--f-body); color: var(--muted); cursor: pointer; transition: background .15s, color .15s; }
+.ng-op button.on { background: #2b3a47; color: #fff; box-shadow: none; }
+.ng-op button:focus-visible { outline: 2px solid #2b3a47; outline-offset: 2px; }
+.ng-chk { display: flex; align-items: center; gap: 8px; margin-top: 6px; font-size: 12.5px; cursor: pointer; }
+.ng-chk input { width: 18px; height: 18px; accent-color: #2b3a47; flex: none; }
+.ng .ng-nota { margin-top: 4px; font-size: 12px; color: var(--muted); }
+.ct .ct-falta { display: block; font-size: 12.5px; color: #8a5a1e; }
+
+/* Recorrido de un pendiente: por qué cortes ha pasado. El texto subrayado lo despliega. */
+.cp-sub { background: none; border: 0; padding: 0; font: inherit; color: inherit; text-decoration: underline; text-underline-offset: 2px; text-decoration-thickness: 1px; cursor: pointer; }
+.cp-sub:hover { color: var(--ink, #1d2731); }
+.cp-sub:focus-visible { outline: 2px solid #8fa3b6; outline-offset: 2px; border-radius: 3px; }
+.cp-hijos > .cr-rec { display: grid; justify-content: stretch; max-width: 560px; gap: 10px; margin: 2px 12px 8px 0; padding: 10px 12px; background: #fff; border: 1px solid #d6dee6; border-radius: 12px; animation: cr-entra .18s ease-out; }
+@keyframes cr-entra { from { opacity: 0; transform: translateY(-3px); } to { opacity: 1; transform: none; } }
+@media (prefers-reduced-motion: reduce) { .cp-hijos > .cr-rec { animation: none; } }
+.cr-sec { display: grid; gap: 0; position: relative; }
+.cr-sec + .cr-sec { padding-top: 10px; border-top: 1px solid #e3e9ef; }
+.cr-t { font-size: 12px; font-weight: 600; color: #3b4a58; margin-bottom: 4px; }
+.cr-p { position: relative; display: flex; justify-content: space-between; align-items: baseline; gap: 10px; padding: 4px 0 4px 16px; font-size: 12.5px; color: #3b4a58; }
+.cr-p::before { content: ""; position: absolute; left: 3.5px; top: 0; bottom: 0; width: 1px; background: #d6dee6; }
+.cr-sec > .cr-p:first-of-type::before { top: 50%; }
+.cr-sec > .cr-p:last-child::before { bottom: 50%; }
+.cr-p > i { position: absolute; left: 0; top: 50%; width: 8px; height: 8px; margin-top: -4px; border-radius: 50%; background: #c58a3e; }
+.cr-p.fin > i { background: #2a333d; }
+.cr-p.fin { color: var(--muted); }
+.cr-p a { color: #1d2731; text-decoration: underline; text-underline-offset: 2px; text-decoration-thickness: 1px; }
+.cr-p small { color: var(--muted); font-size: 12px; }
+.cr-p .num { color: #8a5a1e; white-space: nowrap; }
+.cr-mas { align-self: start; justify-self: start; margin: 2px 0 2px 16px; padding: 3px 0; background: none; border: 0; font: inherit; font-size: 12px; color: #4f6375; text-decoration: underline; text-underline-offset: 2px; cursor: pointer; position: relative; }
+.cr-mas::before { content: ""; position: absolute; left: -12.5px; top: 0; bottom: 0; width: 1px; background: #d6dee6; }
+@media (max-width: 640px) { .cp-hijos > .cr-rec { margin-right: 4px; padding: 8px 10px; } }
+.cp-hijos > div > .num { white-space: nowrap; }

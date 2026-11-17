@@ -1,11 +1,11 @@
 "use client";
 
-import { useRef, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import { Icono } from "@/components/Icono";
 import { MAX_ADJUNTO, prepararArchivo } from "@/lib/archivo";
 
 type Evidencia = { etiqueta: string; nombre: string; datos: string; pdf: boolean };
-export type GrupoEvidencia = { metodo: string; total: number; ventas: number; icono: string; enLinea: boolean };
+export type GrupoEvidencia = { metodo: string; total: number; ventas: number; icono: string; enLinea: boolean; /** Texto en lugar de "N cobros". */ nota?: string };
 
 const MAX_ARCHIVOS = 6;
 
@@ -24,6 +24,9 @@ export function EvidenciasCorte({ grupos, obligatorio, cambio, dinero }: { grupo
     setLista(nueva);
     cambio(obligatorio ? grupos.filter((g) => !g.enLinea && g.total > 0 && !nueva.some((e) => e.etiqueta === g.metodo)).length : 0, nueva.length);
   };
+  // Si cambian los grupos (por ejemplo, se decide depositar a la dueña), se vuelve a contar lo que falta.
+  const clave = grupos.map((g) => `${g.metodo}:${g.total}`).join("|");
+  useEffect(() => { cambio(obligatorio ? grupos.filter((g) => !g.enLinea && g.total > 0 && !lista.some((e) => e.etiqueta === g.metodo)).length : 0, lista.length); }, [clave]); // eslint-disable-line react-hooks/exhaustive-deps
   const agregar = async (f?: File) => {
     setError(null);
     if (!f) return;
@@ -52,7 +55,7 @@ export function EvidenciasCorte({ grupos, obligatorio, cambio, dinero }: { grupo
           <div key={g.metodo} className="ev-g">
             <div className="ev-h">
               <span className="ev-ic"><Icono n={g.icono} /></span>
-              <span className="ev-t"><b>{g.metodo}</b><small>{g.ventas} {g.ventas === 1 ? "cobro" : "cobros"}, {dinero(g.total)}{!g.enLinea && g.ventas > 1 ? ". Un archivo puede cubrir varios" : ""}</small></span>
+              <span className="ev-t"><b>{g.metodo}</b><small>{g.nota ? `${dinero(g.total)}. ${g.nota}` : <>{g.ventas} {g.ventas === 1 ? "cobro" : "cobros"}, {dinero(g.total)}{!g.enLinea && g.ventas > 1 ? ". Un archivo puede cubrir varios" : ""}</>}</small></span>
               <span className={`ev-est ${g.enLinea || suyos.length ? "ok" : ""}`}>{g.enLinea ? "Verificado" : suyos.length ? `${suyos.length} ${suyos.length === 1 ? "archivo" : "archivos"}` : falta ? (obligatorio ? "Falta comprobante" : "Sin comprobante") : "Sin cobros"}</span>
             </div>
             {g.enLinea ? <small className="muted">No necesita comprobante: Stripe confirmó cada pago.</small> : (

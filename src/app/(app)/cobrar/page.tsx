@@ -3,9 +3,9 @@ import { esPagoAnulado, esPagoEquipo, esPropinaEntregada } from "@/lib/caja";
 import { asentarCitasPagadas, esCategoriaComisiones } from "@/lib/pagos";
 import { cobraEnLinea } from "@/lib/stripe";
 import { requerirSesion } from "@/lib/auth";
-import { cajaOAbrir, categoriasGasto, equipoQueAtiende, folioCorte, metodosActivos, movimientosDeTurno, serviciosActivos } from "@/lib/datos";
+import { resguardoDe, cajaOAbrir, categoriasGasto, equipoQueAtiende, folioCorte, metodosActivos, movimientosDeTurno, serviciosActivos } from "@/lib/datos";
 import { db, schema } from "@/lib/db";
-import { fechaLarga, fechaLocal, horaCorta } from "@/lib/fechas";
+import { desdeElDia, fechaLarga, fechaLocal, horaCorta } from "@/lib/fechas";
 import { BarraCaja, CajaCerrada, CajaModal, CajaPendiente, type Turno } from "./CajaModal";
 import { FormCobro } from "./FormCobro";
 import type { Promo } from "@/lib/promociones";
@@ -58,7 +58,11 @@ export default async function Cobrar({ searchParams }: { searchParams: Promise<{
     const [sinCobrar] = s.barberia.usaCitas ? await db.select({ n: sql<number>`count(*)::int` }).from(schema.citas)
       .where(and(eq(schema.citas.barberiaId, s.barberia.id), isNull(schema.citas.ventaId), inArray(schema.citas.estado, ["llego", "en_atencion", "completada"]),
         gt(schema.citas.inicio, new Date(Date.now() - 7 * 86400000)), sql`(${schema.citas.estado} = 'completada' or ${schema.citas.fin} < now())`)) : [{ n: 0 }];
+    // Lo del negocio guardado en el sobre: en el corte se puede sumar al depósito de hoy.
+    const res = await resguardoDe(s.barberia.id);
     turno = {
+      resguardo: res.saldo > 0 ? { saldo: res.saldo, desde: desdeElDia(fechaLocal(res.pendientes[0].creadoEn, zona), fechaLocal(new Date(), zona)) } : undefined,
+      esTitular: s.usuario.rol === "duena",
       desde: horaCorta(t.abiertoEn, zona), abrio: abrio?.nombre.split(" ")[0] ?? "", abrioAvatar: abrio?.avatar ?? "iniciales", abiertoEn: t.abiertoEn.toISOString(), dia: fechaLarga(t.fechaOperativa).toLowerCase(),
       deOtroDia: t.fechaOperativa < fechaLocal(new Date(), zona), folioCorte: folio, m: datos.m, esperado: datos.esperado,
       ventas: datos.ventas, ventasEfectivo: datos.ventasEfectivo, propinas: datos.propinasTotal, otros: datos.otrosPorMetodo.map((x) => ({ metodo: x.metodo, total: x.total, ventas: x.ventas })),
@@ -105,7 +109,7 @@ export default async function Cobrar({ searchParams }: { searchParams: Promise<{
             )}
           </>
         )}
-      {opera && <CajaModal inicial={q.caja === "cerrar" ? "corte" : q.caja === "retiro" || q.caja === "movimiento" ? "movimiento" : null} turno={turno} limiteDiferencia={s.barberia.limiteDiferenciaCaja} categorias={cats.filter((c) => !esCategoriaComisiones(c.nombre)).map((c) => c.nombre)} evidencias={s.barberia.usaEvidenciaCorte} egresos={s.puede("gastos.registrar")} configurar={s.puede("configuracion.egresos") && !s.vista} />}
+      {opera && <CajaModal titular={s.usuario.rol === "duena"} inicial={q.caja === "cerrar" ? "corte" : q.caja === "retiro" || q.caja === "movimiento" ? "movimiento" : null} turno={turno} limiteDiferencia={s.barberia.limiteDiferenciaCaja} categorias={cats.filter((c) => !esCategoriaComisiones(c.nombre)).map((c) => c.nombre)} evidencias={s.barberia.usaEvidenciaCorte} egresos={s.puede("gastos.registrar")} configurar={s.puede("configuracion.egresos") && !s.vista} />}
     </>
   );
 }
