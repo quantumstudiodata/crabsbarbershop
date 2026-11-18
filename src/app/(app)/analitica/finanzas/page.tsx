@@ -377,8 +377,8 @@ export default async function MovimientosPagina({ searchParams }: { searchParams
       const iO = e.origen ? cortesAsc.findIndex((x) => x.id === e.origen) : -1;
       const desde = iO >= 0 && iO <= iC ? iO : iC;
       e.recorrido = cortesAsc.slice(desde, iC + 1).map((t, k) => ({ id: t.id, texto: etiquetaCorte(t), estado: k === 0 ? "quedó pendiente" : "sigue pendiente", monto: e.monto }));
-      // El primer día no se desglosa: solo se dice "para el próximo corte". El recorrido sale cuando ya pasó más de un día.
-      e.desdeTxt = cortesAsc[desde].fechaOperativa < cortesAsc[iC].fechaOperativa ? desdeElDia(cortesAsc[desde].fechaOperativa, hoy) : undefined;
+      // En el corte donde se quedó no se desglosa: solo se dice "para el próximo corte". El recorrido sale desde el corte siguiente.
+      e.desdeTxt = desde < iC ? desdeElDia(cortesAsc[desde].fechaOperativa, hoy) : undefined;
       if (c.id === ultimoCorte?.id) e.final = "Se le paga en el próximo corte o por transferencia";
     }
   }
@@ -395,10 +395,11 @@ export default async function MovimientosPagina({ searchParams }: { searchParams
         const t = cortesAsc.find((x) => x.id === p.turnoId);
         return { id: p.turnoId ?? "", texto: t ? etiquetaCorte(t) : diaCortoDe(fechaLocal(p.creadoEn, zona), hoy), estado: "se resguardó", monto };
       });
-      // Igual que con el equipo: lo resguardado el mismo día no se desglosa.
+      // Igual que con el equipo: en el corte donde se resguardó no se desglosa; desde el corte siguiente, sí.
       const desdeDe = (lista: { p: (typeof res.partes)[number] }[]) => {
-        const dia = cortesAsc.find((x) => x.id === lista[0].p.turnoId)?.fechaOperativa ?? fechaLocal(lista[0].p.creadoEn, zona);
-        return dia < tc.fechaOperativa ? desdeElDia(dia, hoy) : "";
+        const k = cortesAsc.findIndex((x) => x.id === lista[0].p.turnoId);
+        const antes = k >= 0 ? k < iC : lista[0].p.creadoEn.getTime() < fin;
+        return antes ? desdeElDia(k >= 0 ? cortesAsc[k].fechaOperativa : fechaLocal(lista[0].p.creadoEn, zona), hoy) : "";
       };
       const aqui = res.partes.flatMap((p) => p.depositos.filter((d) => d.turnoId === c.id).map((d) => ({ p, monto: d.monto })));
       const vivas = res.partes.filter((p) => hasta(p.turnoId, p.creadoEn))
