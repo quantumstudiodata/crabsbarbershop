@@ -377,7 +377,8 @@ export default async function MovimientosPagina({ searchParams }: { searchParams
       const iO = e.origen ? cortesAsc.findIndex((x) => x.id === e.origen) : -1;
       const desde = iO >= 0 && iO <= iC ? iO : iC;
       e.recorrido = cortesAsc.slice(desde, iC + 1).map((t, k) => ({ id: t.id, texto: etiquetaCorte(t), estado: k === 0 ? "quedó pendiente" : "sigue pendiente", monto: e.monto }));
-      e.desdeTxt = desde === iC ? "para el próximo corte" : desdeElDia(cortesAsc[desde].fechaOperativa, hoy);
+      // El primer día no se desglosa: solo se dice "para el próximo corte". El recorrido sale cuando ya pasó más de un día.
+      e.desdeTxt = cortesAsc[desde].fechaOperativa < cortesAsc[iC].fechaOperativa ? desdeElDia(cortesAsc[desde].fechaOperativa, hoy) : undefined;
       if (c.id === ultimoCorte?.id) e.final = "Se le paga en el próximo corte o por transferencia";
     }
   }
@@ -394,7 +395,11 @@ export default async function MovimientosPagina({ searchParams }: { searchParams
         const t = cortesAsc.find((x) => x.id === p.turnoId);
         return { id: p.turnoId ?? "", texto: t ? etiquetaCorte(t) : diaCortoDe(fechaLocal(p.creadoEn, zona), hoy), estado: "se resguardó", monto };
       });
-      const desdeDe = (lista: { p: (typeof res.partes)[number] }[]) => desdeElDia(fechaLocal(lista[0].p.creadoEn, zona), hoy);
+      // Igual que con el equipo: lo resguardado el mismo día no se desglosa.
+      const desdeDe = (lista: { p: (typeof res.partes)[number] }[]) => {
+        const dia = cortesAsc.find((x) => x.id === lista[0].p.turnoId)?.fechaOperativa ?? fechaLocal(lista[0].p.creadoEn, zona);
+        return dia < tc.fechaOperativa ? desdeElDia(dia, hoy) : "";
+      };
       const aqui = res.partes.flatMap((p) => p.depositos.filter((d) => d.turnoId === c.id).map((d) => ({ p, monto: d.monto })));
       const vivas = res.partes.filter((p) => hasta(p.turnoId, p.creadoEn))
         .map((p) => ({ p, monto: p.monto - p.depositos.filter((d) => hasta(d.turnoId, d.creadoEn)).reduce((a, d) => a + d.monto, 0) })).filter((x) => x.monto > 0);

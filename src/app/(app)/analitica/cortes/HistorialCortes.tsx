@@ -81,7 +81,7 @@ export function FilaCorte({ c, corregir, abrir, ver = true, hijos = [] }: { c: C
   const pendientes = (c.fueraCaja ?? []).filter((x) => x.como === "para el próximo corte");
   const personas = [...new Set(pendientes.map((p) => p.nombre))].map((n) => {
     const items = pendientes.filter((p) => p.nombre === n);
-    const viejo = [...items].sort((a, b) => (b.recorrido?.length ?? 0) - (a.recorrido?.length ?? 0))[0];
+    const viejo = items.filter((x) => x.desdeTxt).sort((a, b) => (b.recorrido?.length ?? 0) - (a.recorrido?.length ?? 0))[0];
     return { nombre: n, items, total: items.reduce((a, x) => a + x.monto, 0), desdeTxt: viejo?.desdeTxt ?? "" };
   });
   const [abiertoRec, setAbiertoRec] = useState<string | null>(null);
@@ -102,11 +102,11 @@ export function FilaCorte({ c, corregir, abrir, ver = true, hijos = [] }: { c: C
             return (
               <Fragment key={k}>
                 <div className={n.tipo === "resguardado" ? "cp-pe" : ""}>
-                  <span>{n.tipo === "resguardado" && <i className="cp-pend" aria-label="Resguardado" />}Negocio <small>{n.tipo === "resguardado" ? "resguardado para depositar" : "resguardado"}{" "}
-                    <button type="button" className="cp-sub" aria-expanded={abiertoRec === k} onClick={() => alternar(k)}>{n.desdeTxt}</button>{n.tipo === "depositado" ? ", también depositado" : ""}</small></span>
+                  <span>{n.tipo === "resguardado" && <i className="cp-pend" aria-label="Resguardado" />}Negocio <small>{n.tipo === "resguardado" ? "resguardado para depositar" : "resguardado"}
+                    {n.desdeTxt && <>{" "}<button type="button" className="cp-sub" aria-expanded={abiertoRec === k} onClick={() => alternar(k)}>{n.desdeTxt}</button></>}{n.tipo === "depositado" ? ", también depositado" : ""}</small></span>
                   <span className="num">{n.tipo === "resguardado" ? $(n.monto) : `−${$(n.monto)}`}</span>
                 </div>
-                {abiertoRec === k && <Recorrido secciones={[{ pasos: n.recorrido, final: n.tipo === "resguardado" ? "Se deposita en el próximo corte" : undefined }]} />}
+                {abiertoRec === k && n.desdeTxt && <Recorrido secciones={[{ pasos: n.recorrido, final: n.tipo === "resguardado" ? "Se deposita en el próximo corte" : undefined }]} />}
               </Fragment>
             );
           })}
@@ -215,10 +215,10 @@ function Detalle({ c, cerrar, ajustar }: { c: Corte | null; cerrar: () => void; 
           {propDeCaja > 0 && <Rg s="-" t="Propinas con tarjeta" sub="Se pagaron con la caja" v={$(propDeCaja)} />}
           <Rg s="=" t="Debía quedar" v={$(c.esperado)} cls="tot" />
           <Rg t="Se contó" sub={c.diferencia === 0 ? "Cuadró" : estado.replace(/^./, (x) => x.toUpperCase())} v={$(c.contado)} />
-          {(c.fueraCaja ?? []).map((x, i) => <Rg key={`f${i}`} t={`${x.nombre}, comisión`} sub={x.como === "por transferencia" ? "Por transferencia, no sale de la caja" : `Pendiente${x.dias ? `, del ${x.dias}` : ""}${x.desdeTxt && (x.recorrido?.length ?? 0) > 1 ? `, ${x.desdeTxt}` : ", para el próximo corte"}`} v={$(x.monto)} cls="mu" />)}
+          {(c.fueraCaja ?? []).map((x, i) => <Rg key={`f${i}`} t={`${x.nombre}, comisión`} sub={x.como === "por transferencia" ? "Por transferencia, no sale de la caja" : `Pendiente${x.dias ? `, del ${x.dias}` : ""}${x.desdeTxt ? `, ${x.desdeTxt}` : ", para el próximo corte"}`} v={$(x.monto)} cls="mu" />)}
           {c.propinasEfectivo > 0 && <Rg t="Propinas en efectivo" sub="Aparte de la caja" v={$(c.propinasEfectivo)} cls="mu" />}
-          {resDep && <Rg t="Negocio, lo resguardado" sub={`También se depositó, ${resDep.desdeTxt}`} v={$(resDep.monto)} cls="mu" />}
-          {resQueda && <Rg t="Negocio, resguardado" sub={`Sin depositar, ${resQueda.desdeTxt}`} v={$(resQueda.monto)} cls="mu" />}
+          {resDep && <Rg t="Negocio, lo resguardado" sub={resDep.desdeTxt ? `También se depositó, ${resDep.desdeTxt}` : "También se depositó"} v={$(resDep.monto)} cls="mu" />}
+          {resQueda && <Rg t="Negocio, resguardado" sub={resQueda.desdeTxt ? `Sin depositar, ${resQueda.desdeTxt}` : "Sin depositar"} v={$(resQueda.monto)} cls="mu" />}
         </div>
         {c.otrosEgresos.length > 0 && (
           <>
