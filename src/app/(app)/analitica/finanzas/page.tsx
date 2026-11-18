@@ -1,5 +1,5 @@
 import { periodoDia } from "@/lib/periodo";
-import { and, desc, eq, gte, ilike, inArray, isNotNull, isNull, lte, or, sql, type SQL } from "drizzle-orm";
+import { and, asc, desc, eq, gte, ilike, inArray, isNotNull, isNull, like, lte, or, sql, type SQL } from "drizzle-orm";
 import { registrarGastosAutomaticos } from "@/lib/gastosAuto";
 import { alias } from "drizzle-orm/pg-core";
 import { redirect } from "next/navigation";
@@ -176,9 +176,6 @@ export default async function MovimientosPagina({ searchParams }: { searchParams
     cajaDe(s),
     s.puede("ventas.modificar") ? metodosActivos(bId) : Promise.resolve([]),
   ]);
-  // Lo que se decidió en cada cierre (quién recibió cuánto y cómo): sirve para poner cada pago debajo de su corte.
-  const cierres = diasP.length && pd && ph ? await db.select({ creadoEn: t.historial.creadoEn, detalle: t.historial.detalle }).from(t.historial)
-    .where(and(eq(t.historial.barberiaId, bId), eq(t.historial.tipo, "caja"), sql`${t.historial.detalle} ? 'comisiones'`, ...enPagina(t.historial.creadoEn))) : [];
   // Pagos de días anteriores a la página que se entregaron (o se dejaron pendientes) en un corte que sí está en la página:
   // sin ellos, un corte no mostraría a quién le pagó una comisión vieja.
   const pagosAntes = verCortes && ver("cortes") && verPagos && ver("equipo") && pd && turnosPagina.length
@@ -187,6 +184,22 @@ export default async function MovimientosPagina({ searchParams }: { searchParams
         sql`(${t.pagosComision.creadoEn} at time zone ${zona})::date between ${sumarDias(pd, -45)}::date and ${sumarDias(pd, -1)}::date`,
         ...(pagosDe ? [eq(t.pagosComision.barberoId, pagosDe)] : [])))
     : [];
+  // Para saber en qué corte se entregó cada pago se miran también las salidas de caja y los cierres de días anteriores:
+  // si no, un pago de ayer tomaría la salida o el renglón del cierre de hoy (mismo nombre y monto) y saldría dos veces aquí.
+  const conPagos = pd && ph && (pagos.length > 0 || pagosAntes.length > 0);
+  const [salidasAmplias, cierresAmplios] = conPagos ? await Promise.all([
+    db.select({ id: t.movimientosCaja.id, turnoId: t.movimientosCaja.turnoId, dia: t.turnosCaja.fechaOperativa, monto: t.movimientosCaja.monto, concepto: t.movimientosCaja.concepto, creadoEn: t.movimientosCaja.creadoEn })
+      .from(t.movimientosCaja).innerJoin(t.turnosCaja, eq(t.turnosCaja.id, t.movimientosCaja.turnoId))
+      .where(and(eq(t.movimientosCaja.barberiaId, bId), eq(t.movimientosCaja.tipo, "retiro"), like(t.movimientosCaja.concepto, "Pago %"),
+        gte(t.turnosCaja.fechaOperativa, sumarDias(pd!, -45)), lte(t.turnosCaja.fechaOperativa, phMas!)))
+      .orderBy(asc(t.movimientosCaja.creadoEn)),
+    db.select({ creadoEn: t.historial.creadoEn, detalle: t.historial.detalle }).from(t.historial)
+      .where(and(eq(t.historial.barberiaId, bId), eq(t.historial.tipo, "caja"), sql`${t.historial.detalle} ? 'comisiones'`,
+        sql`(${t.historial.creadoEn} at time zone ${zona})::date between ${sumarDias(pd!, -45)}::date and ${phMas}::date`))
+      .orderBy(asc(t.historial.creadoEn)),
+  ]) : [[], []];
+  // Con un filtro de fechas o de búsqueda solo se ven algunos cortes; para asignar los pagos se usan todos.
+  const cortesTodos = conPagos && (f.periodo || f.buscar) ? await turnosCerrados(bId, 100000) : turnos;
   // Pagos que siguen pendientes de entregar: se muestran siempre en la primera página, sean del día que sean,
   // para que nadie pierda de vista de cuándo es ese dinero.
   const pendientesTodos = verPagos && ver("equipo") && pagina === 1 && !f.periodo
@@ -255,46 +268,49 @@ export default async function MovimientosPagina({ searchParams }: { searchParams
     } });
   }
   // Cada pago en efectivo dejó una salida en la caja ("Pago a Ana"): con ella se sabe en qué corte se entregó.
-  const salidasPago = movsCaja.filter((m) => m.tipo === "retiro" && esPagoEquipo(m.concepto));
+  const salidasPago = salidasAmplias.filter((m) => esPagoEquipo(m.concepto));
   const usadas = new Set<string>();
   // Cortes del más viejo al más nuevo: la comisión automática se decide (caja, transferencia o mañana) en el primer corte después de liquidarse.
   const cortesAsc = [...turnos].filter((c) => c.cerradoEn).sort((a, b) => a.cerradoEn!.getTime() - b.cerradoEn!.getTime());
   const corteDespuesDe = (d: Date) => cortesAsc.find((c) => c.cerradoEn!.getTime() > d.getTime());
   const ultimoCorte = cortesAsc[cortesAsc.length - 1];
-  // Cada pago se resuelve una sola vez: la salida de caja que le corresponde se aparta y no puede usarse para otro pago.
-  const corteDePago = new Map<string, string | undefined>();
+  const todosAsc = cortesTodos === turnos ? cortesAsc : [...cortesTodos].filter((c) => c.cerradoEn).sort((a, b) => a.cerradoEn!.getTime() - b.cerradoEn!.getTime());
+  // El corte de cada cierre anotado y sus renglones ("Ana $1,250 por transferencia"). Cada renglón se usa para un solo pago.
+  const renglones = cierresAmplios.flatMap((h, k) => {
+    const c = todosAsc.reduce<{ c?: (typeof todosAsc)[number]; d: number }>((m, x) => {
+      const d = Math.abs(x.cerradoEn!.getTime() - h.creadoEn.getTime());
+      return d < m.d ? { c: x, d } : m;
+    }, { d: 5 * 60000 }).c;
+    if (!c) return [];
+    return [...String((h.detalle as { comisiones?: string }).comisiones ?? "").matchAll(/([^,]+?) \$([\d,]+(?:\.\d{1,2})?) (de la caja|por transferencia)/g)]
+      .map((m, n) => ({ k: `${k}-${n}`, corte: c.id, dia: c.fechaOperativa, nombre: m[1].trim(), monto: Math.round(Number(m[2].replace(/,/g, "")) * 100) }));
+  });
+  const renglonUsado = new Set<string>();
   // Pagos cuyo corte se supo por su salida de caja o por lo anotado en el cierre (no por cercanía de fechas).
   const seguro = new Set<string>();
-  const turnoDePago = (p: (typeof pagos)[number]["p"], nombre: string) => {
-    if (!corteDePago.has(p.id)) corteDePago.set(p.id, buscarCorteDePago(p, nombre));
-    return corteDePago.get(p.id);
-  };
+  // Cada pago se resuelve una sola vez, del más viejo al más nuevo: toma la primera salida (o renglón del cierre) de su día en adelante
+  // que nadie más tomó. Así el pago de ayer se queda en el corte de ayer y no se repite en el de hoy.
+  const corteDePago = new Map<string, string | undefined>();
   const buscarCorteDePago = (p: (typeof pagos)[number]["p"], nombre: string) => {
     if (p.tipo !== "pago") return undefined;
+    const primero = nombre.split(" ")[0], desde = fechaLocal(p.creadoEn, zona);
     if (/^Efectivo de caja/.test(p.nota)) {
-      const primero = nombre.split(" ")[0];
-      const m = salidasPago.filter((x) => !usadas.has(x.id) && x.monto === p.monto && x.concepto.endsWith(` ${primero}`))
-        .sort((a, b) => Math.abs(a.creadoEn.getTime() - p.creadoEn.getTime()) - Math.abs(b.creadoEn.getTime() - p.creadoEn.getTime()))[0];
-      if (m) { usadas.add(m.id); seguro.add(p.id); return m.turnoId; }
+      const m = salidasPago.find((x) => !usadas.has(x.id) && x.monto === p.monto && x.concepto.endsWith(` ${primero}`) && x.dia >= desde);
+      if (m) { usadas.add(m.id); seguro.add(p.id); return m.turnoId ?? undefined; }
     }
     // Comisión entregada en un corte (por transferencia o en efectivo): el cierre guardó "Ana $1,250 por transferencia".
     if (!p.nota.startsWith("Por entregar de caja")) {
-      const primero = nombre.split(" ")[0];
-      for (const h of cierres) {
-        const txt = String((h.detalle as { comisiones?: string }).comisiones ?? "");
-        const hay = [...txt.matchAll(/([^,]+?) \$([\d,]+(?:\.\d{1,2})?) (de la caja|por transferencia)/g)]
-          .some((m) => m[1].trim() === primero && Math.round(Number(m[2].replace(/,/g, "")) * 100) === p.monto);
-        if (!hay) continue;
-        // El corte más cercano al momento del cierre (dos cortes pueden cerrarse con minutos de diferencia).
-        const c = cortesAsc.reduce<{ c?: (typeof cortesAsc)[number]; d: number }>((m, x) => {
-          const d = Math.abs(x.cerradoEn!.getTime() - h.creadoEn.getTime());
-          return d < m.d ? { c: x, d } : m;
-        }, { d: 5 * 60000 }).c;
-        if (c) { seguro.add(p.id); return c.id; }
-      }
+      const r = renglones.find((x) => !renglonUsado.has(x.k) && x.nombre === primero && x.monto === p.monto && x.dia >= desde);
+      if (r) { renglonUsado.add(r.k); seguro.add(p.id); return r.corte; }
       if (/Pago automático/.test(p.nota)) return corteDespuesDe(p.creadoEn)?.id;
     }
     return undefined;
+  };
+  for (const { p, nombre } of [...pagosAntes, ...pagos].sort((a, b) => a.p.creadoEn.getTime() - b.p.creadoEn.getTime()))
+    if (!corteDePago.has(p.id)) corteDePago.set(p.id, buscarCorteDePago(p, nombre));
+  const turnoDePago = (p: (typeof pagos)[number]["p"], nombre: string) => {
+    if (!corteDePago.has(p.id)) corteDePago.set(p.id, buscarCorteDePago(p, nombre));
+    return corteDePago.get(p.id);
   };
   const diasCortos = (t: string) => t.replace(/^(de|del)\s+/i, "").replace(/ de ([a-záéíóú]+)/gi, (_, m: string) => ` ${({ enero: "ene", febrero: "feb", marzo: "mar", abril: "abr", mayo: "may", junio: "jun", julio: "jul", agosto: "ago", septiembre: "sep", octubre: "oct", noviembre: "nov", diciembre: "dic" } as Record<string, string>)[m.toLowerCase()] ?? m}`).replace(/(\d+) (\w+) al (\d+) \2\b/, "$1 al $3 $2");
   const DE_QUE = (nota: string) => nota.slice(nota.indexOf(":") + 1).replace(/^\s*Pago automático\s*/, "").replace(/\s*\(entregado en el corte\)\s*$/, "").trim();
