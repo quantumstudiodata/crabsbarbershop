@@ -55,8 +55,16 @@ export function Movimientos({ dias, registrar, hoy, cajaAbierta, categorias, opc
                   // Lo que se entregó al cerrar un corte va en renglones cortos bajo su pastilla, no como filas sueltas.
                   const cortes = new Set(d.items.flatMap((x) => (x.k === "corte" ? [x.c.id] : [])));
                   const esHijo = (x: ItemHistorial) => x.k === "mov" && !!x.corte && !x.pend && cortes.has(x.corte) && (x.m.tipo === "pago" || x.m.tipo === "propina" || x.m.tipo === "negocio") && !x.m.cancelado;
-                  const hijosDe = (id: string) => d.items.filter((x) => esHijo(x) && x.corte === id).map((x) => hijo((x as { m: Movimiento }).m))
-                    .sort((a, b) => Number(/transferencia|aparte/.test(a.que)) - Number(/transferencia|aparte/.test(b.que)));
+                  // Cada venta deja su comisión; en el corte se ve un solo renglón por persona y forma de pago.
+                  const hijosDe = (id: string) => {
+                    const juntos = new Map<string, Movimiento>();
+                    for (const x of d.items) {
+                      if (!esHijo(x) || x.corte !== id) continue;
+                      const m = (x as { m: Movimiento }).m, h = hijo(m), k = `${h.nombre}|${h.que}`, ya = juntos.get(k);
+                      juntos.set(k, ya ? { ...ya, monto: ya.monto + m.monto } : m);
+                    }
+                    return [...juntos.values()].map(hijo).sort((a, b) => Number(/transferencia|aparte/.test(a.que)) - Number(/transferencia|aparte/.test(b.que)));
+                  };
                   return (
                   <div key={d.fecha}>
                     <div className={`hist-dia ${d.sinTotal ? "pend-dia" : ""}`}><span>{d.titulo}</span>{!d.sinTotal && <b className="num">{formatoDinero(d.total)}</b>}</div>
