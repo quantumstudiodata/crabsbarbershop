@@ -3,6 +3,7 @@ import { and, asc, eq, inArray, isNull, sql } from "drizzle-orm";
 import { desdeElDia, diaCortoDe, fechaLocal, horaCorta } from "./fechas";
 import { db, schema as s } from "./db";
 import { comisionesDeTurno } from "./comisionesCorte";
+import { foliosCorte } from "./datos";
 import { esLlevoDuena, type MovimientosTurno } from "./caja";
 
 /**
@@ -58,10 +59,10 @@ export async function datosDuena(barberiaId: string, zona: string) {
   const c = await cuentaDuena(barberiaId);
   const hoy = fechaLocal(new Date(), zona);
   const ids = c.pendientes.map((p) => p.turnoId).filter((x): x is string => !!x);
-  const turnos = ids.length ? await db.select({ id: s.turnosCaja.id, fecha: s.turnosCaja.fechaOperativa, cerradoEn: s.turnosCaja.cerradoEn }).from(s.turnosCaja).where(inArray(s.turnosCaja.id, ids)) : [];
+  const [turnos, folios] = await Promise.all([ids.length ? db.select({ id: s.turnosCaja.id, fecha: s.turnosCaja.fechaOperativa, cerradoEn: s.turnosCaja.cerradoEn }).from(s.turnosCaja).where(inArray(s.turnosCaja.id, ids)) : Promise.resolve([]), foliosCorte(barberiaId)]);
   const partes = c.pendientes.map((p) => {
     const t = turnos.find((x) => x.id === p.turnoId);
-    return { texto: t ? `${diaCortoDe(t.fecha, hoy)}, corte ${t.cerradoEn ? horaCorta(t.cerradoEn, zona) : ""}` : diaCortoDe(fechaLocal(p.creadoEn, zona), hoy), monto: p.queda };
+    return { texto: t ? `${diaCortoDe(t.fecha, hoy)}, corte ${folios.get(t.id) ?? (t.cerradoEn ? horaCorta(t.cerradoEn, zona) : "")}` : diaCortoDe(fechaLocal(p.creadoEn, zona), hoy), monto: p.queda };
   });
   const primero = c.pendientes[0];
   const diaPrimero = primero ? turnos.find((x) => x.id === primero.turnoId)?.fecha ?? fechaLocal(primero.creadoEn, zona) : hoy;

@@ -369,7 +369,8 @@ export default async function MovimientosPagina({ searchParams }: { searchParams
     else fijos.push(filaPago(p, nombre));
   }
   // El recorrido de cada pendiente: los cortes desde donde se quedó hasta este, con su día y hora. Cada uno abre ese corte.
-  const etiquetaCorte = (t: (typeof cortesAsc)[number]) => `${diaCortoDe(t.fechaOperativa, hoy)}, corte ${horaCorta(t.cerradoEn!, zona)}`;
+  // Cada corte se cita por su día y su folio ("Lun 16 nov, corte C-000001").
+  const etiquetaCorte = (t: (typeof cortesAsc)[number]) => `${diaCortoDe(t.fechaOperativa, hoy)}, corte ${folios.get(t.id) ?? horaCorta(t.cerradoEn!, zona)}`;
   if (enCortes) for (const c of cortes) {
     const iC = cortesAsc.findIndex((x) => x.id === c.id);
     if (iC < 0) continue;
