@@ -1,4 +1,4 @@
-import { and, eq, sql } from "drizzle-orm";
+import { and, eq, inArray, sql } from "drizzle-orm";
 import { registrarGastosAutomaticos } from "@/lib/gastosAuto";
 import Link from "next/link";
 import { redirect } from "next/navigation";
@@ -6,13 +6,14 @@ import { BotonCajon } from "@/components/Cajon";
 import { Icono } from "@/components/Icono";
 import { requerirSesion } from "@/lib/auth";
 import { db, schema } from "@/lib/db";
-import { fechaLocal, finDeMes } from "@/lib/fechas";
+import { desdeElDia, diaCortoDe, fechaLocal, finDeMes } from "@/lib/fechas";
 import { libretaAnio, libretaBarberos, libretaMes, mesesConDatos } from "@/lib/libreta";
 import { formatoDinero } from "@/lib/money";
 import { NavLibreta } from "./NavLibreta";
 import { DeslizaSemana } from "./HojaSemana";
 import { liquidarAutomaticos } from "@/lib/pagosAuto";
 import { asentarCitasPagadas } from "@/lib/pagos";
+import { cuentaDuena } from "@/lib/duena";
 
 export const metadata = { title: "Datos" };
 
@@ -115,6 +116,8 @@ async function Mes({ barberiaId, mes, hoy, zona, semana }: { barberiaId: string;
         )}
       </section>
 
+      {!m.historico && <LoDuena barberiaId={barberiaId} mes={mes} zona={zona} nombreMes={nombreMes} />}
+
       {!m.historico && (
         <section className="glass tabla-l pivote-l subir d1 solo-escritorio">
           <div className="entre"><span className="lab">Por barbero y semana</span><span className="muted chico-t">Toca una semana para abrir su hoja</span></div>
@@ -211,5 +214,39 @@ async function Barberos({ barberiaId, anio, zona }: { barberiaId: string; anio: 
       </table></div>
       {columnas.some((c) => c.clave.startsWith("hist:")) && <p className="ayuda-txt">Barbero A y Barbero B son las columnas del Excel de la contadora.</p>}
     </div>
+  );
+}
+
+/**
+ * Lo del negocio para la dueña: lo que sigue pendiente de depositar y los depósitos del mes, con los días que cubrió cada uno.
+ * El efectivo de la dueña no es gasto ni ingreso nuevo; aquí solo se lleva la cuenta de lo que se le ha entregado.
+ */
+async function LoDuena({ barberiaId, mes, zona, nombreMes }: { barberiaId: string; mes: string; zona: string; nombreMes: string }) {
+  const c = await cuentaDuena(barberiaId);
+  const hoy = fechaLocal(new Date(), zona);
+  const delMes = c.depositos.filter((d) => fechaLocal(d.creadoEn, zona).startsWith(mes));
+  if (!c.partes.length && !delMes.length) return null;
+  const ids = [...new Set([...c.pendientes, ...delMes.flatMap((d) => d.cubre)].map((x) => x.turnoId).filter((x): x is string => !!x))];
+  const turnos = ids.length ? await db.select({ id: schema.turnosCaja.id, fecha: schema.turnosCaja.fechaOperativa }).from(schema.turnosCaja)
+    .where(and(eq(schema.turnosCaja.barberiaId, barberiaId), inArray(schema.turnosCaja.id, ids))) : [];
+  const diaDe = (id: string | null) => turnos.find((t) => t.id === id)?.fecha;
+  const primero = c.pendientes[0] ? diaDe(c.pendientes[0].turnoId) ?? fechaLocal(c.pendientes[0].creadoEn, zona) : null;
+  const cubre = (d: (typeof delMes)[number]) => {
+    const f = d.cubre.map((x) => diaDe(x.turnoId)).filter((x): x is string => !!x).sort();
+    return f.length ? (f[0] === f[f.length - 1] ? diaCortoDe(f[0], hoy) : `${diaCortoDe(f[0], hoy)} al ${diaCortoDe(f[f.length - 1], hoy)}`) : "";
+  };
+  return (
+    <section className="glass lb-duena subir d1">
+      <div className="entre"><span className="lab">Lo de la dueña</span>{c.saldo > 0 && primero && <span className="muted chico-t">{desdeElDia(primero, hoy).replace(/^./, (x) => x.toUpperCase())}</span>}</div>
+      <div className="lb-duena-r"><span>Pendiente de depositar</span><b className={`num ${c.saldo > 0 ? "lb-duena-pend" : ""}`}>{$(c.saldo)}</b></div>
+      <div className="lb-duena-r"><span>Depositado en {nombreMes}</span><b className="num">{$(delMes.reduce((a, d) => a + d.monto, 0))}</b></div>
+      {delMes.length > 0 && (
+        <div className="lb-duena-l">
+          {[...delMes].reverse().map((d) => (
+            <div key={d.id}><span>{diaCortoDe(fechaLocal(d.creadoEn, zona), hoy)}<small>{cubre(d) ? `Cubre ${cubre(d)}` : ""}</small></span><span className="num">{$(d.monto)}</span></div>
+          ))}
+        </div>
+      )}
+    </section>
   );
 }

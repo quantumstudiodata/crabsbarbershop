@@ -117,7 +117,9 @@ export default async function MovimientosPagina({ searchParams }: { searchParams
       .where(and(eq(t.pagosComision.barberiaId, bId), ...enFechas(t.pagosComision.creadoEn), ...(pagosDe ? [eq(t.pagosComision.barberoId, pagosDe)] : []), ...(texto ? [ilike(t.usuarios.nombre, texto)] : []))).groupBy(sql`1`) : [],
     // Las salidas por pagos al equipo no se cuentan: ya aparecen como pago.
     verCaja && ver("caja") ? db.select(porFila(diaCaja)).from(t.movimientosCaja).innerJoin(t.turnosCaja, eq(t.turnosCaja.id, t.movimientosCaja.turnoId))
-      .where(and(...condMov, sql`${t.movimientosCaja.concepto} !~ '^Pago (de comisiones |anulado )?a '`)).groupBy(sql`1`) : [],
+      // Lo pendiente de la dueña tampoco: va dentro de su corte.
+      .where(and(...condMov, sql`${t.movimientosCaja.concepto} !~ '^Pago (de comisiones |anulado )?a '`,
+        sql`${t.movimientosCaja.concepto} not in ('Pendiente de depositar a la dueña', 'Acumulado para la dueña', 'Depósito a la dueña', 'Resguardado para depositar')`)).groupBy(sql`1`) : [],
     verPagos && ver("equipo") ? db.select(porFila(local(t.historial.creadoEn))).from(t.historial)
       .where(and(eq(t.historial.barberiaId, bId), sql`${t.historial.detalle} ? 'propinaTransferencia'`, ...enFechas(t.historial.creadoEn), ...(pagosDe ? [sql`${t.historial.detalle}->>'barberoId' = ${pagosDe}`] : []))).groupBy(sql`1`) : [],
   ]);
@@ -126,6 +128,9 @@ export default async function MovimientosPagina({ searchParams }: { searchParams
   for (const [d, n] of diasV) sumar(d, n);
   for (const c of turnos) sumar(c.fechaOperativa, 1);
   for (const x of [...diasG, ...diasP, ...diasM, ...diasT]) sumar(x.d, x.n);
+  // Los depósitos a la dueña son renglones propios de Movimientos (también los anulados).
+  if (verCaja && ver("caja") && !f.buscar) for (const x of await db.select(porFila(local(t.negocioDuena.creadoEn))).from(t.negocioDuena)
+    .where(and(eq(t.negocioDuena.barberiaId, bId), eq(t.negocioDuena.tipo, "deposito"), ...enFechas(t.negocioDuena.creadoEn))).groupBy(sql`1`)) sumar(x.d, x.n);
   const todosDias = [...porDia.keys()].sort().reverse();
   const totalFilas = [...porDia.values()].reduce((a, n) => a + n, 0);
   // Páginas por filas: se juntan días completos hasta llegar a 10 filas en escritorio (15 en el teléfono). Un día muy lleno va solo en su página.
@@ -425,6 +430,19 @@ export default async function MovimientosPagina({ searchParams }: { searchParams
     items.push({ k: "mov", dia, t: d.creadoEn.getTime(), m: {
       id: `d${d.id}`, tipo: "deposito", titulo: "Depósito a la dueña", hora: horaCorta(d.creadoEn, zona), sub, monto: -d.monto,
       detalle: [...cub.map((x) => [x.t ? etiquetaCorte(x.t) : "Corte", formatoDinero(x.monto)] as [string, string]), ["Registró", `${quien}${quien ? ", " : ""}${horaCorta(d.creadoEn, zona)}`]],
+      comprobante: d.comprobanteNombre ? { id: d.id, nombre: d.comprobanteNombre, url: `/api/deposito/${d.id}` } : undefined,
+      deposito: d.id,
+    } });
+  }
+  // Los depósitos anulados se siguen viendo, tachados, con quién los anuló.
+  if (verCaja && ver("caja") && duena) for (const d of duena.anulados) {
+    const dia = fechaLocal(d.creadoEn, zona);
+    if (!dias.includes(dia) || f.buscar) continue;
+    const quien = gente.find((g) => g.id === d.usuarioId)?.nombre.split(" ")[0] ?? "";
+    const anulo = gente.find((g) => g.id === d.anuladoPor)?.nombre.split(" ")[0] ?? "";
+    items.push({ k: "mov", dia, t: d.creadoEn.getTime(), m: {
+      id: `d${d.id}`, tipo: "deposito", titulo: "Depósito a la dueña", hora: horaCorta(d.creadoEn, zona), sub: `Anulado${anulo ? ` por ${anulo}` : ""}. No cuenta`, monto: -d.monto, cancelado: true,
+      detalle: [["Registró", `${quien}${quien ? ", " : ""}${horaCorta(d.creadoEn, zona)}`], ["Anuló", `${anulo}${anulo && d.anuladoEn ? ", " : ""}${d.anuladoEn ? horaCorta(d.anuladoEn, zona) : ""}`]],
       comprobante: d.comprobanteNombre ? { id: d.id, nombre: d.comprobanteNombre, url: `/api/deposito/${d.id}` } : undefined,
     } });
   }

@@ -105,7 +105,7 @@ export function FilaCorte({ c, corregir, abrir, ver = true, hijos = [] }: { c: C
                   <span><i className="cp-pend" aria-label="Pendiente" />Negocio <small>depósito pendiente{n.desdeTxt && <>{" "}<button type="button" className="cp-sub" aria-expanded={abiertoRec === k} onClick={() => alternar(k)}>{n.desdeTxt}</button></>}</small></span>
                   <span className="num">{$(n.monto)}</span>
                 </div>
-                {abiertoRec === k && n.desdeTxt && <Recorrido secciones={[{ pasos: n.recorrido, final: "Se deposita con Movimiento de caja" }]} />}
+                {abiertoRec === k && n.desdeTxt && <Recorrido secciones={[{ pasos: n.recorrido }]} />}
               </Fragment>
             );
           })}
@@ -115,11 +115,11 @@ export function FilaCorte({ c, corregir, abrir, ver = true, hijos = [] }: { c: C
             return (
               <Fragment key={k}>
                 <div className="cp-pe">
-                  <span><i className="cp-pend" aria-label="Pendiente" />{p.nombre} <small>{uno ? `comisión${uno.dias ? ` del ${uno.dias}` : ""}, pendiente` : `${p.items.length} comisiones pendientes`}{" "}
+                  <span><i className="cp-pend" aria-label="Pendiente" />{p.nombre} <small>{uno ? `comisión${uno.dias ? ` ${atendido(uno.dias)}` : ""}, pendiente` : `${p.items.length} comisiones pendientes`}{" "}
                     {p.desdeTxt ? <button type="button" className="cp-sub" aria-expanded={abiertoRec === k} onClick={() => alternar(k)}>{p.desdeTxt}</button> : "para el próximo corte"}</small></span>
                   <span className="num">{$(p.total)}</span>
                 </div>
-                {abiertoRec === k && <Recorrido secciones={p.items.map((x) => ({ titulo: p.items.length > 1 ? `Comisión${x.dias ? ` del ${x.dias}` : ""}, ${$(x.monto)}` : undefined, pasos: x.recorrido ?? [], final: x.final }))} />}
+                {abiertoRec === k && <Recorrido secciones={p.items.map((x) => ({ titulo: p.items.length > 1 ? `Comisión${x.dias ? ` ${atendido(x.dias)}` : ""}, ${$(x.monto)}` : undefined, pasos: x.recorrido ?? [], final: x.final }))} />}
               </Fragment>
             );
           })}
@@ -130,6 +130,9 @@ export function FilaCorte({ c, corregir, abrir, ver = true, hijos = [] }: { c: C
     </div>
   );
 }
+
+/** "13 nov" pasa a "de lo atendido el 13 nov"; "10 al 15 nov", a "de lo atendido del 10 al 15 nov": los días en que se ganó la comisión. */
+const atendido = (dias: string) => `de lo atendido ${dias.includes(" al ") ? "del" : "el"} ${dias}`;
 
 /**
  * Por qué cortes ha pasado un pendiente. Cada corte es un enlace que lo abre. Si son muchos, se ven el primero
@@ -214,7 +217,7 @@ function Detalle({ c, cerrar, ajustar }: { c: Corte | null; cerrar: () => void; 
           {propDeCaja > 0 && <Rg s="-" t="Propinas con tarjeta" sub="Se pagaron con la caja" v={$(propDeCaja)} />}
           <Rg s="=" t="Debía quedar" v={$(c.esperado)} cls="tot" />
           <Rg t="Se contó" sub={c.diferencia === 0 ? "Cuadró" : estado.replace(/^./, (x) => x.toUpperCase())} v={$(c.contado)} />
-          {(c.fueraCaja ?? []).map((x, i) => <Rg key={`f${i}`} t={`${x.nombre}, comisión`} sub={x.como === "por transferencia" ? "Por transferencia, no sale de la caja" : `Pendiente${x.dias ? `, del ${x.dias}` : ""}${x.desdeTxt ? `, ${x.desdeTxt}` : ", para el próximo corte"}`} v={$(x.monto)} cls="mu" />)}
+          {(c.fueraCaja ?? []).map((x, i) => <Rg key={`f${i}`} t={`${x.nombre}, comisión`} sub={x.como === "por transferencia" ? "Por transferencia, no sale de la caja" : `Pendiente ${x.desdeTxt || "para el próximo corte"}${x.dias ? `. Es de lo atendido ${x.dias.includes(" al ") ? "del" : "el"} ${x.dias}` : ""}`} v={$(x.monto)} cls="mu" />)}
           {c.propinasEfectivo > 0 && <Rg t="Propinas en efectivo" sub="Aparte de la caja" v={$(c.propinasEfectivo)} cls="mu" />}
           {pendNeg && (
             <div className="cd-neg">

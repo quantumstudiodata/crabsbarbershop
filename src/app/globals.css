@@ -5997,3 +5997,14 @@ button.cp-pill:focus-visible { outline: 2px solid #2b3a47; outline-offset: 2px; 
 .cd-neg { display: grid; gap: 0; padding-top: 6px; margin-top: 4px; border-top: 1px solid rgba(43,58,71,.12); }
 .cd-neg-t { font-size: 13px; font-weight: 600; color: #3b4a58; padding: 4px 0 2px; }
 .cd-neg .ct-r.cd-neg-tot .ct-v { color: #8a5a1e; font-weight: 600; }
+/* Datos: lo de la dueña (pendiente de depositar y depósitos del mes). */
+.lb-duena { display: grid; gap: 6px; padding: 18px 22px; }
+.lb-duena-r { display: flex; justify-content: space-between; align-items: baseline; gap: 12px; padding: 4px 0; font-size: 14px; }
+.lb-duena-r b { font-size: 16px; }
+.lb-duena-r .lb-duena-pend { color: #8a5a1e; }
+.lb-duena-l { display: grid; gap: 0; margin-top: 4px; border-top: 1px solid rgba(43,58,71,.1); }
+.lb-duena-l > div { display: flex; justify-content: space-between; gap: 12px; padding: 7px 0; border-bottom: 1px solid rgba(43,58,71,.07); font-size: 13.5px; }
+.lb-duena-l small { display: block; color: var(--muted); font-size: 12px; }
+.ct-menu .ct-menu-sub { display: block; padding: 8px 4px 2px; font-size: 12.5px; color: var(--muted); }
+.ct-menu .ct-menu-sub .enlace { font-size: 12.5px; }
+.ct-menu .ct-menu-sub .enlace.on { color: var(--fg); font-weight: 600; }

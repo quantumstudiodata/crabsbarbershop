@@ -9,6 +9,7 @@ import { comisionDeServicio, elegirRegla } from "@/lib/comisiones";
 import { db, schema } from "@/lib/db";
 import { registrar } from "@/lib/historial";
 import { MINUTOS_CORRECCION } from "@/lib/caja";
+import { recalcularNegocio } from "@/lib/duena";
 import { formatoDinero, leerPesos } from "@/lib/money";
 import { texto, volver } from "@/lib/volver";
 
@@ -81,6 +82,8 @@ export async function cancelarVenta(form: FormData) {
       detalle: { folio: v.venta.folio, motivo, total: v.venta.total, devolucionEfectivo: devolucion || undefined, total_texto: formatoDinero(v.venta.total) },
     });
   });
+  // Si el corte de esa venta ya cerró, lo que se le debe a la dueña de ese corte baja.
+  if (v.turno.estado === "cerrado") await recalcularNegocio(s.barberia.id, v.turno.id).catch((e) => console.error("recalcular_negocio", e));
   revalidatePath("/", "layout");
   volver(regreso, { aviso: "cancelada" });
 }
@@ -156,6 +159,7 @@ export async function modificarVenta(_: EstadoModificar, form: FormData): Promis
       detalle: { folio: v.venta.folio, motivo, antes, ahora, total },
     });
   });
+  if (v.turno.estado === "cerrado") await recalcularNegocio(s.barberia.id, v.turno.id).catch((e) => console.error("recalcular_negocio", e));
   revalidatePath("/", "layout");
   return { ok: true, n: Date.now() };
 }

@@ -1,6 +1,8 @@
 "use client";
 
-import { useState } from "react";
+import { useActionState, useEffect, useState } from "react";
+import { Modal } from "@/components/ui";
+import { anularDeposito, type EstadoCaja } from "../../caja/actions";
 import { Vacio } from "@/components/Vacio";
 import { Icono } from "@/components/Icono";
 import { FilaVentaVista, type FilaVenta } from "@/components/HistorialVentas";
@@ -11,7 +13,7 @@ import { Cancelar, type FilaEgreso, Nuevo, type OpcionesEgreso } from "../gastos
 
 export type Movimiento = {
   id: string; tipo: "egreso" | "pago" | "renta" | "caja" | "propina" | "gasto" | "deposito"; titulo: string; sub: string; monto: number; hora: string; cancelado?: boolean; /** Liquidado pero sin entregar todavía. */ pendiente?: boolean;
-  detalle: [string, string][]; comprobante?: { id: string; nombre: string; url?: string }; egreso?: FilaEgreso;
+  detalle: [string, string][]; comprobante?: { id: string; nombre: string; url?: string }; egreso?: FilaEgreso; /** Depósito a la dueña que se puede anular. */ deposito?: string;
 };
 /** Todo lo que pasó en el negocio, en un solo historial: ventas, cortes de caja y movimientos de dinero. */
 /** `corte`: el corte de caja al que pertenece (propinas y pagos que se entregaron al cerrar); se muestra justo debajo de ese corte. */
@@ -94,7 +96,10 @@ function hijo(m: Movimiento): HijoCorte {
 
 /** Un movimiento de dinero con el mismo formato que una venta: hora, qué fue, de qué tipo y cuánto. */
 function FilaMov({ m, abierto, alternar, cancelar }: { m: Movimiento; abierto: boolean; alternar: () => void; cancelar: (f: FilaEgreso) => void }) {
+  const [anular, setAnular] = useState(false);
   return (
+    <>
+    {anular && m.deposito && <AnularDeposito id={m.deposito} monto={Math.abs(m.monto)} cerrar={() => setAnular(false)} />}
     <div className={`hist-fila mov-h ${m.tipo} ${TONO[m.tipo]} ${m.pendiente ? "pendiente" : ""} ${m.cancelado ? "cancelada" : ""} ${abierto ? "abierta" : ""}`}>
       <button type="button" className="hist-linea mov-fila" aria-expanded={abierto} onClick={alternar}>
         <span className="t">{m.hora}</span>
@@ -108,8 +113,27 @@ function FilaMov({ m, abierto, alternar, cancelar }: { m: Movimiento; abierto: b
           {m.detalle.map(([k, v]) => <span key={k}><small>{k}</small>{v}</span>)}
           {m.comprobante && <span><small>Comprobante</small><a className="enlace" href={m.comprobante.url ?? `/api/comprobante/${m.comprobante.id}`} target="_blank" rel="noreferrer">{m.comprobante.nombre}</a></span>}
           {m.egreso?.puedeCancelar && <span className="anular"><button type="button" className="bt sec solo chico" onClick={() => cancelar(m.egreso!)}>Cancelar egreso</button></span>}
+          {m.deposito && !m.cancelado && <span className="anular"><button type="button" className="bt sec solo chico" onClick={() => setAnular(true)}>Anular depósito</button></span>}
         </div>
       )}
     </div>
+    </>
+  );
+}
+
+/** Anular un depósito a la dueña mal registrado: pide el motivo y lo pendiente vuelve a subir. */
+function AnularDeposito({ id, monto, cerrar }: { id: string; monto: number; cerrar: () => void }) {
+  const [e, accion, guardando] = useActionState<EstadoCaja, FormData>(anularDeposito, {});
+  useEffect(() => { if (e.ok) cerrar(); }, [e.ok, e.n, cerrar]);
+  return (
+    <Modal abierto cerrar={cerrar} etiqueta="Depósito a la dueña" titulo={`Anular depósito de ${formatoDinero(monto)}`}>
+      <form action={accion} className="pila">
+        <input type="hidden" name="id" value={id} />
+        <p className="ayuda-txt" style={{ margin: 0 }}>Úsalo si el depósito no se hizo o se registró mal. Lo pendiente de depositar a la dueña vuelve a subir.</p>
+        <label className="campo"><span>¿Por qué se anula?</span><input className="input" name="motivo" maxLength={200} required placeholder="Ejemplo: se registró dos veces" /></label>
+        {e.error && <p className="aviso error">{e.error}</p>}
+        <div className="acciones"><button className="bt" disabled={guardando}>{guardando ? "Anulando…" : "Anular depósito"}</button></div>
+      </form>
+    </Modal>
   );
 }

@@ -1,7 +1,7 @@
 "use server";
 
 import { ventasDeCitasPagadas } from "@/lib/pagos";
-import { and, eq, like, sql } from "drizzle-orm";
+import { and, eq, isNull, like, sql } from "drizzle-orm";
 import { POR_ENTREGAR, liquidarAutomaticos } from "@/lib/pagosAuto";
 import { revalidatePath } from "next/cache";
 import { requerirSesion } from "@/lib/auth";
@@ -97,6 +97,27 @@ export async function registrarDeposito(_: EstadoCaja, form: FormData): Promise<
   });
   revalidatePath("/", "layout");
   return listo(saldo - monto > 0 ? `Depósito de ${formatoDinero(monto)} guardado. Quedan ${formatoDinero(saldo - monto)} pendientes de depositar.` : `Depósito de ${formatoDinero(monto)} guardado. Ya no hay nada pendiente de depositar.`);
+}
+
+/** Anula un depósito a la dueña que se registró por error. Lo puede hacer cualquiera del equipo, con el motivo. Lo pendiente vuelve a subir. */
+export async function anularDeposito(_: EstadoCaja, form: FormData): Promise<EstadoCaja> {
+  const s = await requerirSesion();
+  const id = texto(form, "id", 40);
+  const motivo = texto(form, "motivo", 200).trim();
+  if (!/^[0-9a-f-]{36}$/.test(id)) return { error: "No se encontró el depósito." };
+  if (!motivo) return { error: "Escribe por qué se anula." };
+  const ok = await db.transaction(async (tx) => {
+    const [d] = await tx.update(schema.negocioDuena).set({ anuladoEn: new Date(), anuladoPor: s.usuario.id })
+      .where(and(eq(schema.negocioDuena.id, id), eq(schema.negocioDuena.barberiaId, s.barberia.id), eq(schema.negocioDuena.tipo, "deposito"), isNull(schema.negocioDuena.anuladoEn)))
+      .returning({ monto: schema.negocioDuena.monto });
+    if (!d) return false;
+    await registrar(tx, { barberiaId: s.barberia.id, usuarioId: s.usuario.id, tipo: "caja",
+      accion: `${s.usuario.nombre} anuló un depósito a la dueña de ${formatoDinero(d.monto)}`, detalle: { depositoAnulado: id, monto: d.monto, motivo } });
+    return true;
+  });
+  if (!ok) return { error: "Ese depósito ya estaba anulado." };
+  revalidatePath("/", "layout");
+  return listo("Depósito anulado. Lo pendiente de depositar volvió a subir.");
 }
 
 export async function registrarGasto(_: EstadoCaja, form: FormData): Promise<EstadoCaja> {

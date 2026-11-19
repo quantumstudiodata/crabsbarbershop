@@ -334,10 +334,17 @@ function CortePasos({ turno, accion, cerrando, error, contado, setContado, limit
   const fondo = m.fondoInicial;
   const paraRepartir = Math.max(0, enCaja - fondo);
   const [resto, setResto] = useState<Record<string, "manana" | "transferencia">>({});
+  // Cómo se le paga hoy a cada quien: de la caja (lo que alcance) o, si se decide así, todo en el próximo corte o por transferencia.
+  const [modo, setModo] = useState<Record<string, "caja" | "manana" | "transferencia">>({});
   const [dados, setDados] = useState<Record<string, boolean>>({});
   const [cambiando, setCambiando] = useState<string | null>(null);
   let queda = paraRepartir;
-  const reparto = gente.map((x) => { const ef = Math.min(x.total, queda); queda -= ef; return { ...x, ef, falta: x.total - ef }; });
+  const reparto = gente.map((x) => {
+    // Las propinas con tarjeta siempre salen de la caja; la comisión, solo si se paga de la caja hoy.
+    const deCajaHoy = (modo[x.id] ?? "caja") === "caja" || x.comision === 0;
+    const ef = Math.min(deCajaHoy ? x.total : x.otro, queda); queda -= ef;
+    return { ...x, ef, falta: x.total - ef };
+  });
   const saleDeCaja = reparto.reduce((a, x) => a + x.ef, 0);
   // Lo del negocio se descuenta solo al contar: sale de la caja lo que le toca (lo que alcance arriba del fondo) y se acumula para la dueña.
   // Si no alcanza, lo demás se le sigue debiendo. El depósito se registra aparte, en Movimiento de caja.
@@ -376,7 +383,7 @@ function CortePasos({ turno, accion, cerrando, error, contado, setContado, limit
         {reparto.map((x) => (
           <span key={`h${x.id}`} hidden>
             <input type="hidden" name={`efectivo:${x.id}`} value={x.ef} />
-            <input type="hidden" name={`entrega:${x.id}`} value={resto[x.id] ?? "manana"} />
+            <input type="hidden" name={`entrega:${x.id}`} value={(modo[x.id] ?? "caja") !== "caja" ? modo[x.id] : resto[x.id] ?? "manana"} />
           </span>
         ))}
 
@@ -413,8 +420,23 @@ function CortePasos({ turno, accion, cerrando, error, contado, setContado, limit
               {fondo > 0 && <Rg s="-" t="Fondo para mañana" sub="Se queda en la caja" v={formatoDinero(Math.min(fondo, enCaja))} />}
               <Rg s="=" t="Para repartir" v={formatoDinero(paraRepartir)} cls="tot" />
               {reparto.map((x) => {
-                const r = resto[x.id] ?? "manana";
+                const md = modo[x.id] ?? "caja";
+                const r = md !== "caja" ? md : resto[x.id] ?? "manana";
                 const quePaga = [x.comision ? (x.detalle === "de hoy" ? "Comisión de hoy" : `Comisión ${fechasCortas(x.detalle)}`) : "", x.otro ? `propinas con tarjeta ${formatoDinero(x.otro)}` : ""].filter(Boolean).join(" y ").replace(/^p/, "P");
+                // "caja": lo que alcance y lo demás en el próximo corte; "cajaTransf": lo que alcance y lo demás por transferencia.
+                const sel = md === "caja" ? (r === "transferencia" ? "cajaTransf" : "caja") : md;
+                const elegir = (k: "caja" | "cajaTransf" | "manana" | "transferencia") => {
+                  setModo((v) => ({ ...v, [x.id]: k === "cajaTransf" ? "caja" : k }));
+                  setResto((v) => ({ ...v, [x.id]: k === "cajaTransf" || k === "transferencia" ? "transferencia" : "manana" }));
+                  setCambiando(null);
+                };
+                const falta = md === "caja" && x.falta > 0;
+                const ops: [typeof sel, string, string][] = [
+                  ["caja", "De la caja", falta ? `Lo que alcanza hoy, ${formatoDinero(x.ef)}; lo demás en el próximo corte` : "Se le da hoy en efectivo"],
+                  ...(falta ? [["cajaTransf", "De la caja y lo demás por transferencia", `Hoy ${formatoDinero(x.ef)}; ${formatoDinero(x.falta)} por transferencia`] as [typeof sel, string, string]] : []),
+                  ["manana", "Todo en el próximo corte", "Se le da en efectivo en el siguiente cierre"],
+                  ["transferencia", "Todo por transferencia", "Le llega a quien administra para hacerla"],
+                ];
                 return (
                   <div key={x.id} className={`ct-per ${x.ef === 0 ? "nada" : ""}`}>
                     <Rg s={x.ef > 0 ? "-" : undefined} v={formatoDinero(x.ef)} t={
@@ -424,28 +446,27 @@ function CortePasos({ turno, accion, cerrando, error, contado, setContado, limit
                       </label>
                     } sub={quePaga}>
                       {x.falta > 0 && (
-                        <>
-                          <small className="ct-falta">
-                            {x.ef === 0 ? `Ya no alcanzó el efectivo. Los ${formatoDinero(x.falta)}` : `Le tocan ${formatoDinero(x.total)}. Los ${formatoDinero(x.falta)} que faltan,`}{" "}
-                            {x.comision === 0 || r === "transferencia" ? "por transferencia" : "en el próximo corte"}
-                          </small>
-                          {x.comision > 0 && <button type="button" className="ct-cambiar" aria-expanded={cambiando === x.id} onClick={() => setCambiando((v) => (v === x.id ? null : x.id))}>Cambiar</button>}
-                          {cambiando === x.id && (
-                            <div className="ct-menu" role="radiogroup" aria-label={`Cómo se le pagan a ${x.nombre} los ${formatoDinero(x.falta)} que faltan`}>
-                              <span>¿Cómo se le pagan a {x.nombre} los {formatoDinero(x.falta)} que faltan?</span>
-                              {([["manana", "En el próximo corte", "Se le da en efectivo en el siguiente cierre"], ["transferencia", "Por transferencia", "Le llega a quien administra para hacerla"]] as const).map(([k, t, d]) => (
-                                <button type="button" key={k} role="radio" aria-checked={r === k} className={r === k ? "on" : ""} onClick={() => { setResto((v) => ({ ...v, [x.id]: k })); setCambiando(null); }}>
-                                  <span><b>{t}</b><small>{d}</small></span>{r === k && <Icono n="palomita" />}
-                                </button>
-                              ))}
-                            </div>
-                          )}
-                        </>
+                        <small className="ct-falta">
+                          {md !== "caja" ? `Los ${formatoDinero(x.falta)} de su comisión` : x.ef === 0 ? `Ya no alcanzó el efectivo. Los ${formatoDinero(x.falta)}` : `Le tocan ${formatoDinero(x.total)}. Los ${formatoDinero(x.falta)} que faltan,`}{" "}
+                          {x.comision === 0 || r === "transferencia" ? "por transferencia" : "en el próximo corte"}
+                        </small>
+                      )}
+                      {x.comision > 0 && <button type="button" className="ct-cambiar" aria-expanded={cambiando === x.id} onClick={() => setCambiando((v) => (v === x.id ? null : x.id))}>Cambiar</button>}
+                      {cambiando === x.id && (
+                        <div className="ct-menu" role="radiogroup" aria-label={`Cómo se le paga a ${x.nombre}`}>
+                          <span>¿Cómo se le paga a {x.nombre}?</span>
+                          {ops.map(([k, t, d]) => (
+                            <button type="button" key={k} role="radio" aria-checked={sel === k} className={sel === k ? "on" : ""} onClick={() => elegir(k)}>
+                              <span><b>{t}</b><small>{d}</small></span>{sel === k && <Icono n="palomita" />}
+                            </button>
+                          ))}
+                        </div>
                       )}
                     </Rg>
                   </div>
                 );
               })}
+              {leToca > 0 && <Rg s={negocio > 0 ? "-" : undefined} t="Negocio" sub={seDebe === 0 ? "Pendiente de depositar a la dueña. Se aparta solo al contar" : negocio > 0 ? `Le tocan ${formatoDinero(leToca)}; solo alcanzan ${formatoDinero(negocio)}. Lo demás queda pendiente` : `Le tocan ${formatoDinero(leToca)}. No alcanza el efectivo, queda pendiente`} v={formatoDinero(negocio)} cls="ct-neg" />}
               {propAparte > 0 && <Rg t="Propinas en efectivo" sub={`Aparte de la caja: ${propinasEq.filter((p) => p.efectivo > 0).map((p) => `${p.nombre.split(" ")[0]} ${formatoDinero(p.efectivo)}`).join(", ")}`} v={formatoDinero(propAparte)} cls="mu" />}
             </div>
           </div>

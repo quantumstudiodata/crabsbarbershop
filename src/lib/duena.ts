@@ -3,7 +3,7 @@ import { and, asc, eq, inArray, isNull, sql } from "drizzle-orm";
 import { desdeElDia, diaCortoDe, fechaLocal, horaCorta } from "./fechas";
 import { db, schema as s } from "./db";
 import { comisionesDeTurno } from "./comisionesCorte";
-import { foliosCorte } from "./datos";
+import { foliosCorte, movimientosDeTurno } from "./datos";
 import { esLlevoDuena, type MovimientosTurno } from "./caja";
 
 /**
@@ -32,12 +32,14 @@ export type DepositoDuena = { id: string; monto: number; creadoEn: Date; usuario
  */
 export async function cuentaDuena(barberiaId: string) {
   const filas = await db.select({ id: s.negocioDuena.id, tipo: s.negocioDuena.tipo, turnoId: s.negocioDuena.turnoId, monto: s.negocioDuena.monto, creadoEn: s.negocioDuena.creadoEn,
-    usuarioId: s.negocioDuena.usuarioId, comprobanteNombre: s.negocioDuena.comprobanteNombre })
-    .from(s.negocioDuena).where(and(eq(s.negocioDuena.barberiaId, barberiaId), isNull(s.negocioDuena.anuladoEn)))
+    usuarioId: s.negocioDuena.usuarioId, comprobanteNombre: s.negocioDuena.comprobanteNombre, anuladoEn: s.negocioDuena.anuladoEn, anuladoPor: s.negocioDuena.anuladoPor })
+    .from(s.negocioDuena).where(eq(s.negocioDuena.barberiaId, barberiaId))
     .orderBy(asc(s.negocioDuena.creadoEn));
-  const partes: ParteDuena[] = filas.filter((x) => x.tipo === "acumulado" && x.monto > 0).map((x) => ({ id: x.id, turnoId: x.turnoId, monto: x.monto, queda: x.monto, creadoEn: x.creadoEn, depositos: [] }));
+  // Los depósitos anulados no cuentan, pero se siguen viendo en Movimientos.
+  const anulados = filas.filter((x) => x.tipo === "deposito" && x.anuladoEn);
+  const partes: ParteDuena[] = filas.filter((x) => x.tipo === "acumulado" && !x.anuladoEn && x.monto > 0).map((x) => ({ id: x.id, turnoId: x.turnoId, monto: x.monto, queda: x.monto, creadoEn: x.creadoEn, depositos: [] }));
   const depositos: DepositoDuena[] = [];
-  for (const d of filas.filter((x) => x.tipo === "deposito")) {
+  for (const d of filas.filter((x) => x.tipo === "deposito" && !x.anuladoEn)) {
     const dep: DepositoDuena = { id: d.id, monto: d.monto, creadoEn: d.creadoEn, usuarioId: d.usuarioId, comprobanteNombre: d.comprobanteNombre, cubre: [] };
     let falta = d.monto;
     for (const p of partes) {
@@ -51,7 +53,7 @@ export async function cuentaDuena(barberiaId: string) {
     depositos.push(dep);
   }
   const pendientes = partes.filter((p) => p.queda > 0);
-  return { saldo: pendientes.reduce((a, p) => a + p.queda, 0), partes, pendientes, depositos };
+  return { saldo: pendientes.reduce((a, p) => a + p.queda, 0), partes, pendientes, depositos, anulados };
 }
 
 /** Lo que se le debe a la dueña con el corte de donde viene cada parte ("Lun 16 nov, corte 21:49"), para mostrarlo en la caja. */
@@ -67,4 +69,20 @@ export async function datosDuena(barberiaId: string, zona: string) {
   const primero = c.pendientes[0];
   const diaPrimero = primero ? turnos.find((x) => x.id === primero.turnoId)?.fecha ?? fechaLocal(primero.creadoEn, zona) : hoy;
   return { saldo: c.saldo, desde: c.saldo > 0 ? desdeElDia(diaPrimero, hoy) : "", partes };
+}
+
+/**
+ * Vuelve a calcular lo que le toca al negocio de un corte ya cerrado (por ejemplo, si después se canceló o se modificó una venta).
+ * Lo que se apartó en efectivo no cambia; solo lo que se le debe a la dueña.
+ */
+export async function recalcularNegocio(barberiaId: string, turnoId: string) {
+  const [t] = await db.select({ estado: s.turnosCaja.estado, fondo: s.turnosCaja.fondoInicial, cerradoEn: s.turnosCaja.cerradoEn, cerradoPor: s.turnosCaja.cerradoPor })
+    .from(s.turnosCaja).where(and(eq(s.turnosCaja.id, turnoId), eq(s.turnosCaja.barberiaId, barberiaId))).limit(1);
+  if (!t || t.estado !== "cerrado") return;
+  const datos = await movimientosDeTurno(barberiaId, turnoId, t.fondo);
+  const leToca = await leTocaAlNegocio(barberiaId, turnoId, datos);
+  const [fila] = await db.select({ id: s.negocioDuena.id, monto: s.negocioDuena.monto }).from(s.negocioDuena)
+    .where(and(eq(s.negocioDuena.turnoId, turnoId), eq(s.negocioDuena.tipo, "acumulado"), isNull(s.negocioDuena.anuladoEn))).limit(1);
+  if (fila) { if (fila.monto !== leToca) await db.update(s.negocioDuena).set({ monto: leToca }).where(eq(s.negocioDuena.id, fila.id)); }
+  else if (leToca > 0) await db.insert(s.negocioDuena).values({ barberiaId, tipo: "acumulado", turnoId, monto: leToca, enCaja: 0, usuarioId: t.cerradoPor, creadoEn: t.cerradoEn ?? new Date() });
 }

@@ -146,8 +146,10 @@ export async function sincronizarReembolso(intento: string) {
 /** Si una venta salió de una cita pagada en línea y el pago se devolvió, la venta se cancela sola. */
 async function cancelarVentaReembolsada(ventaId: string | null) {
   if (!ventaId) return;
-  await db.update(schema.ventas).set({ estado: "cancelada", motivoCancelacion: "Se devolvió el pago en línea", canceladaEn: new Date() })
-    .where(and(eq(schema.ventas.id, ventaId), eq(schema.ventas.estado, "pagada")));
+  const r = await db.update(schema.ventas).set({ estado: "cancelada", motivoCancelacion: "Se devolvió el pago en línea", canceladaEn: new Date() })
+    .where(and(eq(schema.ventas.id, ventaId), eq(schema.ventas.estado, "pagada"))).returning({ barberiaId: schema.ventas.barberiaId, turnoId: schema.ventas.turnoId });
+  // Si su corte ya cerró, lo que se le debe a la dueña de ese corte se vuelve a calcular.
+  if (r[0]?.turnoId) { const { recalcularNegocio } = await import("./duena"); await recalcularNegocio(r[0].barberiaId, r[0].turnoId).catch((e) => console.error("recalcular_negocio", e)); }
 }
 
 /**
