@@ -88,7 +88,7 @@ export async function registrarDeposito(_: EstadoCaja, form: FormData): Promise<
   if (!TIPOS_ADJUNTO.test(archivo) || archivo.length > MAX_ADJUNTO) return { error: "El comprobante debe ser una foto o un PDF de máximo 1 MB." };
   const { saldo } = await cuentaDuena(s.barberia.id);
   if (saldo <= 0) return { error: "No hay nada pendiente de depositar a la dueña." };
-  if (monto > saldo) return { error: `Solo se le deben ${formatoDinero(saldo)}. Revisa el monto.` };
+  if (monto > saldo) return { error: `Solo hay ${formatoDinero(saldo)} pendientes de depositar. Revisa el monto.` };
   await db.transaction(async (tx) => {
     await tx.insert(schema.negocioDuena).values({ barberiaId: s.barberia.id, tipo: "deposito", monto, usuarioId: s.usuario.id,
       comprobanteNombre: nombre, comprobanteTipo: archivo.slice(5, archivo.indexOf(";")), comprobanteDatos: archivo });
@@ -96,7 +96,7 @@ export async function registrarDeposito(_: EstadoCaja, form: FormData): Promise<
       accion: `${s.usuario.nombre} registró un depósito a la dueña de ${formatoDinero(monto)}`, detalle: { depositoDuena: monto, quedan: saldo - monto } });
   });
   revalidatePath("/", "layout");
-  return listo(saldo - monto > 0 ? `Depósito de ${formatoDinero(monto)} guardado. Faltan ${formatoDinero(saldo - monto)}.` : `Depósito de ${formatoDinero(monto)} guardado. Ya no se le debe nada.`);
+  return listo(saldo - monto > 0 ? `Depósito de ${formatoDinero(monto)} guardado. Quedan ${formatoDinero(saldo - monto)} pendientes de depositar.` : `Depósito de ${formatoDinero(monto)} guardado. Ya no hay nada pendiente de depositar.`);
 }
 
 export async function registrarGasto(_: EstadoCaja, form: FormData): Promise<EstadoCaja> {
@@ -267,7 +267,7 @@ export async function cerrarCaja(_: EstadoCaja, form: FormData): Promise<EstadoC
         propinas: [...porPersona.values()].some((x) => x.efectivo + x.propCaja + x.propTransf) ? [...porPersona.values()].filter((x) => x.efectivo + x.propCaja + x.propTransf)
           .map((x) => `${x.nombre} ${[x.efectivo ? `${formatoDinero(x.efectivo)} en efectivo, aparte` : "", x.propCaja ? `${formatoDinero(x.propCaja)} con tarjeta de la caja` : "", x.propTransf ? `${formatoDinero(x.propTransf)} con tarjeta por transferencia` : ""].filter(Boolean).join(" y ")}`).join(", ") : undefined,
         comisiones: resumenCom.length ? resumenCom.join(", ") : undefined,
-        negocio: leToca > 0 ? `Se acumuló para la dueña ${formatoDinero(leToca)}${enCajaNegocio < leToca ? `, ${formatoDinero(enCajaNegocio)} de la caja y ${formatoDinero(leToca - enCajaNegocio)} que se le deben` : ""}` : undefined },
+        negocio: leToca > 0 ? `Pendiente de depositar a la dueña ${formatoDinero(leToca)}${enCajaNegocio < leToca ? `, ${formatoDinero(enCajaNegocio)} salieron de la caja y ${formatoDinero(leToca - enCajaNegocio)} no alcanzaron` : ""}` : undefined },
     });
   });
   const zona = s.barberia.zonaHoraria;

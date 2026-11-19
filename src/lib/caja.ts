@@ -42,9 +42,9 @@ export const esPropinaEntregada = (concepto: string) => concepto.startsWith(`${C
 export const esPagoEquipo = (concepto: string) => /^Pago (de comisiones )?a /.test(concepto);
 
 /** Lo del negocio que se acumula para la dueña en el corte: sale de la caja y se guarda aparte hasta que se le deposita. */
-export const CONCEPTO_ACUMULADO = "Acumulado para la dueña";
+export const CONCEPTO_ACUMULADO = "Pendiente de depositar a la dueña";
 /** También los nombres que usaba el corte anterior, por si queda alguno sin pasar. */
-export const esAcumulado = (concepto: string) => concepto === CONCEPTO_ACUMULADO || concepto === "Depósito a la dueña" || concepto === "Resguardado para depositar";
+export const esAcumulado = (concepto: string) => concepto === CONCEPTO_ACUMULADO || concepto === "Acumulado para la dueña" || concepto === "Depósito a la dueña" || concepto === "Resguardado para depositar";
 /** Efectivo que se llevó Titular (o alguien de su parte) durante el día: cuenta como lo del negocio. */
 export const CONCEPTO_DUENA = "La dueña se llevó efectivo";
 export const esLlevoDuena = (concepto: string) => concepto.startsWith(CONCEPTO_DUENA);

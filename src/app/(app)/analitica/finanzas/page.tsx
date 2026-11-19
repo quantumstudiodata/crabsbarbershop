@@ -400,7 +400,7 @@ export default async function MovimientosPagina({ searchParams }: { searchParams
     c.negocioRes = [{
       tipo: "pendiente", monto: vivas.reduce((a, x) => a + x.monto, 0),
       desdeTxt: antes ? desdeElDia(k0 >= 0 ? cortesAsc[k0].fechaOperativa : fechaLocal(vivas[0].p.creadoEn, zona), hoy) : "",
-      recorrido: vivas.map(({ p, monto }) => { const t = corteDe(p.turnoId); return { id: p.turnoId ?? "", texto: t ? etiquetaCorte(t) : diaCortoDe(fechaLocal(p.creadoEn, zona), hoy), estado: "se acumuló", monto }; }),
+      recorrido: vivas.map(({ p, monto }) => { const t = corteDe(p.turnoId); return { id: p.turnoId ?? "", texto: t ? etiquetaCorte(t) : diaCortoDe(fechaLocal(p.creadoEn, zona), hoy), estado: "quedó pendiente", monto }; }),
     }];
   }
   // Cada depósito a la dueña es un renglón propio con los cortes que cubre.
@@ -410,7 +410,7 @@ export default async function MovimientosPagina({ searchParams }: { searchParams
     const cub = d.cubre.map((x) => ({ ...x, t: corteDe(x.turnoId) }));
     const fechas = cub.map((x) => x.t?.fechaOperativa).filter((x): x is string => !!x).sort();
     const largo = (x: string) => fechaLarga(x).split(" de ")[0].toLowerCase();
-    const sub = fechas.length ? `${fechas[0] === fechas[fechas.length - 1] ? `Del ${largo(fechas[0])}` : `Del ${largo(fechas[0])} al ${largo(fechas[fechas.length - 1])}`}, ${cub.length} ${cub.length === 1 ? "corte" : "cortes"}` : "Lo acumulado del negocio";
+    const sub = fechas.length ? `${fechas[0] === fechas[fechas.length - 1] ? `Del ${largo(fechas[0])}` : `Del ${largo(fechas[0])} al ${largo(fechas[fechas.length - 1])}`}, ${cub.length} ${cub.length === 1 ? "corte" : "cortes"}` : "Lo pendiente del negocio";
     const quien = gente.find((g) => g.id === d.usuarioId)?.nombre.split(" ")[0] ?? "";
     items.push({ k: "mov", dia, t: d.creadoEn.getTime(), m: {
       id: `d${d.id}`, tipo: "deposito", titulo: "Depósito a la dueña", hora: horaCorta(d.creadoEn, zona), sub, monto: -d.monto,

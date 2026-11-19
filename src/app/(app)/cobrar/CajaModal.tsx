@@ -201,7 +201,7 @@ export function CajaModal({ inicial, turno, limiteDiferencia, categorias, eviden
     const ops: [Vista, string, string, string][] = [
       ["gasto", "etiqueta", "Pagué algo con dinero de la caja", "Agua, limpieza, productos. Cuenta como gasto."],
       ["entrada", "entrada", "Puse dinero en la caja", "Para tener cambio. No cuenta como venta."],
-      ...((turno?.duena?.saldo ?? 0) > 0 ? [["deposito", "enviar", "Deposité a la dueña", `Se le deben ${formatoDinero(turno!.duena!.saldo)}, ${turno!.duena!.desde}. Con comprobante.`] as [Vista, string, string, string]] : []),
+      ...((turno?.duena?.saldo ?? 0) > 0 ? [["deposito", "enviar", "Deposité a la dueña", `Pendiente de depositar ${formatoDinero(turno!.duena!.saldo)}, ${turno!.duena!.desde}. Con comprobante.`] as [Vista, string, string, string]] : []),
       ...(titular ? [["retiro", "salida", "Me llevo efectivo de la caja", "Lo tomo yo o alguien de mi parte. Se descuenta de lo del negocio."] as [Vista, string, string, string]] : []),
     ];
     return (
@@ -456,10 +456,10 @@ function CortePasos({ turno, accion, cerrando, error, contado, setContado, limit
           <div className="ct-hoja">
             <Rg t="En la caja" v={formatoDinero(enCaja)} />
             {reparto.filter((x) => x.ef > 0).map((x) => <Rg key={`c${x.id}`} s="-" t={x.nombre} v={formatoDinero(x.ef)} />)}
-            {leToca > 0 && <Rg s={negocio > 0 ? "-" : undefined} t="Negocio" sub={seDebe === 0 ? "Se acumula para la dueña" : negocio > 0 ? `Le tocan ${formatoDinero(leToca)}. Se acumulan los ${formatoDinero(negocio)} que alcanzaron y se le quedan debiendo ${formatoDinero(seDebe)}` : `Le tocan ${formatoDinero(leToca)}. No alcanzó el efectivo, se le quedan debiendo`} v={formatoDinero(negocio)} />}
+            {leToca > 0 && <Rg s={negocio > 0 ? "-" : undefined} t="Negocio" sub={seDebe === 0 ? "Queda pendiente de depositar a la dueña" : negocio > 0 ? `Le tocan ${formatoDinero(leToca)}. Salen de la caja ${formatoDinero(negocio)}; los otros ${formatoDinero(seDebe)} no alcanzaron y también quedan pendientes` : `Le tocan ${formatoDinero(leToca)}. No alcanzó el efectivo; quedan pendientes de depositar`} v={formatoDinero(negocio)} />}
             <Rg s="=" t="Debe quedar" sub={esperado === fondo ? "El fondo para mañana" : esperado > fondo ? `El fondo y ${formatoDinero(esperado - fondo)} que se quedan en la caja` : undefined} v={formatoDinero(esperado)} cls="tot" />
           </div>
-          {deuda > 0 && <p className="ct-duena"><i aria-hidden="true" />Con este corte, se le deben a la dueña <b>{formatoDinero(deuda)}</b>{turno.duena?.saldo ? `, ${turno.duena.desde}` : ""}. Cuando se deposite, se registra en Movimiento de caja.</p>}
+          {deuda > 0 && <p className="ct-duena"><i aria-hidden="true" />Con este corte, quedan pendientes de depositar a la dueña <b>{formatoDinero(deuda)}</b>{turno.duena?.saldo ? `, ${turno.duena.desde}` : ""}. Cuando se deposite, se registra en Movimiento de caja.</p>}
           <label className="campo">
             <span>¿Cuánto contaste?</span>
             <input className="input grande" name="contado" inputMode="decimal" placeholder="$0" autoComplete="off" value={contado} onChange={(e) => setContado(e.target.value)} required />
@@ -524,7 +524,7 @@ function Deposito({ duena, accion, guardando, error, atras }: { duena: NonNullab
           <div className="ct-r mu"><span className="ct-t">Queda por depositar</span><span className="ct-v num">{formatoDinero(queda)}</span></div>
         </div>
       </div>
-      {centavos > duena.saldo && <p className="aviso error">Solo se le deben {formatoDinero(duena.saldo)}.</p>}
+      {centavos > duena.saldo && <p className="aviso error">Solo hay {formatoDinero(duena.saldo)} pendientes de depositar.</p>}
       <div className="campo"><span>Comprobante del depósito</span>
         <div className="dp-arch">
           <label className="bt sec chico"><Icono n="camara" />Foto<input type="file" accept="image/*" capture="environment" hidden onChange={(e) => elegir(e.target.files?.[0])} /></label>
