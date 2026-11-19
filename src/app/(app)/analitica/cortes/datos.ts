@@ -59,7 +59,8 @@ export async function armarCortes(barberiaId: string, turnos: Turno[], o: { zona
       // Se busca hacia atrás mientras el mismo pendiente (persona, monto y días) siga apareciendo: el más viejo es donde se quedó.
       let origen = turnoDe(cierres[i]);
       for (let k = i + 1; k < cierres.length; k++) {
-        if (!leer(cierres[k]).some((y) => y.como === x.como && y.nombre === x.nombre && y.monto === x.monto && y.dias === x.dias)) break;
+        // La misma comisión (persona y días); si se pagó una parte, el monto que sigue pendiente baja, pero es la misma.
+        if (!leer(cierres[k]).some((y) => y.como === x.como && y.nombre === x.nombre && y.dias === x.dias && (x.dias ? y.monto >= x.monto : y.monto === x.monto))) break;
         origen = turnoDe(cierres[k]) ?? origen;
       }
       return { ...x, origen };

@@ -319,7 +319,7 @@ export default async function MovimientosPagina({ searchParams }: { searchParams
     const renta = p.tipo === "renta";
     const pendiente = !renta && p.monto > 0 && p.nota.startsWith("Por entregar de caja");
     // De dónde viene un pago pendiente: de qué días es la comisión y en qué corte se dejó para después.
-    const origen = pendiente ? corteDespuesDe(p.creadoEn) : undefined;
+    const origen = pendiente ? origenDe(p) : undefined;
     const deCuando = DE_QUE(p.nota);
     // Corto para que quepa en la fila: "10 al 15 nov", "13 nov".
     const MES: Record<string, string> = { enero: "ene", febrero: "feb", marzo: "mar", abril: "abr", mayo: "may", junio: "jun", julio: "jul", agosto: "ago", septiembre: "sep", octubre: "oct", noviembre: "nov", diciembre: "dic" };
@@ -341,8 +341,13 @@ export default async function MovimientosPagina({ searchParams }: { searchParams
   // en el corte donde se quedó ("para el próximo corte") y en cada corte siguiente mientras no se pagó ("desde el corte C-…").
   // Los cierres nuevos lo dejan anotado; para los de antes se reconstruye con la fecha de la comisión y el corte donde se pagó.
   const enCortes = verCortes && ver("cortes");
+  // Lo que el cierre dejó anotado manda: si un corte ya trae los pendientes de una persona, no se le agregan otros reconstruidos
+  // (por ejemplo, la parte que se pagó al día siguiente de una comisión que se quedó completa).
+  const anotado = new Set(cortes.flatMap((c) => (c.fueraCaja ?? []).filter((y) => y.como === "para el próximo corte").map((y) => `${c.id}|${y.nombre}`)));
+  // El corte donde se quedó: el primero que cerró después de liquidarse y que ya es del día en que termina el periodo de la comisión.
+  const origenDe = (p: (typeof pagos)[number]["p"]) => cortesAsc.find((c) => c.cerradoEn!.getTime() > p.creadoEn.getTime() && (!p.semana || c.fechaOperativa >= p.semana));
   const seguirPendiente = (p: (typeof pagos)[number]["p"], nombre: string, pagadoEn?: string) => {
-    const origen = corteDespuesDe(p.creadoEn);
+    const origen = origenDe(p);
     if (!origen) return;
     const iO = cortesAsc.findIndex((x) => x.id === origen.id);
     const iH = pagadoEn ? cortesAsc.findIndex((x) => x.id === pagadoEn) : cortesAsc.length;
@@ -351,6 +356,7 @@ export default async function MovimientosPagina({ searchParams }: { searchParams
     for (let k = iO; k < iH; k++) {
       const c = cortes.find((x) => x.id === cortesAsc[k].id);
       if (!c) continue;
+      if (anotado.has(`${c.id}|${nom}`)) continue;
       const lista = (c.fueraCaja ??= []);
       if (lista.some((y) => y.como === "para el próximo corte" && y.nombre === nom && y.monto === p.monto)) continue;
       lista.push({ nombre: nom, monto: p.monto, como: "para el próximo corte", dias, origen: origen.id });
@@ -363,7 +369,7 @@ export default async function MovimientosPagina({ searchParams }: { searchParams
     if (pagado && seguro.has(p.id)) seguirPendiente(p, nombre, pagado);
   }
   for (const { p, nombre } of pendientesTodos) {
-    const origen = corteDespuesDe(p.creadoEn);
+    const origen = origenDe(p);
     if (enCortes) { seguirPendiente(p, nombre); continue; }
     if (origen && origen.id === ultimoCorte?.id && turnosPagina.some((c) => c.id === origen.id)) items.push(filaPago(p, nombre, { corte: origen.id, pend: true }));
     else fijos.push(filaPago(p, nombre));
@@ -378,7 +384,9 @@ export default async function MovimientosPagina({ searchParams }: { searchParams
       if (e.como !== "para el próximo corte") continue;
       const iO = e.origen ? cortesAsc.findIndex((x) => x.id === e.origen) : -1;
       const desde = iO >= 0 && iO <= iC ? iO : iC;
-      e.recorrido = cortesAsc.slice(desde, iC + 1).map((t, k) => ({ id: t.id, texto: etiquetaCorte(t), estado: k === 0 ? "quedó pendiente" : "sigue pendiente", monto: e.monto }));
+      // Lo que estaba pendiente en cada corte (si se pagó una parte, en los cortes de antes era más).
+      const montoEn = (id: string) => cortes.find((x) => x.id === id)?.fueraCaja?.find((y) => y.como === e.como && y.nombre === e.nombre && y.dias === e.dias)?.monto ?? e.monto;
+      e.recorrido = cortesAsc.slice(desde, iC + 1).map((t, k) => ({ id: t.id, texto: etiquetaCorte(t), estado: k === 0 ? "quedó pendiente" : "sigue pendiente", monto: montoEn(t.id) }));
       // En el corte donde se quedó no se desglosa: solo se dice "para el próximo corte". El recorrido sale desde el corte siguiente.
       e.desdeTxt = desde < iC ? desdeElDia(cortesAsc[desde].fechaOperativa, hoy) : undefined;
       if (c.id === ultimoCorte?.id) e.final = "Se le paga en el próximo corte o por transferencia";
