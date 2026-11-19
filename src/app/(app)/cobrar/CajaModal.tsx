@@ -451,7 +451,7 @@ function CortePasos({ turno, accion, cerrando, error, contado, setContado, limit
                           {x.comision === 0 || r === "transferencia" ? "por transferencia" : "en el próximo corte"}
                         </small>
                       )}
-                      {x.comision > 0 && <button type="button" className="ct-cambiar" aria-expanded={cambiando === x.id} onClick={() => setCambiando((v) => (v === x.id ? null : x.id))}>Cambiar</button>}
+                      {x.comision > 0 && <button type="button" className="ct-cambiar" aria-expanded={cambiando === x.id} onClick={() => setCambiando((v) => (v === x.id ? null : x.id))}><Icono n="editar" />Cambiar cómo se le paga</button>}
                       {cambiando === x.id && (
                         <div className="ct-menu" role="radiogroup" aria-label={`Cómo se le paga a ${x.nombre}`}>
                           <span>¿Cómo se le paga a {x.nombre}?</span>
@@ -466,7 +466,7 @@ function CortePasos({ turno, accion, cerrando, error, contado, setContado, limit
                   </div>
                 );
               })}
-              {leToca > 0 && <Rg s={negocio > 0 ? "-" : undefined} t="Negocio" sub={seDebe === 0 ? "Pendiente de depositar a la dueña. Se aparta solo al contar" : negocio > 0 ? `Le tocan ${formatoDinero(leToca)}; solo alcanzan ${formatoDinero(negocio)}. Lo demás queda pendiente` : `Le tocan ${formatoDinero(leToca)}. No alcanza el efectivo, queda pendiente`} v={formatoDinero(negocio)} cls="ct-neg" />}
+              {leToca > 0 && <Rg s={negocio > 0 ? "-" : undefined} t="Negocio" sub={seDebe === 0 ? "Pendiente de depositar a la dueña" : `Le tocan ${formatoDinero(leToca)}. Pendiente de depositar a la dueña`} v={formatoDinero(negocio)} cls="ct-neg" />}
               {propAparte > 0 && <Rg t="Propinas en efectivo" sub={`Aparte de la caja: ${propinasEq.filter((p) => p.efectivo > 0).map((p) => `${p.nombre.split(" ")[0]} ${formatoDinero(p.efectivo)}`).join(", ")}`} v={formatoDinero(propAparte)} cls="mu" />}
             </div>
           </div>
@@ -477,7 +477,7 @@ function CortePasos({ turno, accion, cerrando, error, contado, setContado, limit
           <div className="ct-hoja">
             <Rg t="En la caja" v={formatoDinero(enCaja)} />
             {reparto.filter((x) => x.ef > 0).map((x) => <Rg key={`c${x.id}`} s="-" t={x.nombre} v={formatoDinero(x.ef)} />)}
-            {leToca > 0 && <Rg s={negocio > 0 ? "-" : undefined} t="Negocio" sub={seDebe === 0 ? "Queda pendiente de depositar a la dueña" : negocio > 0 ? `Le tocan ${formatoDinero(leToca)}. Salen de la caja ${formatoDinero(negocio)}; los otros ${formatoDinero(seDebe)} no alcanzaron y también quedan pendientes` : `Le tocan ${formatoDinero(leToca)}. No alcanzó el efectivo; quedan pendientes de depositar`} v={formatoDinero(negocio)} />}
+            {leToca > 0 && <Rg s={negocio > 0 ? "-" : undefined} t="Negocio" sub={seDebe === 0 ? "Pendiente de depositar a la dueña" : `Le tocan ${formatoDinero(leToca)}. Pendiente de depositar a la dueña`} v={formatoDinero(negocio)} />}
             <Rg s="=" t="Debe quedar" sub={esperado === fondo ? "El fondo para mañana" : esperado > fondo ? `El fondo y ${formatoDinero(esperado - fondo)} que se quedan en la caja` : undefined} v={formatoDinero(esperado)} cls="tot" />
           </div>
           {deuda > 0 && <p className="ct-duena"><i aria-hidden="true" />Con este corte, quedan pendientes de depositar a la dueña <b>{formatoDinero(deuda)}</b>{turno.duena?.saldo ? `, ${turno.duena.desde}` : ""}. Cuando se deposite, se registra en Movimiento de caja.</p>}
