@@ -7,6 +7,7 @@ import { db, schema } from "@/lib/db";
 import { diasEntre, esFechaValida, fechaLocal, horaCorta, lunesDe, sumarDias } from "@/lib/fechas";
 import { condicionVentas, filtrarCortes } from "@/lib/filtros";
 import { formatoDinero } from "@/lib/money";
+import { cuentaDuena } from "@/lib/duena";
 
 export const dynamic = "force-dynamic";
 
@@ -102,6 +103,42 @@ async function equipo(bId: string, desde: string, hasta: string, zona: string): 
   return filas;
 }
 
+/**
+ * Lo de la dueña: lo que quedó pendiente de depositar en cada corte y cada depósito (con los cortes que cubrió),
+ * y al final lo que sigue pendiente hoy. Los depósitos anulados salen marcados y no cuentan.
+ */
+async function loDuena(bId: string, desde: string, hasta: string, zona: string): Promise<Filas> {
+  const [c, folios, filas, gente] = await Promise.all([
+    cuentaDuena(bId), foliosCorte(bId),
+    db.select({ id: schema.negocioDuena.id, tipo: schema.negocioDuena.tipo, turnoId: schema.negocioDuena.turnoId, monto: schema.negocioDuena.monto, creadoEn: schema.negocioDuena.creadoEn,
+      usuarioId: schema.negocioDuena.usuarioId, anuladoEn: schema.negocioDuena.anuladoEn, anuladoPor: schema.negocioDuena.anuladoPor })
+      .from(schema.negocioDuena).where(eq(schema.negocioDuena.barberiaId, bId)),
+    db.select({ id: schema.usuarios.id, nombre: schema.usuarios.nombre }).from(schema.usuarios).where(eq(schema.usuarios.barberiaId, bId)),
+  ]);
+  const turnos = await db.select({ id: schema.turnosCaja.id, fecha: schema.turnosCaja.fechaOperativa }).from(schema.turnosCaja).where(eq(schema.turnosCaja.barberiaId, bId));
+  const diaCorte = (id: string | null) => turnos.find((t) => t.id === id)?.fecha ?? "";
+  const quien = (id: string | null) => gente.find((g) => g.id === id)?.nombre ?? "";
+  const dep = new Map(c.depositos.map((d) => [d.id, d]));
+  const renglones: { orden: string; fila: unknown[] }[] = [];
+  for (const x of filas) {
+    if (x.tipo === "acumulado") {
+      const dia = diaCorte(x.turnoId) || fechaLocal(x.creadoEn, zona);
+      if (dia < desde || dia > hasta || x.monto <= 0) continue;
+      renglones.push({ orden: `${dia} ${horaCorta(x.creadoEn, zona)}`, fila: [dia, horaCorta(x.creadoEn, zona), "Quedó pendiente de depositar", folios.get(x.turnoId ?? "") ?? "", pesos(x.monto), "", ""] });
+    } else if (x.tipo === "deposito") {
+      const dia = fechaLocal(x.creadoEn, zona);
+      if (dia < desde || dia > hasta) continue;
+      const d = dep.get(x.id);
+      const cubre = d ? d.cubre.map((y) => `${folios.get(y.turnoId ?? "") ?? "corte"} (${diaCorte(y.turnoId)}) ${formatoDinero(y.monto)}`).join(", ") : "";
+      renglones.push({ orden: `${dia} ${horaCorta(x.creadoEn, zona)}`, fila: [dia, horaCorta(x.creadoEn, zona), x.anuladoEn ? "Depósito anulado, no cuenta" : "Depósito a la dueña", "", "", pesos(x.anuladoEn ? 0 : x.monto),
+        x.anuladoEn ? `Registró ${quien(x.usuarioId)}; anuló ${quien(x.anuladoPor)}. Era de ${formatoDinero(x.monto)}` : `Registró ${quien(x.usuarioId)}. Cubre: ${cubre}`] });
+    }
+  }
+  renglones.sort((a, b) => a.orden.localeCompare(b.orden));
+  // Los depósitos van en su propia columna (sin signo menos), para sumarlos fácil.
+  return [["Fecha", "Hora", "Movimiento", "Corte", "Quedó pendiente", "Depositado", "Detalle"], ...renglones.map((r) => r.fila), [], ["", "", "Pendiente de depositar hoy", "", pesos(c.saldo), "", ""]];
+}
+
 export async function GET(req: Request) {
   const s = await obtenerSesion();
   if (!s || s.usuario.debeCambiar) return new Response("Inicia sesión.", { status: 401 });
@@ -125,6 +162,7 @@ export async function GET(req: Request) {
     cortes: async () => ["Cortes de caja", await cortes(bId, desde, hasta, zona, f)],
     equipo: async () => ["Equipo", await equipo(bId, desde, hasta, zona)],
     pagos: async () => ["Pagos al equipo", await pagosEquipo(bId, desde, hasta)],
+    duena: async () => ["Lo de la dueña", await loDuena(bId, desde, hasta, zona)],
   };
   const elegidas = tipo === "todo" ? Object.keys(hojas) : tipo && tipo in hojas ? [tipo] : [];
   if (elegidas.length === 0) return new Response("Tipo de reporte no válido.", { status: 400 });

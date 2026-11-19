@@ -42,9 +42,9 @@ export default async function Libreta({ searchParams }: { searchParams: Promise<
       <a href="/api/libreta?tipo=anual"><Icono n="descargar" /><span><b>Resumen del año</b><small>Ingresos, egresos y utilidad de cada mes</small></span></a>
       <a href="/api/libreta?tipo=barberos"><Icono n="descargar" /><span><b>Ventas por barbero</b><small>Lo de cada barbero mes por mes</small></span></a>
       <span className="lab" style={{ marginTop: 16 }}>Respaldo completo de {nombreMes}</span>
-      <a href={`/api/exportar?tipo=todo&desde=${ini}&hasta=${fin}`}><Icono n="descargar" /><span><b>Todo en un archivo</b><small>Ventas, egresos, cortes, equipo y pagos, una hoja por tema</small></span></a>
+      <a href={`/api/exportar?tipo=todo&desde=${ini}&hasta=${fin}`}><Icono n="descargar" /><span><b>Todo en un archivo</b><small>Ventas, egresos, cortes, equipo, pagos y lo de la dueña, una hoja por tema</small></span></a>
       <div className="hojas-l">
-        {[["ventas", "Ventas"], ["gastos", "Egresos"], ["cortes", "Cortes"], ["pagos", "Pagos al equipo"]].map(([k, t]) => <a key={k} className="hoja-b" href={`/api/exportar?tipo=${k}&desde=${ini}&hasta=${fin}`}>{t}</a>)}
+        {[["ventas", "Ventas"], ["gastos", "Egresos"], ["cortes", "Cortes"], ["pagos", "Pagos al equipo"], ["duena", "Lo de la dueña"]].map(([k, t]) => <a key={k} className="hoja-b" href={`/api/exportar?tipo=${k}&desde=${ini}&hasta=${fin}`}>{t}</a>)}
       </div>
     </div>
   );
