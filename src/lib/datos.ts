@@ -479,34 +479,3 @@ export async function datosParaMeta(barberiaId: string, zona: string, hoy: strin
   return { egresos, barberos, dias, fijos };
 }
 
-/**
- * Lo del negocio guardado en el sobre (resguardado) que todavía no se deposita a la dueña.
- * Cada resguardo se salda con los depósitos de lo resguardado, del más viejo al más nuevo,
- * así se sabe desde qué corte viene lo que queda.
- */
-export async function resguardoDe(barberiaId: string) {
-  const [guardados, depositados] = await Promise.all([
-    db.select({ id: schema.movimientosCaja.id, turnoId: schema.movimientosCaja.turnoId, monto: schema.movimientosCaja.monto, creadoEn: schema.movimientosCaja.creadoEn })
-      .from(schema.movimientosCaja)
-      .where(and(eq(schema.movimientosCaja.barberiaId, barberiaId), eq(schema.movimientosCaja.tipo, "retiro"), eq(schema.movimientosCaja.concepto, "Resguardado para depositar")))
-      .orderBy(asc(schema.movimientosCaja.creadoEn)),
-    db.select({ creadoEn: schema.historial.creadoEn, detalle: schema.historial.detalle }).from(schema.historial)
-      .where(and(eq(schema.historial.barberiaId, barberiaId), sql`${schema.historial.detalle} ? 'resguardoDepositado'`))
-      .orderBy(asc(schema.historial.creadoEn)),
-  ]);
-  // Cada depósito de lo resguardado salda primero lo más viejo. Se guarda en qué corte se depositó cada parte.
-  const partes = guardados.map((g) => ({ ...g, queda: g.monto, depositos: [] as { turnoId: string | null; monto: number; creadoEn: Date }[] }));
-  for (const d of depositados) {
-    const det = d.detalle as { resguardoDepositado?: number; turnoId?: string };
-    let falta = Number(det.resguardoDepositado ?? 0);
-    for (const p of partes) {
-      if (falta <= 0) break;
-      if (p.queda <= 0 || p.creadoEn > d.creadoEn) continue;
-      const usa = Math.min(p.queda, falta);
-      p.queda -= usa; falta -= usa;
-      p.depositos.push({ turnoId: det.turnoId ?? null, monto: usa, creadoEn: d.creadoEn });
-    }
-  }
-  const pendientes = partes.filter((p) => p.queda > 0);
-  return { saldo: pendientes.reduce((a, p) => a + p.queda, 0), pendientes, partes };
-}

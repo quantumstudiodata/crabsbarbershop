@@ -22,7 +22,7 @@ export type Corte = {
   /** Pagos decididos en el cierre que no salieron de la caja. */
   fueraCaja?: { nombre: string; monto: number; como: string; dias?: string; /** Corte donde se quedó pendiente. */ origen?: string; desdeTxt?: string; recorrido?: PasoRecorrido[]; final?: string }[];
   /** Lo del negocio en este corte: lo resguardado que sigue sin depositarse, o lo resguardado que aquí se depositó. */
-  negocioRes?: { tipo: "resguardado" | "depositado"; monto: number; desdeTxt: string; recorrido: PasoRecorrido[] }[];
+  negocioRes?: { tipo: "pendiente"; monto: number; desdeTxt: string; recorrido: PasoRecorrido[] }[];
   ajustes: string[];
   evidencias: { id: string; etiqueta: string; nombre: string; tipo: string }[];
   abrioId?: string;
@@ -101,12 +101,11 @@ export function FilaCorte({ c, corregir, abrir, ver = true, hijos = [] }: { c: C
             const k = `neg${i}`;
             return (
               <Fragment key={k}>
-                <div className={n.tipo === "resguardado" ? "cp-pe" : ""}>
-                  <span>{n.tipo === "resguardado" && <i className="cp-pend" aria-label="Resguardado" />}Negocio <small>{n.tipo === "resguardado" ? "resguardado para depositar" : "resguardado"}
-                    {n.desdeTxt && <>{" "}<button type="button" className="cp-sub" aria-expanded={abiertoRec === k} onClick={() => alternar(k)}>{n.desdeTxt}</button></>}{n.tipo === "depositado" ? ", también depositado" : ""}</small></span>
-                  <span className="num">{n.tipo === "resguardado" ? $(n.monto) : `−${$(n.monto)}`}</span>
+                <div className="cp-pe">
+                  <span><i className="cp-pend" aria-label="Pendiente" />Negocio <small>depósito pendiente{n.desdeTxt && <>{" "}<button type="button" className="cp-sub" aria-expanded={abiertoRec === k} onClick={() => alternar(k)}>{n.desdeTxt}</button></>}</small></span>
+                  <span className="num">{$(n.monto)}</span>
                 </div>
-                {abiertoRec === k && n.desdeTxt && <Recorrido secciones={[{ pasos: n.recorrido, final: n.tipo === "resguardado" ? "Se deposita en el próximo corte" : undefined }]} />}
+                {abiertoRec === k && n.desdeTxt && <Recorrido secciones={[{ pasos: n.recorrido, final: "Se deposita con Movimiento de caja" }]} />}
               </Fragment>
             );
           })}
@@ -201,9 +200,9 @@ function Detalle({ c, cerrar, ajustar }: { c: Corte | null; cerrar: () => void; 
   const nombreDe = (m: Corte["movimientos"][number]) => m.titulo === "Pago al equipo" ? `${m.detalle.replace(/^Comisión de /, "")}, comisión` : m.titulo.startsWith("Negocio, ") ? "Negocio" : m.detalle;
   const subDe = (m: Corte["movimientos"][number]) => m.titulo === "Pago al equipo" ? "De la caja" : m.titulo === "Gasto pagado con la caja" ? "Gasto de caja"
     : m.titulo.startsWith("Negocio, ") ? m.titulo.replace("Negocio, ", "").replace(/^./, (x) => x.toUpperCase()) : m.titulo === "La dueña se llevó efectivo" ? "Cuenta como lo del negocio" : m.titulo;
-  const resDep = c.negocioRes?.find((n) => n.tipo === "depositado");
-  // Lo resguardado de cortes anteriores (lo de este corte ya sale arriba como su renglón).
-  const resQueda = c.negocioRes?.find((n) => n.tipo === "resguardado" && n.recorrido.some((x) => x.id !== c.id));
+
+  // Lo del negocio que a la hora de este corte seguía sin depositarse, con los cortes de donde viene.
+  const pendNeg = c.negocioRes?.[0];
   return (
     <Modal abierto cerrar={cerrar} etiqueta={`Folio ${c.folio}`} titulo={`Corte de caja, ${estado}`}>
       <div className="pila-chica cd">
@@ -217,8 +216,7 @@ function Detalle({ c, cerrar, ajustar }: { c: Corte | null; cerrar: () => void; 
           <Rg t="Se contó" sub={c.diferencia === 0 ? "Cuadró" : estado.replace(/^./, (x) => x.toUpperCase())} v={$(c.contado)} />
           {(c.fueraCaja ?? []).map((x, i) => <Rg key={`f${i}`} t={`${x.nombre}, comisión`} sub={x.como === "por transferencia" ? "Por transferencia, no sale de la caja" : `Pendiente${x.dias ? `, del ${x.dias}` : ""}${x.desdeTxt ? `, ${x.desdeTxt}` : ", para el próximo corte"}`} v={$(x.monto)} cls="mu" />)}
           {c.propinasEfectivo > 0 && <Rg t="Propinas en efectivo" sub="Aparte de la caja" v={$(c.propinasEfectivo)} cls="mu" />}
-          {resDep && <Rg t="Negocio, lo resguardado" sub={resDep.desdeTxt ? `También se depositó, ${resDep.desdeTxt}` : "También se depositó"} v={$(resDep.monto)} cls="mu" />}
-          {resQueda && <Rg t="Negocio, resguardado" sub={resQueda.desdeTxt ? `Sin depositar, ${resQueda.desdeTxt}` : "Sin depositar"} v={$(resQueda.monto)} cls="mu" />}
+          {pendNeg && <Rg t="Negocio, depósito pendiente" sub={`${pendNeg.recorrido.map((x) => `${x.texto} ${$(x.monto)}`).join(", ")}`} v={$(pendNeg.monto)} cls="mu" />}
         </div>
         {c.otrosEgresos.length > 0 && (
           <>

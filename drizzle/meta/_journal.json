@@ -225,6 +225,13 @@
       "when": 1794823913062,
       "tag": "0031_peticiones_internas",
       "breakpoints": true
+    },
+    {
+      "idx": 32,
+      "version": "7",
+      "when": 1795064524867,
+      "tag": "0032_negocio_duena",
+      "breakpoints": true
     }
   ]
 }

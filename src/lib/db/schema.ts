@@ -391,6 +391,28 @@ export const conceptosFrecuentes = pgTable("conceptos_frecuentes", {
 });
 
 // Foto o archivo de un egreso. Se guarda en la base (máximo 2 MB) para no depender de otro servicio.
+// Lo del negocio para la dueña. "acumulado": lo que le tocó en un corte (monto) y lo que de eso se apartó en efectivo (enCaja);
+// "deposito": lo que se le depositó, con su comprobante. Lo que se le debe es la suma de lo acumulado menos lo depositado.
+export const negocioDuena = pgTable(
+  "negocio_duena",
+  {
+    id: id(),
+    barberiaId: barberiaId(),
+    tipo: text("tipo").notNull(),
+    turnoId: uuid("turno_id").references(() => turnosCaja.id),
+    monto: integer("monto").notNull(),
+    enCaja: integer("en_caja").notNull().default(0),
+    comprobanteNombre: text("comprobante_nombre"),
+    comprobanteTipo: text("comprobante_tipo"),
+    comprobanteDatos: text("comprobante_datos"),
+    usuarioId: uuid("usuario_id").references(() => usuarios.id),
+    anuladoEn: timestamp("anulado_en", { withTimezone: true }),
+    anuladoPor: uuid("anulado_por").references(() => usuarios.id),
+    creadoEn: creadoEn(),
+  },
+  (t) => [index("negocio_duena_barberia_idx").on(t.barberiaId, t.tipo), index("negocio_duena_turno_idx").on(t.turnoId)],
+);
+
 export const comprobantes = pgTable("comprobantes", {
   id: id(),
   barberiaId: barberiaId(),

@@ -1,5 +1,5 @@
 import { and, desc, eq, inArray, isNull, lte, ne, sql } from "drizzle-orm";
-import { esDeposito, esLlevoDuena, esPagoAnulado, esPagoEquipo, esPropinaEntregada, esResguardo } from "@/lib/caja";
+import { esAcumulado, esLlevoDuena, esPagoAnulado, esPagoEquipo, esPropinaEntregada } from "@/lib/caja";
 import { cobradoresDe } from "@/lib/faltantes";
 import { ajustesDeTurnos, detalleCortes, metodosActivos, turnosCerrados } from "@/lib/datos";
 import { db, schema } from "@/lib/db";
@@ -79,7 +79,7 @@ export async function armarCortes(barberiaId: string, turnos: Turno[], o: { zona
     const anulados = movs.filter((x) => x.tipo === "entrada" && esPagoAnulado(x.concepto)).reduce((a, x) => a + x.monto, 0);
     const propinasEnt = movs.filter((x) => x.tipo === "retiro" && esPropinaEntregada(x.concepto)).reduce((a, x) => a + x.monto, 0);
     const pagosEquipo = movs.filter((x) => x.tipo === "retiro" && esPagoEquipo(x.concepto)).reduce((a, x) => a + x.monto, 0) - anulados;
-    const negocio = movs.filter((x) => x.tipo === "retiro" && (esDeposito(x.concepto) || esResguardo(x.concepto) || esLlevoDuena(x.concepto))).reduce((a, x) => a + x.monto, 0);
+    const negocio = movs.filter((x) => x.tipo === "retiro" && (esAcumulado(x.concepto) || esLlevoDuena(x.concepto))).reduce((a, x) => a + x.monto, 0);
     return {
       id: c.id, folio: folios.get(c.id) ?? "", dia: fechaLarga(c.fechaOperativa), fechaCorta: c.fechaOperativa === hoy ? "Hoy" : fechaCorta(c.fechaOperativa),
       horario: `${horaCorta(c.abiertoEn, zona)} a ${c.cerradoEn ? horaCorta(c.cerradoEn, zona) : ""}`,
@@ -90,7 +90,7 @@ export async function armarCortes(barberiaId: string, turnos: Turno[], o: { zona
       otrosEgresos: otrosEgresos.filter((x) => x.fecha === c.fechaOperativa).map((x) => ({ concepto: x.concepto, metodo: x.metodo === "tarjeta" ? "Tarjeta" : "Transferencia", monto: x.monto })),
       esperado: c.efectivoEsperado ?? 0, contado: c.efectivoContado ?? 0, diferencia: c.diferencia ?? 0, ajustado: ajustes.filter((x) => x.turnoId === c.id).reduce((a, x) => a + x.monto, 0), notas: c.notasCierre,
       movimientos: [
-        ...movs.map((m) => ({ t: m.creadoEn.getTime(), tipo: m.tipo, hora: horaCorta(m.creadoEn, zona), titulo: m.tipo === "retiro" ? (esPropinaEntregada(m.concepto) ? "Propinas entregadas" : esPagoEquipo(m.concepto) ? "Pago al equipo" : esDeposito(m.concepto) ? "Negocio, depositado a la dueña" : esResguardo(m.concepto) ? "Negocio, resguardado para depositar" : esLlevoDuena(m.concepto) ? "La dueña se llevó efectivo" : "Dinero que se sacó") : m.tipo === "entrada" ? (esPagoAnulado(m.concepto) ? "Pago anulado, el dinero regresó" : "Dinero que se puso") : "Devolución", detalle: esPagoEquipo(m.concepto) ? m.concepto.replace(/^Pago (de comisiones )?a /, "Comisión de ") : m.concepto, monto: m.tipo === "entrada" ? m.monto : -m.monto })),
+        ...movs.map((m) => ({ t: m.creadoEn.getTime(), tipo: m.tipo, hora: horaCorta(m.creadoEn, zona), titulo: m.tipo === "retiro" ? (esPropinaEntregada(m.concepto) ? "Propinas entregadas" : esPagoEquipo(m.concepto) ? "Pago al equipo" : esAcumulado(m.concepto) ? "Negocio, se acumuló para la dueña" : esLlevoDuena(m.concepto) ? "La dueña se llevó efectivo" : "Dinero que se sacó") : m.tipo === "entrada" ? (esPagoAnulado(m.concepto) ? "Pago anulado, el dinero regresó" : "Dinero que se puso") : "Devolución", detalle: esPagoEquipo(m.concepto) ? m.concepto.replace(/^Pago (de comisiones )?a /, "Comisión de ") : m.concepto, monto: m.tipo === "entrada" ? m.monto : -m.monto })),
         ...gastos.map((g) => ({ t: g.creadoEn.getTime(), tipo: "gasto", hora: horaCorta(g.creadoEn, zona), titulo: "Gasto pagado con la caja", detalle: g.concepto, monto: -g.monto })),
       ].sort((a, b) => a.t - b.t),
       fueraCaja: fueraDe(c.cerradoEn),

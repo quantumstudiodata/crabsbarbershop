@@ -5985,3 +5985,11 @@ button.cp-pill:focus-visible { outline: 2px solid #2b3a47; outline-offset: 2px; 
 .cr-mas::before { content: ""; position: absolute; left: -12.5px; top: 0; bottom: 0; width: 1px; background: #d6dee6; }
 @media (max-width: 640px) { .cp-hijos > .cr-rec { margin-right: 4px; padding: 8px 10px; } }
 .cp-hijos > div > .num { white-space: nowrap; }
+
+/* Corte: aviso de lo que se le debe a la dueña, y el depósito en Movimiento de caja. */
+.ct-duena { display: block; margin: 0; padding: 10px 12px; border-radius: 12px; background: rgba(43,58,71,.06); font-size: 13px; color: #3b4a58; }
+.ct-duena i { display: inline-block; width: 8px; height: 8px; margin-right: 8px; border-radius: 3px; background: #c58a3e; vertical-align: 1px; }
+.ct-duena b { color: #8a5a1e; }
+.dp-arch { display: flex; flex-wrap: wrap; gap: 8px; align-items: center; }
+.dp-arch label { cursor: pointer; }
+.dp-cubre .ct-r.mu .ct-v { color: var(--muted); }

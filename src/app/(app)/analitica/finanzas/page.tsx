@@ -11,7 +11,7 @@ import { SelectorUrl } from "@/components/SelectorUrl";
 import { AvisoUrl, } from "@/components/Encabezado";
 import { requerirSesion } from "@/lib/auth";
 import { faltantesDe } from "@/lib/faltantes";
-import { cajaDe, categoriasGasto, diasYTotalVentas, equipoConVentas, foliosCorte, metodosActivos, resguardoDe, resumenPeriodo, turnosCerrados, ventasEntre } from "@/lib/datos";
+import { cajaDe, categoriasGasto, diasYTotalVentas, equipoConVentas, foliosCorte, metodosActivos, resumenPeriodo, turnosCerrados, ventasEntre } from "@/lib/datos";
 import { armarCortes, cortesPorRevisar } from "../cortes/datos";
 import { NecesitaRevision } from "../cortes/HistorialCortes";
 import { desdeElDia, diaCortoDe, sumarDias } from "@/lib/fechas";
@@ -21,7 +21,8 @@ import { fechaLarga, fechaLocal, horaCorta } from "@/lib/fechas";
 import { condicionVentas, type ConsultaFiltros, leerFiltros, urlDescarga } from "@/lib/filtros";
 import { esMovil } from "@/lib/dispositivo";
 import { formatoDinero } from "@/lib/money";
-import { esDeposito, esLlevoDuena, esPagoAnulado, esPagoEquipo, esPropinaEntregada, esResguardo, MINUTOS_CORRECCION } from "@/lib/caja";
+import { esAcumulado, esLlevoDuena, esPagoAnulado, esPagoEquipo, esPropinaEntregada, MINUTOS_CORRECCION } from "@/lib/caja";
+import { cuentaDuena } from "@/lib/duena";
 import { Ayuda } from "@/components/Ayuda";
 import { CajaModal } from "../../cobrar/CajaModal";
 import { BotonCaja } from "./BotonCaja";
@@ -382,33 +383,40 @@ export default async function MovimientosPagina({ searchParams }: { searchParams
       if (c.id === ultimoCorte?.id) e.final = "Se le paga en el próximo corte o por transferencia";
     }
   }
-  // Lo del negocio guardado en el sobre: en cada corte se ve lo que sigue resguardado y lo resguardado que ahí se depositó.
-  if (enCortes && cortes.length) {
-    const res = await resguardoDe(bId);
-    if (res.partes.length) for (const c of cortes) {
-      const tc = cortesAsc.find((x) => x.id === c.id);
-      if (!tc?.cerradoEn) continue;
-      // Lo que pasó en este corte o antes: por el orden de los cortes (dos cortes pueden cerrarse con un minuto de diferencia).
-      const iC = cortesAsc.indexOf(tc), fin = tc.cerradoEn.getTime();
-      const hasta = (turnoId: string | null, t: Date) => { const k = turnoId ? cortesAsc.findIndex((x) => x.id === turnoId) : -1; return k >= 0 ? k <= iC : t.getTime() <= fin; };
-      const pasos = (lista: { p: (typeof res.partes)[number]; monto: number }[]) => lista.map(({ p, monto }) => {
-        const t = cortesAsc.find((x) => x.id === p.turnoId);
-        return { id: p.turnoId ?? "", texto: t ? etiquetaCorte(t) : diaCortoDe(fechaLocal(p.creadoEn, zona), hoy), estado: "se resguardó", monto };
-      });
-      // Igual que con el equipo: en el corte donde se resguardó no se desglosa; desde el corte siguiente, sí.
-      const desdeDe = (lista: { p: (typeof res.partes)[number] }[]) => {
-        const k = cortesAsc.findIndex((x) => x.id === lista[0].p.turnoId);
-        const antes = k >= 0 ? k < iC : lista[0].p.creadoEn.getTime() < fin;
-        return antes ? desdeElDia(k >= 0 ? cortesAsc[k].fechaOperativa : fechaLocal(lista[0].p.creadoEn, zona), hoy) : "";
-      };
-      const aqui = res.partes.flatMap((p) => p.depositos.filter((d) => d.turnoId === c.id).map((d) => ({ p, monto: d.monto })));
-      const vivas = res.partes.filter((p) => hasta(p.turnoId, p.creadoEn))
-        .map((p) => ({ p, monto: p.monto - p.depositos.filter((d) => hasta(d.turnoId, d.creadoEn)).reduce((a, d) => a + d.monto, 0) })).filter((x) => x.monto > 0);
-      const negocioRes: NonNullable<typeof c.negocioRes> = [];
-      if (aqui.length) negocioRes.push({ tipo: "depositado", monto: aqui.reduce((a, x) => a + x.monto, 0), desdeTxt: desdeDe(aqui), recorrido: pasos(aqui) });
-      if (vivas.length) negocioRes.push({ tipo: "resguardado", monto: vivas.reduce((a, x) => a + x.monto, 0), desdeTxt: desdeDe(vivas), recorrido: pasos(vivas) });
-      if (negocioRes.length) c.negocioRes = negocioRes;
-    }
+  // Lo del negocio para la dueña: en cada corte se ve todo lo que a esa hora seguía sin depositarse, con los cortes de donde viene.
+  const duena = (enCortes && cortes.length) || (verCaja && ver("caja")) ? await cuentaDuena(bId) : null;
+  const corteDe = (id: string | null) => (id ? cortesAsc.find((x) => x.id === id) : undefined);
+  if (enCortes && duena?.partes.length) for (const c of cortes) {
+    const tc = corteDe(c.id);
+    if (!tc?.cerradoEn) continue;
+    const iC = cortesAsc.indexOf(tc), fin = tc.cerradoEn.getTime();
+    const hasta = (turnoId: string | null, t: Date) => { const k = turnoId ? cortesAsc.findIndex((x) => x.id === turnoId) : -1; return k >= 0 ? k <= iC : t.getTime() <= fin; };
+    const vivas = duena.partes.filter((p) => hasta(p.turnoId, p.creadoEn))
+      .map((p) => ({ p, monto: p.monto - p.depositos.filter((d) => d.creadoEn.getTime() <= fin).reduce((a, d) => a + d.monto, 0) })).filter((x) => x.monto > 0);
+    if (!vivas.length) continue;
+    // En el corte donde se acumuló no se desglosa; desde el corte siguiente, sí ("desde el lunes 16"), con cada corte citado.
+    const k0 = cortesAsc.findIndex((x) => x.id === vivas[0].p.turnoId);
+    const antes = k0 >= 0 ? k0 < iC : vivas[0].p.creadoEn.getTime() < fin;
+    c.negocioRes = [{
+      tipo: "pendiente", monto: vivas.reduce((a, x) => a + x.monto, 0),
+      desdeTxt: antes ? desdeElDia(k0 >= 0 ? cortesAsc[k0].fechaOperativa : fechaLocal(vivas[0].p.creadoEn, zona), hoy) : "",
+      recorrido: vivas.map(({ p, monto }) => { const t = corteDe(p.turnoId); return { id: p.turnoId ?? "", texto: t ? etiquetaCorte(t) : diaCortoDe(fechaLocal(p.creadoEn, zona), hoy), estado: "se acumuló", monto }; }),
+    }];
+  }
+  // Cada depósito a la dueña es un renglón propio con los cortes que cubre.
+  if (verCaja && ver("caja") && duena) for (const d of duena.depositos) {
+    const dia = fechaLocal(d.creadoEn, zona);
+    if (!dias.includes(dia) || f.buscar) continue;
+    const cub = d.cubre.map((x) => ({ ...x, t: corteDe(x.turnoId) }));
+    const fechas = cub.map((x) => x.t?.fechaOperativa).filter((x): x is string => !!x).sort();
+    const largo = (x: string) => fechaLarga(x).split(" de ")[0].toLowerCase();
+    const sub = fechas.length ? `${fechas[0] === fechas[fechas.length - 1] ? `Del ${largo(fechas[0])}` : `Del ${largo(fechas[0])} al ${largo(fechas[fechas.length - 1])}`}, ${cub.length} ${cub.length === 1 ? "corte" : "cortes"}` : "Lo acumulado del negocio";
+    const quien = gente.find((g) => g.id === d.usuarioId)?.nombre.split(" ")[0] ?? "";
+    items.push({ k: "mov", dia, t: d.creadoEn.getTime(), m: {
+      id: `d${d.id}`, tipo: "deposito", titulo: "Depósito a la dueña", hora: horaCorta(d.creadoEn, zona), sub, monto: -d.monto,
+      detalle: [...cub.map((x) => [x.t ? etiquetaCorte(x.t) : "Corte", formatoDinero(x.monto)] as [string, string]), ["Registró", `${quien}${quien ? ", " : ""}${horaCorta(d.creadoEn, zona)}`]],
+      comprobante: d.comprobanteNombre ? { id: d.id, nombre: d.comprobanteNombre, url: `/api/deposito/${d.id}` } : undefined,
+    } });
   }
   for (const { p, nombre } of pagos) {
     if (pendIds.has(p.id)) continue;
@@ -422,13 +430,8 @@ export default async function MovimientosPagina({ searchParams }: { searchParams
     if (corte && seguro.has(p.id) && turnosPagina.some((c) => c.id === corte)) items.push(filaPago(p, nombre, { corte }));
   }
   // Lo que entró o salió de la caja sin ser venta ni gasto. Los pagos al equipo ya aparecen como pago; aquí no se repiten.
-  if (verCaja && ver("caja")) for (const c of movsCaja.filter((x) => !esPagoEquipo(x.concepto) && !esPagoAnulado(x.concepto) && !esResguardo(x.concepto) && (!f.buscar || x.concepto.toLowerCase().includes(f.buscar.toLowerCase())))) {
-    if (esDeposito(c.concepto)) {
-      items.push({ k: "mov", dia: c.dia, t: c.creadoEn.getTime(), corte: c.turnoId, m: {
-        id: `c${c.id}`, tipo: "negocio", titulo: "Negocio", hora: horaCorta(c.creadoEn, zona), sub: "depositado a la dueña", monto: -c.monto, detalle: [],
-      } });
-      continue;
-    }
+  // Lo acumulado para la dueña no sale como renglón: va en el desglose de su corte.
+  if (verCaja && ver("caja")) for (const c of movsCaja.filter((x) => !esPagoEquipo(x.concepto) && !esPagoAnulado(x.concepto) && !esAcumulado(x.concepto) && (!f.buscar || x.concepto.toLowerCase().includes(f.buscar.toLowerCase())))) {
     const sale = c.tipo === "retiro", propina = esPropinaEntregada(c.concepto);
     items.push({ k: "mov", dia: c.dia, t: c.creadoEn.getTime(), corte: propina ? c.turnoId : undefined, m: {
       id: `c${c.id}`, tipo: propina ? "propina" : "caja", titulo: c.concepto, hora: horaCorta(c.creadoEn, zona),

@@ -10,8 +10,8 @@ import { formatoDinero } from "@/lib/money";
 import { Cancelar, type FilaEgreso, Nuevo, type OpcionesEgreso } from "../gastos/Egresos";
 
 export type Movimiento = {
-  id: string; tipo: "egreso" | "pago" | "renta" | "caja" | "propina" | "gasto" | "negocio"; titulo: string; sub: string; monto: number; hora: string; cancelado?: boolean; /** Liquidado pero sin entregar todavía. */ pendiente?: boolean;
-  detalle: [string, string][]; comprobante?: { id: string; nombre: string }; egreso?: FilaEgreso;
+  id: string; tipo: "egreso" | "pago" | "renta" | "caja" | "propina" | "gasto" | "deposito"; titulo: string; sub: string; monto: number; hora: string; cancelado?: boolean; /** Liquidado pero sin entregar todavía. */ pendiente?: boolean;
+  detalle: [string, string][]; comprobante?: { id: string; nombre: string; url?: string }; egreso?: FilaEgreso;
 };
 /** Todo lo que pasó en el negocio, en un solo historial: ventas, cortes de caja y movimientos de dinero. */
 /** `corte`: el corte de caja al que pertenece (propinas y pagos que se entregaron al cerrar); se muestra justo debajo de ese corte. */
@@ -20,9 +20,9 @@ export type DiaHistorial = { fecha: string; titulo: string; total: number; sinTo
 type Categoria = { id: string; nombre: string; activo: boolean };
 
 const firma = (c: number) => `${c < 0 ? "−" : "+"}${formatoDinero(Math.abs(c))}`;
-const ETIQUETA: Record<Movimiento["tipo"], string> = { egreso: "Egreso", pago: "Pago al equipo", renta: "Renta", caja: "Caja", propina: "Propina", gasto: "Gasto de caja", negocio: "Negocio" };
+const ETIQUETA: Record<Movimiento["tipo"], string> = { egreso: "Egreso", pago: "Pago al equipo", renta: "Renta", caja: "Caja", propina: "Propina", gasto: "Gasto de caja", deposito: "Negocio" };
 /** Cada tipo lleva un tono de gris azulado distinto, sutil, para distinguirlos de un vistazo. */
-const TONO: Record<Movimiento["tipo"], string> = { egreso: "t-egreso", pago: "t-equipo", renta: "t-equipo", propina: "t-equipo", caja: "t-caja", gasto: "t-caja", negocio: "t-caja" };
+const TONO: Record<Movimiento["tipo"], string> = { egreso: "t-egreso", pago: "t-equipo", renta: "t-equipo", propina: "t-equipo", caja: "t-caja", gasto: "t-caja", deposito: "t-caja" };
 
 /** Historial de movimientos: ventas, cortes de caja, egresos, pagos al equipo y dinero que entró o salió de la caja, el más reciente arriba. */
 export function Movimientos({ dias, registrar, hoy, cajaAbierta, categorias, opciones, filtros, abrirEgreso, botonCaja, regreso, opcionesVenta, conteo, corregir, abrirCorte }: {
@@ -54,7 +54,7 @@ export function Movimientos({ dias, registrar, hoy, cajaAbierta, categorias, opc
                 {dias.map((d) => {
                   // Lo que se entregó al cerrar un corte va en renglones cortos bajo su pastilla, no como filas sueltas.
                   const cortes = new Set(d.items.flatMap((x) => (x.k === "corte" ? [x.c.id] : [])));
-                  const esHijo = (x: ItemHistorial) => x.k === "mov" && !!x.corte && !x.pend && cortes.has(x.corte) && (x.m.tipo === "pago" || x.m.tipo === "propina" || x.m.tipo === "negocio") && !x.m.cancelado;
+                  const esHijo = (x: ItemHistorial) => x.k === "mov" && !!x.corte && !x.pend && cortes.has(x.corte) && (x.m.tipo === "pago" || x.m.tipo === "propina") && !x.m.cancelado;
                   // Cada venta deja su comisión; en el corte se ve un solo renglón por persona y forma de pago.
                   const hijosDe = (id: string) => {
                     const juntos = new Map<string, Movimiento>();
@@ -84,7 +84,6 @@ export function Movimientos({ dias, registrar, hoy, cajaAbierta, categorias, opc
 
 /** "Pago a Ana" pasa a "Ana, comisión, de la caja"; las propinas en efectivo van aparte de la caja. */
 function hijo(m: Movimiento): HijoCorte {
-  if (m.tipo === "negocio") return { id: m.id, nombre: "Negocio", que: "depositado a la dueña", monto: firma(m.monto) };
   const nombre = m.titulo.replace(/^(Pago a|Propinas para|Propina por transferencia a)\s+/i, "").split(" ")[0];
   if (m.tipo === "propina") {
     const transf = /transferencia/i.test(m.titulo + m.sub);
@@ -107,7 +106,7 @@ function FilaMov({ m, abierto, alternar, cancelar }: { m: Movimiento; abierto: b
       {abierto && (
         <div className="hist-det">
           {m.detalle.map(([k, v]) => <span key={k}><small>{k}</small>{v}</span>)}
-          {m.comprobante && <span><small>Comprobante</small><a className="enlace" href={`/api/comprobante/${m.comprobante.id}`} target="_blank" rel="noreferrer">{m.comprobante.nombre}</a></span>}
+          {m.comprobante && <span><small>Comprobante</small><a className="enlace" href={m.comprobante.url ?? `/api/comprobante/${m.comprobante.id}`} target="_blank" rel="noreferrer">{m.comprobante.nombre}</a></span>}
           {m.egreso?.puedeCancelar && <span className="anular"><button type="button" className="bt sec solo chico" onClick={() => cancelar(m.egreso!)}>Cancelar egreso</button></span>}
         </div>
       )}

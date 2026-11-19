@@ -41,18 +41,15 @@ export const CONCEPTO_PROPINA = "Propinas para";
 export const esPropinaEntregada = (concepto: string) => concepto.startsWith(`${CONCEPTO_PROPINA} `);
 export const esPagoEquipo = (concepto: string) => /^Pago (de comisiones )?a /.test(concepto);
 
-/** La parte del negocio que se saca de la caja en el corte: se deposita a la dueña o se guarda en el sobre del negocio. */
-export const CONCEPTO_DEPOSITO = "Depósito a la dueña";
-export const CONCEPTO_RESGUARDO = "Resguardado para depositar";
+/** Lo del negocio que se acumula para la dueña en el corte: sale de la caja y se guarda aparte hasta que se le deposita. */
+export const CONCEPTO_ACUMULADO = "Acumulado para la dueña";
+/** También los nombres que usaba el corte anterior, por si queda alguno sin pasar. */
+export const esAcumulado = (concepto: string) => concepto === CONCEPTO_ACUMULADO || concepto === "Depósito a la dueña" || concepto === "Resguardado para depositar";
 /** Efectivo que se llevó Titular (o alguien de su parte) durante el día: cuenta como lo del negocio. */
 export const CONCEPTO_DUENA = "La dueña se llevó efectivo";
-export const esDeposito = (concepto: string) => concepto === CONCEPTO_DEPOSITO;
-export const esResguardo = (concepto: string) => concepto === CONCEPTO_RESGUARDO;
 export const esLlevoDuena = (concepto: string) => concepto.startsWith(CONCEPTO_DUENA);
 /** Cualquier salida que es la parte del negocio (no un gasto ni un pago al equipo). */
-export const esParteNegocio = (concepto: string) => esDeposito(concepto) || esResguardo(concepto) || esLlevoDuena(concepto);
-/** Lo que se escribe en el comprobante del depósito. */
-export const ETIQUETA_DEPOSITO = "Depósito a la dueña";
+export const esParteNegocio = (concepto: string) => esAcumulado(concepto) || esLlevoDuena(concepto);
 
 /** Minutos que tiene alguien para anular su propio cobro si se equivocó. */
 export const MINUTOS_CORRECCION = 10;

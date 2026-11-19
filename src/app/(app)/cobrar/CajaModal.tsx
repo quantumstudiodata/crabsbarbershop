@@ -6,8 +6,9 @@ import { Fl, Icono } from "@/components/Icono";
 import { Modal } from "@/components/ui";
 import type { MovimientosTurno } from "@/lib/caja";
 import { formatoDinero, leerPesos } from "@/lib/money";
-import { ETIQUETA_DEPOSITO, esLlevoDuena } from "@/lib/caja";
-import { abrirCaja, cerrarCaja, registrarGasto, registrarMovimiento, type EstadoCaja, type ResumenCorte } from "../caja/actions";
+import { esLlevoDuena } from "@/lib/caja";
+import { abrirCaja, cerrarCaja, registrarDeposito, registrarGasto, registrarMovimiento, type EstadoCaja, type ResumenCorte } from "../caja/actions";
+import { prepararArchivo } from "@/lib/archivo";
 
 export type Turno = {
   desde: string; abrio: string; abrioAvatar: string; abiertoEn: string; dia: string; deOtroDia: boolean; folioCorte: string; m: MovimientosTurno; esperado: number; ventas: number; ventasEfectivo?: number;
@@ -27,14 +28,16 @@ export type Turno = {
   otrosEgresos?: { concepto: string; metodo: string; monto: number }[];
   /** Cada gasto pagado con la caja y cada vez que se sacó o se puso dinero, para verlos en las cuentas. */
   detalle?: { gastos: { concepto: string; monto: number }[]; sacado: { concepto: string; monto: number }[]; puesto: { concepto: string; monto: number }[] };
-  /** Lo del negocio guardado en el sobre, que todavía no se deposita a la dueña. */
-  resguardo?: { saldo: number; desde: string };
+  /** Lo que le toca al negocio de este turno: se acumula para la dueña al cerrar. */
+  leToca?: number;
+  /** Lo que ya se le debe a la dueña de cortes anteriores, con el corte de donde viene cada parte. */
+  duena?: { saldo: number; desde: string; partes: { texto: string; monto: number }[] };
   /** Titular: es la única que puede sacar efectivo sin gastarlo ("Me llevo efectivo"). */
   esTitular?: boolean;
   /** Citas atendidas que siguen sin cobrar. */
   sinCobrar?: number;
 };
-type Vista = "movimiento" | "retiro" | "entrada" | "gasto" | "corte";
+type Vista = "movimiento" | "retiro" | "entrada" | "gasto" | "deposito" | "corte";
 
 const abrir = (v: Vista) => window.dispatchEvent(new CustomEvent("crabs:caja", { detail: v }));
 /** Abre "¿Qué pasó con el dinero?" desde otra pantalla (Movimientos, para quien no usa Cobro). */
@@ -147,6 +150,7 @@ export function CajaModal({ inicial, turno, limiteDiferencia, categorias, eviden
   const [vista, setVista] = useState<Vista | null>(inicial);
   const [eMov, accMov, guardandoMov] = useActionState<EstadoCaja, FormData>(registrarMovimiento, {});
   const [eGasto, accGasto, guardandoGasto] = useActionState<EstadoCaja, FormData>(registrarGasto, {});
+  const [eDep, accDep, guardandoDep] = useActionState<EstadoCaja, FormData>(registrarDeposito, {});
   const [eCerrar, accCerrar, cerrando] = useActionState<EstadoCaja, FormData>(cerrarCaja, {});
   const [concepto, setConcepto] = useState("");
   const [categoria, setCategoria] = useState(categorias[0] ?? "Otros");
@@ -171,6 +175,7 @@ export function CajaModal({ inicial, turno, limiteDiferencia, categorias, eviden
   }, []);
   useEffect(() => { if (eMov.ok) { setVista(null); setConcepto(""); } }, [eMov.n, eMov.ok]);
   useEffect(() => { if (eGasto.ok) setVista(null); }, [eGasto.n, eGasto.ok]);
+  useEffect(() => { if (eDep.ok) setVista(null); }, [eDep.n, eDep.ok]);
   useEffect(() => { if (eCerrar.ok && eCerrar.resumen) { setResumen(eCerrar.resumen); setVista(null); setContado(""); } }, [eCerrar.n, eCerrar.ok, eCerrar.resumen]);
 
   const cerrar = () => { setVista(null); setGasto(""); };
@@ -196,6 +201,7 @@ export function CajaModal({ inicial, turno, limiteDiferencia, categorias, eviden
     const ops: [Vista, string, string, string][] = [
       ["gasto", "etiqueta", "Pagué algo con dinero de la caja", "Agua, limpieza, productos. Cuenta como gasto."],
       ["entrada", "entrada", "Puse dinero en la caja", "Para tener cambio. No cuenta como venta."],
+      ...((turno?.duena?.saldo ?? 0) > 0 ? [["deposito", "enviar", "Deposité a la dueña", `Se le deben ${formatoDinero(turno!.duena!.saldo)}, ${turno!.duena!.desde}. Con comprobante.`] as [Vista, string, string, string]] : []),
       ...(titular ? [["retiro", "salida", "Me llevo efectivo de la caja", "Lo tomo yo o alguien de mi parte. Se descuenta de lo del negocio."] as [Vista, string, string, string]] : []),
     ];
     return (
@@ -224,6 +230,14 @@ export function CajaModal({ inicial, turno, limiteDiferencia, categorias, eviden
           {eMov.error && <p className="aviso error">{eMov.error}</p>}
           <div className="acciones"><button className="bt" disabled={guardandoMov}>{guardandoMov ? "Guardando…" : "Guardar"}<Fl /></button></div>
         </form>
+      </Modal>
+    );
+  }
+
+  if (vistaReal === "deposito" && turno?.duena) {
+    return (
+      <Modal abierto cerrar={cerrar} etiqueta="Movimiento de caja" titulo="Deposité a la dueña">
+        <Deposito duena={turno.duena} accion={accDep} guardando={guardandoDep} error={eDep.error} atras={atras} />
       </Modal>
     );
   }
@@ -325,21 +339,16 @@ function CortePasos({ turno, accion, cerrando, error, contado, setContado, limit
   let queda = paraRepartir;
   const reparto = gente.map((x) => { const ef = Math.min(x.total, queda); queda -= ef; return { ...x, ef, falta: x.total - ef }; });
   const saleDeCaja = reparto.reduce((a, x) => a + x.ef, 0);
-  // La parte del negocio: lo que queda arriba del fondo después de pagarle al equipo. Se deposita a la dueña
-  // o se guarda en el sobre del negocio; así al contar siempre debe quedar solo el fondo.
-  const negocio = Math.max(0, queda);
-  const saldoRes = turno.resguardo?.saldo ?? 0;
-  const [decNeg, setDecNeg] = useState<"depositar" | "resguardar">("depositar");
-  const [conRes, setConRes] = useState(true);
-  const depositoTotal = decNeg === "depositar" ? negocio + (conRes ? saldoRes : 0) : 0;
-  const conNegocio = negocio > 0 || saldoRes > 0;
+  // Lo del negocio se descuenta solo al contar: sale de la caja lo que le toca (lo que alcance arriba del fondo) y se acumula para la dueña.
+  // Si no alcanza, lo demás se le sigue debiendo. El depósito se registra aparte, en Movimiento de caja.
+  const leToca = turno.leToca ?? 0;
+  const negocio = Math.min(leToca, Math.max(0, queda));
+  const seDebe = leToca - negocio;
   const esperado = enCaja - saleDeCaja - negocio;
-  // Comprobantes: los de cobros (si el negocio los pide) y el del depósito a la dueña (siempre que se deposite).
-  const gruposComp: GrupoEvidencia[] = [...(conComprobantes ? grupos : []),
-    ...(depositoTotal > 0 ? [{ metodo: ETIQUETA_DEPOSITO, total: depositoTotal, ventas: 0, icono: "enviar", enLinea: false,
-      nota: decNeg === "depositar" && conRes && saldoRes > 0 && negocio > 0 ? `${formatoDinero(negocio)} de hoy y ${formatoDinero(saldoRes)} que estaban resguardados` : negocio > 0 ? "Lo del negocio de hoy" : "Lo que estaba resguardado" }] : [])];
+  const deuda = (turno.duena?.saldo ?? 0) + leToca;
+  const gruposComp: GrupoEvidencia[] = conComprobantes ? grupos : [];
   const hayComprobantes = gruposComp.length > 0;
-  const nombres = ["caja", ...(reparto.length || conNegocio ? ["reparte"] : []), "cuenta", ...(hayComprobantes ? ["comprobantes"] : [])];
+  const nombres = ["caja", ...(reparto.length ? ["reparte"] : []), "cuenta", ...(hayComprobantes ? ["comprobantes"] : [])];
   const titulos: Record<string, string> = { caja: "Lo que hay en la caja", reparte: turno.verTodo ? "Saca lo de cada quien" : "Saca lo que te toca", comprobantes: "Comprobantes", cuenta: "Cuenta lo que quedó" };
   const botones: Record<string, string> = { reparte: "Repartir", comprobantes: "Comprobantes", cuenta: "Contar" };
   const pasos = nombres.length;
@@ -364,8 +373,6 @@ function CortePasos({ turno, accion, cerrando, error, contado, setContado, limit
         startTransition(() => accion(datos));
       }}>
         <div className="ck-pasos" aria-hidden="true">{Array.from({ length: pasos }, (_, i) => <i key={i} className={i < paso ? "on" : ""} />)}</div>
-        <input type="hidden" name="negocio" value={decNeg} />
-        <input type="hidden" name="incluirResguardo" value={decNeg === "depositar" && conRes ? "si" : ""} />
         {reparto.map((x) => (
           <span key={`h${x.id}`} hidden>
             <input type="hidden" name={`efectivo:${x.id}`} value={x.ef} />
@@ -398,7 +405,7 @@ function CortePasos({ turno, accion, cerrando, error, contado, setContado, limit
           )}
         </div>
 
-        {(reparto.length > 0 || conNegocio) && (
+        {reparto.length > 0 && (
           <div className="pila-chica" hidden={nombre !== "reparte"}>
             <p className="ct-ins">Saca este dinero de la caja y entrégalo. Palomea al darlo.</p>
             <div className="ct-hoja">
@@ -441,26 +448,6 @@ function CortePasos({ turno, accion, cerrando, error, contado, setContado, limit
               })}
               {propAparte > 0 && <Rg t="Propinas en efectivo" sub={`Aparte de la caja: ${propinasEq.filter((p) => p.efectivo > 0).map((p) => `${p.nombre.split(" ")[0]} ${formatoDinero(p.efectivo)}`).join(", ")}`} v={formatoDinero(propAparte)} cls="mu" />}
             </div>
-            {conNegocio && (
-              <div className="ng">
-                <div className="ng-cab"><b>Negocio</b><span className="num">{formatoDinero(negocio)}</span></div>
-                <small>{negocio > 0 ? "Lo que queda después del equipo. Para la dueña." : "Hoy no queda efectivo para el negocio."}</small>
-                <div className="ng-op" role="radiogroup" aria-label="Qué se hace con lo del negocio">
-                  {([["depositar", "Depositar ahora"], ["resguardar", "Resguardar"]] as const).map(([k, t]) => (
-                    <button type="button" key={k} role="radio" aria-checked={decNeg === k} className={decNeg === k ? "on" : ""} onClick={() => setDecNeg(k)}>{t}</button>
-                  ))}
-                </div>
-                {decNeg === "depositar" && saldoRes > 0 && (
-                  <label className="ng-chk">
-                    <input type="checkbox" checked={conRes} onChange={(e) => setConRes(e.target.checked)} />
-                    <span>Sumar lo resguardado {turno.resguardo?.desde}, {formatoDinero(saldoRes)}</span>
-                  </label>
-                )}
-                <small className="ng-nota">{decNeg === "depositar"
-                  ? (depositoTotal > 0 ? `Se depositan ${formatoDinero(depositoTotal)}. El comprobante se sube en el último paso.` : "No hay nada que depositar hoy.")
-                  : `Se guarda en el sobre del negocio. Va sumando ${formatoDinero(saldoRes + negocio)}.`}</small>
-              </div>
-            )}
           </div>
         )}
 
@@ -469,9 +456,10 @@ function CortePasos({ turno, accion, cerrando, error, contado, setContado, limit
           <div className="ct-hoja">
             <Rg t="En la caja" v={formatoDinero(enCaja)} />
             {reparto.filter((x) => x.ef > 0).map((x) => <Rg key={`c${x.id}`} s="-" t={x.nombre} v={formatoDinero(x.ef)} />)}
-            {negocio > 0 && <Rg s="-" t="Negocio" sub={decNeg === "depositar" ? "Se deposita a la dueña" : "Se guarda en el sobre del negocio"} v={formatoDinero(negocio)} />}
-            <Rg s="=" t="Debe quedar" sub={esperado === fondo ? "El fondo para mañana" : undefined} v={formatoDinero(esperado)} cls="tot" />
+            {leToca > 0 && <Rg s={negocio > 0 ? "-" : undefined} t="Negocio" sub={seDebe === 0 ? "Se acumula para la dueña" : negocio > 0 ? `Le tocan ${formatoDinero(leToca)}. Se acumulan los ${formatoDinero(negocio)} que alcanzaron y se le quedan debiendo ${formatoDinero(seDebe)}` : `Le tocan ${formatoDinero(leToca)}. No alcanzó el efectivo, se le quedan debiendo`} v={formatoDinero(negocio)} />}
+            <Rg s="=" t="Debe quedar" sub={esperado === fondo ? "El fondo para mañana" : esperado > fondo ? `El fondo y ${formatoDinero(esperado - fondo)} que se quedan en la caja` : undefined} v={formatoDinero(esperado)} cls="tot" />
           </div>
+          {deuda > 0 && <p className="ct-duena"><i aria-hidden="true" />Con este corte, se le deben a la dueña <b>{formatoDinero(deuda)}</b>{turno.duena?.saldo ? `, ${turno.duena.desde}` : ""}. Cuando se deposite, se registra en Movimiento de caja.</p>}
           <label className="campo">
             <span>¿Cuánto contaste?</span>
             <input className="input grande" name="contado" inputMode="decimal" placeholder="$0" autoComplete="off" value={contado} onChange={(e) => setContado(e.target.value)} required />
@@ -488,7 +476,7 @@ function CortePasos({ turno, accion, cerrando, error, contado, setContado, limit
 
         {hayComprobantes && (
           <div className="pila-chica" hidden={nombre !== "comprobantes"}>
-            <p className="ct-ins">Fotos o PDF de lo que no es efectivo y del depósito a la dueña.</p>
+            <p className="ct-ins">Fotos o PDF de lo que no es efectivo.</p>
             <EvidenciasCorte grupos={gruposComp} obligatorio cambio={(f, n) => { setFaltan(f); setArchivos(n); }} dinero={formatoDinero} />
             {faltan > 0 ? <small className="ct-falta">Falta {faltan === 1 ? "un comprobante" : `${faltan} comprobantes`} para poder cerrar.</small>
               : archivos > 0 && <small className="muted">{archivos} {archivos === 1 ? "comprobante listo" : "comprobantes listos"}.</small>}
@@ -504,5 +492,51 @@ function CortePasos({ turno, accion, cerrando, error, contado, setContado, limit
         </div>
       </form>
     </Modal>
+  );
+}
+
+/**
+ * Depósito a la dueña de lo acumulado del negocio. Se ve qué cortes cubre, de lo más viejo a lo más nuevo;
+ * si se deposita menos, lo demás sigue pendiente. El comprobante es obligatorio.
+ */
+function Deposito({ duena, accion, guardando, error, atras }: { duena: NonNullable<Turno["duena"]>; accion: (d: FormData) => void; guardando: boolean; error?: string; atras: React.ReactNode }) {
+  const [monto, setMonto] = useState(String(duena.saldo / 100));
+  const [archivo, setArchivo] = useState<{ datos: string; nombre: string } | null>(null);
+  const [leyendo, setLeyendo] = useState(false);
+  const centavos = Math.round((Number(monto.replace(/[$,\s]/g, "")) || 0) * 100);
+  let resta = centavos;
+  const cubre = duena.partes.map((p) => { const usa = Math.max(0, Math.min(p.monto, resta)); resta -= usa; return { ...p, usa }; });
+  const queda = Math.max(0, duena.saldo - centavos);
+  const elegir = async (f?: File) => {
+    if (!f) return;
+    setLeyendo(true);
+    try { setArchivo({ datos: await prepararArchivo(f), nombre: f.name }); } finally { setLeyendo(false); }
+  };
+  return (
+    <form action={accion} className="pila">
+      {atras}
+      <label className="campo"><span>¿Cuánto depositaste?</span>
+        <input className="input grande" name="monto" inputMode="decimal" value={monto} onChange={(e) => setMonto(e.target.value)} required aria-label="Monto del depósito" />
+      </label>
+      <div className="campo"><span>Lo que cubre, de lo más viejo a lo más nuevo</span>
+        <div className="ct-hoja dp-cubre">
+          {cubre.map((p, i) => <div key={i} className={`ct-r ${p.usa === 0 ? "mu" : ""}`}><span className="ct-t">{p.texto}{p.usa > 0 && p.usa < p.monto ? <small>{formatoDinero(p.usa)} de {formatoDinero(p.monto)}</small> : null}</span><span className="ct-v num">{formatoDinero(p.usa || p.monto)}</span></div>)}
+          <div className="ct-r mu"><span className="ct-t">Queda por depositar</span><span className="ct-v num">{formatoDinero(queda)}</span></div>
+        </div>
+      </div>
+      {centavos > duena.saldo && <p className="aviso error">Solo se le deben {formatoDinero(duena.saldo)}.</p>}
+      <div className="campo"><span>Comprobante del depósito</span>
+        <div className="dp-arch">
+          <label className="bt sec chico"><Icono n="camara" />Foto<input type="file" accept="image/*" capture="environment" hidden onChange={(e) => elegir(e.target.files?.[0])} /></label>
+          <label className="bt sec chico"><Icono n="clip" />Archivo<input type="file" accept="image/*,application/pdf" hidden onChange={(e) => elegir(e.target.files?.[0])} /></label>
+          {archivo && <small className="muted">{archivo.nombre}</small>}
+          {leyendo && <small className="muted">Preparando…</small>}
+        </div>
+      </div>
+      <input type="hidden" name="comprobante" value={archivo?.datos ?? ""} />
+      <input type="hidden" name="comprobanteNombre" value={archivo?.nombre ?? ""} />
+      {error && <p className="aviso error">{error}</p>}
+      <div className="acciones"><button className="bt" disabled={guardando || !archivo || centavos <= 0 || centavos > duena.saldo}>{guardando ? "Guardando…" : "Guardar depósito"}<Fl /></button></div>
+    </form>
   );
 }
