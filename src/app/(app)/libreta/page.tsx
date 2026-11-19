@@ -6,7 +6,7 @@ import { BotonCajon } from "@/components/Cajon";
 import { Icono } from "@/components/Icono";
 import { requerirSesion } from "@/lib/auth";
 import { db, schema } from "@/lib/db";
-import { desdeElDia, diaCortoDe, fechaLocal, finDeMes } from "@/lib/fechas";
+import { desdeElDia, diaCortoDe, fechaLocal, finDeMes, horaCorta } from "@/lib/fechas";
 import { libretaAnio, libretaBarberos, libretaMes, mesesConDatos } from "@/lib/libreta";
 import { formatoDinero } from "@/lib/money";
 import { NavLibreta } from "./NavLibreta";
@@ -233,7 +233,8 @@ async function LoDuena({ barberiaId, mes, zona, nombreMes }: { barberiaId: strin
   const primero = c.pendientes[0] ? diaDe(c.pendientes[0].turnoId) ?? fechaLocal(c.pendientes[0].creadoEn, zona) : null;
   const cubre = (d: (typeof delMes)[number]) => {
     const f = d.cubre.map((x) => diaDe(x.turnoId)).filter((x): x is string => !!x).sort();
-    return f.length ? (f[0] === f[f.length - 1] ? diaCortoDe(f[0], hoy) : `${diaCortoDe(f[0], hoy)} al ${diaCortoDe(f[f.length - 1], hoy)}`) : "";
+    // Para el contador, siempre la fecha (nunca "Hoy").
+    return f.length ? (f[0] === f[f.length - 1] ? diaCortoDe(f[0], "") : `${diaCortoDe(f[0], "")} al ${diaCortoDe(f[f.length - 1], "")}`) : "";
   };
   return (
     <section className="glass lb-duena subir d1">
@@ -243,7 +244,7 @@ async function LoDuena({ barberiaId, mes, zona, nombreMes }: { barberiaId: strin
       {delMes.length > 0 && (
         <div className="lb-duena-l">
           {[...delMes].reverse().map((d) => (
-            <div key={d.id}><span>{diaCortoDe(fechaLocal(d.creadoEn, zona), hoy)}<small>{cubre(d) ? `Cubre ${cubre(d)}` : ""}</small></span><span className="num">{$(d.monto)}</span></div>
+            <div key={d.id}><span>{diaCortoDe(fechaLocal(d.creadoEn, zona), "")}, {horaCorta(d.creadoEn, zona)}<small>{cubre(d) ? `Cubre ${cubre(d)}` : ""}</small></span><span className="num">{$(d.monto)}</span></div>
           ))}
         </div>
       )}
