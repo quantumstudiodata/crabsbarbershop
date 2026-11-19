@@ -216,7 +216,13 @@ function Detalle({ c, cerrar, ajustar }: { c: Corte | null; cerrar: () => void; 
           <Rg t="Se contó" sub={c.diferencia === 0 ? "Cuadró" : estado.replace(/^./, (x) => x.toUpperCase())} v={$(c.contado)} />
           {(c.fueraCaja ?? []).map((x, i) => <Rg key={`f${i}`} t={`${x.nombre}, comisión`} sub={x.como === "por transferencia" ? "Por transferencia, no sale de la caja" : `Pendiente${x.dias ? `, del ${x.dias}` : ""}${x.desdeTxt ? `, ${x.desdeTxt}` : ", para el próximo corte"}`} v={$(x.monto)} cls="mu" />)}
           {c.propinasEfectivo > 0 && <Rg t="Propinas en efectivo" sub="Aparte de la caja" v={$(c.propinasEfectivo)} cls="mu" />}
-          {pendNeg && <Rg t="Negocio, depósito pendiente" sub={`${pendNeg.recorrido.map((x) => `${x.texto} ${$(x.monto)}`).join(", ")}`} v={$(pendNeg.monto)} cls="mu" />}
+          {pendNeg && (
+            <div className="cd-neg">
+              <span className="cd-neg-t">Negocio, depósito total pendiente</span>
+              {pendNeg.recorrido.map((x) => <Rg key={x.id + x.texto} t={x.texto} v={$(x.monto)} cls="mu" />)}
+              <Rg t="Total pendiente" v={$(pendNeg.monto)} cls="cd-neg-tot" />
+            </div>
+          )}
         </div>
         {c.otrosEgresos.length > 0 && (
           <>

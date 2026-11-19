@@ -5993,3 +5993,7 @@ button.cp-pill:focus-visible { outline: 2px solid #2b3a47; outline-offset: 2px; 
 .dp-arch { display: flex; flex-wrap: wrap; gap: 8px; align-items: center; }
 .dp-arch label { cursor: pointer; }
 .dp-cubre .ct-r.mu .ct-v { color: var(--muted); }
+/* Detalle del corte: lo pendiente de depositar a la dueña, corte por corte (lo más reciente arriba) y su total. */
+.cd-neg { display: grid; gap: 0; padding-top: 6px; margin-top: 4px; border-top: 1px solid rgba(43,58,71,.12); }
+.cd-neg-t { font-size: 13px; font-weight: 600; color: #3b4a58; padding: 4px 0 2px; }
+.cd-neg .ct-r.cd-neg-tot .ct-v { color: #8a5a1e; font-weight: 600; }

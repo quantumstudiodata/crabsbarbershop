@@ -409,7 +409,8 @@ export default async function MovimientosPagina({ searchParams }: { searchParams
     c.negocioRes = [{
       tipo: "pendiente", monto: vivas.reduce((a, x) => a + x.monto, 0),
       desdeTxt: antes ? desdeElDia(k0 >= 0 ? cortesAsc[k0].fechaOperativa : fechaLocal(vivas[0].p.creadoEn, zona), hoy) : "",
-      recorrido: vivas.map(({ p, monto }) => { const t = corteDe(p.turnoId); return { id: p.turnoId ?? "", texto: t ? etiquetaCorte(t) : diaCortoDe(fechaLocal(p.creadoEn, zona), hoy), estado: "quedó pendiente", monto }; }),
+      // Lo más reciente arriba.
+      recorrido: vivas.map(({ p, monto }) => { const t = corteDe(p.turnoId); return { id: p.turnoId ?? "", texto: t ? etiquetaCorte(t) : diaCortoDe(fechaLocal(p.creadoEn, zona), hoy), estado: "quedó el depósito pendiente", monto }; }).reverse(),
     }];
   }
   // Cada depósito a la dueña es un renglón propio con los cortes que cubre.
