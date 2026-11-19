@@ -110,7 +110,7 @@ function FilaMov({ m, abierto, alternar, cancelar }: { m: Movimiento; abierto: b
       </button>
       {abierto && (
         <div className="hist-det">
-          {m.detalle.map(([k, v]) => <span key={k}><small>{k}</small>{v}</span>)}
+          {m.detalle.map(([k, v], i) => <span key={i}><small>{k}</small>{v}</span>)}
           {m.comprobante && <span><small>Comprobante</small><a className="enlace" href={m.comprobante.url ?? `/api/comprobante/${m.comprobante.id}`} target="_blank" rel="noreferrer">{m.comprobante.nombre}</a></span>}
           {m.egreso?.puedeCancelar && <span className="anular"><button type="button" className="bt sec solo chico" onClick={() => cancelar(m.egreso!)}>Cancelar egreso</button></span>}
           {m.deposito && !m.cancelado && <span className="anular"><button type="button" className="bt sec solo chico" onClick={() => setAnular(true)}>Anular depósito</button></span>}

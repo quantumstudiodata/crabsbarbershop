@@ -427,9 +427,18 @@ export default async function MovimientosPagina({ searchParams }: { searchParams
     const largo = (x: string) => fechaLarga(x).split(" de ")[0].toLowerCase();
     const sub = fechas.length ? `${fechas[0] === fechas[fechas.length - 1] ? `Del ${largo(fechas[0])}` : `Del ${largo(fechas[0])} al ${largo(fechas[fechas.length - 1])}`}, ${cub.length} ${cub.length === 1 ? "corte" : "cortes"}` : "Lo pendiente del negocio";
     const quien = gente.find((g) => g.id === d.usuarioId)?.nombre.split(" ")[0] ?? "";
+    // Lo que seguía pendiente justo después de este depósito: lo acumulado hasta ese momento menos lo depositado hasta ese momento.
+    const hastaDep = d.creadoEn.getTime();
+    const quedan = duena.partes.filter((p) => p.creadoEn.getTime() <= hastaDep)
+      .map((p) => ({ t: corteDe(p.turnoId), monto: p.monto - p.depositos.filter((x) => x.creadoEn.getTime() <= hastaDep).reduce((a, x) => a + x.monto, 0) }))
+      .filter((x) => x.monto > 0);
     items.push({ k: "mov", dia, t: d.creadoEn.getTime(), m: {
       id: `d${d.id}`, tipo: "deposito", titulo: "Depósito a la dueña", hora: horaCorta(d.creadoEn, zona), sub, monto: -d.monto,
-      detalle: [...cub.map((x) => [x.t ? etiquetaCorte(x.t) : "Corte", formatoDinero(x.monto)] as [string, string]), ["Registró", `${quien}${quien ? ", " : ""}${horaCorta(d.creadoEn, zona)}`]],
+      // Lo que cubrió (lo más reciente arriba), lo que quedó pendiente después de este depósito y de qué cortes es.
+      detalle: [...[...cub].reverse().map((x) => [x.t ? etiquetaCorte(x.t) : "Corte", formatoDinero(x.monto)] as [string, string]),
+        ["Pendiente", formatoDinero(quedan.reduce((a, x) => a + x.monto, 0))],
+        ...[...quedan].reverse().map((x) => ["Sigue pendiente", `${x.t ? etiquetaCorte(x.t) : "Un corte"}, ${formatoDinero(x.monto)}`] as [string, string]),
+        ["Registró", `${quien}${quien ? ", " : ""}${horaCorta(d.creadoEn, zona)}`]],
       comprobante: d.comprobanteNombre ? { id: d.id, nombre: d.comprobanteNombre, url: `/api/deposito/${d.id}` } : undefined,
       deposito: d.id,
     } });
