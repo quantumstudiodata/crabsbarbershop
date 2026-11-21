@@ -26,6 +26,20 @@ export function avisarGuardado(texto?: string) {
 /** Aviso corto abajo de la pantalla que confirma que algo se guardó. Se va solo. */
 export function AvisoGuardado() {
   const [visible, setVisible] = useState<{ texto: string; n: number } | null>(null);
+  // Freno general contra el doble toque: si el mismo botón manda el mismo formulario dos veces seguidas, la segunda se ignora.
+  // Solo cuenta cuando lo manda un botón (no los filtros que se envían solos) y no aplica a búsquedas.
+  useEffect(() => {
+    const ultimo = new WeakMap<HTMLFormElement, number>();
+    const f = (e: SubmitEvent) => {
+      const form = e.target;
+      if (!(form instanceof HTMLFormElement) || !e.submitter || form.getAttribute("method")?.toLowerCase() === "get") return;
+      const ahora = Date.now(), antes = ultimo.get(form);
+      if (antes && ahora - antes < 1500) { e.preventDefault(); e.stopImmediatePropagation(); return; }
+      ultimo.set(form, ahora);
+    };
+    document.addEventListener("submit", f, true);
+    return () => document.removeEventListener("submit", f, true);
+  }, []);
   useEffect(() => {
     const f = (e: Event) => setVisible({ texto: String((e as CustomEvent).detail), n: Date.now() });
     window.addEventListener("crabs:guardado", f);
