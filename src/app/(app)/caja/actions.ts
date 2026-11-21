@@ -54,7 +54,7 @@ export async function abrirCaja(_: EstadoCaja, form: FormData): Promise<EstadoCa
   }
   // Citas pagadas en línea mientras la caja estaba cerrada: se registran como venta en esta caja.
   await ventasDeCitasPagadas(s.barberia.id).catch((err) => console.error("venta_cita_linea", err));
-  return listo(sumados ? `La caja quedó abierta. Se sumaron ${sumados === 1 ? "1 movimiento" : `${sumados} movimientos`} de cuando estaba cerrada.` : "La caja quedó abierta.");
+  return listo(sumados ? `La caja quedó abierta. ${sumados === 1 ? "Se sumó 1 movimiento" : `Se sumaron ${sumados} movimientos`} de cuando estaba cerrada.` : "La caja quedó abierta.");
 }
 
 type SesionCaja = Awaited<ReturnType<typeof requerirSesion>>;

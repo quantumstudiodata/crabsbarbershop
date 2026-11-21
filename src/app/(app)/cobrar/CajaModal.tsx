@@ -91,10 +91,14 @@ function CajaMovil({ turno }: { turno: Turno }) {
 
 /** Con la caja cerrada no se muestra nada de Cobro: solo abrirla (y registrar lo que pase mientras, que se suma al abrirla). */
 export function CajaCerrada({ opera, sugerido, pendientes = [], mover = false }: { opera: boolean; sugerido: number; pendientes?: PendienteVista[]; mover?: boolean }) {
-  const [e, accion, abriendo] = useActionState<EstadoCaja, FormData>(abrirCaja, {});
+  // El aviso se pide en cuanto responde el servidor: al abrirse la caja esta pantalla desaparece y ya no alcanzaría a mostrarlo.
+  const [e, accion, abriendo] = useActionState<EstadoCaja, FormData>(async (antes, datos) => {
+    const r = await abrirCaja(antes, datos);
+    if (r.ok) avisarGuardado(r.mensaje);
+    return r;
+  }, {});
   const unEnvio = useUnEnvio(abriendo);
   const [fondo, setFondo] = useState(sugerido ? String(sugerido / 100) : "");
-  useEffect(() => { if (e.ok) avisarGuardado(e.mensaje); }, [e.ok, e.n, e.mensaje]);
   const hay = pendientes.length > 0;
   return (
     <section className="caja-puerta subir">
