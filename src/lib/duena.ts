@@ -4,14 +4,16 @@ import { desdeElDia, diaCortoDe, fechaLocal, horaCorta } from "./fechas";
 import { db, schema as s } from "./db";
 import { comisionesDeTurno } from "./comisionesCorte";
 import { foliosCorte, movimientosDeTurno } from "./datos";
-import { esLlevoDuena, type MovimientosTurno } from "./caja";
+import { esLlevoDuena, esPropinaEntregada, type MovimientosTurno } from "./caja";
 
 /**
  * Lo que le toca al negocio en un turno: lo cobrado de servicios y productos menos lo del equipo,
  * menos lo que ya le llegó a la dueña sin pasar por la caja (transferencia, tarjeta, QR),
  * menos los gastos pagados con la caja y lo que la dueña ya se llevó de la caja.
  */
-export async function leTocaAlNegocio(barberiaId: string, turnoId: string, d: { otrosCobros: number; m: MovimientosTurno; movimientos: { tipo: string; monto: number; concepto: string }[] }) {
+export async function leTocaAlNegocio(barberiaId: string, turnoId: string, d: { otrosCobros: number; m: MovimientosTurno; movimientos: { tipo: string; monto: number; concepto: string }[] },
+  /** Propinas con tarjeta o transferencia que se le dieron a la persona con efectivo de la caja (se decide en el corte). */
+  propinasDeCaja?: number) {
   const [ventas, comisiones] = await Promise.all([
     db.select({ total: sql<number>`coalesce(sum(${s.ventas.total}),0)::int` }).from(s.ventas)
       .where(and(eq(s.ventas.barberiaId, barberiaId), eq(s.ventas.turnoId, turnoId), eq(s.ventas.estado, "pagada"))),
@@ -20,7 +22,12 @@ export async function leTocaAlNegocio(barberiaId: string, turnoId: string, d: { 
   const equipo = comisiones.reduce((a, x) => a + x.monto, 0);
   // Los pagos no llevan la propina (va aparte), así que lo cobrado por otras formas de pago ya es todo de servicios.
   const llevo = d.movimientos.filter((x) => x.tipo === "retiro" && esLlevoDuena(x.concepto)).reduce((a, x) => a + x.monto, 0);
-  return Math.max(0, (ventas[0]?.total ?? 0) - equipo - d.otrosCobros - d.m.gastosDeCaja - llevo);
+  // Una propina con tarjeta o transferencia llega a la cuenta de la dueña; si a la persona se le dio con efectivo de la caja,
+  // ese efectivo ya es de la dueña (lo suyo ya le llegó al banco), así que no se le vuelve a contar.
+  // Ya cerrado el corte se saca de lo que salió por propinas menos las propinas en efectivo del turno.
+  const entregadas = d.movimientos.filter((x) => x.tipo === "retiro" && esPropinaEntregada(x.concepto)).reduce((a, x) => a + x.monto, 0);
+  const deCaja = propinasDeCaja ?? Math.max(0, entregadas - d.m.propinasEfectivo);
+  return Math.max(0, (ventas[0]?.total ?? 0) - equipo - d.otrosCobros - d.m.gastosDeCaja - llevo - deCaja);
 }
 
 export type ParteDuena = { id: string; turnoId: string | null; monto: number; queda: number; creadoEn: Date; depositos: { id: string; monto: number; creadoEn: Date }[] };

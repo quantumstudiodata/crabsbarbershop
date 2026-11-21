@@ -305,7 +305,7 @@ export async function cerrarCaja(_: EstadoCaja, form: FormData): Promise<EstadoC
   // Lo del negocio se acumula solo para la dueña: le toca lo cobrado menos lo del equipo, lo que ya le llegó por otras formas de pago,
   // los gastos de caja y lo que ya se llevó. Sale de la caja lo que alcance arriba del fondo; si no alcanza, lo demás se le sigue debiendo.
   // Nunca se da por depositado: el depósito se registra aparte en Movimiento de caja.
-  const leToca = await leTocaAlNegocio(s.barberia.id, turno.id, datos);
+  const leToca = await leTocaAlNegocio(s.barberia.id, turno.id, datos, [...porPersona.values()].reduce((a, x) => a + x.propCaja, 0));
   const enCajaNegocio = Math.min(leToca, Math.max(0, datos.esperado - turno.fondoInicial));
   datos.esperado -= enCajaNegocio;
   // Con la función activa, cada forma de pago (que no sea efectivo) con cobros necesita su evidencia.

@@ -6013,9 +6013,8 @@ button.cp-pill:focus-visible { outline: 2px solid #2b3a47; outline-offset: 2px; 
 .cd-rep-nota { margin: 6px 0 2px; padding: 9px 11px; border-radius: 10px; background: rgba(43,58,71,.06); font-size: 12.5px; color: #3b4a58; }
 
 /* Aviso de "guardado" que aparece abajo y se va solo. */
-.aviso-guardado { position: fixed; left: 50%; bottom: calc(96px + env(safe-area-inset-bottom)); transform: translateX(-50%); z-index: 200; max-width: min(440px, calc(100vw - 32px)); padding: 12px 18px; border-radius: 14px; background: #13171c; color: #fff; font: 500 13.5px/1.35 var(--f-body); box-shadow: 0 12px 30px -12px rgba(10,15,20,.55); animation: aviso-guardado .22s ease-out; text-align: center; }
-@keyframes aviso-guardado { from { opacity: 0; transform: translate(-50%, 8px); } }
-@media (min-width: 1024px) { .aviso-guardado { bottom: 28px; } }
+.aviso-guardado { position: fixed; left: 50%; top: calc(14px + env(safe-area-inset-top)); transform: translateX(-50%); z-index: 200; max-width: min(440px, calc(100vw - 32px)); padding: 12px 18px; border-radius: 14px; background: #13171c; color: #fff; font: 500 13.5px/1.35 var(--f-body); box-shadow: 0 12px 30px -12px rgba(10,15,20,.55); animation: aviso-guardado .22s ease-out; text-align: center; }
+@keyframes aviso-guardado { from { opacity: 0; transform: translate(-50%, -8px); } }
 @media (prefers-reduced-motion: reduce) { .aviso-guardado { animation: none; } }
 
 /* Movimientos registrados con la caja cerrada: se suman al abrirla. */

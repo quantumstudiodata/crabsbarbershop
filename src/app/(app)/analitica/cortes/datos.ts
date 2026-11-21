@@ -131,12 +131,14 @@ export async function armarCortes(barberiaId: string, turnos: Turno[], o: { zona
         const recibido = total - efectivo;
         const llevo = movs.filter((m) => m.tipo === "retiro" && esLlevoDuena(m.concepto)).reduce((a, m) => a + m.monto, 0);
         const gastosCaja = gastos.reduce((a, g) => a + g.monto, 0);
+        // Propinas con tarjeta que llegaron al banco y a la persona se le dieron con efectivo de la caja.
+        const propCaja = Math.max(0, propinasEnt - (det.propinas.find((x) => x.turnoId === c.id)?.efectivo ?? 0));
         const pendiente = acumulados.filter((x) => x.turnoId === c.id).reduce((a, x) => a + x.monto, 0);
         // De lo que quedó pendiente en este corte, cuánto ya se le depositó después.
         const depositado = cuentaNeg.partes.filter((x) => x.turnoId === c.id).reduce((a, x) => a + x.monto - x.queda, 0);
         // Lo que le llegó de más (por transferencia o tarjeta) sobre lo que le tocaba: es del equipo.
-        const deMas = Math.max(0, recibido + gastosCaja + llevo - toca);
-        return { personas, negocio: { vendio: total, toca, recibido, gastos: gastosCaja, llevo, pendiente, depositado, deMas } };
+        const deMas = Math.max(0, recibido + gastosCaja + llevo + propCaja - toca);
+        return { personas, negocio: { vendio: total, toca, recibido, gastos: gastosCaja, llevo, pendiente, depositado, deMas, propCaja } };
       })(),
       evidencias: evid.filter((x) => x.turnoId === c.id).map((x) => ({ id: x.id, etiqueta: x.etiqueta, nombre: x.nombre, tipo: x.tipo })),
       ajustes: ajustes.filter((x) => x.turnoId === c.id).map((x) => `Ajuste de ${formatoDinero(x.monto)} por ${x.usuario.split(" ")[0]}: ${x.motivo}`),

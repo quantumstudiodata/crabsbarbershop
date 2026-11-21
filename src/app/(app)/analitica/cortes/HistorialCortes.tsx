@@ -27,7 +27,7 @@ export type Corte = {
   /** Lo que le tocó a cada quien de lo vendido en este turno y cómo le llegó. */
   reparto?: {
     personas: { nombre: string; vendio: number; toca: number; caja: number; transf: number; pendiente: number; enTurno?: number }[];
-    negocio: { vendio: number; toca: number; recibido: number; gastos: number; llevo: number; pendiente: number; depositado: number; deMas: number };
+    negocio: { vendio: number; toca: number; recibido: number; gastos: number; llevo: number; pendiente: number; depositado: number; deMas: number; propCaja?: number };
   };
   evidencias: { id: string; etiqueta: string; nombre: string; tipo: string }[];
   abrioId?: string;
@@ -291,11 +291,13 @@ function comoPersona(p: Reparto["personas"][number]) {
 }
 /** Cómo le llegó a la dueña lo suyo: transferencias, gastos, lo que se llevó y lo que quedó pendiente de depositar. */
 function comoNegocio(n: Reparto["negocio"]) {
-  const suyo = Math.max(0, n.toca - n.gastos - n.llevo);
+  const prop = n.propCaja ?? 0;
+  const suyo = Math.max(0, n.toca - n.gastos - n.llevo - prop);
   const porTransf = Math.min(n.recibido, suyo);
   const partes = [
     n.gastos ? `${$(n.gastos)} se fueron en gastos de la caja` : "",
     n.llevo ? `ya se llevó ${$(n.llevo)}` : "",
+    prop ? `${$(prop)} de propinas con tarjeta le llegaron al banco y se pagaron con la caja` : "",
     porTransf ? `${$(porTransf)} ya le llegaron por transferencia o tarjeta` : "",
     n.pendiente ? (n.depositado >= n.pendiente ? `${$(n.pendiente)} quedaron pendientes y ya se le depositaron` : n.depositado ? `${$(n.pendiente)} quedaron pendientes, ya se le depositaron ${$(n.depositado)}` : `${$(n.pendiente)} pendientes de depositar`) : "",
   ].filter(Boolean);

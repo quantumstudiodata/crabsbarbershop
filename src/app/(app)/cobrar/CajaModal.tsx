@@ -398,7 +398,9 @@ function CortePasos({ turno, accion, cerrando, error, contado, setContado, limit
   const saleDeCaja = reparto.reduce((a, x) => a + x.ef, 0);
   // Lo del negocio se descuenta solo al contar: sale de la caja lo que le toca (lo que alcance arriba del fondo) y se acumula para la dueña.
   // Si no alcanza, lo demás se le sigue debiendo. El depósito se registra aparte, en Movimiento de caja.
-  const leToca = turno.leToca ?? 0;
+  // Las propinas con tarjeta que se dan con efectivo de la caja ya le llegaron a la dueña al banco: se restan de lo que le toca.
+  const propDeCaja = reparto.reduce((a, x) => a + Math.min(x.otro, x.ef), 0);
+  const leToca = Math.max(0, (turno.leToca ?? 0) - propDeCaja);
   const negocio = Math.min(leToca, Math.max(0, queda));
   const seDebe = leToca - negocio;
   const esperado = enCaja - saleDeCaja - negocio;

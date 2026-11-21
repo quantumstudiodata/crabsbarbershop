@@ -29,13 +29,15 @@ export function AvisoGuardado() {
   // Freno general contra el doble toque: si el mismo botón manda el mismo formulario dos veces seguidas, la segunda se ignora.
   // Solo cuenta cuando lo manda un botón (no los filtros que se envían solos) y no aplica a búsquedas.
   useEffect(() => {
-    const ultimo = new WeakMap<HTMLFormElement, number>();
+    // Se compara también el texto del botón: en los formularios por pasos (como el corte), "Repartir", "Contar" y "Cerrar corte"
+    // son toques distintos y no se frenan aunque vayan rápido.
+    const ultimo = new WeakMap<HTMLFormElement, { boton: string; t: number }>();
     const f = (e: SubmitEvent) => {
       const form = e.target;
       if (!(form instanceof HTMLFormElement) || !e.submitter || form.getAttribute("method")?.toLowerCase() === "get") return;
-      const ahora = Date.now(), antes = ultimo.get(form);
-      if (antes && ahora - antes < 1500) { e.preventDefault(); e.stopImmediatePropagation(); return; }
-      ultimo.set(form, ahora);
+      const boton = (e.submitter.textContent ?? "").trim(), ahora = Date.now(), antes = ultimo.get(form);
+      if (antes && antes.boton === boton && ahora - antes.t < 1500) { e.preventDefault(); e.stopImmediatePropagation(); return; }
+      ultimo.set(form, { boton, t: ahora });
     };
     document.addEventListener("submit", f, true);
     return () => document.removeEventListener("submit", f, true);
