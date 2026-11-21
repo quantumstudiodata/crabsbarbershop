@@ -554,15 +554,20 @@ export default async function MovimientosPagina({ searchParams }: { searchParams
     .where(and(eq(t.movimientosCaja.barberiaId, bId), eq(t.movimientosCaja.tipo, "retiro"), enP(t.movimientosCaja.creadoEn)))).filter((x) => !esPagoEquipo(x.concepto) && !esPropinaEntregada(x.concepto)).reduce((a, x) => a + x.monto, 0) : 0;
   const ventasP = rp?.netas ?? 0;
   const rentas = pagosP.filter((x) => x.tipo === "renta").reduce((a, x) => a + x.monto, 0);
-  const pagadoEquipo = pagosP.filter((x) => x.tipo === "pago").reduce((a, x) => a + x.monto, 0);
   const egresos = gastosP.reduce((a, x) => a + x.monto, 0);
-  const entro = ventasP + rentas, salio = egresos + pagadoEquipo, quedo = entro - salio;
   const esSueldo = (id: string) => SUELDO.has(reglas.find((x) => x.id === id)?.tipo ?? "");
   const comisionesMes = generadas.filter((g) => !esSueldo(g.id));
   const falt = await faltantesDe(bId, p.desde, p.hasta);
-  const porPagar = comisionesMes.reduce((a, g) => a + Math.max(g.comision - pagosP.filter((x) => x.id === g.id && x.tipo === "pago").reduce((b, x) => b + x.monto, 0) - (falt.find((x) => x.usuarioId === g.id)?.monto ?? 0), 0), 0);
+  // Lo del equipo se cuenta por lo vendido en estas fechas (la comisión de cada venta), no por el día en que se paga:
+  // así pagar comisiones atrasadas no baja la ganancia del día en que se pagan, ni se cuenta dos veces.
+  // Quien gana sueldo se cuenta por lo que se le pagó en estas fechas.
+  const comisionesEq = comisionesMes.reduce((a, g) => a + Math.max(g.comision - (falt.find((x) => x.usuarioId === g.id)?.monto ?? 0), 0), 0);
+  const descontado = comisionesMes.reduce((a, g) => a + Math.min(g.comision, falt.find((x) => x.usuarioId === g.id)?.monto ?? 0), 0);
+  const sueldos = pagosP.filter((x) => x.tipo === "pago" && esSueldo(x.id)).reduce((a, x) => a + x.monto, 0);
+  const equipoP = comisionesEq + sueldos;
+  const entro = ventasP + rentas, salio = egresos + equipoP;
   // Resultado: lo vendido menos lo gastado y menos lo que le corresponde al equipo, ya pagado o todavía por pagar.
-  const resultado = quedo - porPagar;
+  const resultado = entro - salio;
   const nombreP = p.tipo === "dia" && p.desde === hoy ? "hoy" : p.tipo === "mes" ? p.etiqueta.split(" ")[0].toLowerCase() : p.etiqueta.toLowerCase();
   const maxB = Math.max(entro, salio, 1);
   const firma = (c: number) => (c < 0 ? `−${$(-c)}` : $(c));
@@ -572,9 +577,10 @@ export default async function MovimientosPagina({ searchParams }: { searchParams
       <div className="paso-c"><span><b>Entró por ventas</b><small>lo que pagaron los clientes</small></span><b className="num">{$(ventasP)}</b></div>
       {rp?.porMetodo.map(([m, v]) => <div key={m} className="sub-c"><span>{m}</span><span className="num">{$(v)}</span></div>)}
       {rentas > 0 && <div className="paso-c"><span><b>Rentas de silla</b><small>lo que pagaron los barberos</small></span><b className="num">+{$(rentas)}</b></div>}
-      <div className="paso-c resta"><span><b>Pagos al equipo</b><small>lo que ya se registró como pagado</small></span><b className="num">{pagadoEquipo ? `−${$(pagadoEquipo)}` : $(0)}</b></div>
-      {comisionesMes.length > 0 && <div className="sub-c"><span>Comisiones generadas en el periodo</span><span className="num">{$(comisionesMes.reduce((a, g) => a + g.comision, 0))}</span></div>}
-      {porPagar > 0 && <div className="paso-c resta"><span><b>Falta por pagar al equipo</b><small>ya lo ganaron y todavía no se les paga</small></span><b className="num">−{$(porPagar)}</b></div>}
+      <div className="paso-c resta"><span><b>Lo que le toca al equipo</b><small>de lo vendido en estas fechas, ya pagado o por pagar</small></span><b className="num">{equipoP ? `−${$(equipoP)}` : $(0)}</b></div>
+      {comisionesMes.length > 0 && <div className="sub-c"><span>Comisiones de lo vendido</span><span className="num">{$(comisionesEq + descontado)}</span></div>}
+      {descontado > 0 && <div className="sub-c"><span>Faltantes que se les descuentan</span><span className="num">−{$(descontado)}</span></div>}
+      {sueldos > 0 && <div className="sub-c"><span>Sueldos pagados</span><span className="num">{$(sueldos)}</span></div>}
       <div className="paso-c resta"><span><b>Gastos del negocio</b><small>egresos registrados</small></span><b className="num">{egresos ? `−${$(egresos)}` : $(0)}</b></div>
       {[...gastosP].sort((a, b) => b.monto - a.monto).map((g) => <div key={g.categoria} className="sub-c"><span>{g.categoria}</span><span className="num">{$(g.monto)}</span></div>)}
       <div className="paso-c total"><span><b>Ganancia</b></span><b className="num">{firma(resultado)}</b></div>
