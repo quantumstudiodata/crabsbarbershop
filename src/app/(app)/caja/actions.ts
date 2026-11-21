@@ -384,6 +384,10 @@ export async function corregirCierre(form: FormData) {
   const [t] = await db.select().from(schema.turnosCaja)
     .where(and(eq(schema.turnosCaja.id, turnoId), eq(schema.turnosCaja.barberiaId, s.barberia.id), eq(schema.turnosCaja.estado, "cerrado"))).limit(1);
   if (!t) volver(R, { error: "No se encontró ese cierre." });
+  // Un doble toque no registra el mismo ajuste dos veces.
+  const [ya] = await db.select({ id: schema.ajustesCierre.id }).from(schema.ajustesCierre).where(and(eq(schema.ajustesCierre.turnoId, t.id), eq(schema.ajustesCierre.monto, signo * monto!),
+    eq(schema.ajustesCierre.usuarioId, s.usuario.id), sql`${schema.ajustesCierre.creadoEn} > now() - interval '30 seconds'`)).limit(1);
+  if (ya) volver(R, { aviso: "guardado" });
   await db.transaction(async (tx) => {
     await tx.insert(schema.ajustesCierre).values({ barberiaId: s.barberia.id, turnoId: t.id, monto: signo * monto, motivo, usuarioId: s.usuario.id });
     await registrar(tx, {

@@ -62,8 +62,11 @@ export default async function Cobrar({ searchParams }: { searchParams: Promise<{
         gt(schema.citas.inicio, new Date(Date.now() - 7 * 86400000)), sql`(${schema.citas.estado} = 'completada' or ${schema.citas.fin} < now())`)) : [{ n: 0 }];
     // Lo del negocio: lo que le toca de este turno (se acumula al cerrar) y lo que ya se le debe de cortes anteriores, con sus días.
     const [leToca, duena] = await Promise.all([leTocaAlNegocio(s.barberia.id, t.id, datos), datosDuena(s.barberia.id, zona)]);
+    // Lo que se registró con la caja cerrada y se sumó al abrirla: ya estaba en lo que se contó al abrir.
+    const antesDeAbrir = datos.movimientos.filter((x) => x.creadoEn < t.abiertoEn).reduce((a, x) => a + (x.tipo === "entrada" ? x.monto : -x.monto), 0)
+      - datos.gastos.filter((g) => g.creadoEn < t.abiertoEn).reduce((a, g) => a + g.monto, 0);
     turno = {
-      leToca, duena,
+      leToca, duena, contadoAlAbrir: antesDeAbrir ? t.fondoInicial + antesDeAbrir : undefined,
       esTitular: s.usuario.rol === "duena",
       desde: horaCorta(t.abiertoEn, zona), abrio: abrio?.nombre.split(" ")[0] ?? "", abrioAvatar: abrio?.avatar ?? "iniciales", abiertoEn: t.abiertoEn.toISOString(), dia: fechaLarga(t.fechaOperativa).toLowerCase(),
       deOtroDia: t.fechaOperativa < fechaLocal(new Date(), zona), folioCorte: folio, m: datos.m, esperado: datos.esperado,

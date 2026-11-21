@@ -102,8 +102,8 @@ export async function armarCortes(barberiaId: string, turnos: Turno[], o: { zona
       otrosEgresos: otrosEgresos.filter((x) => x.fecha === c.fechaOperativa).map((x) => ({ concepto: x.concepto, metodo: x.metodo === "tarjeta" ? "Tarjeta" : "Transferencia", monto: x.monto })),
       esperado: c.efectivoEsperado ?? 0, contado: c.efectivoContado ?? 0, diferencia: c.diferencia ?? 0, ajustado: ajustes.filter((x) => x.turnoId === c.id).reduce((a, x) => a + x.monto, 0), notas: c.notasCierre,
       movimientos: [
-        ...movs.map((m) => ({ t: m.creadoEn.getTime(), tipo: m.tipo, hora: horaCorta(m.creadoEn, zona), titulo: m.tipo === "retiro" ? (esPropinaEntregada(m.concepto) ? "Propinas entregadas" : esPagoEquipo(m.concepto) ? "Pago al equipo" : esAcumulado(m.concepto) ? "Negocio, pendiente de depositar a la dueña" : esLlevoDuena(m.concepto) ? "La dueña se llevó efectivo" : "Dinero que se sacó") : m.tipo === "entrada" ? (esPagoAnulado(m.concepto) ? "Pago anulado, el dinero regresó" : "Dinero que se puso") : "Devolución", detalle: esPagoEquipo(m.concepto) ? m.concepto.replace(/^Pago (de comisiones )?a /, "Comisión de ") : m.concepto, monto: m.tipo === "entrada" ? m.monto : -m.monto })),
-        ...gastos.map((g) => ({ t: g.creadoEn.getTime(), tipo: "gasto", hora: horaCorta(g.creadoEn, zona), titulo: "Gasto pagado con la caja", detalle: g.concepto, monto: -g.monto })),
+        ...movs.map((m) => ({ t: m.creadoEn.getTime(), tipo: m.tipo, hora: horaCorta(m.creadoEn, zona), cerrada: m.creadoEn < c.abiertoEn || undefined, titulo: m.tipo === "retiro" ? (esPropinaEntregada(m.concepto) ? "Propinas entregadas" : esPagoEquipo(m.concepto) ? "Pago al equipo" : esAcumulado(m.concepto) ? "Negocio, pendiente de depositar a la dueña" : esLlevoDuena(m.concepto) ? "La dueña se llevó efectivo" : "Dinero que se sacó") : m.tipo === "entrada" ? (esPagoAnulado(m.concepto) ? "Pago anulado, el dinero regresó" : "Dinero que se puso") : "Devolución", detalle: esPagoEquipo(m.concepto) ? m.concepto.replace(/^Pago (de comisiones )?a /, "Comisión de ") : m.concepto, monto: m.tipo === "entrada" ? m.monto : -m.monto })),
+        ...gastos.map((g) => ({ t: g.creadoEn.getTime(), tipo: "gasto", hora: horaCorta(g.creadoEn, zona), cerrada: g.creadoEn < c.abiertoEn || undefined, titulo: "Gasto pagado con la caja", detalle: g.concepto, monto: -g.monto })),
       ].sort((a, b) => a.t - b.t),
       fueraCaja: fueraDe(c.cerradoEn),
       reparto: (() => {
@@ -116,22 +116,16 @@ export async function armarCortes(barberiaId: string, turnos: Turno[], o: { zona
         const personas = [...vendieron.map((x) => ({ nombre: persona(x.barberoId).nombre.split(" ")[0], vendio: x.vendio, toca: x.toca })), ...sinVenta].map((x) => {
           const nombre = x.nombre;
           const pagos = movs.filter((m) => m.tipo === "retiro" && esPagoEquipo(m.concepto) && m.concepto.endsWith(` ${nombre}`));
-          // Lo que se entregó al cerrar es lo que se decidió en el corte; lo que se pagó antes, durante el turno, va aparte.
-          // Las salidas del cierre se guardan justo después de la hora de cierre (con margen por la diferencia de relojes).
+          // Lo que se entregó al cerrar es lo que se decidió en el corte; lo que se pagó antes, durante el turno, va aparte
+          // (menos lo que se anuló y regresó a la caja). Las salidas del cierre se guardan justo después de la hora de cierre.
           const alCerrar = (m: (typeof pagos)[number]) => !!c.cerradoEn && m.creadoEn.getTime() >= c.cerradoEn.getTime() - 5_000;
           const caja = pagos.filter(alCerrar).reduce((a, m) => a + m.monto, 0);
-          const enTurno = pagos.filter((m) => !alCerrar(m)).reduce((a, m) => a + m.monto, 0);
+          const regreso = movs.filter((m) => m.tipo === "entrada" && esPagoAnulado(m.concepto) && m.concepto.endsWith(` ${nombre}`)).reduce((a, m) => a + m.monto, 0);
+          const enTurno = Math.max(0, pagos.filter((m) => !alCerrar(m)).reduce((a, m) => a + m.monto, 0) - regreso);
           const de = (como: string) => fuera.filter((y) => y.nombre === nombre && y.como === como).reduce((a, y) => a + y.monto, 0);
           const transf = de("por transferencia"), pendiente = de("para el próximo corte");
-          // En el corte se entrega primero lo más viejo: lo que pasa de lo que le toca hoy es de días anteriores.
-          const anteriores = Math.max(0, caja + transf + pendiente - x.toca);
-          let resta = anteriores;
-          const quita = (v: number) => { const q = Math.min(v, resta); resta -= q; return v - q; };
-          const hoyCaja = quita(caja), hoyTransf = quita(transf), hoyPend = quita(pendiente);
-          // Lo que no se decidió en este corte (con pagos por semana, se paga en su fecha).
-          const despues = Math.max(0, x.toca - hoyCaja - hoyTransf - hoyPend);
-          return { nombre, vendio: x.vendio, toca: x.toca, caja: hoyCaja, transf: hoyTransf, pendiente: hoyPend, despues, anteriores, enTurno };
-        });
+          return { nombre, vendio: x.vendio, toca: x.toca, caja, transf, pendiente, enTurno };
+        }).filter((p) => p.vendio || p.caja || p.transf || p.pendiente || p.enTurno);
         const total = metodos.reduce((a, x) => a + x.total, 0);
         const toca = Math.max(0, total - personas.reduce((a, x) => a + x.toca, 0));
         const recibido = total - efectivo;

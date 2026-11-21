@@ -18,7 +18,7 @@ export type Corte = {
   metodos: { metodo: string; total: number }[]; total: number; ventas: number;
   fondo: number; ventasEfectivo: number; propinasEfectivo: number; entradas: number; retiros: number; /** Lo del negocio que salió de la caja (depositado, resguardado o que se llevó la dueña). */ negocio?: number; gastos: number; pagosEquipo: number; propinasEnt: number; otrosEgresos: { concepto: string; metodo: string; monto: number }[];
   esperado: number; contado: number; diferencia: number; ajustado?: number; notas: string | null;
-  movimientos: { hora: string; tipo?: string; titulo: string; detalle: string; monto: number }[];
+  movimientos: { hora: string; tipo?: string; titulo: string; detalle: string; monto: number; /** Se registró con la caja cerrada y se sumó al abrirla. */ cerrada?: boolean }[];
   /** Pagos decididos en el cierre que no salieron de la caja. */
   fueraCaja?: { nombre: string; monto: number; como: string; dias?: string; /** Corte donde se quedó pendiente. */ origen?: string; desdeTxt?: string; recorrido?: PasoRecorrido[]; final?: string }[];
   /** Lo del negocio en este corte: lo resguardado que sigue sin depositarse, o lo resguardado que aquí se depositó. */
@@ -26,7 +26,7 @@ export type Corte = {
   ajustes: string[];
   /** Lo que le tocó a cada quien de lo vendido en este turno y cómo le llegó. */
   reparto?: {
-    personas: { nombre: string; vendio: number; toca: number; caja: number; transf: number; pendiente: number; despues: number; anteriores: number; enTurno?: number }[];
+    personas: { nombre: string; vendio: number; toca: number; caja: number; transf: number; pendiente: number; enTurno?: number }[];
     negocio: { vendio: number; toca: number; recibido: number; gastos: number; llevo: number; pendiente: number; depositado: number; deMas: number };
   };
   evidencias: { id: string; etiqueta: string; nombre: string; tipo: string }[];
@@ -216,9 +216,13 @@ function Detalle({ c, cerrar, ajustar }: { c: Corte | null; cerrar: () => void; 
       <div className="pila-chica cd">
         <p className="ct-ins">{c.dia}, {c.horario}.{c.cerro.nombre ? ` Cerró ${primer(c.cerro.nombre)}.` : ""}</p>
         <div className="ct-hoja">
-          <Rg t="Fondo con el que abrió" v={$(c.fondo)} />
+          {(() => {
+            // Lo registrado con la caja cerrada ya estaba en lo que se contó al abrir: el fondo es lo de antes de esos movimientos.
+            const antes = caja.filter((m) => m.cerrada).reduce((a, m) => a + m.monto, 0);
+            return <Rg t="Fondo con el que abrió" sub={antes ? `Al abrir se contaron ${$(c.fondo + antes)}, ya con lo que pasó con la caja cerrada` : undefined} v={$(c.fondo)} />;
+          })()}
           <Rg s="+" t="Cobrado en efectivo" v={$(c.ventasEfectivo)} />
-          {caja.map((m, i) => <Rg key={i} s={m.monto < 0 ? "-" : "+"} t={nombreDe(m)} sub={`${subDe(m)}, ${m.hora}`} v={$(Math.abs(m.monto))} />)}
+          {caja.map((m, i) => <Rg key={i} s={m.monto < 0 ? "-" : "+"} t={nombreDe(m)} sub={`${subDe(m)}, ${m.cerrada ? `con la caja cerrada, ${m.hora}` : m.hora}`} v={$(Math.abs(m.monto))} />)}
           {propDeCaja > 0 && <Rg s="-" t="Propinas con tarjeta" sub="Se pagaron con la caja" v={$(propDeCaja)} />}
           <Rg s="=" t="Debía quedar" v={$(c.esperado)} cls="tot" />
           <Rg t="Se contó" sub={c.diferencia === 0 ? "Cuadró" : estado.replace(/^./, (x) => x.toUpperCase())} v={$(c.contado)} />
@@ -244,7 +248,7 @@ function Detalle({ c, cerrar, ajustar }: { c: Corte | null; cerrar: () => void; 
           <>
             <span className="cd-t">Reparto del día</span>
             <div className="ct-hoja cd-rep">
-              {c.reparto.personas.map((p) => <Rg key={p.nombre} t={p.nombre} sub={comoPersona(p)} v={$(p.vendio ? p.toca : p.anteriores + (p.enTurno ?? 0))} />)}
+              {c.reparto.personas.map((p) => <Rg key={p.nombre} t={p.nombre} sub={comoPersona(p)} v={$(p.vendio ? p.toca : p.caja + p.transf + (p.enTurno ?? 0))} />)}
               <Rg t="Negocio, la dueña" sub={comoNegocio(c.reparto.negocio)} v={$(c.reparto.negocio.toca)} />
               {c.reparto.negocio.deMas > 0 && <p className="cd-rep-nota">A la dueña le llegaron {$(c.reparto.negocio.recibido)} por transferencia o tarjeta: {$(c.reparto.negocio.toca - c.reparto.negocio.gastos - c.reparto.negocio.llevo > 0 ? c.reparto.negocio.toca - c.reparto.negocio.gastos - c.reparto.negocio.llevo : 0)} son suyos y {$(c.reparto.negocio.deMas)} son del equipo. Se les paga por transferencia o en el próximo corte.</p>}
             </div>
@@ -274,11 +278,16 @@ function Detalle({ c, cerrar, ajustar }: { c: Corte | null; cerrar: () => void; 
 }
 
 type Reparto = NonNullable<Corte["reparto"]>;
-/** "Vendió $660, le toca el 50%: $220 de la caja, $110 pendiente. Además, $96 de días anteriores." */
+/**
+ * Lo que le toca de lo de hoy y lo que pasó con su dinero en este corte, sin adivinar de qué día es cada pago:
+ * "Vendió $660, le toca el 50%. En el corte: $220 de la caja y $110 quedaron pendientes."
+ */
 function comoPersona(p: Reparto["personas"][number]) {
-  const partes = [p.caja ? `${$(p.caja)} de la caja` : "", p.transf ? `${$(p.transf)} por transferencia` : "", p.pendiente ? `${$(p.pendiente)} pendiente` : "", p.despues ? `${$(p.despues)} en su fecha de pago` : ""].filter(Boolean);
-  if (!p.vendio) return `No atendió en este turno.${p.anteriores ? ` Se le dieron ${$(p.anteriores)} de días anteriores.` : ""}${p.enTurno ? ` Durante el turno se le pagaron ${$(p.enTurno)} de la caja.` : ""}`;
-  return `Vendió ${$(p.vendio)}, le toca el ${p.vendio ? Math.round((p.toca / p.vendio) * 100) : 0}%${partes.length ? `: ${partes.join(", ")}` : ""}.${p.anteriores ? ` Además se le dieron ${$(p.anteriores)} de días anteriores.` : ""}${p.enTurno ? ` Durante el turno se le pagaron ${$(p.enTurno)} de la caja.` : ""}`;
+  const partes = [p.caja ? `${$(p.caja)} de la caja` : "", p.transf ? `${$(p.transf)} por transferencia` : "", p.pendiente ? `quedaron pendientes ${$(p.pendiente)}` : ""].filter(Boolean);
+  const lista = partes.length > 1 ? `${partes.slice(0, -1).join(", ")} y ${partes[partes.length - 1]}` : partes[0];
+  const corte = lista ? ` En el corte: ${lista}.` : "";
+  const turno = p.enTurno ? ` Durante el turno se le pagaron ${$(p.enTurno)} de la caja.` : "";
+  return `${p.vendio ? `Vendió ${$(p.vendio)}, le toca el ${Math.round((p.toca / p.vendio) * 100)}%.` : "No atendió en este turno."}${corte}${turno}`;
 }
 /** Cómo le llegó a la dueña lo suyo: transferencias, gastos, lo que se llevó y lo que quedó pendiente de depositar. */
 function comoNegocio(n: Reparto["negocio"]) {
@@ -290,7 +299,7 @@ function comoNegocio(n: Reparto["negocio"]) {
     porTransf ? `${$(porTransf)} ya le llegaron por transferencia o tarjeta` : "",
     n.pendiente ? (n.depositado >= n.pendiente ? `${$(n.pendiente)} quedaron pendientes y ya se le depositaron` : n.depositado ? `${$(n.pendiente)} quedaron pendientes, ya se le depositaron ${$(n.depositado)}` : `${$(n.pendiente)} pendientes de depositar`) : "",
   ].filter(Boolean);
-  if (!partes.length) return `Vendió ${$(n.vendio)}. Le toca el resto`;
+  if (!partes.length) return `Vendió ${$(n.vendio)}. Lo que queda después del equipo es del negocio`;
   return `Vendió ${$(n.vendio)}. ${partes.join(", ").replace(/^./, (x) => x.toUpperCase())}${!n.pendiente && porTransf >= suyo && suyo > 0 ? ". Nada pendiente" : ""}`;
 }
 

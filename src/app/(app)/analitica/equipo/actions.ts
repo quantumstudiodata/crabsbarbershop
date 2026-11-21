@@ -1,6 +1,6 @@
 "use server";
 
-import { and, eq, like, sql } from "drizzle-orm";
+import { and, eq, like, or, sql } from "drizzle-orm";
 import { revalidatePath } from "next/cache";
 import { requerirSesion } from "@/lib/auth";
 import { cajaDe } from "@/lib/datos";
@@ -76,7 +76,9 @@ export async function anularPagoEquipo(id: string, motivo: string): Promise<{ ok
   const [mov] = p.tipo === "pago" ? await db.select({ id: schema.movimientosCaja.id, turnoId: schema.movimientosCaja.turnoId, estado: schema.turnosCaja.estado })
     .from(schema.movimientosCaja).innerJoin(schema.turnosCaja, eq(schema.turnosCaja.id, schema.movimientosCaja.turnoId))
     .where(and(eq(schema.movimientosCaja.barberiaId, s.barberia.id), eq(schema.movimientosCaja.tipo, "retiro"), eq(schema.movimientosCaja.monto, p.monto),
-      sql`${schema.movimientosCaja.creadoEn} = (select creado_en from pagos_comision where id = ${p.id})`, like(schema.movimientosCaja.concepto, `${CONCEPTO_PAGO} %`))).limit(1) : [];
+      sql`${schema.movimientosCaja.creadoEn} = (select creado_en from pagos_comision where id = ${p.id})`,
+      // "Pago a Ana" (Registrar pago manual) o "Pago de comisiones a Ana" (Registrar pago con pagos automáticos).
+      or(like(schema.movimientosCaja.concepto, `${CONCEPTO_PAGO} %`), like(schema.movimientosCaja.concepto, "Pago de comisiones a %")))).limit(1) : [];
   await db.transaction(async (tx) => {
     // Vuelve a verificar dentro de la transacción: si alguien lo anuló al mismo tiempo, no se devuelve dos veces a la caja.
     const hecho = await tx.update(schema.pagosComision).set({ monto: 0, nota: `${p.nota} (anulado: ${m}; era ${formatoDinero(p.monto)})`.slice(0, 200) })

@@ -15,6 +15,8 @@ export type PendienteVista = { id: string; tipo: string; monto: number; titulo: 
 import { prepararArchivo } from "@/lib/archivo";
 
 export type Turno = {
+  /** Si se sumaron movimientos de cuando la caja estaba cerrada: lo que se contó al abrir. */
+  contadoAlAbrir?: number;
   desde: string; abrio: string; abrioAvatar: string; abiertoEn: string; dia: string; deOtroDia: boolean; folioCorte: string; m: MovimientosTurno; esperado: number; ventas: number; ventasEfectivo?: number;
   propinas: number; otros: { metodo: string; total: number; ventas: number }[];
   /** Comisión de cada persona por las ventas de este turno (quien no ve al equipo, solo la suya). */
@@ -438,7 +440,7 @@ function CortePasos({ turno, accion, cerrando, error, contado, setContado, limit
         <div className="pila-chica" hidden={nombre !== "caja"}>
           <p className="ct-ins">Así está la caja ahora, desde las {turno.desde}.</p>
           <div className="ct-hoja">
-            <Rg t="Fondo con el que abrió" v={formatoDinero(m.fondoInicial)} />
+            <Rg t="Fondo con el que abrió" sub={turno.contadoAlAbrir !== undefined ? `Al abrir se contaron ${formatoDinero(turno.contadoAlAbrir)}, ya con lo que pasó con la caja cerrada` : undefined} v={formatoDinero(m.fondoInicial)} />
             <Rg s="+" t="Cobrado en efectivo" sub={`${turno.ventasEfectivo ?? 0} ${(turno.ventasEfectivo ?? 0) === 1 ? "venta" : "ventas"}`} v={formatoDinero(m.cobrosEfectivo)} />
             {det.puesto.map((x, k) => <Rg key={`p${k}`} s="+" t={x.concepto} sub="Dinero que se puso" v={formatoDinero(x.monto)} />)}
             {propOtras > 0 && <Rg s="+" t="Propinas de otras personas" sub="Siguen en la caja" v={formatoDinero(propOtras)} />}
