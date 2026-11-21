@@ -10,6 +10,7 @@ import { FilaCorte, type Corte, type HijoCorte } from "../cortes/HistorialCortes
 import type { Opciones } from "../ventas/ModificarVenta";
 import { formatoDinero } from "@/lib/money";
 import { Cancelar, type FilaEgreso, Nuevo, type OpcionesEgreso } from "../gastos/Egresos";
+import { avisarGuardado, useUnEnvio } from "@/components/Envio";
 
 export type Movimiento = {
   id: string; tipo: "egreso" | "pago" | "renta" | "caja" | "propina" | "gasto" | "deposito"; titulo: string; sub: string; monto: number; hora: string; cancelado?: boolean; /** Liquidado pero sin entregar todavía. */ pendiente?: boolean;
@@ -124,10 +125,11 @@ function FilaMov({ m, abierto, alternar, cancelar }: { m: Movimiento; abierto: b
 /** Anular un depósito a la dueña mal registrado: pide el motivo y lo pendiente vuelve a subir. */
 function AnularDeposito({ id, monto, cerrar }: { id: string; monto: number; cerrar: () => void }) {
   const [e, accion, guardando] = useActionState<EstadoCaja, FormData>(anularDeposito, {});
-  useEffect(() => { if (e.ok) cerrar(); }, [e.ok, e.n, cerrar]);
+  const unEnvio = useUnEnvio(guardando);
+  useEffect(() => { if (e.ok) { avisarGuardado(e.mensaje); cerrar(); } }, [e.ok, e.n, e.mensaje, cerrar]);
   return (
     <Modal abierto cerrar={cerrar} etiqueta="Depósito a la dueña" titulo={`Anular depósito de ${formatoDinero(monto)}`}>
-      <form action={accion} className="pila">
+      <form action={accion} onSubmit={unEnvio} className="pila">
         <input type="hidden" name="id" value={id} />
         <p className="ayuda-txt" style={{ margin: 0 }}>Úsalo si el depósito no se hizo o se registró mal. Lo pendiente de depositar a la dueña vuelve a subir.</p>
         <label className="campo"><span>¿Por qué se anula?</span><input className="input" name="motivo" maxLength={200} required placeholder="Ejemplo: se registró dos veces" /></label>

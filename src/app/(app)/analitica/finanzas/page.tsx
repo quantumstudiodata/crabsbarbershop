@@ -23,6 +23,7 @@ import { esMovil } from "@/lib/dispositivo";
 import { formatoDinero } from "@/lib/money";
 import { esAcumulado, esLlevoDuena, esPagoAnulado, esPagoEquipo, esPropinaEntregada, MINUTOS_CORRECCION } from "@/lib/caja";
 import { cuentaDuena, datosDuena } from "@/lib/duena";
+import { pendientesCaja, textoPendiente } from "@/lib/pendientesCaja";
 import { Ayuda } from "@/components/Ayuda";
 import { CajaModal } from "../../cobrar/CajaModal";
 import { BotonCaja } from "./BotonCaja";
@@ -73,6 +74,8 @@ export default async function MovimientosPagina({ searchParams }: { searchParams
   const movCaja = s.puede("caja.retiros") && !cobra;
   // Lo pendiente de la dueña: el depósito se puede registrar desde aquí aunque la caja esté cerrada (cualquiera del equipo).
   const duenaCaja = await datosDuena(s.barberia.id, s.barberia.zonaHoraria);
+  // Con la caja cerrada, quien registra movimientos de caja los puede guardar como pendientes: se suman cuando alguien la abra.
+  const puedeMover = s.puede("caja.retiros");
   const TIPOS: [string, string][] = [["", "Todos los movimientos"],
     ...(verVentas ? [["ventas", "Ventas"] as [string, string]] : []), ...(verCortes ? [["cortes", "Cortes de caja"] as [string, string]] : []),
     ...(verEgresos ? [["egresos", "Egresos"] as [string, string]] : []), ...(verPagos ? [["equipo", soloMios ? "Mis pagos" : "Pagos al equipo"] as [string, string]] : []),
@@ -605,9 +608,10 @@ export default async function MovimientosPagina({ searchParams }: { searchParams
       {verVentas && <CabeceraVentas barberiaId={bId} zona={zona} hoy={hoy} persona={verTodas ? persona || undefined : s.usuario.id} propias={!verTodas} {...periodoEncabezado(f.periodo, hoy)} />}
       {revision.length > 0 && <NecesitaRevision cortes={revision} puede={s.puede("caja.corregir")} />}
       {anterior && <p className="aviso-sutil">Mostrando {nombreP} hasta que empiece el mes.</p>}
-      {(movCaja || duenaCaja.saldo > 0) && <CajaModal titular={s.usuario.rol === "duena"} inicial={q.caja === "movimiento" ? "movimiento" : null} turno={null} abierta={movCaja && !!turno} enCobro={!movCaja && !!turno} duena={duenaCaja} limiteDiferencia={0}
+      {(movCaja || duenaCaja.saldo > 0 || (!turno && puedeMover)) && <CajaModal titular={s.usuario.rol === "duena"} inicial={q.caja === "movimiento" ? "movimiento" : null} turno={null} abierta={movCaja && !!turno} enCobro={!movCaja && !!turno} duena={duenaCaja} limiteDiferencia={0} mover={puedeMover}
+        pendientes={!turno && puedeMover ? (await pendientesCaja(s.barberia.id, s.barberia.modeloCaja === "individual" ? s.usuario.id : null)).map((x) => textoPendiente(x, s.barberia.zonaHoraria)) : []}
         categorias={cats.filter((c) => c.activo && !esCategoriaComisiones(c.nombre)).map((c) => c.nombre)} configurar={s.puede("configuracion.egresos") && !s.vista} />}
-      <Movimientos corregir={s.puede("caja.corregir")} abrirCorte={q.corte} botonCaja={movCaja || duenaCaja.saldo > 0 ? <BotonCaja abierta={movCaja && !!turno} pendiente={duenaCaja.saldo > 0} /> : undefined} abrirEgreso={q.egreso === "1"} dias={historial} registrar={s.puede("gastos.registrar")} hoy={hoy} cajaAbierta={!!turno} categorias={cats}
+      <Movimientos corregir={s.puede("caja.corregir")} abrirCorte={q.corte} botonCaja={movCaja || duenaCaja.saldo > 0 || (!turno && puedeMover) ? <BotonCaja abierta={movCaja && !!turno} pendiente={duenaCaja.saldo > 0 || (!turno && puedeMover)} /> : undefined} abrirEgreso={q.egreso === "1"} dias={historial} registrar={s.puede("gastos.registrar")} hoy={hoy} cajaAbierta={!!turno} categorias={cats}
         regreso={`/analitica/finanzas${new URLSearchParams(Object.entries(q).filter(([k, v]) => v && !["aviso", "error", "egreso", "caja"].includes(k)) as [string, string][]).toString() ? `?${new URLSearchParams(Object.entries(q).filter(([k, v]) => v && !["aviso", "error", "egreso", "caja"].includes(k)) as [string, string][])}` : ""}`}
         opcionesVenta={opcionesVenta}
         opciones={{ cajaHref: cobra && s.puede("caja.retiros") ? "/cobrar?caja=movimiento" : movCaja ? "/analitica/finanzas?caja=movimiento" : null, metodos: s.barberia.metodosEgreso, periodicidad: false, comprobantes: s.barberia.usaComprobantes, obligatorio: s.barberia.comprobanteObligatorio, frecuentes: frecuentes.map(({ id, concepto, categoria, monto, metodo, periodicidad }) => ({ id, concepto, categoria, monto, metodo, periodicidad })), sugeridas }}

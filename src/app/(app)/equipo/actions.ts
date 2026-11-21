@@ -56,7 +56,7 @@ export async function responderResena(form: FormData) {
  * Por transferencia no toca la caja; en efectivo sale de la caja abierta y queda como salida del turno.
  * Se cubre primero lo más viejo; si se paga solo una parte, lo demás sigue pendiente.
  */
-export async function entregarPendiente(_: { error?: string } | null, form: FormData): Promise<{ error?: string; ok?: number }> {
+export async function entregarPendiente(_: { error?: string; ok?: number; mensaje?: string } | null, form: FormData): Promise<{ error?: string; ok?: number; mensaje?: string }> {
   const s = await requerirSesion("equipo.pagar");
   if (s.vista) return { error: "En la vista previa no se guardan cambios." };
   const barberoId = texto(form, "barberoId", 40);
@@ -66,6 +66,11 @@ export async function entregarPendiente(_: { error?: string } | null, form: Form
   const [u] = await db.select({ id: schema.usuarios.id, nombre: schema.usuarios.nombre }).from(schema.usuarios)
     .where(and(eq(schema.usuarios.id, barberoId), eq(schema.usuarios.barberiaId, s.barberia.id))).limit(1);
   if (!u) return { error: "No se encontró a esa persona." };
+  // Si se presiona varias veces, el pago se guarda una sola vez.
+  const [ya] = await db.select({ suma: sql<number>`coalesce(sum(${schema.pagosComision.monto}), 0)::int` }).from(schema.pagosComision).where(and(eq(schema.pagosComision.barberiaId, s.barberia.id), eq(schema.pagosComision.barberoId, u.id),
+    eq(schema.pagosComision.usuarioId, s.usuario.id), eq(schema.pagosComision.tipo, "pago"), sql`${schema.pagosComision.nota} not like ${`${POR_ENTREGAR}:%`}`,
+    sql`${schema.pagosComision.creadoEn} > now() - interval '30 seconds'`));
+  if (ya && ya.suma === monto) return { ok: Date.now(), mensaje: "El pago ya se había guardado." };
   const filas = await db.select({ id: schema.pagosComision.id, monto: schema.pagosComision.monto, nota: schema.pagosComision.nota, semana: schema.pagosComision.semana, creadoEn: schema.pagosComision.creadoEn })
     .from(schema.pagosComision).where(and(eq(schema.pagosComision.barberiaId, s.barberia.id), eq(schema.pagosComision.barberoId, u.id), eq(schema.pagosComision.tipo, "pago"),
       like(schema.pagosComision.nota, `${POR_ENTREGAR}:%`), sql`${schema.pagosComision.monto} > 0`)).orderBy(asc(schema.pagosComision.creadoEn));
@@ -109,5 +114,5 @@ export async function entregarPendiente(_: { error?: string } | null, form: Form
   }).catch((e) => { if (e instanceof Error && e.message === "cambio") return "cambio" as const; throw e; });
   if (res === "cambio") return { error: "Ese pago ya cambió. Vuelve a abrir la ventana." };
   revalidatePath("/", "layout");
-  return { ok: Date.now() };
+  return { ok: Date.now(), mensaje: `Pago de ${formatoDinero(monto)} a ${nombre} guardado${total - monto > 0 ? `. Quedan ${formatoDinero(total - monto)} pendientes` : ""}.` };
 }

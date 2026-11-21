@@ -232,6 +232,13 @@
       "when": 1795064524867,
       "tag": "0032_negocio_duena",
       "breakpoints": true
+    },
+    {
+      "idx": 33,
+      "version": "7",
+      "when": 1795276108378,
+      "tag": "0033_movimientos_pendientes",
+      "breakpoints": true
     }
   ]
 }

@@ -413,6 +413,32 @@ export const negocioDuena = pgTable(
   (t) => [index("negocio_duena_barberia_idx").on(t.barberiaId, t.tipo), index("negocio_duena_turno_idx").on(t.turnoId)],
 );
 
+/**
+ * Movimientos de caja que se registraron con la caja cerrada (un gasto, dinero que se puso o que se llevó Titular).
+ * Quedan pendientes y se suman al turno cuando alguien abre la caja.
+ */
+export const movimientosPendientes = pgTable(
+  "movimientos_pendientes",
+  {
+    id: id(),
+    barberiaId: barberiaId(),
+    // gasto, entrada o retiro
+    tipo: text("tipo").notNull(),
+    monto: integer("monto").notNull(),
+    concepto: text("concepto").notNull(),
+    categoria: text("categoria"),
+    // Con caja individual, de quién es la caja donde se va a sumar. Vacío = caja compartida.
+    responsableId: uuid("responsable_id").references(() => usuarios.id),
+    usuarioId: uuid("usuario_id").notNull().references(() => usuarios.id),
+    aplicadoTurnoId: uuid("aplicado_turno_id").references(() => turnosCaja.id),
+    aplicadoEn: timestamp("aplicado_en", { withTimezone: true }),
+    canceladoEn: timestamp("cancelado_en", { withTimezone: true }),
+    canceladoPor: uuid("cancelado_por").references(() => usuarios.id),
+    creadoEn: creadoEn(),
+  },
+  (t) => [index("movimientos_pendientes_barberia_idx").on(t.barberiaId, t.aplicadoTurnoId)],
+);
+
 export const comprobantes = pgTable("comprobantes", {
   id: id(),
   barberiaId: barberiaId(),

@@ -7,6 +7,7 @@ import { Modal } from "@/components/ui";
 import { registrarPago } from "../analitica/equipo/actions";
 import { entregarPendiente } from "./actions";
 import { formatoDinero } from "@/lib/money";
+import { avisarGuardado, useUnEnvio } from "@/components/Envio";
 
 export type DatosFila = {
   id: string; nombre: string; avatar: string; modalidad: string; frecuencia: string; periodo: string; semana: string;
@@ -141,9 +142,10 @@ function FormEntrega({ p, total, cajaAbierta, cerrar }: { p: PendientePersona; t
   const [e, accion, guardando] = useActionState(entregarPendiente, null);
   const [forma, setForma] = useState(cajaAbierta ? "efectivo" : "transferencia");
   const [monto, setMonto] = useState((total / 100).toFixed(0));
-  useEffect(() => { if (e?.ok) cerrar(); }, [e?.ok, cerrar]);
+  const unEnvio = useUnEnvio(guardando);
+  useEffect(() => { if (e?.ok) { avisarGuardado(e.mensaje); cerrar(); } }, [e?.ok, e?.mensaje, cerrar]);
   return (
-    <form action={accion} className="pila">
+    <form action={accion} onSubmit={unEnvio} className="pila">
       <input type="hidden" name="barberoId" value={p.id} />
       <input type="hidden" name="forma" value={forma} />
       <dl className="eq-desg">

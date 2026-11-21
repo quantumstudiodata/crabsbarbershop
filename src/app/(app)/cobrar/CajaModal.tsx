@@ -7,7 +7,11 @@ import { Modal } from "@/components/ui";
 import type { MovimientosTurno } from "@/lib/caja";
 import { formatoDinero, leerPesos } from "@/lib/money";
 import { esLlevoDuena } from "@/lib/caja";
-import { abrirCaja, cerrarCaja, registrarDeposito, registrarGasto, registrarMovimiento, type EstadoCaja, type ResumenCorte } from "../caja/actions";
+import { abrirCaja, cerrarCaja, quitarPendiente, registrarDeposito, registrarGasto, registrarMovimiento, type EstadoCaja, type ResumenCorte } from "../caja/actions";
+import { avisarGuardado, useUnEnvio } from "@/components/Envio";
+
+/** Movimiento registrado con la caja cerrada, que se suma cuando alguien la abra. */
+export type PendienteVista = { id: string; tipo: string; monto: number; titulo: string; hora: string };
 import { prepararArchivo } from "@/lib/archivo";
 
 export type Turno = {
@@ -85,21 +89,31 @@ function CajaMovil({ turno }: { turno: Turno }) {
   );
 }
 
-/** Con la caja cerrada no se muestra nada de Cobro: solo abrirla. */
-export function CajaCerrada({ opera, sugerido }: { opera: boolean; sugerido: number }) {
+/** Con la caja cerrada no se muestra nada de Cobro: solo abrirla (y registrar lo que pase mientras, que se suma al abrirla). */
+export function CajaCerrada({ opera, sugerido, pendientes = [], mover = false }: { opera: boolean; sugerido: number; pendientes?: PendienteVista[]; mover?: boolean }) {
   const [e, accion, abriendo] = useActionState<EstadoCaja, FormData>(abrirCaja, {});
+  const unEnvio = useUnEnvio(abriendo);
   const [fondo, setFondo] = useState(sugerido ? String(sugerido / 100) : "");
+  useEffect(() => { if (e.ok) avisarGuardado(e.mensaje); }, [e.ok, e.n, e.mensaje]);
+  const hay = pendientes.length > 0;
   return (
     <section className="caja-puerta subir">
       <span className="icono-caja"><Icono n="caja" /></span>
       <h1 className="titulo">La caja está cerrada</h1>
       {opera ? (
-        <form action={accion} className="pila" style={{ width: "min(360px, 100%)" }}>
-          <p className="muted">Escribe el efectivo con que se abre para dar cambio.</p>
+        <form action={accion} onSubmit={unEnvio} className="pila" style={{ width: "min(360px, 100%)" }}>
+          {hay && (
+            <div className="mov-pend">
+              <span className="lab">Pasó mientras estaba cerrada</span>
+              {pendientes.map((x) => <div key={x.id} className="mov-pend-r"><span><b>{x.titulo}</b><small>{x.hora}</small></span><span className="num">{x.monto < 0 ? "−" : "+"}{formatoDinero(Math.abs(x.monto))}</span></div>)}
+            </div>
+          )}
+          <p className="muted">{hay ? "Cuenta el efectivo que hay ahora en la caja. Lo de arriba se suma solo al abrirla." : "Escribe el efectivo con que se abre para dar cambio."}</p>
           <input className="input grande" name="fondo" inputMode="decimal" placeholder="$0" value={fondo} onChange={(x) => setFondo(x.target.value)} required autoFocus aria-label="Fondo de apertura" style={{ textAlign: "center" }} />
           <div className="billetes" style={{ justifyContent: "center" }}>{[0, 50, 100, 200, 500].map((v) => <button type="button" key={v} onClick={() => setFondo(String(v))}>{formatoDinero(v * 100)}</button>)}</div>
           {e.error && <p className="aviso error">{e.error}</p>}
           <button className="bt grande" disabled={abriendo}>{abriendo ? "Abriendo…" : "Abrir caja"}<Fl /></button>
+          {mover && <button type="button" className="ac-link" style={{ justifySelf: "center" }} onClick={abrirMovimientoCaja}><Icono n="salida" />Movimiento de caja</button>}
         </form>
       ) : <p className="muted">Pide que la abran para poder cobrar.</p>}
     </section>
@@ -146,12 +160,15 @@ function Resumen({ r, cerrar }: { r: ResumenCorte; cerrar: () => void }) {
   );
 }
 
-export function CajaModal({ inicial, turno, limiteDiferencia, categorias, evidencias = false, egresos = false, configurar = false, abierta = false, titular = false, duena: duenaFuera, enCobro = false }: { /** La caja sí está abierta, pero los movimientos de esta persona se registran en Cobro. */ enCobro?: boolean; /** Lo pendiente de la dueña cuando no se tienen los datos del turno (Movimientos, o la caja cerrada). */ duena?: Turno["duena"]; /** Titular: puede sacar efectivo sin gastarlo ("Me llevo efectivo"). */ titular?: boolean; inicial: Vista | null; turno: Turno | null; limiteDiferencia: number; categorias: string[]; evidencias?: boolean; /** Puede registrar egresos en Movimientos. */ egresos?: boolean; /** Puede editar las categorías de gasto. */ configurar?: boolean; /** Fuera de Cobro: hay caja abierta aunque no se tengan sus datos (solo para movimientos, no para el corte). */ abierta?: boolean }) {
+export function CajaModal({ inicial, turno, limiteDiferencia, categorias, evidencias = false, egresos = false, configurar = false, abierta = false, titular = false, duena: duenaFuera, enCobro = false, pendientes = [], mover = true }: { /** Lo registrado con la caja cerrada que se suma al abrirla. */ pendientes?: PendienteVista[]; /** Puede registrar gastos y entradas (con la caja cerrada quedan pendientes). */ mover?: boolean; /** La caja sí está abierta, pero los movimientos de esta persona se registran en Cobro. */ enCobro?: boolean; /** Lo pendiente de la dueña cuando no se tienen los datos del turno (Movimientos, o la caja cerrada). */ duena?: Turno["duena"]; /** Titular: puede sacar efectivo sin gastarlo ("Me llevo efectivo"). */ titular?: boolean; inicial: Vista | null; turno: Turno | null; limiteDiferencia: number; categorias: string[]; evidencias?: boolean; /** Puede registrar egresos en Movimientos. */ egresos?: boolean; /** Puede editar las categorías de gasto. */ configurar?: boolean; /** Fuera de Cobro: hay caja abierta aunque no se tengan sus datos (solo para movimientos, no para el corte). */ abierta?: boolean }) {
   const [vista, setVista] = useState<Vista | null>(inicial);
   const [eMov, accMov, guardandoMov] = useActionState<EstadoCaja, FormData>(registrarMovimiento, {});
   const [eGasto, accGasto, guardandoGasto] = useActionState<EstadoCaja, FormData>(registrarGasto, {});
   const [eDep, accDep, guardandoDep] = useActionState<EstadoCaja, FormData>(registrarDeposito, {});
   const [eCerrar, accCerrar, cerrando] = useActionState<EstadoCaja, FormData>(cerrarCaja, {});
+  const [eQuitar, accQuitar, quitando] = useActionState<EstadoCaja, FormData>(quitarPendiente, {});
+  // Un doble toque no manda el formulario dos veces.
+  const unMov = useUnEnvio(guardandoMov), unGasto = useUnEnvio(guardandoGasto), unDep = useUnEnvio(guardandoDep), unQuitar = useUnEnvio(quitando);
   const [concepto, setConcepto] = useState("");
   const [categoria, setCategoria] = useState(categorias[0] ?? "Otros");
   const [gasto, setGasto] = useState("");
@@ -173,9 +190,11 @@ export function CajaModal({ inicial, turno, limiteDiferencia, categorias, eviden
     document.addEventListener("click", clic);
     return () => { window.removeEventListener("crabs:caja", f); document.removeEventListener("click", clic); };
   }, []);
-  useEffect(() => { if (eMov.ok) { setVista(null); setConcepto(""); } }, [eMov.n, eMov.ok]);
-  useEffect(() => { if (eGasto.ok) setVista(null); }, [eGasto.n, eGasto.ok]);
-  useEffect(() => { if (eDep.ok) setVista(null); }, [eDep.n, eDep.ok]);
+  // Al guardar se cierra la ventana y abajo aparece un aviso de que quedó guardado.
+  useEffect(() => { if (eMov.ok) { setVista(null); setConcepto(""); avisarGuardado(eMov.mensaje); } }, [eMov.n, eMov.ok, eMov.mensaje]);
+  useEffect(() => { if (eGasto.ok) { setVista(null); setGasto(""); avisarGuardado(eGasto.mensaje); } }, [eGasto.n, eGasto.ok, eGasto.mensaje]);
+  useEffect(() => { if (eDep.ok) { setVista(null); avisarGuardado(eDep.mensaje); } }, [eDep.n, eDep.ok, eDep.mensaje]);
+  useEffect(() => { if (eQuitar.ok) avisarGuardado(eQuitar.mensaje); }, [eQuitar.n, eQuitar.ok, eQuitar.mensaje]);
   useEffect(() => { if (eCerrar.ok && eCerrar.resumen) { setResumen(eCerrar.resumen); setVista(null); setContado(""); } }, [eCerrar.n, eCerrar.ok, eCerrar.resumen]);
 
   const cerrar = () => { setVista(null); setGasto(""); };
@@ -183,7 +202,7 @@ export function CajaModal({ inicial, turno, limiteDiferencia, categorias, eviden
   if (!vista) return null;
   // Con la caja cerrada no hay dónde registrar el movimiento: se dice en lugar de no hacer nada.
   // Si hay algo pendiente de depositar a la dueña, sí se puede registrar el depósito (no toca la caja).
-  if (!turno && !abierta && vista !== "corte" && !((duenaFuera?.saldo ?? 0) > 0)) return (
+  if (!turno && !abierta && vista !== "corte" && !mover && !((duenaFuera?.saldo ?? 0) > 0)) return (
     <Modal abierto cerrar={cerrar} etiqueta="Caja" titulo="La caja está cerrada">
       <div className="pila">
         <p className="muted" style={{ margin: 0 }}>Para sacar o poner dinero, o pagar algo con la caja, primero hay que abrirla en Cobro. Lo que se paga por transferencia o tarjeta se registra como egreso.</p>
@@ -193,8 +212,11 @@ export function CajaModal({ inicial, turno, limiteDiferencia, categorias, eviden
   );
   const duena = turno?.duena ?? duenaFuera;
   // Con la caja cerrada solo se puede registrar el depósito a la dueña (no toca la caja).
-  const cerrada = !turno && !abierta;
-  if (!turno && !((abierta || (duena?.saldo ?? 0) > 0) && vista !== "corte")) return null;
+  const cerrada = !turno && !abierta && !enCobro;
+  // Con la caja cerrada, lo que se registra se guarda como pendiente y se suma cuando alguien la abra.
+  const comoPendiente = cerrada && mover;
+  if (!turno && !((abierta || comoPendiente || (duena?.saldo ?? 0) > 0) && vista !== "corte")) return null;
+  const notaCerrada = comoPendiente ? <p className="ayuda-txt" style={{ margin: 0 }}>La caja está cerrada: se guarda y se suma cuando alguien la abra.</p> : null;
 
   // Sacar efectivo sin gastarlo solo lo hace Titular; a los demás un enlace viejo de "retiro" les abre las opciones.
   const vistaReal: Vista = vista === "retiro" && !titular ? "movimiento" : vista;
@@ -203,9 +225,9 @@ export function CajaModal({ inicial, turno, limiteDiferencia, categorias, eviden
   if (vistaReal === "movimiento") {
     // Lo demás que sale de la caja (lo del equipo y lo de la dueña) se saca en el corte.
     const ops: [Vista, string, string, string][] = [
-      ...(cerrada ? [] : [["gasto", "etiqueta", "Pagué algo con dinero de la caja", "Agua, limpieza, productos. Cuenta como gasto."], ["entrada", "entrada", "Puse dinero en la caja", "Para tener cambio. No cuenta como venta."]] as [Vista, string, string, string][]),
+      ...(enCobro || (cerrada && !mover) ? [] : [["gasto", "etiqueta", "Pagué algo con dinero de la caja", "Agua, limpieza, productos. Cuenta como gasto."], ["entrada", "entrada", "Puse dinero en la caja", "Para tener cambio. No cuenta como venta."]] as [Vista, string, string, string][]),
       ...((duena?.saldo ?? 0) > 0 ? [["deposito", "enviar", "Deposité a la dueña", `Pendiente de depositar ${formatoDinero(duena!.saldo)}, ${duena!.desde}. Con comprobante.`] as [Vista, string, string, string]] : []),
-      ...(titular && !cerrada ? [["retiro", "salida", "Me llevo efectivo de la caja", "Lo tomo yo o alguien de mi parte. Se descuenta de lo del negocio."] as [Vista, string, string, string]] : []),
+      ...(titular && !enCobro && (!cerrada || mover) ? [["retiro", "salida", "Me llevo efectivo de la caja", "Lo tomo yo o alguien de mi parte. Se descuenta de lo del negocio."] as [Vista, string, string, string]] : []),
     ];
     return (
       <Modal abierto cerrar={cerrar} etiqueta="Caja" titulo="¿Qué pasó con el dinero?">
@@ -216,7 +238,22 @@ export function CajaModal({ inicial, turno, limiteDiferencia, categorias, eviden
             </button>
           ))}
         </div>
-        {cerrada && <p className="ayuda-txt" style={{ margin: "12px 0 0" }}>{enCobro ? "Para pagar un gasto o poner dinero, usa Movimiento de caja en Cobro." : "La caja está cerrada. Para pagar un gasto o poner dinero, primero ábrela en Cobro."}</p>}
+        {enCobro && <p className="ayuda-txt" style={{ margin: "12px 0 0" }}>Para pagar un gasto o poner dinero, usa Movimiento de caja en Cobro.</p>}
+        {cerrada && <p className="ayuda-txt" style={{ margin: "12px 0 0" }}>{mover ? "La caja está cerrada. Lo que registres se guarda y se suma cuando alguien la abra." : "La caja está cerrada. Para pagar un gasto o poner dinero, primero hay que abrirla en Cobro."}</p>}
+        {cerrada && pendientes.length > 0 && (
+          <div className="mov-pend">
+            <span className="lab">Se suman al abrir la caja</span>
+            {pendientes.map((x) => (
+              <form key={x.id} action={accQuitar} onSubmit={unQuitar} className="mov-pend-r">
+                <input type="hidden" name="id" value={x.id} />
+                <span><b>{x.titulo}</b><small>{x.hora}</small></span>
+                <span className="num">{x.monto < 0 ? "−" : "+"}{formatoDinero(Math.abs(x.monto))}</span>
+                {mover && <button className="enlace" disabled={quitando}>Quitar</button>}
+              </form>
+            ))}
+            {eQuitar.error && <p className="aviso error">{eQuitar.error}</p>}
+          </div>
+        )}
         {egresos && <p className="ayuda-txt" style={{ margin: "12px 0 0" }}>¿Pagaste un gasto con transferencia o tarjeta? Ese dinero no salió de la caja. <a className="enlace" href="/analitica/finanzas?egreso=1">Regístralo aquí</a>.</p>}
       </Modal>
     );
@@ -225,9 +262,10 @@ export function CajaModal({ inicial, turno, limiteDiferencia, categorias, eviden
   if (vistaReal === "retiro") {
     return (
       <Modal abierto cerrar={cerrar} etiqueta="Movimiento de caja" titulo="Me llevo efectivo de la caja">
-        <form action={accMov} className="pila">
+        <form action={accMov} onSubmit={unMov} className="pila">
           <input type="hidden" name="tipo" value="retiro" />
           {atras}
+          {notaCerrada}
           <label className="campo"><span>¿Cuánto?</span><input className="input grande" name="monto" inputMode="decimal" placeholder="$0" required autoFocus aria-label="Monto" /></label>
           <label className="campo"><span>¿Quién lo recoge?</span><input className="input" name="quien" maxLength={80} placeholder="Si lo recoges tú, déjalo en blanco" aria-label="Quién lo recoge" /></label>
           <p className="ayuda-txt" style={{ margin: 0 }}>Se descuenta de lo del negocio de hoy. Si es más, se toma del fondo y el corte lo dice.</p>
@@ -241,7 +279,7 @@ export function CajaModal({ inicial, turno, limiteDiferencia, categorias, eviden
   if (vistaReal === "deposito" && duena) {
     return (
       <Modal abierto cerrar={cerrar} etiqueta="Movimiento de caja" titulo="Deposité a la dueña">
-        <Deposito duena={duena} accion={accDep} guardando={guardandoDep} error={eDep.error} atras={atras} />
+        <Deposito duena={duena} accion={accDep} unEnvio={unDep} guardando={guardandoDep} error={eDep.error} atras={atras} />
       </Modal>
     );
   }
@@ -250,9 +288,10 @@ export function CajaModal({ inicial, turno, limiteDiferencia, categorias, eviden
     const sugeridos = ["Más cambio", "Reposición del fondo"];
     return (
       <Modal abierto cerrar={cerrar} etiqueta="Caja" titulo="Puse dinero en la caja">
-        <form action={accMov} className="pila">
+        <form action={accMov} onSubmit={unMov} className="pila">
           <input type="hidden" name="tipo" value="entrada" />
           {atras}
+          {notaCerrada}
           <p className="ayuda-txt" style={{ margin: 0 }}>No es una venta. La caja tendrá más dinero y el corte lo toma en cuenta.</p>
           <input className="input grande" name="monto" inputMode="decimal" placeholder="$0" required autoFocus aria-label="Monto" />
           <div className="pila-chica">
@@ -269,8 +308,9 @@ export function CajaModal({ inicial, turno, limiteDiferencia, categorias, eviden
   if (vistaReal === "gasto") {
     return (
       <Modal abierto cerrar={cerrar} etiqueta="Caja" titulo="Pagué algo con dinero de la caja">
-        <form action={accGasto} className="pila">
+        <form action={accGasto} onSubmit={unGasto} className="pila">
           {atras}
+          {notaCerrada}
           <input type="hidden" name="categoria" value={categoria} />
           <input className="input grande" name="monto" inputMode="decimal" placeholder="$0" required autoFocus aria-label="Monto" />
           <input className="input" name="concepto" value={gasto} onChange={(e) => setGasto(e.target.value)} placeholder="¿Qué se pagó? Ejemplo: garrafón de agua" required aria-label="Qué se pagó" />
@@ -524,7 +564,7 @@ function CortePasos({ turno, accion, cerrando, error, contado, setContado, limit
  * Depósito a la dueña de lo acumulado del negocio. Se ve qué cortes cubre, de lo más viejo a lo más nuevo;
  * si se deposita menos, lo demás sigue pendiente. El comprobante es obligatorio.
  */
-function Deposito({ duena, accion, guardando, error, atras }: { duena: NonNullable<Turno["duena"]>; accion: (d: FormData) => void; guardando: boolean; error?: string; atras: React.ReactNode }) {
+function Deposito({ duena, accion, unEnvio, guardando, error, atras }: { duena: NonNullable<Turno["duena"]>; accion: (d: FormData) => void; unEnvio: (e: React.FormEvent) => void; guardando: boolean; error?: string; atras: React.ReactNode }) {
   const [monto, setMonto] = useState(String(duena.saldo / 100));
   const [archivo, setArchivo] = useState<{ datos: string; nombre: string } | null>(null);
   const [leyendo, setLeyendo] = useState(false);
@@ -538,7 +578,7 @@ function Deposito({ duena, accion, guardando, error, atras }: { duena: NonNullab
     try { setArchivo({ datos: await prepararArchivo(f), nombre: f.name }); } finally { setLeyendo(false); }
   };
   return (
-    <form action={accion} className="pila">
+    <form action={accion} onSubmit={unEnvio} className="pila">
       {atras}
       <label className="campo"><span>¿Cuánto depositaste?</span>
         <input className="input grande" name="monto" inputMode="decimal" value={monto} onChange={(e) => setMonto(e.target.value)} required aria-label="Monto del depósito" />

@@ -12,6 +12,7 @@ import type { Promo } from "@/lib/promociones";
 import { ModoFoco } from "./ModoFoco";
 import { comisionesDeTurno, entregasDeCorte, propinasDeTurno } from "@/lib/comisionesCorte";
 import { datosDuena, leTocaAlNegocio } from "@/lib/duena";
+import { pendientesCaja, textoPendiente } from "@/lib/pendientesCaja";
 
 export const metadata = { title: "Cobro" };
 
@@ -83,12 +84,17 @@ export default async function Cobrar({ searchParams }: { searchParams: Promise<{
         .map((g) => ({ concepto: g.concepto, metodo: g.metodo === "tarjeta" ? "Tarjeta" : "Transferencia", monto: g.monto })) : [],
     };
   }
+  // Con la caja cerrada: lo que se registró mientras tanto (se suma al abrirla) y lo pendiente de depositar a la dueña.
+  const [pendCaja, duenaCerrada] = !turno && opera
+    ? await Promise.all([pendientesCaja(s.barberia.id, s.barberia.modeloCaja === "individual" ? s.usuario.id : null), datosDuena(s.barberia.id, zona)])
+    : [[], undefined];
+  const pendVista = pendCaja.map((x) => textoPendiente(x, zona));
   const folioVenta = `${s.barberia.folioPrefijo}-${String(s.barberia.siguienteFolio).padStart(6, "0")}`;
 
   return (
     <>
       <ModoFoco />
-      {!turno ? <CajaCerrada opera={opera} sugerido={s.barberia.fondoPredeterminado} />
+      {!turno ? <CajaCerrada opera={opera} sugerido={s.barberia.fondoPredeterminado} pendientes={pendVista} mover={s.puede("caja.retiros")} />
         : turno.deOtroDia && s.barberia.corteObligatorio ? <CajaPendiente dia={turno.dia} opera={opera} />
         : (
           <>
@@ -110,7 +116,8 @@ export default async function Cobrar({ searchParams }: { searchParams: Promise<{
             )}
           </>
         )}
-      {opera && <CajaModal titular={s.usuario.rol === "duena"} inicial={q.caja === "cerrar" ? "corte" : q.caja === "retiro" || q.caja === "movimiento" ? "movimiento" : null} turno={turno} limiteDiferencia={s.barberia.limiteDiferenciaCaja} categorias={cats.filter((c) => !esCategoriaComisiones(c.nombre)).map((c) => c.nombre)} evidencias={s.barberia.usaEvidenciaCorte} egresos={s.puede("gastos.registrar")} configurar={s.puede("configuracion.egresos") && !s.vista} />}
+      {opera && <CajaModal titular={s.usuario.rol === "duena"} inicial={q.caja === "cerrar" ? "corte" : q.caja === "retiro" || q.caja === "movimiento" ? "movimiento" : null} turno={turno} limiteDiferencia={s.barberia.limiteDiferenciaCaja} categorias={cats.filter((c) => !esCategoriaComisiones(c.nombre)).map((c) => c.nombre)} evidencias={s.barberia.usaEvidenciaCorte} egresos={s.puede("gastos.registrar")} configurar={s.puede("configuracion.egresos") && !s.vista}
+        duena={duenaCerrada} pendientes={pendVista} mover={s.puede("caja.retiros")} />}
     </>
   );
 }

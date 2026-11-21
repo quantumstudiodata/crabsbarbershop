@@ -15,6 +15,7 @@ import { registrar } from "@/lib/historial";
 import { formatoDinero, leerPesos } from "@/lib/money";
 import { texto, volver } from "@/lib/volver";
 import { MAX_ADJUNTO, TIPOS_ADJUNTO } from "@/lib/archivo";
+import { aplicarPendientes, efectoPendientes, pendientesCaja } from "@/lib/pendientesCaja";
 
 export type ResumenCorte = {
   folio: string; desde: string; hasta: string; metodos: { metodo: string; total: number }[]; total: number; ventas: number;
@@ -35,17 +36,70 @@ export async function abrirCaja(_: EstadoCaja, form: FormData): Promise<EstadoCa
   const fondo = leerPesos(texto(form, "fondo"));
   if (fondo === null) return { error: "Escribe con cuánto efectivo se abre la caja. Si no hay, escribe 0." };
   if (await cajaDe(s)) return { error: "La caja ya está abierta." };
+  const responsable = s.barberia.modeloCaja === "individual" ? s.usuario.id : null;
+  let sumados = 0;
   try {
     await db.transaction(async (tx) => {
-      await tx.insert(schema.turnosCaja).values({ barberiaId: s.barberia.id, fondoInicial: fondo, abiertoPor: s.usuario.id, responsableId: s.barberia.modeloCaja === "individual" ? s.usuario.id : null, fechaOperativa: fechaLocal(new Date(), s.barberia.zonaHoraria) });
-      await registrar(tx, { barberiaId: s.barberia.id, usuarioId: s.usuario.id, tipo: "caja", accion: `${s.usuario.nombre} abrió la caja con ${formatoDinero(fondo)}`, detalle: { fondo } });
+      // Lo que se registró con la caja cerrada ya está reflejado en lo que se contó: el fondo es lo que había antes de esos movimientos,
+      // y los movimientos se suman al turno. Así el corte termina en lo que de verdad hay.
+      const pend = await pendientesCaja(s.barberia.id, responsable, tx);
+      const fondoInicial = Math.max(0, fondo + efectoPendientes(pend));
+      const [t] = await tx.insert(schema.turnosCaja).values({ barberiaId: s.barberia.id, fondoInicial, abiertoPor: s.usuario.id, responsableId: responsable, fechaOperativa: fechaLocal(new Date(), s.barberia.zonaHoraria) }).returning({ id: schema.turnosCaja.id });
+      sumados = (await aplicarPendientes(tx, s.barberia.id, t.id, responsable, s.barberia.zonaHoraria)).length;
+      await registrar(tx, { barberiaId: s.barberia.id, usuarioId: s.usuario.id, tipo: "caja", accion: `${s.usuario.nombre} abrió la caja con ${formatoDinero(fondo)}`,
+        detalle: { fondo, pendientes: pend.length ? `Se sumaron ${pend.length} movimientos registrados con la caja cerrada` : undefined } });
     });
   } catch {
     return { error: "La caja ya está abierta." };
   }
   // Citas pagadas en línea mientras la caja estaba cerrada: se registran como venta en esta caja.
   await ventasDeCitasPagadas(s.barberia.id).catch((err) => console.error("venta_cita_linea", err));
-  return listo("La caja quedó abierta.");
+  return listo(sumados ? `La caja quedó abierta. Se sumaron ${sumados === 1 ? "1 movimiento" : `${sumados} movimientos`} de cuando estaba cerrada.` : "La caja quedó abierta.");
+}
+
+type SesionCaja = Awaited<ReturnType<typeof requerirSesion>>;
+
+/** El mismo movimiento de la misma persona en los últimos segundos: fue un doble toque, no se guarda otra vez. */
+async function repetido(s: SesionCaja, tipo: string, monto: number, concepto: string) {
+  const hace = sql`now() - interval '30 seconds'`;
+  if (tipo === "gasto") {
+    const [g] = await db.select({ id: schema.gastos.id }).from(schema.gastos).where(and(eq(schema.gastos.barberiaId, s.barberia.id), eq(schema.gastos.usuarioId, s.usuario.id),
+      eq(schema.gastos.monto, monto), eq(schema.gastos.concepto, concepto), sql`${schema.gastos.creadoEn} > ${hace}`)).limit(1);
+    if (g) return true;
+  } else {
+    const [m] = await db.select({ id: schema.movimientosCaja.id }).from(schema.movimientosCaja).where(and(eq(schema.movimientosCaja.barberiaId, s.barberia.id), eq(schema.movimientosCaja.usuarioId, s.usuario.id),
+      eq(schema.movimientosCaja.monto, monto), eq(schema.movimientosCaja.concepto, concepto), sql`${schema.movimientosCaja.creadoEn} > ${hace}`)).limit(1);
+    if (m) return true;
+  }
+  const [p] = await db.select({ id: schema.movimientosPendientes.id }).from(schema.movimientosPendientes).where(and(eq(schema.movimientosPendientes.barberiaId, s.barberia.id),
+    eq(schema.movimientosPendientes.usuarioId, s.usuario.id), eq(schema.movimientosPendientes.tipo, tipo), eq(schema.movimientosPendientes.monto, monto), eq(schema.movimientosPendientes.concepto, concepto),
+    sql`${schema.movimientosPendientes.creadoEn} > ${hace}`)).limit(1);
+  return !!p;
+}
+
+/** Con la caja cerrada, el movimiento queda pendiente y se suma cuando alguien abra la caja. */
+async function guardarPendiente(s: SesionCaja, tipo: string, monto: number, concepto: string, categoria: string | null): Promise<EstadoCaja> {
+  await db.transaction(async (tx) => {
+    await tx.insert(schema.movimientosPendientes).values({ barberiaId: s.barberia.id, tipo, monto, concepto, categoria, usuarioId: s.usuario.id,
+      responsableId: s.barberia.modeloCaja === "individual" ? s.usuario.id : null });
+    await registrar(tx, { barberiaId: s.barberia.id, usuarioId: s.usuario.id, tipo: tipo === "gasto" ? "gasto" : "caja",
+      accion: `${s.usuario.nombre} registró con la caja cerrada: ${tipo === "gasto" ? "gasto" : tipo === "entrada" ? "entrada" : "efectivo que se llevó"} de ${formatoDinero(monto)}. Se suma al abrir la caja`, detalle: { concepto, categoria: categoria ?? undefined, pendiente: true } });
+  });
+  return listo(`Guardado. La caja está cerrada: ${formatoDinero(monto)} se suman cuando alguien la abra.`);
+}
+
+/** Quita un movimiento pendiente que se registró por error (antes de que se abra la caja). */
+export async function quitarPendiente(_: EstadoCaja, form: FormData): Promise<EstadoCaja> {
+  const s = await requerirSesion();
+  if (!s.puede("caja.retiros")) return { error: "No tienes permiso para registrar movimientos de caja." };
+  const id = texto(form, "id", 40);
+  if (!/^[0-9a-f-]{36}$/.test(id)) return { error: "No se encontró ese movimiento." };
+  const [x] = await db.update(schema.movimientosPendientes).set({ canceladoEn: new Date(), canceladoPor: s.usuario.id })
+    .where(and(eq(schema.movimientosPendientes.id, id), eq(schema.movimientosPendientes.barberiaId, s.barberia.id), isNull(schema.movimientosPendientes.aplicadoTurnoId), isNull(schema.movimientosPendientes.canceladoEn)))
+    .returning({ monto: schema.movimientosPendientes.monto, concepto: schema.movimientosPendientes.concepto });
+  if (!x) return { error: "Ese movimiento ya se sumó a la caja o ya se quitó." };
+  await registrar(db, { barberiaId: s.barberia.id, usuarioId: s.usuario.id, tipo: "caja", accion: `${s.usuario.nombre} quitó un movimiento pendiente de ${formatoDinero(x.monto)}`, detalle: { concepto: x.concepto } });
+  return listo("Se quitó el movimiento pendiente.");
 }
 
 export async function registrarMovimiento(_: EstadoCaja, form: FormData): Promise<EstadoCaja> {
@@ -63,7 +117,13 @@ export async function registrarMovimiento(_: EstadoCaja, form: FormData): Promis
   if (!monto) return { error: "Escribe el monto." };
   if (!concepto) return { error: "Escribe para qué fue." };
   const turno = await cajaDe(s);
-  if (!turno) return { error: "La caja está cerrada." };
+  // Si se presiona varias veces, se guarda una sola.
+  if (await repetido(s, tipo, monto, concepto)) return listo(llevo ? `Se registró que te llevaste ${formatoDinero(monto)}.` : `Entrada de ${formatoDinero(monto)} guardada.`);
+  if (!turno) return guardarPendiente(s, tipo, monto, concepto, null);
+  if (llevo) {
+    const d = await movimientosDeTurno(s.barberia.id, turno.id, turno.fondoInicial);
+    if (monto > d.esperado) return { error: `En la caja solo hay ${formatoDinero(Math.max(0, d.esperado))}.` };
+  }
   await db.transaction(async (tx) => {
     await tx.insert(schema.movimientosCaja).values({ barberiaId: s.barberia.id, turnoId: turno.id, tipo, monto, concepto, usuarioId: s.usuario.id });
     await registrar(tx, {
@@ -86,6 +146,10 @@ export async function registrarDeposito(_: EstadoCaja, form: FormData): Promise<
   const nombre = texto(form, "comprobanteNombre", 120) || "comprobante";
   if (!archivo) return { error: "Adjunta el comprobante del depósito." };
   if (!TIPOS_ADJUNTO.test(archivo) || archivo.length > MAX_ADJUNTO) return { error: "El comprobante debe ser una foto o un PDF de máximo 1 MB." };
+  // Si se presiona varias veces, se guarda una sola.
+  const [ya] = await db.select({ id: schema.negocioDuena.id }).from(schema.negocioDuena).where(and(eq(schema.negocioDuena.barberiaId, s.barberia.id), eq(schema.negocioDuena.tipo, "deposito"),
+    eq(schema.negocioDuena.monto, monto), eq(schema.negocioDuena.usuarioId, s.usuario.id), isNull(schema.negocioDuena.anuladoEn), sql`${schema.negocioDuena.creadoEn} > now() - interval '30 seconds'`)).limit(1);
+  if (ya) return listo(`Depósito de ${formatoDinero(monto)} guardado.`);
   const { saldo } = await cuentaDuena(s.barberia.id);
   if (saldo <= 0) return { error: "No hay nada pendiente de depositar a la dueña." };
   if (monto > saldo) return { error: `Solo hay ${formatoDinero(saldo)} pendientes de depositar. Revisa el monto.` };
@@ -131,7 +195,11 @@ export async function registrarGasto(_: EstadoCaja, form: FormData): Promise<Est
   if (!monto) return { error: "Escribe el monto del gasto." };
   if (!concepto) return { error: "Escribe en qué se gastó." };
   const turno = await cajaDe(s);
-  if (!turno) return { error: "La caja está cerrada." };
+  if (await repetido(s, "gasto", monto, concepto)) return listo(`Gasto de ${formatoDinero(monto)} guardado.`);
+  if (!turno) return guardarPendiente(s, "gasto", monto, concepto, categoria);
+  // No puede salir más efectivo del que hay en la caja; lo pagado con transferencia o tarjeta es un egreso.
+  const d = await movimientosDeTurno(s.barberia.id, turno.id, turno.fondoInicial);
+  if (monto > d.esperado) return { error: `En la caja solo hay ${formatoDinero(Math.max(0, d.esperado))}. Si lo pagaste con transferencia o tarjeta, regístralo como egreso.` };
   await db.transaction(async (tx) => {
     await tx.insert(schema.gastos).values({ barberiaId: s.barberia.id, categoria, concepto, monto, metodo: "efectivo", turnoId: turno.id, usuarioId: s.usuario.id, fecha: fechaLocal(new Date(), s.barberia.zonaHoraria) });
     await registrar(tx, {

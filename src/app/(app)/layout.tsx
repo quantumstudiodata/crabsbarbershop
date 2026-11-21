@@ -26,6 +26,7 @@ import { copiaRegla, reglasDe } from "@/lib/datos";
 import { db, schema } from "@/lib/db";
 import { formatoDinero } from "@/lib/money";
 import { NOMBRE_ROL, PERMISOS_CONFIG, PLANTILLAS } from "@/lib/permisos";
+import { AvisoGuardado } from "@/components/Envio";
 
 export const dynamic = "force-dynamic";
 // Ningún pedido de la app debe esperar más de un minuto: si algo se traba, falla rápido en lugar de bloquear 5 minutos.
@@ -78,6 +79,7 @@ export default async function LayoutApp({ children }: { children: React.ReactNod
         </div>
       </header>
       <main className="contenedor">{!s.vista && <PrimeraVez />}{children}</main>
+      <AvisoGuardado />
       {(s.puede("ventas.registrar") || s.puede("ventas.registrar_otros")) && cobraEnLinea(s.barberia) && <QrGlobal />}
       <BarraInferior items={items} mas={{
         historial: s.puede("ventas.ver_todas") || atiende,

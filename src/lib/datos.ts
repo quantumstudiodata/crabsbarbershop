@@ -1,3 +1,4 @@
+import { aplicarPendientes } from "./pendientesCaja";
 // Consultas de lectura. Todas reciben barberiaId desde la sesión: nunca desde la URL ni el formulario.
 
 import { and, asc, desc, eq, gte, inArray, isNotNull, isNull, lte, sql, type SQL } from "drizzle-orm";
@@ -40,10 +41,12 @@ export async function cajaOAbrir(se: { barberia: typeof s.barberias.$inferSelect
   const individual = se.barberia.modeloCaja === "individual";
   try {
     await db.transaction(async (tx) => {
-      await tx.insert(s.turnosCaja).values({
+      const [t] = await tx.insert(s.turnosCaja).values({
         barberiaId: se.barberia.id, fondoInicial: se.barberia.fondoPredeterminado, abiertoPor: se.usuario.id,
         responsableId: individual ? se.usuario.id : null, fechaOperativa: fechaLocal(new Date(), se.barberia.zonaHoraria),
-      });
+      }).returning({ id: s.turnosCaja.id });
+      // Lo que se registró con la caja cerrada se suma a este turno.
+      await aplicarPendientes(tx, se.barberia.id, t.id, individual ? se.usuario.id : null, se.barberia.zonaHoraria);
       await tx.insert(s.historial).values({
         barberiaId: se.barberia.id, usuarioId: se.usuario.id, tipo: "caja",
         accion: `${se.usuario.nombre} abrió la caja con ${(se.barberia.fondoPredeterminado / 100).toLocaleString("es-MX", { style: "currency", currency: "MXN" }).replace(".00", "")}`,
