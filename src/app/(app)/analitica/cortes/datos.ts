@@ -3,6 +3,7 @@ import { esAcumulado, esLlevoDuena, esPagoAnulado, esPagoEquipo, esPropinaEntreg
 import { cobradoresDe } from "@/lib/faltantes";
 import { ajustesDeTurnos, detalleCortes, metodosActivos, turnosCerrados } from "@/lib/datos";
 import { db, schema } from "@/lib/db";
+import { cuentaDuena } from "@/lib/duena";
 import { fechaCorta, fechaLarga, horaCorta } from "@/lib/fechas";
 import { formatoDinero } from "@/lib/money";
 import type { Corte } from "./HistorialCortes";
@@ -66,6 +67,16 @@ export async function armarCortes(barberiaId: string, turnos: Turno[], o: { zona
       return { ...x, origen };
     });
   };
+  // Lo que vendió y le tocó a cada quien en cada turno, y lo que quedó pendiente para la dueña.
+  const [porPersona, acumulados, cuentaNeg] = await Promise.all([
+    db.select({ turnoId: schema.ventas.turnoId, barberoId: schema.conceptos.barberoId, vendio: sql<number>`coalesce(sum(${schema.conceptos.precioCobrado}),0)::int`, toca: sql<number>`coalesce(sum(${schema.conceptos.comision}),0)::int` })
+      .from(schema.conceptos).innerJoin(schema.ventas, eq(schema.ventas.id, schema.conceptos.ventaId))
+      .where(and(eq(schema.ventas.barberiaId, barberiaId), inArray(schema.ventas.turnoId, ids), eq(schema.ventas.estado, "pagada")))
+      .groupBy(schema.ventas.turnoId, schema.conceptos.barberoId),
+    db.select({ turnoId: schema.negocioDuena.turnoId, monto: schema.negocioDuena.monto }).from(schema.negocioDuena)
+      .where(and(eq(schema.negocioDuena.barberiaId, barberiaId), eq(schema.negocioDuena.tipo, "acumulado"), inArray(schema.negocioDuena.turnoId, ids), isNull(schema.negocioDuena.anuladoEn))),
+    cuentaDuena(barberiaId),
+  ]);
   const { zona, hoy, gente, folios } = o;
   const persona = (id: string | null) => gente.find((g) => g.id === id) ?? { nombre: "", avatar: "iniciales" };
   return turnos.map((c): Corte => {
@@ -95,6 +106,44 @@ export async function armarCortes(barberiaId: string, turnos: Turno[], o: { zona
         ...gastos.map((g) => ({ t: g.creadoEn.getTime(), tipo: "gasto", hora: horaCorta(g.creadoEn, zona), titulo: "Gasto pagado con la caja", detalle: g.concepto, monto: -g.monto })),
       ].sort((a, b) => a.t - b.t),
       fueraCaja: fueraDe(c.cerradoEn),
+      reparto: (() => {
+        const fuera = fueraDe(c.cerradoEn);
+        // Quien vendió en el turno, y quien no vendió pero recibió algo en el corte (comisiones de días anteriores).
+        const vendieron = porPersona.filter((x) => x.turnoId === c.id && x.barberoId);
+        const nombres = new Set(vendieron.map((x) => persona(x.barberoId).nombre.split(" ")[0]));
+        const sinVenta = [...new Set([...movs.filter((m) => m.tipo === "retiro" && esPagoEquipo(m.concepto)).map((m) => m.concepto.replace(/^Pago (de comisiones )?a /, "")), ...fuera.map((y) => y.nombre)])]
+          .filter((n) => n && !nombres.has(n)).map((n) => ({ nombre: n, vendio: 0, toca: 0 }));
+        const personas = [...vendieron.map((x) => ({ nombre: persona(x.barberoId).nombre.split(" ")[0], vendio: x.vendio, toca: x.toca })), ...sinVenta].map((x) => {
+          const nombre = x.nombre;
+          const pagos = movs.filter((m) => m.tipo === "retiro" && esPagoEquipo(m.concepto) && m.concepto.endsWith(` ${nombre}`));
+          // Lo que se entregó al cerrar es lo que se decidió en el corte; lo que se pagó antes, durante el turno, va aparte.
+          // Las salidas del cierre se guardan justo después de la hora de cierre (con margen por la diferencia de relojes).
+          const alCerrar = (m: (typeof pagos)[number]) => !!c.cerradoEn && m.creadoEn.getTime() >= c.cerradoEn.getTime() - 5_000;
+          const caja = pagos.filter(alCerrar).reduce((a, m) => a + m.monto, 0);
+          const enTurno = pagos.filter((m) => !alCerrar(m)).reduce((a, m) => a + m.monto, 0);
+          const de = (como: string) => fuera.filter((y) => y.nombre === nombre && y.como === como).reduce((a, y) => a + y.monto, 0);
+          const transf = de("por transferencia"), pendiente = de("para el próximo corte");
+          // En el corte se entrega primero lo más viejo: lo que pasa de lo que le toca hoy es de días anteriores.
+          const anteriores = Math.max(0, caja + transf + pendiente - x.toca);
+          let resta = anteriores;
+          const quita = (v: number) => { const q = Math.min(v, resta); resta -= q; return v - q; };
+          const hoyCaja = quita(caja), hoyTransf = quita(transf), hoyPend = quita(pendiente);
+          // Lo que no se decidió en este corte (con pagos por semana, se paga en su fecha).
+          const despues = Math.max(0, x.toca - hoyCaja - hoyTransf - hoyPend);
+          return { nombre, vendio: x.vendio, toca: x.toca, caja: hoyCaja, transf: hoyTransf, pendiente: hoyPend, despues, anteriores, enTurno };
+        });
+        const total = metodos.reduce((a, x) => a + x.total, 0);
+        const toca = Math.max(0, total - personas.reduce((a, x) => a + x.toca, 0));
+        const recibido = total - efectivo;
+        const llevo = movs.filter((m) => m.tipo === "retiro" && esLlevoDuena(m.concepto)).reduce((a, m) => a + m.monto, 0);
+        const gastosCaja = gastos.reduce((a, g) => a + g.monto, 0);
+        const pendiente = acumulados.filter((x) => x.turnoId === c.id).reduce((a, x) => a + x.monto, 0);
+        // De lo que quedó pendiente en este corte, cuánto ya se le depositó después.
+        const depositado = cuentaNeg.partes.filter((x) => x.turnoId === c.id).reduce((a, x) => a + x.monto - x.queda, 0);
+        // Lo que le llegó de más (por transferencia o tarjeta) sobre lo que le tocaba: es del equipo.
+        const deMas = Math.max(0, recibido + gastosCaja + llevo - toca);
+        return { personas, negocio: { vendio: total, toca, recibido, gastos: gastosCaja, llevo, pendiente, depositado, deMas } };
+      })(),
       evidencias: evid.filter((x) => x.turnoId === c.id).map((x) => ({ id: x.id, etiqueta: x.etiqueta, nombre: x.nombre, tipo: x.tipo })),
       ajustes: ajustes.filter((x) => x.turnoId === c.id).map((x) => `Ajuste de ${formatoDinero(x.monto)} por ${x.usuario.split(" ")[0]}: ${x.motivo}`),
     };

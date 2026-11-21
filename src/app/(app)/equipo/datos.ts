@@ -91,3 +91,19 @@ export async function cuentasEnCurso(barberiaId: string, zona: string, personas:
       cifras: { comision: c.comision, sueldo: c.sueldo, vendido: c.vendido, pagado, periodo, desde: per.desde, hasta: per.hasta } };
   }));
 }
+
+const MES_CORTO: Record<string, string> = { enero: "ene", febrero: "feb", marzo: "mar", abril: "abr", mayo: "may", junio: "jun", julio: "jul", agosto: "ago", septiembre: "sep", octubre: "oct", noviembre: "nov", diciembre: "dic" };
+
+/** Comisiones ya liquidadas que faltan por entregar, por persona y de qué días son ("10 al 15 nov"), de la más vieja a la más nueva. */
+export async function pendientesPorEntregar(barberiaId: string) {
+  const filas = await db.select({ id: s.pagosComision.barberoId, monto: s.pagosComision.monto, nota: s.pagosComision.nota }).from(s.pagosComision)
+    .where(and(eq(s.pagosComision.barberiaId, barberiaId), eq(s.pagosComision.tipo, "pago"), like(s.pagosComision.nota, `${POR_ENTREGAR}:%`), sql`${s.pagosComision.monto} > 0`))
+    .orderBy(asc(s.pagosComision.creadoEn));
+  const m = new Map<string, { monto: number; dias: string }[]>();
+  for (const f of filas) {
+    const dias = f.nota.slice(POR_ENTREGAR.length + 2).replace(/^\s*Pago automático\s*/i, "").replace(/^(de|del)\s+/i, "")
+      .replace(/ de ([a-záéíóú]+)/gi, (_, x: string) => ` ${MES_CORTO[x.toLowerCase()] ?? x}`).replace(/(\d+) (\w+) al (\d+) \2\b/, "$1 al $3 $2").replace(/[(),]/g, "").trim();
+    m.set(f.id, [...(m.get(f.id) ?? []), { monto: f.monto, dias }]);
+  }
+  return m;
+}

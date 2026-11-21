@@ -1,10 +1,12 @@
 "use client";
 
-import { useEffect, useState } from "react";
+import { useActionState, useEffect, useState } from "react";
 import { Avatar } from "@/components/Avatar";
 import { Fl, Icono } from "@/components/Icono";
 import { Modal } from "@/components/ui";
 import { registrarPago } from "../analitica/equipo/actions";
+import { entregarPendiente } from "./actions";
+import { formatoDinero } from "@/lib/money";
 
 export type DatosFila = {
   id: string; nombre: string; avatar: string; modalidad: string; frecuencia: string; periodo: string; semana: string;
@@ -95,5 +97,75 @@ export function RegistrarPago({ filas, regreso, texto = "Registrar pago", clase 
         )}
       </Modal>
     </>
+  );
+}
+
+export type PendientePersona = { id: string; nombre: string; avatar: string; partes: { monto: number; dias: string }[] };
+
+/**
+ * Con pagos automáticos: registrar que ya se le pagó a alguien una comisión pendiente de entregar,
+ * por transferencia o con efectivo de la caja abierta, sin hacer un corte.
+ */
+export function EntregarPendientes({ personas, cajaAbierta, texto = "Registrar pago", clase = "eq2-pri" }: { personas: PendientePersona[]; cajaAbierta: boolean; texto?: string; clase?: string }) {
+  const [abierto, setAbierto] = useState(false);
+  const [elegida, setElegida] = useState<PendientePersona | null>(personas.length === 1 ? personas[0] : null);
+  const cerrar = () => { setAbierto(false); setElegida(personas.length === 1 ? personas[0] : null); };
+  if (!personas.length) return null;
+  const total = (x: PendientePersona) => x.partes.reduce((a, p) => a + p.monto, 0);
+  return (
+    <>
+      <button type="button" className={clase} onClick={() => setAbierto(true)}>{texto}</button>
+      <Modal abierto={abierto} cerrar={cerrar} etiqueta="Pendiente de entregar" titulo={elegida ? elegida.nombre : "¿A quién?"}>
+        {elegida ? (
+          <div className="pila">
+            {personas.length > 1 && <button type="button" className="eq2-atras" onClick={() => setElegida(null)}><Icono n="izquierda" />Elegir a otra persona</button>}
+            <FormEntrega p={elegida} total={total(elegida)} cajaAbierta={cajaAbierta} cerrar={cerrar} />
+          </div>
+        ) : (
+          <div className="eq2-elige">
+            {personas.map((x) => (
+              <button type="button" key={x.id} className="eq2-fila" onClick={() => setElegida(x)}>
+                <Avatar avatar={x.avatar} nombre={x.nombre} t={32} />
+                <span><b>{x.nombre}</b><small>{x.partes.length === 1 ? `Comisión ${x.partes[0].dias}` : `${x.partes.length} comisiones pendientes`}</small></span>
+                <span className="eq2-m"><b>{formatoDinero(total(x))}</b><small>por entregar</small></span>
+              </button>
+            ))}
+          </div>
+        )}
+      </Modal>
+    </>
+  );
+}
+
+function FormEntrega({ p, total, cajaAbierta, cerrar }: { p: PendientePersona; total: number; cajaAbierta: boolean; cerrar: () => void }) {
+  const [e, accion, guardando] = useActionState(entregarPendiente, null);
+  const [forma, setForma] = useState(cajaAbierta ? "efectivo" : "transferencia");
+  const [monto, setMonto] = useState((total / 100).toFixed(0));
+  useEffect(() => { if (e?.ok) cerrar(); }, [e?.ok, cerrar]);
+  return (
+    <form action={accion} className="pila">
+      <input type="hidden" name="barberoId" value={p.id} />
+      <input type="hidden" name="forma" value={forma} />
+      <dl className="eq-desg">
+        {p.partes.map((x, i) => <div key={i}><dt>Comisión {x.dias || "de días anteriores"}</dt><dd>{formatoDinero(x.monto)}</dd></div>)}
+        {p.partes.length > 1 && <div><dt>Total pendiente</dt><dd>{formatoDinero(total)}</dd></div>}
+      </dl>
+      <div className="tarjeta-m pila">
+        <div className="campo"><span>Forma de pago</span>
+          <div className="pg-formas" role="radiogroup" aria-label="Forma de pago">
+            <button type="button" role="radio" aria-checked={forma === "transferencia"} className={forma === "transferencia" ? "on" : ""} onClick={() => setForma("transferencia")}>Transferencia</button>
+            <button type="button" role="radio" aria-checked={forma === "efectivo"} className={forma === "efectivo" ? "on" : ""} disabled={!cajaAbierta} onClick={() => setForma("efectivo")}>Efectivo de la caja</button>
+          </div>
+        </div>
+        <p className="ayuda-txt" style={{ margin: 0 }}>{forma === "efectivo" ? "Sale de la caja abierta y se descuenta en el próximo corte." : cajaAbierta ? "No toca la caja." : "No toca la caja. Para pagar en efectivo, primero abre la caja en Cobro."}</p>
+        <label className="campo"><span>Monto pagado</span>
+          <span className="pg-monto"><input className="input grande" name="monto" inputMode="decimal" value={monto} onChange={(ev) => setMonto(ev.target.value)} required />
+            <button type="button" className="bt sec chico" onClick={() => setMonto((total / 100).toFixed(0))}>Todo {formatoDinero(total)}</button></span>
+        </label>
+        <p className="ayuda-txt" style={{ margin: 0 }}>Se cubre primero lo más viejo. Si pagas menos, lo demás sigue pendiente.</p>
+      </div>
+      {e?.error && <p className="aviso error">{e.error}</p>}
+      <div className="acciones"><button className="bt" disabled={guardando}>{guardando ? "Guardando…" : "Registrar pago"}<Fl /></button></div>
+    </form>
   );
 }

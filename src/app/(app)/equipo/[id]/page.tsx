@@ -16,7 +16,9 @@ import { fechaCorta, fechaLarga, fechaLocal } from "@/lib/fechas";
 import { NOMBRE_ROL, type Rol } from "@/lib/permisos";
 import { MesEquipo } from "../Partes";
 import { cuentasEnCurso, mesElegido, sesionEquipo } from "../datos";
-import { RegistrarPago } from "../Pago";
+import { EntregarPendientes, RegistrarPago } from "../Pago";
+import { pendientesPorEntregar } from "../datos";
+import { cajaDe } from "@/lib/datos";
 
 export const metadata = { title: "Equipo" };
 
@@ -92,7 +94,10 @@ export default async function Ficha({ params, searchParams }: { params: Promise<
         ...(enCurso.anteriores > 0 ? [["De periodos anteriores", formatoDinero(enCurso.anteriores)] as [string, string]] : []),
       ];
   const auto = se.barberia.pagosEquipoAuto;
-  const pagar = enCurso && enCurso.fila.puedePagar && !auto ? <RegistrarPago filas={[enCurso.fila]} regreso={`/equipo/${u.id}${q}`} texto={renta ? "Registrar cobro" : "Registrar pago"} clase="eq2-pri eqa-bt" /> : null;
+  // Con pagos automáticos, lo pendiente de entregar se puede marcar como pagado sin esperar al corte.
+  const [pendPropios, cajaPropia] = auto && puedePagar && esperaCorte ? await Promise.all([pendientesPorEntregar(se.barberia.id), cajaDe(se)]) : [null, null];
+  const pagar = enCurso && enCurso.fila.puedePagar && !auto ? <RegistrarPago filas={[enCurso.fila]} regreso={`/equipo/${u.id}${q}`} texto={renta ? "Registrar cobro" : "Registrar pago"} clase="eq2-pri eqa-bt" />
+    : pendPropios?.get(u.id) ? <EntregarPendientes personas={[{ id: u.id, nombre: u.nombre, avatar: u.avatar, partes: pendPropios.get(u.id)! }]} cajaAbierta={!!cajaPropia} clase="eq2-pri eqa-bt" /> : null;
   const info = (
     <dl className="fa-dl">
       <dt>Horario</dt><dd>{h.horas || "Sin horario"}</dd>

@@ -4,15 +4,15 @@ import { eq, sql } from "drizzle-orm";
 import { Avatar } from "@/components/Avatar";
 import { AvisoUrl } from "@/components/Encabezado";
 import { Icono } from "@/components/Icono";
-import { ventasEntre } from "@/lib/datos";
+import { cajaDe, ventasEntre } from "@/lib/datos";
 import { db, schema } from "@/lib/db";
 import { rendimiento } from "@/lib/equipo";
 import { faltantesEnRevision } from "@/lib/faltantes";
 import { formatoDinero } from "@/lib/money";
 import { fechaCorta } from "@/lib/fechas";
 import { MesEquipo } from "./Partes";
-import { RegistrarPago } from "./Pago";
-import { cuentasEnCurso, mesElegido, personasEquipo, sesionEquipo } from "./datos";
+import { EntregarPendientes, RegistrarPago } from "./Pago";
+import { cuentasEnCurso, mesElegido, pendientesPorEntregar, personasEquipo, sesionEquipo } from "./datos";
 import { Ayuda } from "@/components/Ayuda";
 
 export const metadata = { title: "Equipo" };
@@ -35,14 +35,17 @@ export default async function Equipo({ searchParams }: { searchParams: Promise<{
     const dia = `${ym}-${m.hasta.slice(8, 10)}`;
     return { desde: `${ym}-01`, hasta: dia < fin ? dia : fin, nombre: new Date(`${ym}-15T12:00:00Z`).toLocaleDateString("es-MX", { month: "long", timeZone: "UTC" }) };
   })();
-  const [{ ventas }, { ventas: ventasAnt }, cuentas, revision, [cal], porResena] = await Promise.all([
+  const [{ ventas }, { ventas: ventasAnt }, cuentas, revision, [cal], porResena, porEntregar, cajaPropia] = await Promise.all([
     ventasEntre(se.barberia.id, m.desde, m.hasta, { zona }),
     ventasEntre(se.barberia.id, ant.desde, ant.hasta, { zona }),
     cuentasEnCurso(se.barberia.id, zona, activas, puedePagar),
     faltantesEnRevision(se.barberia.id),
     db.select({ n: sql<number>`count(*)::int`, prom: sql<number>`coalesce(avg(${schema.resenas.calificacion}), 0)::float` }).from(schema.resenas).where(eq(schema.resenas.barberiaId, se.barberia.id)),
     db.select({ id: schema.resenas.barberoId, n: sql<number>`count(*)::int`, prom: sql<number>`avg(${schema.resenas.calificacion})::float` }).from(schema.resenas).where(eq(schema.resenas.barberiaId, se.barberia.id)).groupBy(schema.resenas.barberoId),
+    puedePagar && auto ? pendientesPorEntregar(se.barberia.id) : Promise.resolve(new Map<string, { monto: number; dias: string }[]>()),
+    puedePagar && auto ? cajaDe(se) : Promise.resolve(null),
   ]);
+  const pendEntrega = activas.filter((p) => porEntregar.has(p.id)).map((p) => ({ id: p.id, nombre: p.nombre, avatar: p.avatar, partes: porEntregar.get(p.id)! }));
   const total = rendimiento(ventas);
   const cuentaDe = (id: string) => cuentas.find((c) => c.id === id);
   const filas = activas.map((p) => ({ ...p, r: rendimiento(ventas, p.id), c: cuentaDe(p.id) })).sort((a, b) => b.r.vendido - a.r.vendido);
@@ -86,9 +89,11 @@ export default async function Equipo({ searchParams }: { searchParams: Promise<{
           </div>
         )}
         {puedePagar && !auto && <RegistrarPago filas={cuentas.filter((c) => c.saldo > 0).map((c) => c.fila)} regreso={`/equipo${q}`} clase="eq2-pri eqa-bt" abrir={q0.pagar === "1"} />}
-        {auto && <Link href="/equipo/pagos" className="eq2-pri eqa-bt">Historial de comisiones</Link>}
+        {puedePagar && auto && <EntregarPendientes personas={pendEntrega} cajaAbierta={!!cajaPropia} clase="eq2-pri eqa-bt" />}
+        {auto && !(puedePagar && pendEntrega.length) && <Link href="/equipo/pagos" className="eq2-pri eqa-bt">Historial de comisiones</Link>}
         <nav className="eqa-links" aria-label="Más de Equipo">
           {puedePagar && !auto && <Link href="/equipo/pagos">Historial de pagos</Link>}
+          {auto && puedePagar && pendEntrega.length > 0 && <Link href="/equipo/pagos">Historial de comisiones</Link>}
           {revision.length > 0 && <Link href="/equipo/pagos#faltantes">{revision.length} {revision.length === 1 ? "faltante en revisión" : "faltantes en revisión"}</Link>}
           {archivadas.length > 0 && <Link href={urlArch} className="sutil">{verArch ? "Ocultar archivados" : `Archivados (${archivadas.length})`}</Link>}
         </nav>
@@ -132,7 +137,7 @@ export default async function Equipo({ searchParams }: { searchParams: Promise<{
           </div>
         )}
         {filas.length > 0 && <small className="eqa-nota">La barra muestra cuánto aporta cada persona a las ventas del mes. {se.barberia.pagosEquipoAuto
-          ? "Las comisiones se liquidan solas en su fecha de pago. En el corte de caja se elige si se entregan de la caja, al día siguiente o por transferencia."
+          ? "Las comisiones se liquidan solas en su fecha de pago. En el corte de caja se elige si se entregan de la caja, al día siguiente o por transferencia. Si ya se pagó fuera del corte, márcalo con Registrar pago."
           : "Lo que falta por pagar incluye lo pendiente de periodos anteriores."}</small>}
       </section>
     </div>

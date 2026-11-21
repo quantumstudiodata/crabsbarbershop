@@ -146,7 +146,7 @@ function Resumen({ r, cerrar }: { r: ResumenCorte; cerrar: () => void }) {
   );
 }
 
-export function CajaModal({ inicial, turno, limiteDiferencia, categorias, evidencias = false, egresos = false, configurar = false, abierta = false, titular = false }: { /** Titular: puede sacar efectivo sin gastarlo ("Me llevo efectivo"). */ titular?: boolean; inicial: Vista | null; turno: Turno | null; limiteDiferencia: number; categorias: string[]; evidencias?: boolean; /** Puede registrar egresos en Movimientos. */ egresos?: boolean; /** Puede editar las categorías de gasto. */ configurar?: boolean; /** Fuera de Cobro: hay caja abierta aunque no se tengan sus datos (solo para movimientos, no para el corte). */ abierta?: boolean }) {
+export function CajaModal({ inicial, turno, limiteDiferencia, categorias, evidencias = false, egresos = false, configurar = false, abierta = false, titular = false, duena: duenaFuera, enCobro = false }: { /** La caja sí está abierta, pero los movimientos de esta persona se registran en Cobro. */ enCobro?: boolean; /** Lo pendiente de la dueña cuando no se tienen los datos del turno (Movimientos, o la caja cerrada). */ duena?: Turno["duena"]; /** Titular: puede sacar efectivo sin gastarlo ("Me llevo efectivo"). */ titular?: boolean; inicial: Vista | null; turno: Turno | null; limiteDiferencia: number; categorias: string[]; evidencias?: boolean; /** Puede registrar egresos en Movimientos. */ egresos?: boolean; /** Puede editar las categorías de gasto. */ configurar?: boolean; /** Fuera de Cobro: hay caja abierta aunque no se tengan sus datos (solo para movimientos, no para el corte). */ abierta?: boolean }) {
   const [vista, setVista] = useState<Vista | null>(inicial);
   const [eMov, accMov, guardandoMov] = useActionState<EstadoCaja, FormData>(registrarMovimiento, {});
   const [eGasto, accGasto, guardandoGasto] = useActionState<EstadoCaja, FormData>(registrarGasto, {});
@@ -182,7 +182,8 @@ export function CajaModal({ inicial, turno, limiteDiferencia, categorias, eviden
   if (resumen) return <Resumen r={resumen} cerrar={() => setResumen(null)} />;
   if (!vista) return null;
   // Con la caja cerrada no hay dónde registrar el movimiento: se dice en lugar de no hacer nada.
-  if (!turno && !abierta && vista !== "corte") return (
+  // Si hay algo pendiente de depositar a la dueña, sí se puede registrar el depósito (no toca la caja).
+  if (!turno && !abierta && vista !== "corte" && !((duenaFuera?.saldo ?? 0) > 0)) return (
     <Modal abierto cerrar={cerrar} etiqueta="Caja" titulo="La caja está cerrada">
       <div className="pila">
         <p className="muted" style={{ margin: 0 }}>Para sacar o poner dinero, o pagar algo con la caja, primero hay que abrirla en Cobro. Lo que se paga por transferencia o tarjeta se registra como egreso.</p>
@@ -190,7 +191,10 @@ export function CajaModal({ inicial, turno, limiteDiferencia, categorias, eviden
       </div>
     </Modal>
   );
-  if (!turno && !(abierta && vista !== "corte")) return null;
+  const duena = turno?.duena ?? duenaFuera;
+  // Con la caja cerrada solo se puede registrar el depósito a la dueña (no toca la caja).
+  const cerrada = !turno && !abierta;
+  if (!turno && !((abierta || (duena?.saldo ?? 0) > 0) && vista !== "corte")) return null;
 
   // Sacar efectivo sin gastarlo solo lo hace Titular; a los demás un enlace viejo de "retiro" les abre las opciones.
   const vistaReal: Vista = vista === "retiro" && !titular ? "movimiento" : vista;
@@ -199,10 +203,9 @@ export function CajaModal({ inicial, turno, limiteDiferencia, categorias, eviden
   if (vistaReal === "movimiento") {
     // Lo demás que sale de la caja (lo del equipo y lo de la dueña) se saca en el corte.
     const ops: [Vista, string, string, string][] = [
-      ["gasto", "etiqueta", "Pagué algo con dinero de la caja", "Agua, limpieza, productos. Cuenta como gasto."],
-      ["entrada", "entrada", "Puse dinero en la caja", "Para tener cambio. No cuenta como venta."],
-      ...((turno?.duena?.saldo ?? 0) > 0 ? [["deposito", "enviar", "Deposité a la dueña", `Pendiente de depositar ${formatoDinero(turno!.duena!.saldo)}, ${turno!.duena!.desde}. Con comprobante.`] as [Vista, string, string, string]] : []),
-      ...(titular ? [["retiro", "salida", "Me llevo efectivo de la caja", "Lo tomo yo o alguien de mi parte. Se descuenta de lo del negocio."] as [Vista, string, string, string]] : []),
+      ...(cerrada ? [] : [["gasto", "etiqueta", "Pagué algo con dinero de la caja", "Agua, limpieza, productos. Cuenta como gasto."], ["entrada", "entrada", "Puse dinero en la caja", "Para tener cambio. No cuenta como venta."]] as [Vista, string, string, string][]),
+      ...((duena?.saldo ?? 0) > 0 ? [["deposito", "enviar", "Deposité a la dueña", `Pendiente de depositar ${formatoDinero(duena!.saldo)}, ${duena!.desde}. Con comprobante.`] as [Vista, string, string, string]] : []),
+      ...(titular && !cerrada ? [["retiro", "salida", "Me llevo efectivo de la caja", "Lo tomo yo o alguien de mi parte. Se descuenta de lo del negocio."] as [Vista, string, string, string]] : []),
     ];
     return (
       <Modal abierto cerrar={cerrar} etiqueta="Caja" titulo="¿Qué pasó con el dinero?">
@@ -213,6 +216,7 @@ export function CajaModal({ inicial, turno, limiteDiferencia, categorias, eviden
             </button>
           ))}
         </div>
+        {cerrada && <p className="ayuda-txt" style={{ margin: "12px 0 0" }}>{enCobro ? "Para pagar un gasto o poner dinero, usa Movimiento de caja en Cobro." : "La caja está cerrada. Para pagar un gasto o poner dinero, primero ábrela en Cobro."}</p>}
         {egresos && <p className="ayuda-txt" style={{ margin: "12px 0 0" }}>¿Pagaste un gasto con transferencia o tarjeta? Ese dinero no salió de la caja. <a className="enlace" href="/analitica/finanzas?egreso=1">Regístralo aquí</a>.</p>}
       </Modal>
     );
@@ -234,10 +238,10 @@ export function CajaModal({ inicial, turno, limiteDiferencia, categorias, eviden
     );
   }
 
-  if (vistaReal === "deposito" && turno?.duena) {
+  if (vistaReal === "deposito" && duena) {
     return (
       <Modal abierto cerrar={cerrar} etiqueta="Movimiento de caja" titulo="Deposité a la dueña">
-        <Deposito duena={turno.duena} accion={accDep} guardando={guardandoDep} error={eDep.error} atras={atras} />
+        <Deposito duena={duena} accion={accDep} guardando={guardandoDep} error={eDep.error} atras={atras} />
       </Modal>
     );
   }
