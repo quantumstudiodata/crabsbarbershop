@@ -6,6 +6,7 @@ import { requerirSesion } from "@/lib/auth";
 import { cajaDe, movimientosDeTurno } from "@/lib/datos";
 import { db, schema } from "@/lib/db";
 import { POR_ENTREGAR } from "@/lib/pagosAuto";
+import { efectivoUsable } from "@/lib/caja";
 import { registrar } from "@/lib/historial";
 import { formatoDinero, leerPesos } from "@/lib/money";
 import { texto, volver } from "@/lib/volver";
@@ -81,7 +82,8 @@ export async function entregarPendiente(_: { error?: string; ok?: number; mensaj
   if (forma === "efectivo") {
     if (!turno) return { error: "La caja está cerrada. Ábrela en Cobro o registra el pago por transferencia." };
     const d = await movimientosDeTurno(s.barberia.id, turno.id, turno.fondoInicial);
-    if (monto > d.esperado) return { error: `En la caja solo hay ${formatoDinero(Math.max(0, d.esperado))}.` };
+    const usable = efectivoUsable(d);
+    if (monto > usable) return { error: `En la caja hay ${formatoDinero(usable)} que se pueden usar (las propinas no se tocan).` };
   }
   const nombre = u.nombre.split(" ")[0];
   const ahora = new Date();

@@ -5,7 +5,7 @@ import { and, eq, isNull, like, sql } from "drizzle-orm";
 import { POR_ENTREGAR, liquidarAutomaticos } from "@/lib/pagosAuto";
 import { revalidatePath } from "next/cache";
 import { requerirSesion } from "@/lib/auth";
-import { CONCEPTO_ACUMULADO, CONCEPTO_DUENA, CONCEPTO_PROPINA, compararConteo, requiereExplicacion } from "@/lib/caja";
+import { CONCEPTO_ACUMULADO, CONCEPTO_DUENA, CONCEPTO_PROPINA, compararConteo, efectivoUsable, requiereExplicacion } from "@/lib/caja";
 import { cuentaDuena, leTocaAlNegocio } from "@/lib/duena";
 import { propinasDeTurno } from "@/lib/comisionesCorte";
 import { cajaDe, categoriasGasto, folioCorte, movimientosDeTurno } from "@/lib/datos";
@@ -122,7 +122,8 @@ export async function registrarMovimiento(_: EstadoCaja, form: FormData): Promis
   if (!turno) return guardarPendiente(s, tipo, monto, concepto, null);
   if (llevo) {
     const d = await movimientosDeTurno(s.barberia.id, turno.id, turno.fondoInicial);
-    if (monto > d.esperado) return { error: `En la caja solo hay ${formatoDinero(Math.max(0, d.esperado))}.` };
+    const usable = efectivoUsable(d);
+    if (monto > usable) return { error: `En la caja hay ${formatoDinero(usable)} que se pueden usar (las propinas no se tocan).` };
   }
   await db.transaction(async (tx) => {
     await tx.insert(schema.movimientosCaja).values({ barberiaId: s.barberia.id, turnoId: turno.id, tipo, monto, concepto, usuarioId: s.usuario.id });
@@ -199,7 +200,8 @@ export async function registrarGasto(_: EstadoCaja, form: FormData): Promise<Est
   if (!turno) return guardarPendiente(s, "gasto", monto, concepto, categoria);
   // No puede salir más efectivo del que hay en la caja; lo pagado con transferencia o tarjeta es un egreso.
   const d = await movimientosDeTurno(s.barberia.id, turno.id, turno.fondoInicial);
-  if (monto > d.esperado) return { error: `En la caja solo hay ${formatoDinero(Math.max(0, d.esperado))}. Si lo pagaste con transferencia o tarjeta, regístralo como egreso.` };
+  const usable = efectivoUsable(d);
+  if (monto > usable) return { error: `En la caja hay ${formatoDinero(usable)} que se pueden usar (las propinas no se tocan). Si lo pagaste con transferencia o tarjeta, regístralo como egreso.` };
   await db.transaction(async (tx) => {
     await tx.insert(schema.gastos).values({ barberiaId: s.barberia.id, categoria, concepto, monto, metodo: "efectivo", turnoId: turno.id, usuarioId: s.usuario.id, fecha: fechaLocal(new Date(), s.barberia.zonaHoraria) });
     await registrar(tx, {

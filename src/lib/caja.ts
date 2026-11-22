@@ -53,3 +53,12 @@ export const esParteNegocio = (concepto: string) => esAcumulado(concepto) || esL
 
 /** Minutos que tiene alguien para anular su propio cobro si se equivocó. */
 export const MINUTOS_CORRECCION = 10;
+
+/**
+ * El efectivo de la caja que se puede usar (gastos, pagos, lo que se lleva Titular): lo que hay sin las propinas en efectivo,
+ * que son de quien hizo el servicio y no se tocan. Las propinas que ya se entregaron durante el turno ya salieron.
+ */
+export function efectivoUsable(d: { esperado: number; m: MovimientosTurno; movimientos: { tipo: string; monto: number; concepto: string }[] }) {
+  const entregadas = d.movimientos.filter((x) => x.tipo === "retiro" && esPropinaEntregada(x.concepto)).reduce((a, x) => a + x.monto, 0);
+  return Math.max(0, d.esperado - Math.max(0, d.m.propinasEfectivo - entregadas));
+}
