@@ -6025,3 +6025,11 @@ button.cp-pill:focus-visible { outline: 2px solid #2b3a47; outline-offset: 2px; 
 .mov-pend-r b { font-weight: 500; display: block; }
 .mov-pend-r small { color: var(--muted); font-size: 12px; }
 .mov-pend-r .enlace { font-size: 12.5px; }
+
+/* Historial de movimientos en celular: el título en su renglón y los botones juntos abajo, sin cortarse ni encimarse. */
+@media (max-width: 760px) {
+  .tit-mov { flex-wrap: wrap; row-gap: 10px; }
+  .tit-mov > .lab { flex: 1 0 100%; }
+  .tit-mov > .fila { flex-wrap: nowrap; margin-left: auto; }
+  .tit-mov > .fila .bt { white-space: nowrap; }
+}

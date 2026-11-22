@@ -38,7 +38,7 @@ export function Movimientos({ dias, registrar, hoy, cajaAbierta, categorias, opc
   const [cancelar, setCancelar] = useState<FilaEgreso | null>(null);
   return (
     <>
-      <div className="tit-fuera">
+      <div className="tit-fuera tit-mov">
         <span className="lab">Historial de movimientos{conteo ? <span className="muted" style={{ textTransform: "none", letterSpacing: 0, marginLeft: 8 }}>{conteo}</span> : null}</span>
         <span className="fila" style={{ gap: 8 }}>
           {botonCaja}
