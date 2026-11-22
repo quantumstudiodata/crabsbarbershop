@@ -4,7 +4,8 @@ import { eq, sql } from "drizzle-orm";
 import { Avatar } from "@/components/Avatar";
 import { AvisoUrl } from "@/components/Encabezado";
 import { Icono } from "@/components/Icono";
-import { cajaDe, ventasEntre } from "@/lib/datos";
+import { cajaDe, movimientosDeTurno, ventasEntre } from "@/lib/datos";
+import { efectivoUsable } from "@/lib/caja";
 import { db, schema } from "@/lib/db";
 import { rendimiento } from "@/lib/equipo";
 import { faltantesEnRevision } from "@/lib/faltantes";
@@ -89,7 +90,7 @@ export default async function Equipo({ searchParams }: { searchParams: Promise<{
           </div>
         )}
         {puedePagar && !auto && <RegistrarPago filas={cuentas.filter((c) => c.saldo > 0).map((c) => c.fila)} regreso={`/equipo${q}`} clase="eq2-pri eqa-bt" abrir={q0.pagar === "1"} />}
-        {puedePagar && auto && <EntregarPendientes personas={pendEntrega} cajaAbierta={!!cajaPropia} clase="eq2-pri eqa-bt" />}
+        {puedePagar && auto && <EntregarPendientes personas={pendEntrega} cajaAbierta={!!cajaPropia} efectivo={cajaPropia ? efectivoUsable(await movimientosDeTurno(se.barberia.id, cajaPropia.id, cajaPropia.fondoInicial)) : 0} clase="eq2-pri eqa-bt" />}
         {auto && !(puedePagar && pendEntrega.length) && <Link href="/equipo/pagos" className="eq2-pri eqa-bt">Historial de comisiones</Link>}
         <nav className="eqa-links" aria-label="Más de Equipo">
           {puedePagar && !auto && <Link href="/equipo/pagos">Historial de pagos</Link>}

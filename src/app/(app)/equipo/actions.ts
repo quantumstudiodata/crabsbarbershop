@@ -78,13 +78,14 @@ export async function entregarPendiente(_: { error?: string; ok?: number; mensaj
   const total = filas.reduce((a, x) => a + x.monto, 0);
   if (!total) return { error: "Ya no tiene pagos pendientes." };
   if (monto > total) return { error: `Solo tiene ${formatoDinero(total)} pendientes.` };
-  const turno = forma === "efectivo" ? await cajaDe(s) : null;
-  if (forma === "efectivo") {
-    if (!turno) return { error: "La caja está cerrada. Ábrela en Cobro o registra el pago por transferencia." };
-    const d = await movimientosDeTurno(s.barberia.id, turno.id, turno.fondoInicial);
-    const usable = efectivoUsable(d);
-    if (monto > usable) return { error: `En la caja hay ${formatoDinero(usable)} que se pueden usar (las propinas no se tocan).` };
-  }
+  // Si hay efectivo, se paga de la caja; por transferencia solo lo que la caja no alcance a cubrir
+  // (así no se queda en la caja dinero que ya se pagó desde el banco). Con la caja cerrada se paga en el próximo corte.
+  const caja = await cajaDe(s);
+  if (!caja) return { error: "La caja está cerrada. Se le paga en el próximo corte: de la caja, y lo que no alcance, por transferencia." };
+  const usable = efectivoUsable(await movimientosDeTurno(s.barberia.id, caja.id, caja.fondoInicial));
+  if (forma === "efectivo" && monto > usable) return { error: `En la caja hay ${formatoDinero(usable)} que se pueden usar (las propinas no se tocan).` };
+  if (forma === "transferencia" && monto > Math.max(0, total - usable)) return { error: total <= usable ? "Alcanza el efectivo de la caja: págale de ahí." : `Por transferencia solo lo que no alcanza la caja: ${formatoDinero(total - usable)}. Lo demás, de la caja.` };
+  const turno = forma === "efectivo" ? caja : null;
   const nombre = u.nombre.split(" ")[0];
   const ahora = new Date();
   const hechos: string[] = [];

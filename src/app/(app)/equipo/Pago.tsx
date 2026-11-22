@@ -107,7 +107,7 @@ export type PendientePersona = { id: string; nombre: string; avatar: string; par
  * Con pagos automáticos: registrar que ya se le pagó a alguien una comisión pendiente de entregar,
  * por transferencia o con efectivo de la caja abierta, sin hacer un corte.
  */
-export function EntregarPendientes({ personas, cajaAbierta, texto = "Registrar pago", clase = "eq2-pri" }: { personas: PendientePersona[]; cajaAbierta: boolean; texto?: string; clase?: string }) {
+export function EntregarPendientes({ personas, cajaAbierta, efectivo = 0, texto = "Registrar pago", clase = "eq2-pri" }: { personas: PendientePersona[]; cajaAbierta: boolean; /** Efectivo de la caja que se puede usar (sin propinas). */ efectivo?: number; texto?: string; clase?: string }) {
   const [abierto, setAbierto] = useState(false);
   const [elegida, setElegida] = useState<PendientePersona | null>(personas.length === 1 ? personas[0] : null);
   const cerrar = () => { setAbierto(false); setElegida(personas.length === 1 ? personas[0] : null); };
@@ -120,7 +120,7 @@ export function EntregarPendientes({ personas, cajaAbierta, texto = "Registrar p
         {elegida ? (
           <div className="pila">
             {personas.length > 1 && <button type="button" className="eq2-atras" onClick={() => setElegida(null)}><Icono n="izquierda" />Elegir a otra persona</button>}
-            <FormEntrega p={elegida} total={total(elegida)} cajaAbierta={cajaAbierta} cerrar={cerrar} />
+            <FormEntrega p={elegida} total={total(elegida)} cajaAbierta={cajaAbierta} efectivo={efectivo} cerrar={cerrar} />
           </div>
         ) : (
           <div className="eq2-elige">
@@ -138,31 +138,39 @@ export function EntregarPendientes({ personas, cajaAbierta, texto = "Registrar p
   );
 }
 
-function FormEntrega({ p, total, cajaAbierta, cerrar }: { p: PendientePersona; total: number; cajaAbierta: boolean; cerrar: () => void }) {
+function FormEntrega({ p, total, cajaAbierta, efectivo, cerrar }: { p: PendientePersona; total: number; cajaAbierta: boolean; efectivo: number; cerrar: () => void }) {
   const [e, accion, guardando] = useActionState(entregarPendiente, null);
-  const [forma, setForma] = useState(cajaAbierta ? "efectivo" : "transferencia");
-  const [monto, setMonto] = useState((total / 100).toFixed(0));
+  // Si hay efectivo se paga de la caja; por transferencia solo lo que la caja no alcance.
+  const deCaja = Math.min(total, efectivo), maxTransf = Math.max(0, total - efectivo);
+  const [forma, setForma] = useState(deCaja > 0 ? "efectivo" : "transferencia");
+  const tope = forma === "efectivo" ? deCaja : maxTransf;
+  const [monto, setMonto] = useState((tope / 100).toFixed(0));
+  const cambiar = (f: string) => { setForma(f); setMonto((((f === "efectivo" ? deCaja : maxTransf)) / 100).toFixed(0)); };
   const unEnvio = useUnEnvio(guardando);
   useEffect(() => { if (e?.ok) { avisarGuardado(e.mensaje); cerrar(); } }, [e?.ok, e?.mensaje, cerrar]);
+  const lista = <dl className="eq-desg">
+    {p.partes.map((x, i) => <div key={i}><dt>Comisión {x.dias || "de días anteriores"}</dt><dd>{formatoDinero(x.monto)}</dd></div>)}
+    {p.partes.length > 1 && <div><dt>Total pendiente</dt><dd>{formatoDinero(total)}</dd></div>}
+  </dl>;
+  if (!cajaAbierta) return <div className="pila">{lista}<p className="ayuda-txt" style={{ margin: 0 }}>La caja está cerrada. Se le paga en el próximo corte: de la caja, y lo que no alcance, por transferencia.</p></div>;
   return (
     <form action={accion} onSubmit={unEnvio} className="pila">
       <input type="hidden" name="barberoId" value={p.id} />
       <input type="hidden" name="forma" value={forma} />
-      <dl className="eq-desg">
-        {p.partes.map((x, i) => <div key={i}><dt>Comisión {x.dias || "de días anteriores"}</dt><dd>{formatoDinero(x.monto)}</dd></div>)}
-        {p.partes.length > 1 && <div><dt>Total pendiente</dt><dd>{formatoDinero(total)}</dd></div>}
-      </dl>
+      {lista}
       <div className="tarjeta-m pila">
         <div className="campo"><span>Forma de pago</span>
           <div className="pg-formas" role="radiogroup" aria-label="Forma de pago">
-            <button type="button" role="radio" aria-checked={forma === "transferencia"} className={forma === "transferencia" ? "on" : ""} onClick={() => setForma("transferencia")}>Transferencia</button>
-            <button type="button" role="radio" aria-checked={forma === "efectivo"} className={forma === "efectivo" ? "on" : ""} disabled={!cajaAbierta} onClick={() => setForma("efectivo")}>Efectivo de la caja</button>
+            <button type="button" role="radio" aria-checked={forma === "efectivo"} className={forma === "efectivo" ? "on" : ""} disabled={deCaja === 0} onClick={() => cambiar("efectivo")}>Efectivo de la caja</button>
+            <button type="button" role="radio" aria-checked={forma === "transferencia"} className={forma === "transferencia" ? "on" : ""} disabled={maxTransf === 0} onClick={() => cambiar("transferencia")}>Transferencia</button>
           </div>
         </div>
-        <p className="ayuda-txt" style={{ margin: 0 }}>{forma === "efectivo" ? "Sale de la caja abierta y se descuenta en el próximo corte." : cajaAbierta ? "No toca la caja." : "No toca la caja. Para pagar en efectivo, primero abre la caja en Cobro."}</p>
+        <p className="ayuda-txt" style={{ margin: 0 }}>{forma === "efectivo"
+          ? `Sale de la caja abierta. ${maxTransf > 0 ? `En la caja alcanza para ${formatoDinero(deCaja)}; lo demás, ${formatoDinero(maxTransf)}, por transferencia.` : ""}`
+          : `En la caja no alcanza: por transferencia van ${formatoDinero(maxTransf)}${deCaja > 0 ? `, y ${formatoDinero(deCaja)} de la caja` : ""}.`}</p>
         <label className="campo"><span>Monto pagado</span>
           <span className="pg-monto"><input className="input grande" name="monto" inputMode="decimal" value={monto} onChange={(ev) => setMonto(ev.target.value)} required />
-            <button type="button" className="bt sec chico" onClick={() => setMonto((total / 100).toFixed(0))}>Todo {formatoDinero(total)}</button></span>
+            <button type="button" className="bt sec chico" onClick={() => setMonto((tope / 100).toFixed(0))}>Todo {formatoDinero(tope)}</button></span>
         </label>
         <p className="ayuda-txt" style={{ margin: 0 }}>Se cubre primero lo más viejo. Si pagas menos, lo demás sigue pendiente.</p>
       </div>

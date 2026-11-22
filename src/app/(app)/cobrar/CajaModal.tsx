@@ -487,7 +487,8 @@ function CortePasos({ turno, accion, cerrando, error, contado, setContado, limit
                   ["caja", "De la caja", falta ? `Lo que alcanza hoy, ${formatoDinero(x.ef)}; lo demás en el próximo corte` : "Se le da hoy en efectivo"],
                   ...(falta ? [["cajaTransf", "De la caja y lo demás por transferencia", `Hoy ${formatoDinero(x.ef)}; ${formatoDinero(x.falta)} por transferencia`] as [typeof sel, string, string]] : []),
                   ["manana", "Todo en el próximo corte", "Se le da en efectivo en el siguiente cierre"],
-                  ["transferencia", "Todo por transferencia", "Le llega a quien administra para hacerla"],
+                  // Sin "Todo por transferencia": si hay efectivo se paga de la caja; por transferencia solo va lo que no alcance,
+                  // así no se queda en la caja dinero que ya se pagó desde el banco.
                 ];
                 return (
                   <div key={x.id} className={`ct-per ${x.ef === 0 ? "nada" : ""}`}>
