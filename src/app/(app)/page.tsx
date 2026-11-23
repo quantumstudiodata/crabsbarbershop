@@ -313,7 +313,7 @@ export default async function Inicio({ searchParams }: { searchParams: Promise<Q
   const previo = pagadas.filter((v) => v.fecha === sumarDias(hoy, -7) && v.creadoEn.getTime() <= limite).reduce((a, v) => a + v.total, 0);
   // Con meta mensual del negocio, la meta del día es la suma de lo que le toca a cada barbero.
   const delMes = s.barberia.usaMetas ? await metasDelMes(s.barberia.id, s.barberia.metaMensual, zona, hoy) : null;
-  const meta = !s.barberia.usaMetas ? null : delMes ? { monto: Math.max(delMes.diaria, 1), ayuda: "Es la suma de la meta del día de cada persona; sale de la meta del mes.", nota: `Meta del mes ${formatoDinero(s.barberia.metaMensual)}` }
+  const meta = !s.barberia.usaMetas ? null : delMes ? { monto: Math.max(delMes.diaria, 1), ayuda: "Es la suma de la meta del día de cada persona; sale de la meta del mes.", nota: `Ganancia que se busca en el mes ${formatoDinero(s.barberia.metaMensual)}` }
     : { monto: calcularMeta(s.barberia.metaDiaria, [7, 14, 21, 28].map((d) => pagadas.filter((v) => v.fecha === sumarDias(hoy, -d)).reduce((a, v) => a + v.total, 0))).monto };
   const conceptos = deHoy.flatMap((v) => v.conceptos);
   const filasEq = equipo.map((e) => {

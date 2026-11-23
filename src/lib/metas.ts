@@ -28,8 +28,8 @@ export function explicarMeta(m: Meta, periodo: "semana" | "día"): string {
 // - Por comisión, al negocio le queda (100% - comisión) de cada cobro: hay que cobrar más para cubrir su parte.
 // - Con sueldo, al negocio le queda todo el cobro, pero el sueldo se suma a lo que hay que cubrir.
 // - Con renta de silla, lo que cobra es suyo: su renta se resta de lo que hay que cubrir y no lleva meta.
-// La meta es lo que el negocio conserva después de pagar al equipo; no descuenta renta, luz ni otros gastos,
-// así que no es utilidad.
+// La meta es la ganancia real que se quiere al mes: lo que le queda al negocio después de pagar al equipo
+// y los gastos del mes (renta, luz, agua y demás). Por eso los gastos se suman a lo que hay que cubrir.
 
 export type BarberoMeta = {
   id: string; nombre: string;
@@ -43,8 +43,7 @@ export type MetaDiaria = { id: string; nombre: string; diaria: number; mensual: 
 export function metaDelNegocio(metaMensual: number, egresosMes: number, barberos: BarberoMeta[], diasHabiles: number) {
   const sueldos = barberos.reduce((a, b) => a + (b.tipo === "sueldo" || b.tipo === "mixto" ? b.mensual : 0), 0);
   const rentas = barberos.reduce((a, b) => a + (b.tipo === "renta" ? b.mensual : 0), 0);
-  void egresosMes;
-  const cubrir = Math.max(0, metaMensual + sueldos - rentas);
+  const cubrir = Math.max(0, metaMensual + egresosMes + sueldos - rentas);
   const conMeta = barberos.filter((b) => b.tipo !== "renta");
   const parte = (b: BarberoMeta) => {
     if (b.tipo === "porcentaje" || b.tipo === "mixto") return Math.max(0.05, 1 - b.porcentaje / 10000);
@@ -62,7 +61,7 @@ export function metaDelNegocio(metaMensual: number, egresosMes: number, barberos
     if (b.tipo === "renta") return { id: b.id, nombre: b.nombre, diaria: 0, mensual: 0, parteNegocio: 0, aplica: false };
     return { id: b.id, nombre: b.nombre, mensual: mensualCadaUno, diaria: Math.round(mensualCadaUno / dias / 100) * 100, parteNegocio: Math.round(parte(b) * 100), aplica: true };
   });
-  return { cubrir, sueldos, rentas, egresos: 0, porBarbero, diaria: porBarbero.reduce((a, b) => a + b.diaria, 0) };
+  return { cubrir, sueldos, rentas, egresos: egresosMes, porBarbero, diaria: porBarbero.reduce((a, b) => a + b.diaria, 0) };
 }
 
 /** Días de trabajo del mes (lunes a sábado). */

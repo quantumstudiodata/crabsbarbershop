@@ -113,46 +113,42 @@ export function CajaConfig({ apertura, corte, fondo, diferencia, evidencia }: { 
 type DatosMeta = { egresos: number; barberos: BarberoMeta[]; dias: number; fijos: { concepto: string; mensual: number }[] };
 
 export function MetaMensual({ metaMensual, datosMeta }: { metaMensual: number; datosMeta: DatosMeta }) {
-  // Meta calculada: lo que cuestan al mes los gastos frecuentes, redondeado a miles. Los sueldos y las rentas
-  // de silla ya entran en la meta de cada barbero. Sin gastos frecuentes ni sueldos, no se propone nada.
-  const fijos = datosMeta.fijos.reduce((a, f) => a + f.mensual, 0);
-  const calculada = fijos > 0 ? Math.ceil(fijos / 100 / 1000) * 1000 : 0;
   return (
     <FormGuardar className="pila">
-      <Ajuste name="metaMensual" titulo="Meta mensual del negocio" ayuda="Establece cuánto deseas obtener mensualmente después de pagar al equipo. El sistema calculará las metas diarias de venta necesarias para alcanzar ese objetivo."
+      <Ajuste name="metaMensual" titulo="Ganancia que quieres al mes" ayuda="Lo que quieres que le quede al negocio cada mes, ya pagado el equipo y los gastos del mes (renta, luz, agua y demás). Con eso se calcula cuánto debe vender cada barbero al día."
         inicial={metaMensual} opciones={[0, 10000, 20000, 40000]} max={150000} paso={1000} formato={(v) => (v ? formatoDinero(v * 100) : "Sin meta")}
-        sugerido={calculada ? { valor: calculada, texto: `Calculada, ${formatoDinero(calculada * 100)}` } : undefined}
-        vista={(v) => <VistaMeta meta={v} datos={datosMeta} calculada={calculada} />} />
+        vista={(v) => <VistaMeta meta={v} datos={datosMeta} />} />
     </FormGuardar>
   );
 }
 
-/** Cómo queda la meta de cada barbero con la meta mensual elegida. */
-function VistaMeta({ meta, datos, calculada }: { meta: number; datos: DatosMeta; calculada: number }) {
+/** Cómo queda la meta de cada barbero con la ganancia elegida: se suman los gastos del mes, los sueldos y las comisiones. */
+function VistaMeta({ meta, datos }: { meta: number; datos: DatosMeta }) {
   if (!meta) return <>Sin meta mensual, la meta de cada día se calcula sola con lo que se ha vendido.</>;
-  const r = metaDelNegocio(meta * 100, 0, datos.barberos, datos.dias);
+  const fijos = datos.fijos.reduce((a, f) => a + f.mensual, 0);
+  const gastosMes = fijos > 0 ? fijos : datos.egresos;
+  const r = metaDelNegocio(meta * 100, gastosMes, datos.barberos, datos.dias);
   const conMeta = r.porBarbero.filter((b) => b.aplica);
   const ventasMes = conMeta.reduce((a, b) => a + b.mensual, 0);
   const $p = (c: number) => formatoDinero(Math.round(c / 100) * 100);
   const pagos: Record<string, string> = { porcentaje: "porcentaje por servicio", fijo: "pago fijo por servicio", renta: "renta de silla", sueldo: "sueldo fijo", mixto: "sueldo más porcentaje" };
   return (
     <div className="vista-meta">
-      {meta === calculada && (
-        <div className="calculo-m">
-          <span className="lab">Cómo se calculó</span>
-          {datos.fijos.map((f) => <div key={f.concepto}><span>{f.concepto}</span><span className="num">{$p(f.mensual)} al mes</span></div>)}
-          {r.sueldos > 0 && <div><span>Sueldos del equipo</span><span className="num">+{$p(r.sueldos)}</span></div>}
-          {r.rentas > 0 && <div><span>Rentas de silla que entran</span><span className="num">−{$p(r.rentas)}</span></div>}
-          {datos.barberos.filter((b) => b.tipo === "porcentaje" || b.tipo === "mixto" || b.tipo === "fijo").map((b) => (
-            <div key={b.id}><span>{b.nombre.split(" ")[0]}, {pagos[b.tipo!]}</span><span className="muted">{b.tipo === "fijo" ? `${formatoDinero(b.montoFijo)} por servicio` : `${b.porcentaje / 100}% de lo que cobra`}</span></div>
-          ))}
-          <div className="tot-m"><span>Ventas necesarias en el mes</span><b className="num">{$p(ventasMes)}</b></div>
-          <small>La meta cubre los gastos frecuentes. Los sueldos y las comisiones se suman al calcular cuánto debe vender cada barbero; las rentas de silla se restan. Si cambian, vuelve a elegir la meta calculada.</small>
-        </div>
-      )}
-      <span><b style={{ fontSize: 15 }}>Objetivo mensual: {formatoDinero(meta * 100)}</b><br />
-        El equipo deberá generar suficientes ventas para que el negocio conserve {formatoDinero(meta * 100)} después de pagar las comisiones{r.sueldos ? " y los sueldos" : ""}.
-        {meta === calculada ? " Con esto se cubren los gastos frecuentes del negocio." : " Esta cifra todavía no descuenta renta, luz, agua y demás gastos."}</span>
+      <div className="calculo-m">
+        <span className="lab">Cómo se calcula</span>
+        <div><span>Ganancia que quieres</span><span className="num">{$p(meta * 100)}</span></div>
+        {fijos > 0
+          ? datos.fijos.map((f) => <div key={f.concepto}><span>{f.concepto}</span><span className="num">+{$p(f.mensual)}</span></div>)
+          : <div><span>Gastos de un mes normal<br /><small className="muted">Promedio de los egresos de los últimos meses</small></span><span className="num">+{$p(gastosMes)}</span></div>}
+        {r.sueldos > 0 && <div><span>Sueldos del equipo</span><span className="num">+{$p(r.sueldos)}</span></div>}
+        {r.rentas > 0 && <div><span>Rentas de silla que entran</span><span className="num">−{$p(r.rentas)}</span></div>}
+        <div className="tot-m"><span>Debe quedarle al negocio después de comisiones</span><b className="num">{$p(r.cubrir)}</b></div>
+        {datos.barberos.filter((b) => b.tipo === "porcentaje" || b.tipo === "mixto" || b.tipo === "fijo").map((b) => (
+          <div key={b.id}><span>{b.nombre.split(" ")[0]}, {pagos[b.tipo!]}</span><span className="muted">{b.tipo === "fijo" ? `${formatoDinero(b.montoFijo)} por servicio` : `${b.porcentaje / 100}% de lo que cobra`}</span></div>
+        ))}
+        <div className="tot-m"><span>Ventas necesarias en el mes</span><b className="num">{$p(ventasMes)}</b></div>
+        <small>Si cambian los gastos frecuentes, los sueldos o las comisiones, la meta se vuelve a calcular sola.</small>
+      </div>
       <span className="lab" style={{ marginTop: 4 }}>Meta diaria de ventas por barbero, en partes iguales</span>
       <div className="metas-b">
         {r.porBarbero.map((b) => (

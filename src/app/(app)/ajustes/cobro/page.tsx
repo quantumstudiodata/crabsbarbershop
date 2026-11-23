@@ -100,8 +100,8 @@ export default async function ConfigurarNegocio({ searchParams }: { searchParams
       </Bloque>
 
       <Bloque numero={3} titulo="Metas" puedeEditar={edita("metas")}
-        resumen={b.usaMetas ? (b.metaMensual ? `Objetivo mensual de ${$(b.metaMensual)}` : "Activas, sin objetivo mensual") : "Apagadas"}
-        detalle={<Resumen filas={[["Metas de ventas", si(b.usaMetas)], ["Objetivo mensual", b.metaMensual ? $(b.metaMensual) : "Sin objetivo"]]} />}>
+        resumen={b.usaMetas ? (b.metaMensual ? `Ganancia buscada al mes ${$(b.metaMensual)}` : "Activas, sin objetivo mensual") : "Apagadas"}
+        detalle={<Resumen filas={[["Metas de ventas", si(b.usaMetas)], ["Ganancia buscada al mes", b.metaMensual ? $(b.metaMensual) : "Sin definir"]]} />}>
         <Funciones funciones={[
           { clave: "metas", nombre: "Metas de ventas", activa: b.usaMetas, encendida: "Inicio muestra la meta de ventas y cuánto lleva acumulado el negocio.", apagada: "Inicio no muestra metas." },
         ]} />

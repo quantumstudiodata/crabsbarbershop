@@ -207,16 +207,16 @@ describe("meta mensual del negocio", () => {
       { id: "b", nombre: "Beto", tipo: "sueldo", porcentaje: 0, montoFijo: 0, mensual: 600000, peso: 1, ticket: 15000 },
       { id: "c", nombre: "Ceci", tipo: "renta", porcentaje: 0, montoFijo: 0, mensual: 300000, peso: 1, ticket: 15000 },
     ], 26);
-    // Cubrir: 20,000 de meta + 6,000 de sueldo - 3,000 de renta = 23,000. Los egresos no entran: no es utilidad.
-    expect(r.cubrir).toBe(2300000);
+    // Cubrir: 20,000 de ganancia + 10,000 de gastos + 6,000 de sueldo - 3,000 de renta = 33,000.
+    expect(r.cubrir).toBe(3300000);
     const ana = r.porBarbero.find((x) => x.id === "a")!;
     const beto = r.porBarbero.find((x) => x.id === "b")!;
-    // A cada uno le toca la mitad (11,500). Ana cobra con comisión del 50%, así que habría que vender 23,000; con Beto, 11,500.
-    // Se promedia para que los dos tengan la misma meta: 17,250.
-    expect(ana.mensual).toBe(1725000);
-    expect(beto.mensual).toBe(1725000);
+    // A cada uno le toca la mitad (16,500). Ana cobra con comisión del 50%, así que habría que vender 33,000; con Beto, 16,500.
+    // Se promedia para que los dos tengan la misma meta: 24,750.
+    expect(ana.mensual).toBe(2475000);
+    expect(beto.mensual).toBe(2475000);
     expect(r.porBarbero.find((x) => x.id === "c")!.aplica).toBe(false);
-    expect(ana.diaria).toBe(Math.round(1725000 / 26 / 100) * 100);
+    expect(ana.diaria).toBe(Math.round(2475000 / 26 / 100) * 100);
     expect(ana.diaria).toBe(beto.diaria);
   });
   it("con dos barberos a comisión del 50%, 20,000 al mes en 25 días son 1,600 diarios de venta", () => {

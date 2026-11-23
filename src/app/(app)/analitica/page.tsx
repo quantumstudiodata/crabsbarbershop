@@ -8,7 +8,7 @@ import { periodoEncabezado } from "@/components/CabeceraPeriodo";
 import { Grafica } from "@/components/Grafica";
 import { Icono } from "@/components/Icono";
 import { requerirSesion } from "@/lib/auth";
-import { equipoConVentas, resumenPeriodo, turnosCerrados, ventasEntre } from "@/lib/datos";
+import { equipoConVentas, metasDelMes, resumenPeriodo, turnosCerrados, ventasEntre } from "@/lib/datos";
 import { cuentaDe } from "@/lib/equipo";
 import { db, schema as t } from "@/lib/db";
 import { diasEntre, fechaCorta, fechaLocal, inicioDeMes, sumarDias } from "@/lib/fechas";
@@ -64,8 +64,9 @@ export default async function Resumen({ searchParams }: { searchParams: Promise<
   const conDif = cortes.filter((c) => (c.diferencia ?? 0) !== 0);
   const v = cambio(r.netas, prev.netas);
 
-  // Meta del mes: solo con metas activas y viendo un mes.
-  const meta = s.barberia.usaMetas && s.barberia.metaMensual > 0 && p.tipo === "mes" ? s.barberia.metaMensual : 0;
+  // Meta del mes: las ventas necesarias para lograr la ganancia que se quiere (ya con lo del equipo y los gastos del mes).
+  const delMes = s.barberia.usaMetas && s.barberia.metaMensual > 0 && p.tipo === "mes" ? await metasDelMes(bId, s.barberia.metaMensual, s.barberia.zonaHoraria, hoy) : null;
+  const meta = delMes ? Math.ceil(delMes.porBarbero.filter((x) => x.aplica).reduce((a, x) => a + x.mensual, 0) / 100) * 100 : 0;
   const diasRestantes = Array.from({ length: diasEntre(hoy, p.hasta) }, (_, i) => sumarDias(hoy, i + 1)).filter((d) => new Date(`${d}T12:00:00Z`).getUTCDay() !== 0).length;
   const pct = meta ? porcentaje(r.netas, meta) : 0;
 
@@ -120,7 +121,7 @@ export default async function Resumen({ searchParams }: { searchParams: Promise<
           <div className="rs-meta">
             <div className="anillo-m" role="img" aria-label={`${pct}% de la meta`} style={{ ["--p" as string]: Math.min(pct, 100) }}><div><b>{pct}%</b><small>de la meta</small></div></div>
             <div className="rs-meta-t">
-              <span className="lab">Meta de {nombreP.toLowerCase()}</span>
+              <span className="lab">Meta de ventas de {nombreP.toLowerCase()}</span>
               <b>{$(r.netas)} <span>de {$(meta)}</span></b>
               {r.netas >= meta ? <small>Meta alcanzada</small> : <div><b>Faltan {$(meta - r.netas)}</b><small>{diasRestantes > 0 ? `en ${diasRestantes} ${diasRestantes === 1 ? "día" : "días"} de trabajo, unos ${$(Math.ceil((meta - r.netas) / diasRestantes / 100) * 100)} por día` : "Ya no quedan días de trabajo en el mes"}</small></div>}
             </div>

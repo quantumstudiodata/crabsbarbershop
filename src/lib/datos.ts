@@ -435,7 +435,13 @@ export async function equipoConVentas(barberiaId: string) {
 export async function metasDelMes(barberiaId: string, metaMensual: number, zona: string, hoy: string) {
   if (!metaMensual) return null;
   const d = await datosParaMeta(barberiaId, zona, hoy);
-  return metaDelNegocio(metaMensual, d.egresos, d.barberos, d.dias);
+  return metaDelNegocio(metaMensual, gastosDelMes(d), d.barberos, d.dias);
+}
+
+/** Gastos de un mes normal para la meta: los gastos frecuentes (y sueldos de administración); si no hay, el promedio de los egresos de los últimos meses. */
+export function gastosDelMes(d: { egresos: number; fijos: { mensual: number }[] }) {
+  const fijos = d.fijos.reduce((a, f) => a + f.mensual, 0);
+  return fijos > 0 ? fijos : d.egresos;
 }
 
 /** Lo que se necesita para calcular la meta: egresos de un mes normal, cómo se le paga a cada quien y cuánto trabaja. */
