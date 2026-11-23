@@ -213,11 +213,11 @@ function Detalle({ c, cerrar, ajustar }: { c: Corte | null; cerrar: () => void; 
   const caja = c.movimientos.filter((m) => !/^Propinas entregadas/.test(m.titulo));
   // La caja, renglón por renglón, con palabras: "Menos lo de Berenice", "Menos el gasto: garrafón".
   const nombreDe = (m: Corte["movimientos"][number]) => m.titulo === "Pago al equipo" ? `Menos lo de ${m.detalle.replace(/^Comisión de /, "")}`
-    : m.titulo.startsWith("Negocio, ") ? "Menos lo que se sacó para depositarle a la dueña" : m.titulo === "La dueña se llevó efectivo" ? "Menos lo que retiró la dueña"
+    : m.titulo.startsWith("Negocio, ") ? "Menos el efectivo para depositar" : m.titulo === "La dueña se llevó efectivo" ? "Menos el retiro de efectivo"
     : m.titulo === "Gasto pagado con la caja" ? `Menos el gasto: ${m.detalle.toLowerCase()}` : m.titulo === "Pago anulado, el dinero regresó" ? "Más un pago anulado que regresó"
     : m.titulo === "Dinero que se puso" ? `Más dinero que se puso: ${m.detalle.toLowerCase()}` : m.titulo === "Devolución" ? `Menos la devolución: ${m.detalle.toLowerCase()}` : `Menos ${m.detalle.toLowerCase()}`;
   const subDe = (m: Corte["movimientos"][number]) => m.titulo === "Pago al equipo" ? "Comisión, de la caja" : m.titulo === "Gasto pagado con la caja" ? "Gasto pagado con la caja"
-    : m.titulo.startsWith("Negocio, ") ? "Pendiente de depositar" : m.titulo === "La dueña se llevó efectivo" ? m.detalle.replace(/^La dueña se llevó efectivo,?\s*/, "").replace(/^./, (x) => x.toUpperCase()) || "Efectivo que sacó" : "Movimiento de caja";
+    : m.titulo.startsWith("Negocio, ") ? "Lo del negocio, pendiente de depositar a su cuenta" : m.titulo === "La dueña se llevó efectivo" ? m.detalle.replace(/^La dueña se llevó efectivo,?\s*/, "").replace(/^./, (x) => x.toUpperCase()) || "Efectivo que sacó" : "Movimiento de caja";
 
   // Cómo se le dio a cada quien: lo del equipo renglón por renglón y la cuenta de la dueña.
   const rep = c.reparto && (c.reparto.personas.length > 0 || c.reparto.negocio.toca > 0) ? c.reparto : null;
@@ -237,14 +237,14 @@ function Detalle({ c, cerrar, ajustar }: { c: Corte | null; cerrar: () => void; 
   const duena: { t: string; sub?: string; v: number; am?: boolean }[] = [];
   if (rep) {
     const n = rep.negocio, prop = n.propCaja ?? 0, enCaja = n.enCaja ?? 0;
-    if (n.recibido + prop) duena.push({ t: "Ya en la cuenta del negocio", sub: `Ventas con transferencia o tarjeta ${$(n.recibido)}${prop ? `, y ${$(prop)} de propinas con tarjeta, porque a quien se la dejaron se le pagó en efectivo` : ""}`, v: n.recibido + prop });
-    if (n.deMas > 0) duena.push({ t: "De eso, es del equipo", sub: "Le llegó más de lo que le toca: se le paga al equipo por transferencia o en el próximo corte", v: n.deMas });
+    if (n.recibido + prop) duena.push({ t: "Ya en la cuenta del negocio", sub: `Ventas con transferencia o tarjeta ${$(n.recibido)}${prop ? `, y ${$(prop)} de propinas con tarjeta, porque a quien se la dejaron se le pagó en efectivo de la caja` : ""}`, v: n.recibido + prop });
+    if (n.deMas > 0) duena.push({ t: "De eso, es del equipo", sub: "A la cuenta llegó más de lo que le toca al negocio: se le paga al equipo por transferencia o en el próximo corte", v: n.deMas });
     if (n.gastos) duena.push({ t: "Menos los gastos", sub: `${n.gastosTxt ? `${n.gastosTxt.replace(/^./, (x) => x.toUpperCase())}, pagado` : "Pagados"} con la caja`, v: n.gastos });
-    if (n.llevo) duena.push({ t: "Retiró de la caja", sub: "Efectivo que sacó durante el día", v: n.llevo });
-    if (enCaja) duena.push({ t: "Se sacaron de la caja para depositarle", v: enCaja, am: true });
+    if (n.llevo) duena.push({ t: "Retiros de efectivo", sub: "Efectivo que se sacó de la caja durante el día", v: n.llevo });
+    if (enCaja) duena.push({ t: "Efectivo para depositar", sub: "Sale de la caja y queda pendiente de depositar a la cuenta del negocio", v: enCaja, am: true });
     const debe = Math.max(0, n.pendiente - enCaja);
     const pagoAtrasado = rep.personas.some((p) => p.caja > p.toca);
-    if (debe) duena.push({ t: "Se le debe, no hubo efectivo", sub: pagoAtrasado ? "El efectivo se usó para pagos pendientes del equipo" : "No alcanzó el efectivo de la caja", v: debe, am: true });
+    if (debe) duena.push({ t: "Falta por depositar, no hubo efectivo", sub: pagoAtrasado ? "El efectivo se usó para pagos pendientes del equipo" : "No alcanzó el efectivo de la caja", v: debe, am: true });
     // Cortes de antes de que se llevara la cuenta de lo de la dueña: lo demás se queda sin desglose.
     const resto = n.toca - (n.recibido + prop - n.deMas) - n.gastos - n.llevo - enCaja - debe;
     if (!n.conCuenta && resto > 0) duena.push({ t: "Lo demás", sub: "Este corte es de antes de que se llevara la cuenta de los depósitos", v: resto });
@@ -263,15 +263,15 @@ function Detalle({ c, cerrar, ajustar }: { c: Corte | null; cerrar: () => void; 
             <span className="cd-t">A quién le toca</span>
             <div className="ct-hoja">
               {rep.personas.filter((p) => p.vendio > 0).map((p) => <Rg key={p.nombre} t={p.nombre} sub={`${Math.round((p.toca / p.vendio) * 100)}% de lo que vendió, ${$(p.vendio)}`} v={$(p.toca)} />)}
-              <Rg t="Negocio, la dueña" sub="Lo que queda de lo vendido" v={$(rep.negocio.toca)} />
+              <Rg t="Negocio" sub="Lo que queda de lo vendido" v={$(rep.negocio.toca)} />
             </div>
-            <span className="cd-t">Cómo se le dio a cada quien</span>
+            <span className="cd-t">Cómo recibió cada quien su parte</span>
             <div className="ct-hoja">
               {equipo.length > 0 && <span className="cd-grp">Equipo</span>}
               {equipo.map((x, i) => <Rg key={`e${i}`} t={x.t} sub={x.sub} v={$(x.v)} cls={x.mu ? "mu" : ""} />)}
-              <span className="cd-grp">La dueña</span>
+              <span className="cd-grp">Negocio</span>
               {duena.map((x, i) => <Rg key={`d${i}`} t={x.t} sub={x.sub} v={x.am ? <span className="cd-am">{$(x.v)}</span> : $(x.v)} />)}
-              <Rg t="Total de la dueña" v={$(rep.negocio.toca)} cls="tot" />
+              <Rg t="Total del negocio" v={$(rep.negocio.toca)} cls="tot" />
             </div>
           </>
         )}
@@ -298,7 +298,7 @@ function Detalle({ c, cerrar, ajustar }: { c: Corte | null; cerrar: () => void; 
           <>
             <span className="cd-t">Pendientes de los últimos días</span>
             <div className="ct-hoja">
-              {(c.historialNeg?.length ?? 0) > 0 && <span className="cd-grp">Depósitos a la dueña</span>}
+              {(c.historialNeg?.length ?? 0) > 0 && <span className="cd-grp">Depósitos del negocio</span>}
               {c.historialNeg?.map((x) => <Rg key={x.id} cls={x.pendiente ? "" : "mu"} t={<>{x.dia} <span className="cd-fol">{x.folio}</span></>} sub={x.nota} v={x.pendiente ? <span className="cd-am">{$(x.pendiente)}</span> : $(x.monto)} />)}
               {(c.historialNeg?.length ?? 0) > 0 && <Rg t="Falta depositar" v={<span className="cd-am">{$(c.faltaNeg ?? 0)}</span>} cls="tot" />}
               {(c.historialEq?.length ?? 0) > 0 && <span className="cd-grp">Pagos al equipo</span>}

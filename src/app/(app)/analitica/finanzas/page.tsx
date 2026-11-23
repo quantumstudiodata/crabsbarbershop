@@ -439,7 +439,7 @@ export default async function MovimientosPagina({ searchParams }: { searchParams
           const parte = duena.partes.find((x) => x.turnoId === tc.id);
           const folio = folios.get(tc.id) ?? "";
           const dia = diaCortoDe(tc.fechaOperativa, hoy);
-          if (!parte) return tc.cerradoEn && tc.cerradoEn.getTime() >= inicioCuenta - 60_000 ? [{ id: tc.id, dia, folio, monto: 0, pendiente: 0, nota: "Saldado, no quedó nada por depositarle" }] : [];
+          if (!parte) return tc.cerradoEn && tc.cerradoEn.getTime() >= inicioCuenta - 60_000 ? [{ id: tc.id, dia, folio, monto: 0, pendiente: 0, nota: "Saldado, no quedó nada por depositar" }] : [];
           const deps = parte.depositos.map((d) => `${formatoDinero(d.monto)} el ${cuando(d.creadoEn)}`);
           const nota = parte.queda === 0 ? `Saldado, depositado ${parte.depositos.length === 1 ? `el ${cuando(parte.depositos[0].creadoEn)}` : deps.join(" y ")}`
             : parte.queda < parte.monto ? `Pendiente ${formatoDinero(parte.queda)}, se depositaron ${deps.join(" y ")}` : "Pendiente";
