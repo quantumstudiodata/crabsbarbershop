@@ -6033,3 +6033,12 @@ button.cp-pill:focus-visible { outline: 2px solid #2b3a47; outline-offset: 2px; 
   .tit-mov > .fila { flex-wrap: nowrap; margin-left: auto; }
   .tit-mov > .fila .bt { white-space: nowrap; }
 }
+
+/* Detalle del corte de corrido: grupos dentro de una lista, folio y montos pendientes. */
+.cd-grp { display: block; font: 500 10.5px var(--f-mono); letter-spacing: .12em; text-transform: uppercase; color: var(--muted); margin: 10px 0 2px; }
+.cd-grp:first-child { margin-top: 2px; }
+.cd-fol { font: 500 11.5px var(--f-mono); color: var(--muted); margin-left: 4px; }
+.cd-am { color: var(--warn); }
+/* Corte: pregunta de cómo se le da a cada quien su propina con tarjeta. */
+.ct-prop { display: grid; gap: 6px; margin-top: 8px; font-size: 13px; color: var(--muted); }
+.ct-prop .pg-formas button { font-size: 13px; }

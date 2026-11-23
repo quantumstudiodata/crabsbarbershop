@@ -423,6 +423,37 @@ export default async function MovimientosPagina({ searchParams }: { searchParams
       recorrido: vivas.map(({ p, monto }) => { const t = corteDe(p.turnoId); return { id: p.turnoId ?? "", texto: t ? etiquetaCorte(t) : diaCortoDe(fechaLocal(p.creadoEn, zona), hoy), estado: "quedó el depósito pendiente", monto }; }).reverse(),
     }];
   }
+  // En el detalle de cada corte: lo de la dueña en los cortes recientes (pendiente o saldado y por qué) y lo que quedó pendiente al equipo.
+  if (enCortes && cortes.length) {
+    const inicioCuenta = duena?.partes[0]?.creadoEn.getTime();
+    const cuando = (d: Date) => diaCortoDe(fechaLocal(d, zona), hoy).replace(/^./, (x) => x.toLowerCase());
+    const porEntregar = await db.select({ id: t.pagosComision.barberoId, nota: t.pagosComision.nota }).from(t.pagosComision)
+      .where(and(eq(t.pagosComision.barberiaId, bId), eq(t.pagosComision.tipo, "pago"), sql`${t.pagosComision.nota} like 'Por entregar de caja:%'`, sql`${t.pagosComision.monto} > 0`));
+    const norm = (s: string) => diasCortos(s.replace(/^\s*Pago automático\s*/i, "")).replace(/[(),]/g, "").trim();
+    const siguePend = porEntregar.map((x) => ({ nombre: (gente.find((g) => g.id === x.id)?.nombre ?? "").split(" ")[0], dias: norm(x.nota.slice(x.nota.indexOf(":") + 1)) }));
+    for (const c of cortes) {
+      const iC = cortesAsc.findIndex((x) => x.id === c.id);
+      if (iC < 0) continue;
+      if (duena && inicioCuenta) {
+        c.historialNeg = cortesAsc.slice(Math.max(0, iC - 4), iC + 1).reverse().flatMap((tc) => {
+          const parte = duena.partes.find((x) => x.turnoId === tc.id);
+          const folio = folios.get(tc.id) ?? "";
+          const dia = diaCortoDe(tc.fechaOperativa, hoy);
+          if (!parte) return tc.cerradoEn && tc.cerradoEn.getTime() >= inicioCuenta - 60_000 ? [{ id: tc.id, dia, folio, monto: 0, pendiente: 0, nota: "Saldado, no quedó nada por depositarle" }] : [];
+          const deps = parte.depositos.map((d) => `${formatoDinero(d.monto)} el ${cuando(d.creadoEn)}`);
+          const nota = parte.queda === 0 ? `Saldado, depositado ${parte.depositos.length === 1 ? `el ${cuando(parte.depositos[0].creadoEn)}` : deps.join(" y ")}`
+            : parte.queda < parte.monto ? `Pendiente ${formatoDinero(parte.queda)}, se depositaron ${deps.join(" y ")}` : "Pendiente";
+          return [{ id: tc.id, dia, folio, monto: parte.monto, pendiente: parte.queda, nota }];
+        });
+        c.faltaNeg = duena.partes.filter((x) => { const k = cortesAsc.findIndex((y) => y.id === x.turnoId); return k >= 0 ? k <= iC : true; }).reduce((a, x) => a + x.queda, 0);
+      }
+      c.historialEq = (c.fueraCaja ?? []).map((y) => {
+        if (y.como === "por transferencia") return { nombre: y.nombre, monto: y.monto, dias: y.dias, saldado: true, nota: "Por transferencia" };
+        const sigue = siguePend.some((x) => x.nombre === y.nombre && (!y.dias || !x.dias || x.dias === y.dias));
+        return { nombre: y.nombre, monto: y.monto, dias: y.dias, saldado: !sigue, nota: sigue ? "Pendiente" : "Saldado, ya se le pagó" };
+      });
+    }
+  }
   // Cada depósito a la dueña es un renglón propio con los cortes que cubre.
   if (verCaja && ver("caja") && duena) for (const d of duena.depositos) {
     const dia = fechaLocal(d.creadoEn, zona);

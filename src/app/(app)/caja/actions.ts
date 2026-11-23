@@ -281,6 +281,8 @@ export async function cerrarCaja(_: EstadoCaja, form: FormData): Promise<EstadoC
       dar = (decision === "caja" ? totalCom : 0) + (otro - propTransf);
     } else {
       dar = Math.max(0, Math.min(Math.round(Number(crudo) || 0), totalCom + otro));
+      // La propina con tarjeta se da como se eligió en el corte: en efectivo de la caja o por transferencia.
+      propTransf = texto(form, `propina:${id}`) === "transferencia" ? otro : 0;
     }
     // Primero las propinas con tarjeta (salen de la caja), después la comisión más vieja.
     const propCaja = Math.min(otro - propTransf, dar);

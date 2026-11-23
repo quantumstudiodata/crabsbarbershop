@@ -68,7 +68,7 @@ export async function armarCortes(barberiaId: string, turnos: Turno[], o: { zona
     });
   };
   // Lo que vendió y le tocó a cada quien en cada turno, y lo que quedó pendiente para la dueña.
-  const [porPersona, acumulados, cuentaNeg] = await Promise.all([
+  const [porPersona, acumulados, cuentaNeg, propinasP] = await Promise.all([
     db.select({ turnoId: schema.ventas.turnoId, barberoId: schema.conceptos.barberoId, vendio: sql<number>`coalesce(sum(${schema.conceptos.precioCobrado}),0)::int`, toca: sql<number>`coalesce(sum(${schema.conceptos.comision}),0)::int` })
       .from(schema.conceptos).innerJoin(schema.ventas, eq(schema.ventas.id, schema.conceptos.ventaId))
       .where(and(eq(schema.ventas.barberiaId, barberiaId), inArray(schema.ventas.turnoId, ids), eq(schema.ventas.estado, "pagada")))
@@ -76,6 +76,11 @@ export async function armarCortes(barberiaId: string, turnos: Turno[], o: { zona
     db.select({ turnoId: schema.negocioDuena.turnoId, monto: schema.negocioDuena.monto }).from(schema.negocioDuena)
       .where(and(eq(schema.negocioDuena.barberiaId, barberiaId), eq(schema.negocioDuena.tipo, "acumulado"), inArray(schema.negocioDuena.turnoId, ids), isNull(schema.negocioDuena.anuladoEn))),
     cuentaDuena(barberiaId),
+    // Propinas de cada persona en cada turno: en efectivo (se le dan aparte) y con tarjeta o transferencia.
+    db.select({ turnoId: schema.ventas.turnoId, barberoId: schema.propinas.barberoId, efectivo: schema.propinas.esEfectivo, monto: sql<number>`coalesce(sum(${schema.propinas.monto}),0)::int` })
+      .from(schema.propinas).innerJoin(schema.ventas, eq(schema.ventas.id, schema.propinas.ventaId))
+      .where(and(eq(schema.ventas.barberiaId, barberiaId), inArray(schema.ventas.turnoId, ids), eq(schema.ventas.estado, "pagada")))
+      .groupBy(schema.ventas.turnoId, schema.propinas.barberoId, schema.propinas.esEfectivo),
   ]);
   const { zona, hoy, gente, folios } = o;
   const persona = (id: string | null) => gente.find((g) => g.id === id) ?? { nombre: "", avatar: "iniciales" };
@@ -111,7 +116,9 @@ export async function armarCortes(barberiaId: string, turnos: Turno[], o: { zona
         // Quien vendió en el turno, y quien no vendió pero recibió algo en el corte (comisiones de días anteriores).
         const vendieron = porPersona.filter((x) => x.turnoId === c.id && x.barberoId);
         const nombres = new Set(vendieron.map((x) => persona(x.barberoId).nombre.split(" ")[0]));
-        const sinVenta = [...new Set([...movs.filter((m) => m.tipo === "retiro" && esPagoEquipo(m.concepto)).map((m) => m.concepto.replace(/^Pago (de comisiones )?a /, "")), ...fuera.map((y) => y.nombre)])]
+        const propT = propinasP.filter((x) => x.turnoId === c.id);
+        const sinVenta = [...new Set([...movs.filter((m) => m.tipo === "retiro" && esPagoEquipo(m.concepto)).map((m) => m.concepto.replace(/^Pago (de comisiones )?a /, "")), ...fuera.map((y) => y.nombre),
+          ...propT.map((x) => persona(x.barberoId).nombre.split(" ")[0])])]
           .filter((n) => n && !nombres.has(n)).map((n) => ({ nombre: n, vendio: 0, toca: 0 }));
         const personas = [...vendieron.map((x) => ({ nombre: persona(x.barberoId).nombre.split(" ")[0], vendio: x.vendio, toca: x.toca })), ...sinVenta].map((x) => {
           const nombre = x.nombre;
@@ -124,8 +131,14 @@ export async function armarCortes(barberiaId: string, turnos: Turno[], o: { zona
           const enTurno = Math.max(0, pagos.filter((m) => !alCerrar(m)).reduce((a, m) => a + m.monto, 0) - regreso);
           const de = (como: string) => fuera.filter((y) => y.nombre === nombre && y.como === como).reduce((a, y) => a + y.monto, 0);
           const transf = de("por transferencia"), pendiente = de("para el próximo corte");
-          return { nombre, vendio: x.vendio, toca: x.toca, caja, transf, pendiente, enTurno };
-        }).filter((p) => p.vendio || p.caja || p.transf || p.pendiente || p.enTurno);
+          // Propinas: en efectivo se le dan aparte; con tarjeta, lo que salió de la caja para la persona es lo entregado menos lo de efectivo.
+          const deEsta = propT.filter((y) => persona(y.barberoId).nombre.split(" ")[0] === nombre);
+          const propEf = deEsta.filter((y) => y.efectivo).reduce((a, y) => a + y.monto, 0);
+          const propTar = deEsta.filter((y) => !y.efectivo).reduce((a, y) => a + y.monto, 0);
+          const entregada = movs.filter((m) => m.tipo === "retiro" && esPropinaEntregada(m.concepto) && m.concepto.endsWith(` ${nombre}`)).reduce((a, m) => a + m.monto, 0);
+          const propCaja = Math.min(propTar, Math.max(0, entregada - propEf));
+          return { nombre, vendio: x.vendio, toca: x.toca, caja, transf, pendiente, enTurno, propEf, propCaja, propTransf: Math.max(0, propTar - propCaja) };
+        }).filter((p) => p.vendio || p.caja || p.transf || p.pendiente || p.enTurno || p.propEf || p.propCaja || p.propTransf);
         const total = metodos.reduce((a, x) => a + x.total, 0);
         const toca = Math.max(0, total - personas.reduce((a, x) => a + x.toca, 0));
         const recibido = total - efectivo;
@@ -138,7 +151,10 @@ export async function armarCortes(barberiaId: string, turnos: Turno[], o: { zona
         const depositado = cuentaNeg.partes.filter((x) => x.turnoId === c.id).reduce((a, x) => a + x.monto - x.queda, 0);
         // Lo que le llegó de más (por transferencia o tarjeta) sobre lo que le tocaba: es del equipo.
         const deMas = Math.max(0, recibido + gastosCaja + llevo + propCaja - toca);
-        return { personas, negocio: { vendio: total, toca, recibido, gastos: gastosCaja, llevo, pendiente, depositado, deMas, propCaja } };
+        // Lo que salió de la caja al cerrar para depositarle a la dueña.
+        const enCaja = movs.filter((m) => m.tipo === "retiro" && esAcumulado(m.concepto)).reduce((a, m) => a + m.monto, 0);
+        const conCuenta = acumulados.some((x) => x.turnoId === c.id);
+        return { personas, negocio: { vendio: total, toca, recibido, gastos: gastosCaja, llevo, pendiente, depositado, deMas, propCaja, enCaja, conCuenta, gastosTxt: gastos.map((g) => g.concepto).join(", ") } };
       })(),
       evidencias: evid.filter((x) => x.turnoId === c.id).map((x) => ({ id: x.id, etiqueta: x.etiqueta, nombre: x.nombre, tipo: x.tipo })),
       ajustes: ajustes.filter((x) => x.turnoId === c.id).map((x) => `Ajuste de ${formatoDinero(x.monto)} por ${x.usuario.split(" ")[0]}: ${x.motivo}`),

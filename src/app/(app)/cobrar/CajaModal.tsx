@@ -388,18 +388,21 @@ function CortePasos({ turno, accion, cerrando, error, contado, setContado, limit
   const [modo, setModo] = useState<Record<string, "caja" | "manana" | "transferencia">>({});
   const [dados, setDados] = useState<Record<string, boolean>>({});
   const [cambiando, setCambiando] = useState<string | null>(null);
+  // Cómo se le da a cada quien su propina con tarjeta: se pregunta, no se decide sola.
+  const [propForma, setPropForma] = useState<Record<string, "caja" | "transferencia">>({});
   let queda = paraRepartir;
   const reparto = gente.map((x) => {
-    // Las propinas con tarjeta siempre salen de la caja; la comisión, solo si se paga de la caja hoy.
+    // La propina con tarjeta se le da como la persona elija: en efectivo de la caja o por transferencia. La comisión, si se paga de la caja hoy.
     const deCajaHoy = (modo[x.id] ?? "caja") === "caja" || x.comision === 0;
-    const ef = Math.min(deCajaHoy ? x.total : x.otro, queda); queda -= ef;
-    return { ...x, ef, falta: x.total - ef };
+    const propCaja = propForma[x.id] === "transferencia" ? 0 : x.otro;
+    const ef = Math.min((deCajaHoy ? x.comision : 0) + propCaja, queda); queda -= ef;
+    return { ...x, ef, falta: x.comision + propCaja - ef, propTransf: x.otro - propCaja, propDeCaja: Math.min(propCaja, ef) };
   });
   const saleDeCaja = reparto.reduce((a, x) => a + x.ef, 0);
   // Lo del negocio se descuenta solo al contar: sale de la caja lo que le toca (lo que alcance arriba del fondo) y se acumula para la dueña.
   // Si no alcanza, lo demás se le sigue debiendo. El depósito se registra aparte, en Movimiento de caja.
   // Las propinas con tarjeta que se dan con efectivo de la caja ya le llegaron a la dueña al banco: se restan de lo que le toca.
-  const propDeCaja = reparto.reduce((a, x) => a + Math.min(x.otro, x.ef), 0);
+  const propDeCaja = reparto.reduce((a, x) => a + x.propDeCaja, 0);
   const leToca = Math.max(0, (turno.leToca ?? 0) - propDeCaja);
   const negocio = Math.min(leToca, Math.max(0, queda));
   const seDebe = leToca - negocio;
@@ -421,7 +424,9 @@ function CortePasos({ turno, accion, cerrando, error, contado, setContado, limit
   const fueraCaja = grupos.filter((g) => !EN_LINEA.includes(g.metodo));
   const conDif = dif !== null && dif !== 0;
   // En el paso de contar no se avanza sin escribir cuánto se contó.
-  const puedeSeguir = nombre !== "cuenta" || c !== null;
+  // Antes de seguir, se elige cómo se le da a cada quien su propina con tarjeta.
+  const faltaPropina = reparto.some((x) => x.otro > 0 && !propForma[x.id]);
+  const puedeSeguir = (nombre !== "cuenta" || c !== null) && !(nombre === "reparte" && faltaPropina);
   return (
     <Modal abierto cerrar={cerrar} etiqueta={`Corte de caja, paso ${paso} de ${pasos}`} titulo={titulos[nombre]}>
       {/* Enter en un paso intermedio avanza al siguiente en lugar de cerrar la caja. */}
@@ -436,6 +441,7 @@ function CortePasos({ turno, accion, cerrando, error, contado, setContado, limit
           <span key={`h${x.id}`} hidden>
             <input type="hidden" name={`efectivo:${x.id}`} value={x.ef} />
             <input type="hidden" name={`entrega:${x.id}`} value={(modo[x.id] ?? "caja") !== "caja" ? modo[x.id] : resto[x.id] ?? "manana"} />
+            <input type="hidden" name={`propina:${x.id}`} value={propForma[x.id] === "transferencia" ? "transferencia" : "caja"} />
           </span>
         ))}
 
@@ -504,6 +510,16 @@ function CortePasos({ turno, accion, cerrando, error, contado, setContado, limit
                           {x.comision === 0 || r === "transferencia" ? "por transferencia" : "en el próximo corte"}
                         </small>
                       )}
+                      {x.otro > 0 && (
+                        <div className="ct-prop">
+                          <span>Le dejaron {formatoDinero(x.otro)} de propina con tarjeta. ¿Cómo se le da?</span>
+                          <div className="pg-formas" role="radiogroup" aria-label={`Propina de ${x.nombre}`}>
+                            {([["caja", "En efectivo de la caja"], ["transferencia", "Por transferencia"]] as const).map(([k, tx]) => (
+                              <button type="button" key={k} role="radio" aria-checked={propForma[x.id] === k} className={propForma[x.id] === k ? "on" : ""} onClick={() => setPropForma((v) => ({ ...v, [x.id]: k }))}>{tx}</button>
+                            ))}
+                          </div>
+                        </div>
+                      )}
                       {x.comision > 0 && <button type="button" className="ct-cambiar" aria-expanded={cambiando === x.id} onClick={() => setCambiando((v) => (v === x.id ? null : x.id))}><Icono n="editar" />Cambiar cómo se le paga</button>}
                       {cambiando === x.id && (
                         <div className="ct-menu" role="radiogroup" aria-label={`Cómo se le paga a ${x.nombre}`}>
@@ -557,6 +573,7 @@ function CortePasos({ turno, accion, cerrando, error, contado, setContado, limit
           </div>
         )}
 
+        {nombre === "reparte" && faltaPropina && <small className="ct-falta">Elige cómo se le da la propina con tarjeta para seguir.</small>}
         {error && <p className="aviso error">{error}</p>}
         <div className="ck-acc">
           {paso > 1 ? <button type="button" className="ck-atras" aria-label="Anterior" onClick={() => setPaso(paso - 1)}><Icono n="regresar" /></button> : <span />}
