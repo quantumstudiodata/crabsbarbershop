@@ -10,7 +10,7 @@ export default function Error({ error, reset }: { error: Error & { digest?: stri
     setVista(v);
     // Si la pestaña quedó con una versión anterior de la app, se recarga una vez para tomar la nueva.
     try {
-      if (/Failed to find Server Action|Loading chunk|ChunkLoadError|Failed to fetch dynamically imported module/i.test(error.message) && sessionStorage.getItem("crabs-recarga") !== location.pathname) {
+      if (/Failed to find Server Action|Loading chunk|ChunkLoadError|Failed to fetch dynamically imported module|reading 'call'|Load failed/i.test(error.message) && sessionStorage.getItem("crabs-recarga") !== location.pathname) {
         sessionStorage.setItem("crabs-recarga", location.pathname);
         location.reload();
         return;

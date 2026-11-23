@@ -232,7 +232,7 @@ export function CajaModal({ inicial, turno, limiteDiferencia, categorias, eviden
     // Lo demás que sale de la caja (lo del equipo y lo de la dueña) se saca en el corte.
     const ops: [Vista, string, string, string][] = [
       ...(enCobro || (cerrada && !mover) ? [] : [["gasto", "etiqueta", "Pagué algo con dinero de la caja", "Agua, limpieza, productos. Cuenta como gasto."], ["entrada", "entrada", "Puse dinero en la caja", "Para tener cambio. No cuenta como venta."]] as [Vista, string, string, string][]),
-      ...((duena?.saldo ?? 0) > 0 ? [["deposito", "enviar", "Deposité a la dueña", `Pendiente de depositar ${formatoDinero(duena!.saldo)}, ${duena!.desde}. Con comprobante.`] as [Vista, string, string, string]] : []),
+      ...((duena?.saldo ?? 0) > 0 ? [["deposito", "enviar", "Deposité a la dueña", `Pendiente de depositar ${formatoDinero(duena!.saldo)}, ${duena!.desde}.`] as [Vista, string, string, string]] : []),
       ...(titular && !enCobro && (!cerrada || mover) ? [["retiro", "salida", "Me llevo efectivo de la caja", "Lo tomo yo o alguien de mi parte. Se descuenta de lo del negocio."] as [Vista, string, string, string]] : []),
     ];
     return (
@@ -588,7 +588,7 @@ function CortePasos({ turno, accion, cerrando, error, contado, setContado, limit
 
 /**
  * Depósito a la dueña de lo acumulado del negocio. Se ve qué cortes cubre, de lo más viejo a lo más nuevo;
- * si se deposita menos, lo demás sigue pendiente. El comprobante es obligatorio.
+ * si se deposita menos, lo demás sigue pendiente. El comprobante es opcional.
  */
 function Deposito({ duena, accion, unEnvio, guardando, error, atras }: { duena: NonNullable<Turno["duena"]>; accion: (d: FormData) => void; unEnvio: (e: React.FormEvent) => void; guardando: boolean; error?: string; atras: React.ReactNode }) {
   const [monto, setMonto] = useState(String(duena.saldo / 100));
@@ -616,7 +616,7 @@ function Deposito({ duena, accion, unEnvio, guardando, error, atras }: { duena: 
         </div>
       </div>
       {centavos > duena.saldo && <p className="aviso error">Solo hay {formatoDinero(duena.saldo)} pendientes de depositar.</p>}
-      <div className="campo"><span>Comprobante del depósito</span>
+      <div className="campo"><span>Comprobante del depósito (opcional)</span>
         <div className="dp-arch">
           <label className="bt sec chico"><Icono n="camara" />Foto<input type="file" accept="image/*" capture="environment" hidden onChange={(e) => elegir(e.target.files?.[0])} /></label>
           <label className="bt sec chico"><Icono n="clip" />Archivo<input type="file" accept="image/*,application/pdf" hidden onChange={(e) => elegir(e.target.files?.[0])} /></label>
@@ -627,7 +627,7 @@ function Deposito({ duena, accion, unEnvio, guardando, error, atras }: { duena: 
       <input type="hidden" name="comprobante" value={archivo?.datos ?? ""} />
       <input type="hidden" name="comprobanteNombre" value={archivo?.nombre ?? ""} />
       {error && <p className="aviso error">{error}</p>}
-      <div className="acciones"><button className="bt" disabled={guardando || !archivo || centavos <= 0 || centavos > duena.saldo}>{guardando ? "Guardando…" : "Guardar depósito"}<Fl /></button></div>
+      <div className="acciones"><button className="bt" disabled={guardando || leyendo || centavos <= 0 || centavos > duena.saldo}>{guardando ? "Guardando…" : "Guardar depósito"}<Fl /></button></div>
     </form>
   );
 }

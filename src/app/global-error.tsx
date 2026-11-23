@@ -3,7 +3,7 @@
 import { useEffect } from "react";
 
 // Errores que pasan cuando se publicó una versión nueva y la pestaña sigue con la anterior: se arreglan recargando.
-const DE_VERSION = /Failed to find Server Action|Loading chunk|ChunkLoadError|Failed to fetch dynamically imported module|Unexpected token '<'/i;
+const DE_VERSION = /Failed to find Server Action|Loading chunk|ChunkLoadError|Failed to fetch dynamically imported module|Unexpected token '<'|reading 'call'|Load failed/i;
 
 /** Último respaldo: si falla toda la página, en lugar de una pantalla negra se ve esto y se puede recargar. */
 export default function ErrorGlobal({ error }: { error: Error & { digest?: string } }) {

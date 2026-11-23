@@ -119,7 +119,8 @@ export default async function MovimientosPagina({ searchParams }: { searchParams
     }) : [],
     verGastos ? db.select(porFila(diaGasto)).from(t.gastos).where(and(...condGasto)).groupBy(sql`1`) : [],
     verPagos && ver("equipo") ? db.select(porFila(local(t.pagosComision.creadoEn))).from(t.pagosComision).innerJoin(t.usuarios, eq(t.usuarios.id, t.pagosComision.barberoId))
-      .where(and(eq(t.pagosComision.barberiaId, bId), ...enFechas(t.pagosComision.creadoEn), ...(pagosDe ? [eq(t.pagosComision.barberoId, pagosDe)] : []), ...(texto ? [ilike(t.usuarios.nombre, texto)] : []))).groupBy(sql`1`) : [],
+      // Lo pendiente de entregar va en su propio grupo arriba, no en su día: no cuenta para armar las páginas.
+      .where(and(eq(t.pagosComision.barberiaId, bId), ...enFechas(t.pagosComision.creadoEn), sql`${t.pagosComision.nota} not like 'Por entregar de caja:%'`, ...(pagosDe ? [eq(t.pagosComision.barberoId, pagosDe)] : []), ...(texto ? [ilike(t.usuarios.nombre, texto)] : []))).groupBy(sql`1`) : [],
     // Las salidas por pagos al equipo no se cuentan: ya aparecen como pago.
     verCaja && ver("caja") ? db.select(porFila(diaCaja)).from(t.movimientosCaja).innerJoin(t.turnosCaja, eq(t.turnosCaja.id, t.movimientosCaja.turnoId))
       // Lo pendiente de la dueña tampoco: va dentro de su corte.
@@ -131,28 +132,24 @@ export default async function MovimientosPagina({ searchParams }: { searchParams
   const porDia = new Map<string, number>();
   const sumar = (d: string, n: number) => { if (d) porDia.set(d, (porDia.get(d) ?? 0) + n); };
   for (const [d, n] of diasV) sumar(d, n);
-  for (const c of turnos) sumar(c.fechaOperativa, 1);
+  // La caja abierta todavía no es un corte: no se cuenta como renglón (si no, un día sin nada que mostrar ocuparía una página).
+  for (const c of turnos) if (c.cerradoEn) sumar(c.fechaOperativa, 1);
   for (const x of [...diasG, ...diasP, ...diasM, ...diasT]) sumar(x.d, x.n);
   // Los depósitos a la dueña son renglones propios de Movimientos (también los anulados).
   if (verCaja && ver("caja") && !f.buscar) for (const x of await db.select(porFila(local(t.negocioDuena.creadoEn))).from(t.negocioDuena)
     .where(and(eq(t.negocioDuena.barberiaId, bId), eq(t.negocioDuena.tipo, "deposito"), ...enFechas(t.negocioDuena.creadoEn))).groupBy(sql`1`)) sumar(x.d, x.n);
   const todosDias = [...porDia.keys()].sort().reverse();
   const totalFilas = [...porDia.values()].reduce((a, n) => a + n, 0);
-  // Páginas por filas: se juntan días completos hasta llegar a 10 filas en escritorio (15 en el teléfono). Un día muy lleno va solo en su página.
+  // Páginas por días completos: cada página lleva al menos 2 días, y se le suman más días mientras quepan en 10 filas (15 en el teléfono).
   const movil = await esMovil();
   const LIMITE = movil ? 15 : 10;
-  // Un día con más filas que el límite se reparte en varias páginas (parte: desde qué fila y hasta cuál de ese día).
   type Grupo = { dias: string[]; parte?: { desde: number; hasta: number } };
   const grupos: Grupo[] = [];
   for (const d of todosDias) {
     const n = porDia.get(d) ?? 0;
-    if (n > LIMITE) {
-      for (let i = 0; i < n; i += LIMITE) grupos.push({ dias: [d], parte: { desde: i, hasta: i + LIMITE >= n ? Infinity : i + LIMITE } });
-      continue;
-    }
     const ultimo = grupos[grupos.length - 1];
-    const lleva = ultimo && !ultimo.parte ? ultimo.dias.reduce((a, x) => a + (porDia.get(x) ?? 0), 0) : Infinity;
-    if (lleva + n > LIMITE) grupos.push({ dias: [d] }); else ultimo.dias.push(d);
+    const lleva = ultimo ? ultimo.dias.reduce((a, x) => a + (porDia.get(x) ?? 0), 0) : 0;
+    if (ultimo && (ultimo.dias.length < 2 || lleva + n <= LIMITE)) ultimo.dias.push(d); else grupos.push({ dias: [d] });
   }
   const paginas = Math.max(1, grupos.length);
   // Al llegar con ?corte=<id> (desde un aviso), se abre la página donde está ese corte.

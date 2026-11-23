@@ -25,26 +25,9 @@ import { verificadosDe, type Verificado } from "@/lib/pagos";
 import { Pendientes } from "./Pendientes";
 import { PrimerosPasos } from "./PrimerosPasos";
 import { Suspense } from "react";
-import { resumenSemana, type ResumenSemana } from "@/lib/resumenSemana";
+import type { ResumenSemana } from "@/lib/resumenSemana";
 import { registrarGastosAutomaticos } from "@/lib/gastosAuto";
 
-/** Resumen de la semana pasada: lo vendido, las transferencias por comparar con el banco y lo que se salió de lo normal. */
-function TarjetaSemana({ r }: { r: ResumenSemana }) {
-  return (
-    <section className="glass ini-sem subir d3" aria-label="Semana pasada">
-      <div className="entre"><span className="lab">Semana pasada</span><small className="muted">{r.periodo}</small></div>
-      <div className="ini-sem-c">
-        <span><small>Vendido</small><b>{formatoDinero(r.ventas)}</b><em>{r.cambio === null ? `${r.servicios} servicios` : `${Math.abs(r.cambio)}% ${r.cambio >= 0 ? "más" : "menos"} que la anterior`}</em></span>
-        <span><small>Transferencias</small><b>{formatoDinero(r.transferencias.total)}</b><em>{r.transferencias.n ? `${r.transferencias.n} para comparar con tu banco` : "Ninguna esa semana"}</em></span>
-      </div>
-      {r.alertas.length ? (
-        <div className="ini-sem-a">
-          {r.alertas.map((a) => <Link key={a.texto} href={a.href}><Icono n="ojo" /><span>{a.texto}</span><Icono n="derecha" /></Link>)}
-        </div>
-      ) : <p className="ini-sem-ok"><Icono n="palomita" />Todo en orden: nada fuera de lo normal.</p>}
-    </section>
-  );
-}
 import { pendientesConfig, pendientesDe, type Pendiente } from "./pendientes";
 
 type Q = { aviso?: string; error?: string };
@@ -282,12 +265,10 @@ function InicioVista(v: Vista) {
           )}
         </>} />
 
-      {v.semana && <TarjetaSemana r={v.semana} />}
-
       <section className="ultimos-s subir d3">
         <div className="entre">
-          <h2 className="sub-t">Últimos servicios</h2>
-          {v.verVentas && <Link className="bt-ver" href="/analitica/finanzas?tipo=ventas">Ver todas las ventas<span><Icono n="derecha" /></span></Link>}
+          <h2 className="sub-t">Últimos movimientos</h2>
+          {v.verVentas && <Link className="bt-ver" href="/analitica/finanzas">Ver todos los movimientos<span><Icono n="derecha" /></span></Link>}
         </div>
         <UltimosServicios filas={v.ultimos} />
       </section>
@@ -346,9 +327,9 @@ export default async function Inicio({ searchParams }: { searchParams: Promise<Q
       total={total} servicios={conceptos.length} clientes={deHoy.length} previo={previo}
       movs={pagadas.map((v) => ({ creadoEn: v.creadoEn, fecha: v.fecha, monto: v.total }))}
       meta={meta} citas={citas} equipo={filasEq} pendientes={pendientes}
-      ultimos={filasUltimos(ventas.slice(0, 5), equipo, hoy, zona, await verificadosDe(ventas.slice(0, 5).map((v) => v.id)))}
+      ultimos={filasUltimos(ventas.slice(0, 8), equipo, hoy, zona, await verificadosDe(ventas.slice(0, 8).map((v) => v.id)))}
       verMas={{ href: "/analitica", texto: "Ver semana y mes en Reportes" }} verVentas={s.puede("ventas.ver_todas")} agendar={s.barberia.usaCitas && s.puede("citas.modificar")}
-      semana={s.puede("reportes.ver") && ["duena", "admin", "contador"].includes(s.usuario.rol) ? await registrarGastosAutomaticos(s.barberia.id).then(() => resumenSemana(s.barberia.id, zona)).catch(() => null) : null} />
+      semana={s.puede("reportes.ver") && ["duena", "admin", "contador"].includes(s.usuario.rol) ? await registrarGastosAutomaticos(s.barberia.id).then(() => null).catch(() => null) : null} />
   );
 }
 
@@ -389,7 +370,7 @@ async function InicioBarbero({ s, hoy, zona, turno, avisos }: { s: Sesion; hoy: 
       movs={mios.map((c) => ({ creadoEn: c.creadoEn, fecha: c.fecha, monto: c.precioCobrado }))}
       meta={s.barberia.usaMetas ? { monto: Math.max(metaHoy, 1), ayuda: mia?.aplica ? "Sale de la meta mensual del negocio y de tu forma de pago." : "Refleja tu meta de ventas y cuánto llevas de ella." } : null}
       citas={citas} equipo={filasEq} pendientes={pendientes}
-      ultimos={filasUltimos(todas.slice(0, 5), gente, hoy, zona, await verificadosDe(todas.slice(0, 5).map((v) => v.id)))}
+      ultimos={filasUltimos(todas.slice(0, 8), gente, hoy, zona, await verificadosDe(todas.slice(0, 8).map((v) => v.id)))}
       verMas={{ href: "/analitica/finanzas?tipo=ventas", texto: "Ver tus ventas en Movimientos" }} verVentas agendar={s.barberia.usaCitas && s.puede("citas.modificar")} />
   );
 }

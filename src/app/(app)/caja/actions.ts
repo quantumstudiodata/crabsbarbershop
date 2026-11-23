@@ -145,8 +145,8 @@ export async function registrarDeposito(_: EstadoCaja, form: FormData): Promise<
   if (!monto) return { error: "Escribe cuánto depositaste." };
   const archivo = String(form.get("comprobante") ?? "");
   const nombre = texto(form, "comprobanteNombre", 120) || "comprobante";
-  if (!archivo) return { error: "Adjunta el comprobante del depósito." };
-  if (!TIPOS_ADJUNTO.test(archivo) || archivo.length > MAX_ADJUNTO) return { error: "El comprobante debe ser una foto o un PDF de máximo 1 MB." };
+  // El comprobante es opcional; si se adjunta, tiene que ser una foto o un PDF.
+  if (archivo && (!TIPOS_ADJUNTO.test(archivo) || archivo.length > MAX_ADJUNTO)) return { error: "El comprobante debe ser una foto o un PDF de máximo 1 MB." };
   // Si se presiona varias veces, se guarda una sola.
   const [ya] = await db.select({ id: schema.negocioDuena.id }).from(schema.negocioDuena).where(and(eq(schema.negocioDuena.barberiaId, s.barberia.id), eq(schema.negocioDuena.tipo, "deposito"),
     eq(schema.negocioDuena.monto, monto), eq(schema.negocioDuena.usuarioId, s.usuario.id), isNull(schema.negocioDuena.anuladoEn), sql`${schema.negocioDuena.creadoEn} > now() - interval '30 seconds'`)).limit(1);
@@ -156,7 +156,7 @@ export async function registrarDeposito(_: EstadoCaja, form: FormData): Promise<
   if (monto > saldo) return { error: `Solo hay ${formatoDinero(saldo)} pendientes de depositar. Revisa el monto.` };
   await db.transaction(async (tx) => {
     await tx.insert(schema.negocioDuena).values({ barberiaId: s.barberia.id, tipo: "deposito", monto, usuarioId: s.usuario.id,
-      comprobanteNombre: nombre, comprobanteTipo: archivo.slice(5, archivo.indexOf(";")), comprobanteDatos: archivo });
+      comprobanteNombre: archivo ? nombre : null, comprobanteTipo: archivo ? archivo.slice(5, archivo.indexOf(";")) : null, comprobanteDatos: archivo || null });
     await registrar(tx, { barberiaId: s.barberia.id, usuarioId: s.usuario.id, tipo: "caja",
       accion: `${s.usuario.nombre} registró un depósito a la dueña de ${formatoDinero(monto)}`, detalle: { depositoDuena: monto, quedan: saldo - monto } });
   });
