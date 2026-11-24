@@ -232,14 +232,15 @@ export function CajaModal({ inicial, turno, limiteDiferencia, categorias, eviden
     // Lo demás que sale de la caja (lo del equipo y lo de la dueña) se saca en el corte.
     const ops: [Vista, string, string, string][] = [
       ...(enCobro || (cerrada && !mover) ? [] : [["gasto", "etiqueta", "Pagué algo con dinero de la caja", "Agua, limpieza, productos. Cuenta como gasto."], ["entrada", "entrada", "Puse dinero en la caja", "Para tener cambio. No cuenta como venta."]] as [Vista, string, string, string][]),
-      ...((duena?.saldo ?? 0) > 0 ? [["deposito", "enviar", "Deposité a la dueña", `Pendiente de depositar ${formatoDinero(duena!.saldo)}, ${duena!.desde}.`] as [Vista, string, string, string]] : []),
+      // Siempre se ve, para que nadie piense que desapareció: si no hay nada pendiente, se dice y no se puede abrir.
+      ...(duena ? [["deposito", "enviar", "Deposité al negocio", duena.saldo > 0 ? `Pendiente de depositar ${formatoDinero(duena.saldo)}, ${duena.desde}.` : "No hay nada pendiente de depositar."] as [Vista, string, string, string]] : []),
       ...(titular && !enCobro && (!cerrada || mover) ? [["retiro", "salida", "Me llevo efectivo de la caja", "Lo tomo yo o alguien de mi parte. Se descuenta de lo del negocio."] as [Vista, string, string, string]] : []),
     ];
     return (
       <Modal abierto cerrar={cerrar} etiqueta="Caja" titulo="¿Qué pasó con el dinero?">
         <div className="mov-ops">
           {ops.map(([v, ic, t, d]) => (
-            <button type="button" key={v} className="mov-op" onClick={() => { if (v !== "gasto") setConcepto(""); setVista(v); }}>
+            <button type="button" key={v} className="mov-op" disabled={v === "deposito" && !((duena?.saldo ?? 0) > 0)} onClick={() => { if (v !== "gasto") setConcepto(""); setVista(v); }}>
               <span className="mov-ic"><Icono n={ic} /></span><span><b>{t}</b><small>{d}</small></span><Icono n="derecha" />
             </button>
           ))}
@@ -282,9 +283,9 @@ export function CajaModal({ inicial, turno, limiteDiferencia, categorias, eviden
     );
   }
 
-  if (vistaReal === "deposito" && duena) {
+  if (vistaReal === "deposito" && duena && duena.saldo > 0) {
     return (
-      <Modal abierto cerrar={cerrar} etiqueta="Movimiento de caja" titulo="Deposité a la dueña">
+      <Modal abierto cerrar={cerrar} etiqueta="Movimiento de caja" titulo="Deposité al negocio">
         <Deposito duena={duena} accion={accDep} unEnvio={unDep} guardando={guardandoDep} error={eDep.error} atras={atras} />
       </Modal>
     );
