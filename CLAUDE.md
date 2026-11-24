@@ -102,6 +102,42 @@ Lee esto completo antes de trabajar. Resume los gustos de la usuaria, el negocio
 - Resumen: tarjeta principal de lo vendido con anillo de meta, actividad de ventas, resultado financiero, "Requiere atención".
 - Finanzas: "ese diseño ya me gustaba", no tocar sin que lo pida.
 
+## Cómo funciona la plataforma (flujo diario)
+
+- **Acceso**: cada persona entra con usuario y contraseña en `/entrar`. Titular o Administrador crean usuarios desde Ajustes > Usuarios con puesto (plantilla de permisos) y permisos individuales; se genera una contraseña temporal de 30 min que la persona cambia al entrar. Hay guía de primer uso según permisos y una bienvenida animada la primera vez. Soporte de plataforma puede "cambiar experiencia" (ver como Titular, Administrador, etc.) sin salir de la página y tiene su Centro de soporte (solicitudes, negocios, actividad e incidencias, vista previa a pantalla completa; acciones reales solo en negocios de prueba).
+- **Abrir caja** (Cobro): se cuenta el fondo; si había movimientos registrados con la caja cerrada, se suman y se avisa. Con caja individual cada quien tiene la suya; con caja compartida es una sola.
+- **Cobrar**: se eligen servicios/productos por categoría, quién atendió, promociones o descuento (con autorización si pasa el límite), propina y forma de pago (efectivo, transferencia, tarjeta, QR de Stripe, dividir pago). Las ventas quedan en el turno. La venta y la propina se atribuyen a **quien realizó el servicio**, no a quien registró el cobro. Se puede cancelar o modificar una venta con permiso; si el corte ya cerró, se recalcula lo del negocio.
+- **Movimiento de caja** (Cobro, menú, Inicio con caja abierta): "Pagué algo con dinero de la caja" (gasto), "Puse dinero en la caja" (entrada, para cambio), "Deposité al negocio" (depósito de lo pendiente, no toca la caja), "Me llevo efectivo de la caja" (solo Titular). Los egresos pagados con transferencia o tarjeta no salen de la caja: se registran en Finanzas.
+- **Corte de caja** (3 pasos): 1) repartir: se ve lo vendido por forma de pago, a quién le toca (comisión de cada persona y lo del negocio), cómo se le da a cada quien (efectivo de la caja, pendiente, propina con tarjeta en efectivo o por transferencia); 2) contar el efectivo y comparar con lo que debía quedar (diferencia permitida configurable, evidencias y observaciones si se activan); 3) cerrar: se registran los pagos al equipo como salidas de caja, lo del negocio queda "pendiente de depositar" y sale el resumen/ticket del corte. Si un día no se cerró, Inicio avisa "Tienes un corte de caja pendiente".
+- **Después del corte**: lo pendiente al equipo se entrega desde Equipo (efectivo de la caja abierta o transferencia solo por lo que no alcance); lo del negocio se deposita desde Movimiento de caja con comprobante opcional; los faltantes se revisan en Equipo.
+- **Equipo**: lista de personas con lo que llevan y lo pendiente, ficha con datos del mes, esquemas de pago (comisión, sueldo con periodicidad y día de pago, renta de silla), descanso rotativo, faltantes, reseñas de la encuesta.
+- **Citas**: agenda en línea del tiempo/semana/lista, bloquear horarios, Nueva cita paso a paso. Página pública `/reservar/[slug]` con pago en línea o transferencia; anticipación mínima configurable (la Titular pidió 2 horas); **no hay reembolsos**, solo reagendar; si el cliente llega tarde lo atiende quien esté libre o espera. Las citas reservadas o pagadas salen primero en acciones rápidas.
+- **Reportes**: Resumen (vendido, meta, actividad, resultado financiero, requiere atención), Movimientos/Finanzas (historial por día con cortes, egresos, depósitos y ganancia), Equipo, Cortes (lista con detalle lateral, marcar revisado solo en "Necesita revisión"). **Datos/Libreta** para el contador con descargas a Excel (ventas, egresos, cortes, pagos al equipo, lo del negocio).
+- **Ajustes > Configuración del negocio**: cobros y métodos de pago, caja (apertura con fondo, fondo sugerido, diferencia permitida, modelo de caja), metas (ganancia que se busca al mes), egresos y finanzas (categorías, gastos frecuentes, pagos al equipo automáticos), funciones opcionales con interruptores.
+- **Notificaciones e Historial** filtrados por rol y permisos. El Barbero solo ve lo suyo (sus ventas, su meta diaria, su historial).
+
+## Problemas reales con las personas que la usan
+
+- **La Titular tiene otro trabajo** y no puede hacer todo en la app: casi todo lo opera la Encargada. La app debe hacer los cálculos sola y la Encargada se basa en ellos para pagar.
+- **Preocupación de que no se registren pagos**: la Encargada puede no ser constante con los registros. Por eso los registros deben ser rápidos, con pocos pasos y avisos de lo que falta (corte pendiente, por depositar), sin depender de que alguien recuerde.
+- **Cuesta entender el corte**: la usuaria y la Titular han batallado para entender de dónde sale cada número (cuánto le tocaba a cada barbero, por qué "no alcanzó", qué se depositó y de qué días). De ahí salieron: detalle de corrido, pendientes con día y folio, saldados visibles y textos en lenguaje simple. Cualquier cifra nueva debe decir de dónde sale.
+- **Confusión de conceptos**: gasto vs egreso vs retiro, "resguardar efectivo", "sacar/meter" (sonaba a albur). Se simplificó a frases de lo que pasó ("Pagué algo con dinero de la caja", "Puse dinero en la caja").
+- **Registros que la persona no reconoce**: la Encargada dijo que no registró un "Negocio depositado a la dueña"; un pago en línea aparecía como registrado por la Titular y a la hora en que se abrió la app, no a la del pago. Regla: cada registro dice quién lo hizo de verdad y a qué hora real, y los automáticos se distinguen.
+- **No encuentran opciones**: la Encargada dijo que ya no le salía "depositar al negocio" (solo aparecía con saldo pendiente). Regla: no desaparecer opciones sin explicar; mostrarlas apagadas con el motivo.
+- **Comprobantes**: los empleados no tienen acceso a la cuenta de la Titular, así que solo pueden comprobar transferencias con la foto del comprobante; subirlos no debe quitarles tiempo (agrupados por categoría, sin orden obligatorio). Con QR de Stripe no hace falta comprobante.
+- **Errores en sus celulares**: pantallas de error por versión vieja o mala señal ("reading 'call'" en Inicio, "Load failed" en Cobro); ahora recargan solas una vez.
+- **Dobles toques** en celular que duplicaban registros: resuelto con frenos.
+- La política de comisiones definitiva sigue pendiente de confirmación de la Titular.
+
+## Dónde nos quedamos (24 nov 2026)
+
+- Último código publicado: `962448d` ("Deposité al negocio" siempre visible, apagada si no hay pendiente). Antes: `d3ccd3d` (meta como ganancia real) y `63e1bdf` (Inicio sin Semana pasada, Últimos movimientos, historial de 2 días, comprobante de depósito opcional, recarga ante errores).
+- Conversación abierta:
+  1. Excel en una sola hoja: espera que elija A, B, C o D para el bloque del corte.
+  2. "Hoy va $X" de lo del negocio con la caja abierta: se le explicó qué implica y se recomendó solo informativo; espera su decisión. **No modificar hasta que diga.**
+  3. Encargada sin opción de depositar: se le dijo que no se puede saber sin ver la base real y cómo revisarlo en Datos; pidió no hacer más cambios por ahora.
+- Lo de la caja cerrada se quedó como está (los movimientos se guardan y se suman al abrir).
+
 ## Pendiente o por decidir
 
 - **Excel de movimientos (una sola hoja)**: le gustó "todo en una hoja", pero el bloque del corte no se entendía. Se le enviaron 4 opciones (A corte de arriba a abajo, B resumen del corte arriba de cada día, C tabla de cortes arriba y movimientos abajo, D la caja como saldo). **Esperando que elija**. Generador del mockup en el scratchpad (`xl2/gen.cjs`), puede perderse.
